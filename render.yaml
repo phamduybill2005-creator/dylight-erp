@@ -1,0 +1,57 @@
+# ============================================================================
+# RENDER BLUEPRINT — DỰNG TẤT CẢ TRONG 1 LẦN BẤM, 1 TÀI KHOẢN, MIỄN PHÍ.
+#
+# Cách dùng:
+#   1) Đẩy mã nguồn lên GitHub.
+#   2) Vào https://render.com -> New -> Blueprint -> chọn repo này -> Apply.
+#      Render tự tạo: CSDL Postgres + Backend + Frontend, và tự nối DATABASE_URL.
+#   3) Vào service "dosco-erp-api" -> tab Shell -> chạy 1 lần:  python -m app.seed
+#   4) Mở URL của "dosco-erp-web" để đăng nhập.  (Đổi ngay mật khẩu demo.)
+#
+# Lưu ý: Render đặt URL theo tên service -> đã điền sẵn bên dưới. Nếu Render cấp
+# URL khác (do tên đã có người dùng), sửa lại 3 giá trị URL cho khớp rồi redeploy.
+# ============================================================================
+
+databases:
+  - name: dosco-erp-db
+    plan: free
+    databaseName: dylight
+    user: dylight
+
+services:
+  # ---------- BACKEND (FastAPI, Docker) ----------
+  - type: web
+    name: dosco-erp-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL          # tự nối từ CSDL ở trên — không cần điền tay
+        fromDatabase:
+          name: dosco-erp-db
+          property: connectionString
+      - key: SECRET_KEY            # tự sinh chuỗi ngẫu nhiên an toàn
+        generateValue: true
+      - key: ATTENDANCE_API_KEY    # tự sinh key cho máy chấm công
+        generateValue: true
+      - key: OCR_PROVIDER
+        value: mock
+      - key: FRONTEND_ORIGINS      # origin của frontend (sửa nếu Render cấp URL khác)
+        value: https://dosco-erp-web.onrender.com
+
+  # ---------- FRONTEND (Next.js) ----------
+  - type: web
+    name: dosco-erp-web
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      # Trỏ tới backend ở trên (sửa nếu Render cấp URL khác). Next "nướng" lúc build.
+      - key: NEXT_PUBLIC_API_BASE
+        value: https://dosco-erp-api.onrender.com/api/v1
+      - key: NEXT_PUBLIC_ASSET_BASE
+        value: https://dosco-erp-api.onrender.com

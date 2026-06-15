@@ -1,0 +1,209 @@
+// Kiểu dữ liệu phản chiếu schema của backend (giữ đồng bộ với app/schemas.py).
+
+export type Role = "ADMIN" | "DIRECTOR" | "MANAGER" | "ACCOUNTANT" | "FIELD_STAFF";
+
+export interface User {
+  id: number;
+  company_id: number;
+  email: string;
+  full_name: string;
+  role: Role;
+  is_active: boolean;
+  phone?: string | null;
+  address?: string | null;
+  dob?: string | null;
+  identity_card?: string | null;
+  cv_details?: string | null;
+  schedule?: string | null;
+  manager_id?: number | null;
+  manager_name?: string | null;
+}
+
+export interface Company {
+  id: number;
+  name: string;
+  code: string;
+  tax_code?: string | null;
+  is_active: boolean;
+}
+
+export interface KpiSummary {
+  active_contracts: number;
+  total_contract_value: number;
+  total_invoice_cost: number;
+  total_collected: number;
+  estimated_profit: number;
+  pending_invoices: number;
+}
+
+export interface ProjectProfit {
+  project_id: number;
+  project_name: string;
+  contract_value: number;
+  cost: number;
+  profit: number;
+  margin_percent: number;
+}
+
+export type ProjectStatus =
+  | "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "CANCELLED";
+
+export interface Project {
+  id: number;
+  company_id: number;
+  bid_id?: number | null;
+  code: string;
+  name: string;
+  location?: string | null;
+  manager_name?: string | null;
+  status: ProjectStatus;
+  start_date?: string | null;
+  end_date?: string | null;
+  created_at: string;
+  members?: User[];
+}
+
+export type InvoiceStatus =
+  | "PENDING" | "PROCESSING" | "EXTRACTED" | "VERIFIED" | "REJECTED";
+
+export interface Invoice {
+  id: number;
+  company_id: number;
+  project_id?: number | null;
+  contract_id?: number | null;
+  image_url?: string | null;
+  original_filename?: string | null;
+  supplier_name?: string | null;
+  supplier_tax_code?: string | null;
+  invoice_number?: string | null;
+  invoice_date?: string | null;
+  amount_no_vat: number;
+  vat_amount: number;
+  total_amount: number;
+  category?: string | null;
+  ocr_confidence?: number | null;
+  status: InvoiceStatus;
+  created_at: string;
+}
+
+export type BidStatus = "DRAFT" | "SUBMITTED" | "WON" | "LOST" | "CANCELLED";
+
+export interface Bid {
+  id: number;
+  company_id: number;
+  code: string;
+  name: string;
+  investor?: string | null;
+  package_value: number;
+  status: BidStatus;
+  submit_date?: string | null;
+  result_date?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export type ContractStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "LIQUIDATED";
+
+export interface Contract {
+  id: number;
+  company_id: number;
+  project_id: number;
+  code: string;
+  name: string;
+  partner?: string | null;
+  value_no_vat: number;
+  vat_percent: number;
+  status: ContractStatus;
+  sign_date?: string | null;
+  created_at: string;
+}
+
+export type PaymentType = "ADVANCE" | "PROGRESS" | "FINAL";
+export type PaymentDirection = "IN" | "OUT";
+
+export interface Payment {
+  id: number;
+  company_id: number;
+  contract_id: number;
+  code?: string | null;
+  payment_type: PaymentType;
+  direction: PaymentDirection;
+  amount: number;
+  payment_date?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface Progress {
+  id: number;
+  company_id: number;
+  project_id: number;
+  title: string;
+  percent_complete: number;
+  planned_date?: string | null;
+  actual_date?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+// Chấm công (attendance) — 1 bản ghi / người / ngày.
+export type AttendanceSource = "MANUAL" | "MACHINE" | "API";
+
+export interface Attendance {
+  id: number;
+  company_id: number;
+  user_id: number;
+  work_date: string;          // "YYYY-MM-DD"
+  check_in?: string | null;   // ISO datetime
+  check_out?: string | null;  // ISO datetime
+  source: AttendanceSource;
+  device_id?: string | null;
+  note?: string | null;
+  worked_minutes: number;
+  is_late: boolean;
+  created_at: string;
+  user_name?: string | null;
+}
+
+export interface AttendanceSummary {
+  user_id: number;
+  full_name: string;
+  present_days: number;
+  late_days: number;
+  total_hours: number;
+}
+
+// Đánh giá 2 chiều nhân viên <-> quản lý trực tiếp.
+export type EvaluationDirection = "STAFF_TO_MANAGER" | "MANAGER_TO_STAFF";
+
+export interface Evaluation {
+  id: number;
+  company_id: number;
+  period: string;             // "YYYY-MM"
+  evaluator_id: number;
+  evaluatee_id: number;
+  direction: EvaluationDirection;
+  rating: number;             // 1-5
+  comment?: string | null;
+  created_at: string;
+  evaluator_name?: string | null;
+  evaluatee_name?: string | null;
+}
+
+// Hạng mục dự toán (BOQ) — mô hình 2 cấp: nhóm cha (parent_id=null) + đầu việc con.
+export interface ProjectItem {
+  id: number;
+  company_id: number;
+  project_id: number;
+  parent_id: number | null;
+  order_index: number;
+  code?: string | null;
+  name: string;
+  unit?: string | null;
+  quantity: number;
+  unit_price: number;
+  amount: number;          // thành tiền = khối lượng × đơn giá (đầu việc con)
+  note?: string | null;
+  created_at: string;
+}
+

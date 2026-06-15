@@ -1,0 +1,408 @@
+"use client";
+
+// Tab "Hạng mục" — bảng dự toán/khối lượng (BOQ) chi tiết kiểu Excel.
+// Mô hình 2 cấp: nhóm cha (parent_id=null) chứa các đầu việc con.
+// Sửa trực tiếp từng ô (lưu khi rời ô), tự tính Thành tiền = KL × Đơn giá,
+// tiểu tổng mỗi nhóm + tổng dự toán, và xuất ra Excel/CSV.
+
+import { useCallback, useEffect, useState } from "react";
+import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon } from "@heroicons/react/24/outline";
+import { api } from "@/lib/api";
+import { formatVND } from "@/lib/format";
+import type { ProjectItem } from "@/lib/types";
+
+const num = (v: unknown) => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
+const lineAmount = (i: ProjectItem) => num(i.quantity) * num(i.unit_price);
+
+/** Ô nhập có lưu cục bộ để gõ mượt; chỉ commit (lưu DB) khi giá trị đổi và rời ô. */
+function EditableCell({
+  value,
+  onCommit,
+  type = "text",
+  placeholder,
+  className = "",
+}: {
+  value: string | number | null | undefined;
+  onCommit: (v: string | number) => void;
+  type?: "text" | "number";
+  placeholder?: string;
+  className?: string;
+}) {
+  const [v, setV] = useState<string | number>(value ?? "");
+  useEffect(() => {
+    setV(value ?? "");
+  }, [value]);
+
+  const display = type === "number" ? (v === 0 || v === "" ? "" : v) : (v ?? "");
+
+  // Lưu khi rời ô — đọc thẳng giá trị DOM (luôn mới) và so với value đã lưu (prop).
+  // So theo SỐ với cột số để tránh "0.0" vs "0" báo sai là không đổi.
+  function commit(raw: string) {
+    if (type === "number") {
+      const nv = raw === "" ? 0 : Number(raw);
+      if (nv !== Number(value ?? 0)) onCommit(nv);
+    } else if (raw !== (value ?? "")) {
+      onCommit(raw);
+    }
+  }
+
+  return (
+    <input
+      type={type}
+      inputMode={type === "number" ? "decimal" : undefined}
+      value={display as string | number}
+      placeholder={placeholder}
+      onChange={(e) =>
+        setV(type === "number" ? (e.target.value === "" ? 0 : Number(e.target.value)) : e.target.value)
+      }
+      onBlur={(e) => commit(e.target.value)}
+      className={`w-full bg-transparent px-2 py-1.5 text-xs text-ink outline-none focus:bg-amber/5 focus:ring-1 focus:ring-amber rounded ${className}`}
+    />
+  );
+}
+
+export default function ProjectItemsTab({ projectId }: { projectId: number }) {
+  const [items, setItems] = useState<ProjectItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api
+      .projectItems(projectId)
+      .then(setItems)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [projectId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const groups = items
+    .filter((i) => i.parent_id == null)
+    .sort((a, b) => a.order_index - b.order_index || a.id - b.id);
+  const childrenOf = (gid: number) =>
+    items.filter((i) => i.parent_id === gid).sort((a, b) => a.order_index - b.order_index || a.id - b.id);
+  const groupSubtotal = (gid: number) => childrenOf(gid).reduce((s, c) => s + lineAmount(c), 0);
+  const grandTotal = items.filter((i) => i.parent_id != null).reduce((s, c) => s + lineAmount(c), 0);
+
+  // ----- Mutations -----
+  async function persist(id: number, patch: Partial<ProjectItem>) {
+    setError(null);
+    try {
+      const updated = await api.updateProjectItem(id, patch);
+      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Lưu hạng mục thất bại.");
+      load();
+    }
+  }
+
+  async function addGroup() {
+    setBusy(true);
+    setError(null);
+    try {
+      const maxOrder = Math.max(0, ...groups.map((g) => g.order_index));
+      const created = await api.createProjectItem({
+        project_id: projectId,
+        name: "Hạng mục mới",
+        order_index: maxOrder + 1,
+      });
+      setItems((prev) => [...prev, created]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Thêm nhóm hạng mục thất bại.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addChild(group: ProjectItem) {
+    setBusy(true);
+    setError(null);
+    try {
+      const siblings = childrenOf(group.id);
+      const maxOrder = Math.max(0, ...siblings.map((s) => s.order_index));
+      const created = await api.createProjectItem({
+        project_id: projectId,
+        parent_id: group.id,
+        name: "",
+        unit: "",
+        quantity: 0,
+        unit_price: 0,
+        order_index: maxOrder + 1,
+      });
+      setItems((prev) => [...prev, created]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Thêm đầu việc thất bại.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(item: ProjectItem) {
+    const isGroup = item.parent_id == null;
+    const msg = isGroup
+      ? `Xoá nhóm "${item.name || "(chưa đặt tên)"}" và toàn bộ đầu việc bên trong?`
+      : `Xoá đầu việc "${item.name || "(chưa đặt tên)"}"?`;
+    if (typeof window !== "undefined" && !window.confirm(msg)) return;
+    setError(null);
+    try {
+      await api.deleteProjectItem(item.id);
+      setItems((prev) => prev.filter((i) => i.id !== item.id && i.parent_id !== item.id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Xoá hạng mục thất bại.");
+    }
+  }
+
+  // ----- Xuất Excel (CSV, BOM UTF-8) -----
+  function exportCSV() {
+    const headers = ["STT", "Mã", "Tên hạng mục", "ĐVT", "Khối lượng", "Đơn giá", "Thành tiền", "Ghi chú"];
+    const esc = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
+    const rows: string[] = [];
+    groups.forEach((g, gi) => {
+      rows.push(
+        [gi + 1, esc(g.code), esc(g.name), "", "", "", groupSubtotal(g.id).toFixed(0), esc(g.note)].join(",")
+      );
+      childrenOf(g.id).forEach((c, ci) => {
+        rows.push(
+          [
+            `${gi + 1}.${ci + 1}`,
+            esc(c.code),
+            esc(c.name),
+            esc(c.unit),
+            num(c.quantity),
+            num(c.unit_price).toFixed(0),
+            lineAmount(c).toFixed(0),
+            esc(c.note),
+          ].join(",")
+        );
+      });
+    });
+    rows.push(["", "", esc("TỔNG CỘNG"), "", "", "", grandTotal.toFixed(0), ""].join(","));
+
+    const csv = "﻿" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Du_toan_du_an_${projectId}_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  if (loading) {
+    return <p className="py-12 text-center text-xs text-muted">Đang tải bảng dự toán...</p>;
+  }
+
+  return (
+    <div className="space-y-3 lg:space-y-4">
+      {/* Thanh tiêu đề + hành động */}
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-xs font-semibold text-muted uppercase lg:text-sm">
+            Bảng dự toán chi tiết ({groups.length} nhóm)
+          </h3>
+          <p className="text-[11px] text-muted lg:text-xs">Tổng dự toán: <span className="font-bold text-ink tnum">{formatVND(grandTotal)}</span></p>
+        </div>
+        <button
+          onClick={exportCSV}
+          disabled={items.length === 0}
+          className="flex shrink-0 items-center gap-1.5 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow hover:bg-ink transition-all disabled:opacity-50"
+        >
+          <ArrowDownTrayIcon className="h-4 w-4" />
+          Xuất Excel
+        </button>
+      </div>
+
+      {error && <p className="rounded-lg bg-bad/10 px-3 py-2 text-xs text-bad">{error}</p>}
+
+      {items.length === 0 ? (
+        <div className="rounded-xl2 bg-white p-8 text-center shadow-card">
+          <TableCellsIcon className="mx-auto h-10 w-10 text-line" />
+          <p className="mt-2 text-xs text-muted">Chưa có hạng mục dự toán nào cho dự án này.</p>
+          <button
+            onClick={addGroup}
+            disabled={busy}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-xl2 bg-amber px-4 py-2 text-xs font-semibold text-ink disabled:opacity-50"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Thêm nhóm hạng mục
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Bảng cuộn ngang trên mobile */}
+          <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+            <table className="w-full min-w-[680px] border-collapse text-xs">
+              <thead>
+                <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
+                  <th className="w-10 px-2 py-2 text-left font-semibold">STT</th>
+                  <th className="px-2 py-2 text-left font-semibold">Tên hạng mục</th>
+                  <th className="w-16 px-2 py-2 text-left font-semibold">ĐVT</th>
+                  <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>
+                  <th className="w-28 px-2 py-2 text-right font-semibold">Đơn giá</th>
+                  <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>
+                  <th className="w-8 px-1 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g, gi) => {
+                  const kids = childrenOf(g.id);
+                  return (
+                    <GroupRows
+                      key={g.id}
+                      group={g}
+                      groupIndex={gi}
+                      kids={kids}
+                      subtotal={groupSubtotal(g.id)}
+                      onPersist={persist}
+                      onAddChild={addChild}
+                      onRemove={remove}
+                      busy={busy}
+                    />
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-ink bg-ink text-white">
+                  <td colSpan={5} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
+                    Tổng cộng dự toán
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(grandTotal)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <button
+            onClick={addGroup}
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl2 border border-dashed border-line py-2.5 text-xs font-semibold text-steel hover:border-steel hover:bg-paper transition-all disabled:opacity-50"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Thêm nhóm hạng mục
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function GroupRows({
+  group,
+  groupIndex,
+  kids,
+  subtotal,
+  onPersist,
+  onAddChild,
+  onRemove,
+  busy,
+}: {
+  group: ProjectItem;
+  groupIndex: number;
+  kids: ProjectItem[];
+  subtotal: number;
+  onPersist: (id: number, patch: Partial<ProjectItem>) => void;
+  onAddChild: (g: ProjectItem) => void;
+  onRemove: (i: ProjectItem) => void;
+  busy: boolean;
+}) {
+  return (
+    <>
+      {/* Dòng nhóm cha */}
+      <tr className="border-t border-line bg-steel/5">
+        <td className="px-2 py-1.5 text-[11px] font-bold text-ink">{groupIndex + 1}</td>
+        <td className="px-1 py-1">
+          <EditableCell
+            value={group.name}
+            onCommit={(v) => onPersist(group.id, { name: String(v) })}
+            placeholder="Tên nhóm hạng mục"
+            className="font-bold text-ink"
+          />
+        </td>
+        <td colSpan={2} />
+        <td className="px-2 py-1.5 text-right text-[10px] text-muted">Tiểu tổng</td>
+        <td className="whitespace-nowrap px-2 py-1.5 text-right text-xs font-bold text-ink tnum">{formatVND(subtotal)}</td>
+        <td className="px-1 py-1 text-center">
+          <button
+            onClick={() => onRemove(group)}
+            title="Xoá nhóm"
+            aria-label={`Xoá nhóm hạng mục ${group.name || ""}`.trim()}
+            className="rounded p-1 text-muted hover:bg-bad/10 hover:text-bad focus:outline-none focus:ring-2 focus:ring-bad"
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </button>
+        </td>
+      </tr>
+
+      {/* Các đầu việc con */}
+      {kids.map((c, ci) => (
+        <tr key={c.id} className="border-t border-line/60">
+          <td className="px-2 py-1 text-[10px] text-muted">
+            {groupIndex + 1}.{ci + 1}
+          </td>
+          <td className="px-1 py-0.5 pl-3">
+            <EditableCell
+              value={c.name}
+              onCommit={(v) => onPersist(c.id, { name: String(v) })}
+              placeholder="Tên đầu việc / công tác..."
+            />
+          </td>
+          <td className="px-1 py-0.5">
+            <EditableCell value={c.unit} onCommit={(v) => onPersist(c.id, { unit: String(v) })} placeholder="m³, m², kg..." />
+          </td>
+          <td className="px-1 py-0.5">
+            <EditableCell
+              type="number"
+              value={c.quantity}
+              onCommit={(v) => onPersist(c.id, { quantity: Number(v) })}
+              className="text-right"
+            />
+          </td>
+          <td className="px-1 py-0.5">
+            <EditableCell
+              type="number"
+              value={c.unit_price}
+              onCommit={(v) => onPersist(c.id, { unit_price: Number(v) })}
+              className="text-right"
+            />
+          </td>
+          <td className="whitespace-nowrap px-2 py-1 text-right text-xs font-semibold text-ink tnum">{formatVND(lineAmount(c))}</td>
+          <td className="px-1 py-1 text-center">
+            <button
+              onClick={() => onRemove(c)}
+              title="Xoá đầu việc"
+              aria-label={`Xoá đầu việc ${c.name || ""}`.trim()}
+              className="rounded p-1 text-muted hover:bg-bad/10 hover:text-bad focus:outline-none focus:ring-2 focus:ring-bad"
+            >
+              <TrashIcon className="h-3.5 w-3.5" />
+            </button>
+          </td>
+        </tr>
+      ))}
+
+      {/* Nút thêm đầu việc vào nhóm */}
+      <tr className="border-t border-line/40">
+        <td />
+        <td colSpan={6} className="px-1 py-1">
+          <button
+            onClick={() => onAddChild(group)}
+            disabled={busy}
+            className="flex items-center gap-1 pl-2 text-[11px] font-semibold text-steel hover:text-ink disabled:opacity-50"
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+            Thêm đầu việc
+          </button>
+        </td>
+      </tr>
+    </>
+  );
+}

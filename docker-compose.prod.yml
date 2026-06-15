@@ -1,0 +1,79 @@
+# ====================================================================
+# TRIỂN KHAI SẢN XUẤT — chạy ERP sau Caddy (HTTPS tự động) trên 1 server.
+#
+# 1) Tạo file .env cạnh file này (xem các biến bên dưới), đổi HẾT mật khẩu/secret.
+# 2) Trỏ DNS:  erp.dosco.vn  ->  IP server này (bản ghi A).
+# 3) Chạy:     docker compose -f docker-compose.prod.yml up -d --build
+# 4) Nạp dữ liệu lần đầu:
+#              docker compose -f docker-compose.prod.yml exec backend python -m app.seed
+#
+# Biến cần đặt trong .env (ví dụ):
+#   DOMAIN=erp.dosco.vn
+#   POSTGRES_PASSWORD=<mật khẩu mạnh>
+#   SECRET_KEY=<chuỗi ngẫu nhiên dài>
+#   ATTENDANCE_API_KEY=<key mạnh cho máy chấm công>
+# ====================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dylight
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?dat POSTGRES_PASSWORD trong .env}
+      POSTGRES_DB: dylight
+    volumes:
+      - dylight_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dylight"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://dylight:${POSTGRES_PASSWORD}@db:5432/dylight
+      SECRET_KEY: ${SECRET_KEY:?dat SECRET_KEY trong .env}
+      FRONTEND_ORIGINS: https://${DOMAIN:-erp.dosco.vn}
+      ATTENDANCE_API_KEY: ${ATTENDANCE_API_KEY:-}
+      OCR_PROVIDER: ${OCR_PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_VISION_API_KEY: ${GOOGLE_VISION_API_KEY:-}
+    volumes:
+      - dylight_uploads:/code/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # "Nướng" vào bundle lúc build -> trình duyệt gọi đúng domain thật.
+        NEXT_PUBLIC_API_BASE: https://${DOMAIN:-erp.dosco.vn}/api/v1
+        NEXT_PUBLIC_ASSET_BASE: https://${DOMAIN:-erp.dosco.vn}
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  dylight_pgdata:
+  dylight_uploads:
+  caddy_data:
+  caddy_config:

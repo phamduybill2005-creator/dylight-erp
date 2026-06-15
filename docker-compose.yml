@@ -1,0 +1,54 @@
+# DYLIGHT ERP — môi trường chạy đầy đủ: PostgreSQL + Backend (FastAPI) + Frontend (Next.js).
+# Khởi chạy:  docker compose up --build
+# Sau khi backend chạy, nạp dữ liệu mẫu:
+#   docker compose exec backend python -m app.seed
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dylight
+      POSTGRES_PASSWORD: dylight
+      POSTGRES_DB: dylight
+    ports:
+      - "5432:5432"
+    volumes:
+      - dylight_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dylight"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://dylight:dylight@db:5432/dylight
+      SECRET_KEY: doi-secret-key-nay-trong-moi-truong-that
+      FRONTEND_ORIGINS: http://localhost:3000
+      # Đổi sang "openai" hoặc "google" và điền API key để dùng AI thật.
+      OCR_PROVIDER: mock
+      OPENAI_API_KEY: ""
+      GOOGLE_VISION_API_KEY: ""
+    ports:
+      - "8000:8000"
+    volumes:
+      - dylight_uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    environment:
+      # Trình duyệt gọi API qua cổng host, nên trỏ về localhost:8000.
+      NEXT_PUBLIC_API_BASE: http://localhost:8000/api/v1
+      NEXT_PUBLIC_ASSET_BASE: http://localhost:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  dylight_pgdata:
+  dylight_uploads:

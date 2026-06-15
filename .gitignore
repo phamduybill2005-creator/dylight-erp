@@ -1,0 +1,22 @@
+# --- Python / Backend ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+backend/uploads/
+backend/.env
+backend/dosco.db
+
+# --- Node / Frontend ---
+node_modules/
+.next/
+out/
+.turbo/
+npm-debug.log*
+frontend/.env.local
+
+# --- Môi trường & hệ thống ---
+.env
+.DS_Store
+*.log

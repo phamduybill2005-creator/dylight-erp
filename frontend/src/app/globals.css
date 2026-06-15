@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html, body {
+  background: theme(colors.paper);
+  color: theme(colors.ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Số liệu tài chính dùng chữ số đều cột (tabular) để dễ đọc, dễ so sánh */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Tôn trọng người dùng tắt hiệu ứng chuyển động */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@layer components {
+  /* Thẻ nội dung chuẩn của ứng dụng */
+  .card {
+    @apply rounded-2xl bg-white shadow-card border border-line/70;
+  }
+  /* Vùng an toàn dưới cùng cho điện thoại có thanh gesture */
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
+  }
+}

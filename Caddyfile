@@ -1,0 +1,19 @@
+# Reverse proxy + HTTPS tự động cho ERP.
+# Một tên miền phục vụ cả web (Next.js) và API/ảnh (FastAPI) -> không lo CORS.
+# Đổi "erp.dosco.vn" thành tên miền phụ thật của bạn nếu khác.
+erp.dosco.vn {
+	encode gzip
+
+	# API và file tĩnh (ảnh hóa đơn) -> backend
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /static/* {
+		reverse_proxy backend:8000
+	}
+
+	# Còn lại -> frontend Next.js
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

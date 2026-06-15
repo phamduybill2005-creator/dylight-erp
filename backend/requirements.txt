@@ -1,0 +1,16 @@
+# === DYLIGHT ERP - Backend dependencies ===
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+alembic==1.14.0
+pydantic==2.10.3
+pydantic-settings==2.7.0
+python-jose[cryptography]==3.3.0       # Ký & xác thực JWT
+passlib[bcrypt]==1.7.4                  # Băm mật khẩu
+bcrypt==4.0.1                           # Ghim 4.x: passlib 1.7.4 lỗi self-test với bcrypt 5.x
+email-validator==2.3.0                  # Pydantic EmailStr cần gói này
+python-multipart==0.0.19                # Nhận file upload (ảnh hóa đơn)
+python-dotenv==1.0.1
+httpx==0.28.1                           # Gọi API OCR (OpenAI / Google Vision)
+openai==1.57.0                          # GPT-4o Vision (tùy chọn)
