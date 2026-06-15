@@ -55,6 +55,8 @@ function deskNav(tier: Tier): NavLink[] {
   ];
   if (tier === "DIRECTOR") {
     items.push(
+      { href: "/partners", label: "Đối tác", icon: BuildingOffice2Icon },
+      { href: "/payroll", label: "Bảng lương", icon: UsersIcon },
       { href: "/reconciliation", label: "Đối soát quyết toán", icon: ScaleIcon },
       { href: "/reports", label: "Báo cáo lãi / lỗ", icon: BanknotesIcon }
     );

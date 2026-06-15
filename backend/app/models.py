@@ -101,6 +101,17 @@ class EvaluationDirection(str, enum.Enum):
     MANAGER_TO_STAFF = "MANAGER_TO_STAFF"   # Quản lý đánh giá nhân viên cấp dưới
 
 
+class PartnerType(str, enum.Enum):
+    INVESTOR = "INVESTOR"          # Chủ đầu tư
+    SUPPLIER = "SUPPLIER"          # Nhà cung cấp
+    SUBCONTRACTOR = "SUBCONTRACTOR"  # Nhà thầu phụ
+
+
+class SalaryType(str, enum.Enum):
+    MONTHLY = "MONTHLY"           # Lương tháng
+    DAILY = "DAILY"               # Lương công nhật (theo ngày công)
+
+
 # --------------------------------------------------------------------------
 # 1. COMPANIES — đơn vị thuê (tenant): công ty hoặc chi nhánh
 # --------------------------------------------------------------------------
@@ -142,6 +153,13 @@ class User(Base):
     cv_details: Mapped[str | None] = mapped_column(Text)
     schedule: Mapped[str | None] = mapped_column(Text)
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    # --- Cấu hình lương (NHẠY CẢM: chỉ Giám đốc xem/sửa; KHÔNG trả ra UserOut chung) ---
+    # salary_type lưu dạng String ("MONTHLY"/"DAILY") để dễ tự thêm cột (ALTER) trên DB cũ.
+    base_salary: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)   # lương cơ bản (tháng) hoặc đơn giá ngày
+    salary_type: Mapped[str] = mapped_column(String(20), default=SalaryType.MONTHLY.value)
+    allowance: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)     # phụ cấp/tháng (xăng xe, công trường…)
+    num_dependents: Mapped[int] = mapped_column(Integer, default=0)           # số người phụ thuộc (giảm trừ thuế TNCN)
 
     company: Mapped["Company"] = relationship(back_populates="users")
     manager: Mapped["User | None"] = relationship("User", remote_side=[id], backref="subordinates")
@@ -416,3 +434,52 @@ class Evaluation(Base):
     @property
     def evaluatee_name(self) -> str | None:
         return self.evaluatee.full_name if self.evaluatee else None
+
+
+# --------------------------------------------------------------------------
+# 12. PARTNERS — danh mục đối tác: Chủ đầu tư / Nhà cung cấp / Nhà thầu phụ
+#     (NHẠY CẢM: chỉ Giám đốc/Quản trị quản lý — gắn công nợ về sau)
+# --------------------------------------------------------------------------
+class Partner(Base):
+    __tablename__ = "partners"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    type: Mapped[PartnerType] = mapped_column(SAEnum(PartnerType), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    tax_code: Mapped[str | None] = mapped_column(String(20))      # MST
+    contact_person: Mapped[str | None] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(30))
+    email: Mapped[str | None] = mapped_column(String(255))
+    address: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# --------------------------------------------------------------------------
+# 13. PAYROLL — bảng lương theo kỳ (tính từ chấm công)
+#     (NHẠY CẢM: chỉ Giám đốc/Quản trị)
+# --------------------------------------------------------------------------
+class Payroll(Base):
+    __tablename__ = "payroll"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    period: Mapped[str] = mapped_column(String(7), index=True)    # "YYYY-MM"
+    working_days: Mapped[Decimal] = mapped_column(Numeric(6, 2), default=0)   # ngày công thực tế
+    base_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)   # lương theo công
+    allowance: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)     # phụ cấp
+    gross: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)         # tổng thu nhập
+    insurance: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)     # BHXH+BHYT+BHTN (NV đóng 10.5%)
+    personal_income_tax: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)  # thuế TNCN
+    net: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)           # thực nhận
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship("User")
+
+    @property
+    def user_name(self) -> str | None:
+        return self.user.full_name if self.user else None

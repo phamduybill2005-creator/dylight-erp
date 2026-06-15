@@ -190,6 +190,53 @@ export interface Evaluation {
   evaluatee_name?: string | null;
 }
 
+// Đối tác (Partner) — Chủ đầu tư / Nhà cung cấp / Nhà thầu phụ.
+export type PartnerType = "INVESTOR" | "SUPPLIER" | "SUBCONTRACTOR";
+
+export interface Partner {
+  id: number;
+  company_id: number;
+  type: PartnerType;
+  name: string;
+  tax_code?: string | null;
+  contact_person?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  note?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+// Bảng lương (Payroll).
+export type SalaryType = "MONTHLY" | "DAILY";
+
+export interface SalaryConfig {
+  id: number;            // = user id
+  full_name: string;
+  base_salary: number;
+  salary_type: SalaryType;
+  allowance: number;
+  num_dependents: number;
+}
+
+export interface Payroll {
+  id: number;
+  company_id: number;
+  user_id: number;
+  period: string;        // "YYYY-MM"
+  working_days: number;
+  base_amount: number;
+  allowance: number;
+  gross: number;
+  insurance: number;
+  personal_income_tax: number;
+  net: number;
+  note?: string | null;
+  created_at: string;
+  user_name?: string | null;
+}
+
 // Hạng mục dự toán (BOQ) — mô hình 2 cấp: nhóm cha (parent_id=null) + đầu việc con.
 export interface ProjectItem {
   id: number;

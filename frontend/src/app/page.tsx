@@ -19,6 +19,8 @@ import {
   ArrowTrendingDownIcon,
   ClockIcon,
   StarIcon,
+  BuildingOffice2Icon,
+  UsersIcon,
   ArrowRightCircleIcon,
   ArrowLeftEndOnRectangleIcon,
 } from "@heroicons/react/24/outline";
@@ -45,6 +47,8 @@ const MODULES: ModuleDef[] = [
   { href: "/projects", label: "Quản lý tiến độ", icon: ChartBarIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/attendance", label: "Chấm công", icon: ClockIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
+  { href: "/partners", label: "Đối tác", icon: BuildingOffice2Icon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR"] },
+  { href: "/payroll", label: "Bảng lương", icon: UsersIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
   { href: "/reconciliation", label: "Đối soát quyết toán", icon: ScaleIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR"] },
   { href: "/reports", label: "Báo cáo lãi / lỗ", icon: BanknotesIcon, tint: "bg-ok/10 text-ok", tiers: ["DIRECTOR"] },
 ];

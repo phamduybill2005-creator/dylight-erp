@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -200,6 +200,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  // --- Partners (Đối tác) — chỉ Giám đốc ---
+  partners: (type?: string) =>
+    request<Partner[]>(`/partners${type ? `?type=${type}` : ""}`),
+  createPartner: (payload: Partial<Partner> & { name: string }) =>
+    request<Partner>("/partners", { method: "POST", body: JSON.stringify(payload) }),
+  updatePartner: (id: number, payload: Partial<Partner>) =>
+    request<Partner>(`/partners/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deletePartner: (id: number) =>
+    request<void>(`/partners/${id}`, { method: "DELETE" }),
+
+  // --- Payroll (Bảng lương) — chỉ Giám đốc ---
+  salaryStaff: () => request<SalaryConfig[]>("/payroll/staff"),
+  setSalary: (userId: number, payload: Partial<SalaryConfig>) =>
+    request<SalaryConfig>(`/payroll/staff/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  generatePayroll: (period: string) =>
+    request<Payroll[]>(`/payroll/generate?period=${period}`, { method: "POST" }),
+  payrollList: (period?: string) =>
+    request<Payroll[]>(`/payroll${period ? `?period=${period}` : ""}`),
 
   // --- Users ---
   users: () => request<User[]>("/auth/users"),

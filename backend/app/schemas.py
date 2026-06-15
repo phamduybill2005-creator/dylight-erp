@@ -13,7 +13,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from app.models import (
     UserRole, BidStatus, ProjectStatus, ContractStatus,
     InvoiceStatus, PaymentType, PaymentDirection,
-    AttendanceSource, EvaluationDirection,
+    AttendanceSource, EvaluationDirection, PartnerType, SalaryType,
 )
 
 
@@ -392,3 +392,76 @@ class EvaluationOut(BaseModel):
     created_at: datetime
     evaluator_name: str | None = None
     evaluatee_name: str | None = None
+
+
+# ------------------------- PARTNER (ĐỐI TÁC) -------------------------
+class PartnerBase(BaseModel):
+    type: PartnerType = PartnerType.SUPPLIER
+    name: str = Field(min_length=1)
+    tax_code: str | None = None
+    contact_person: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    note: str | None = None
+    is_active: bool = True
+
+
+class PartnerCreate(PartnerBase):
+    pass
+
+
+class PartnerUpdate(BaseModel):
+    type: PartnerType | None = None
+    name: str | None = None
+    tax_code: str | None = None
+    contact_person: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    note: str | None = None
+    is_active: bool | None = None
+
+
+class PartnerOut(PartnerBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    created_at: datetime
+
+
+# ------------------------- PAYROLL (BẢNG LƯƠNG) -------------------------
+class SalaryConfig(BaseModel):
+    """Cấu hình lương của 1 nhân viên (chỉ Giám đốc xem/sửa)."""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    full_name: str
+    base_salary: Decimal = Decimal(0)
+    salary_type: SalaryType = SalaryType.MONTHLY
+    allowance: Decimal = Decimal(0)
+    num_dependents: int = 0
+
+
+class SalaryConfigUpdate(BaseModel):
+    base_salary: Decimal | None = None
+    salary_type: SalaryType | None = None
+    allowance: Decimal | None = None
+    num_dependents: int | None = None
+
+
+class PayrollOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    user_id: int
+    period: str
+    working_days: Decimal
+    base_amount: Decimal
+    allowance: Decimal
+    gross: Decimal
+    insurance: Decimal
+    personal_income_tax: Decimal
+    net: Decimal
+    note: str | None = None
+    created_at: datetime
+    user_name: str | None = None
