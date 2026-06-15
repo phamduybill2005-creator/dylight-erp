@@ -22,6 +22,15 @@ from app.routers import (
 # (đã có sẵn alembic trong requirements) để quản lý phiên bản schema.
 Base.metadata.create_all(bind=engine)
 
+# Tự nạp dữ liệu mẫu khi CSDL trống (tiện deploy — khỏi vào Shell chạy seed).
+# seed.run() đã tự bỏ qua nếu đã có dữ liệu; bọc try để lỗi seed không làm sập app.
+if settings.AUTO_SEED:
+    try:
+        from app.seed import run as _seed_run
+        _seed_run()
+    except Exception as _e:  # noqa: BLE001
+        print(f"[auto-seed] bo qua (loi khi seed): {_e}")
+
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",

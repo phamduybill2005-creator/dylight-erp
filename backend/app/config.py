@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_MB: int = 15
 
+    # --- Tự nạp dữ liệu mẫu khi khởi động nếu CSDL trống ---
+    # Tiện cho deploy: không cần vào Shell chạy seed thủ công. An toàn vì chỉ
+    # tạo dữ liệu khi chưa có công ty nào. Đặt False để tắt sau khi đã có dữ liệu thật.
+    AUTO_SEED: bool = True
+
     # --- Chấm công (attendance) ---
     # Khóa API cho máy chấm công gọi endpoint /attendance/punch (header X-API-Key).
     # Để trống = chưa bật endpoint cho máy (mọi lời gọi máy sẽ bị từ chối).
