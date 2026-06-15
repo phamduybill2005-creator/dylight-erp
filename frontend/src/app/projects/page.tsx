@@ -1,11 +1,11 @@
 "use client";
 
-// Trang Dự án & Hợp đồng. Liệt kê dự án kèm trạng thái và số liệu tài chính
-// (ghép với báo cáo lãi/lỗ theo dự án từ backend).
+// Trang Dự án & Hợp đồng — trình bày dạng BẢNG (kiểu Excel): kẻ ô, hàng/cột,
+// có dòng tổng cộng. Cột tài chính (Giá trị HĐ / Chi phí / Lãi-lỗ) chỉ hiện cho
+// Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { MapPinIcon, UserIcon } from "@heroicons/react/24/outline";
+import { useRouter } from "next/navigation";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
@@ -21,15 +21,18 @@ const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
 };
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [profit, setProfit] = useState<Record<number, ProjectProfit>>({});
+  const [showFinance, setShowFinance] = useState(false);
 
   useEffect(() => {
     api.projects().then(setProjects).catch(() => {});
-    // Số liệu lãi/lỗ theo dự án chỉ dành cho Giám đốc — Quản lý sẽ không tải (tránh 403).
+    // Số liệu lãi/lỗ theo dự án chỉ dành cho Giám đốc — Quản lý không tải (tránh 403).
     api.me()
       .then((me) => {
         if (!isDirector(me.role)) return;
+        setShowFinance(true);
         api
           .profitByProject()
           .then((rows) =>
@@ -40,6 +43,26 @@ export default function ProjectsPage() {
       .catch(() => {});
   }, []);
 
+  // Tổng cộng các cột tài chính (chỉ tính dự án có dữ liệu lãi/lỗ).
+  const totals = projects.reduce(
+    (acc, p) => {
+      const fin = profit[p.id];
+      if (fin) {
+        acc.contract += Number(fin.contract_value);
+        acc.cost += Number(fin.cost);
+        acc.profit += Number(fin.profit);
+      }
+      return acc;
+    },
+    { contract: 0, cost: 0, profit: 0 }
+  );
+  const totalMargin = totals.contract > 0 ? (totals.profit / totals.contract) * 100 : 0;
+
+  const TH = "border border-line px-3 py-2 font-semibold whitespace-nowrap";
+  const TD = "border border-line px-3 py-2 align-middle";
+  // Số cột phần "thông tin" (trước các cột tiền) để gộp ô cho dòng TỔNG CỘNG.
+  const infoCols = 6;
+
   return (
     <AppShell>
       <h1 className="text-lg font-semibold text-ink lg:text-2xl">Dự án & Hợp đồng</h1>
@@ -47,76 +70,96 @@ export default function ProjectsPage() {
         Theo dõi vòng đời dự án từ đấu thầu tới quyết toán.
       </p>
 
-      <div className="mt-4 space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
-        {projects.length === 0 && (
-          <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-full">
-            Chưa có dự án nào.
-          </p>
-        )}
-        {projects.map((p) => {
-          const st = PROJECT_STATUS[p.status] ?? PROJECT_STATUS.PLANNING;
-          const fin = profit[p.id];
-          return (
-            <Link
-              key={p.id}
-              href={`/projects/${p.id}`}
-              className="block rounded-xl2 bg-white p-4 lg:p-5 shadow-card hover:border-amber/50 border border-transparent transition-all"
-            >
-              <div className="flex items-start justify-between">
-                <div className="min-w-0">
-                  <p className="font-mono text-[11px] text-muted">{p.code}</p>
-                  <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                </div>
-                <span className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
-                  {st.label}
-                </span>
-              </div>
+      <div className="mt-4 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+        <table className="w-full min-w-[680px] border-collapse text-sm">
+          <thead>
+            <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
+              <th className={`${TH} w-10 text-center`}>STT</th>
+              <th className={TH}>Mã DA</th>
+              <th className={TH}>Tên dự án</th>
+              <th className={TH}>Địa điểm</th>
+              <th className={TH}>Quản lý</th>
+              <th className={TH}>Trạng thái</th>
+              {showFinance && <th className={`${TH} text-right`}>Giá trị HĐ</th>}
+              {showFinance && <th className={`${TH} text-right`}>Chi phí</th>}
+              {showFinance && <th className={`${TH} text-right`}>Lãi / lỗ</th>}
+              {showFinance && <th className={`${TH} text-right`}>Biên %</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {projects.length === 0 && (
+              <tr>
+                <td className={`${TD} text-center text-muted`} colSpan={showFinance ? infoCols + 4 : infoCols}>
+                  Chưa có dự án nào.
+                </td>
+              </tr>
+            )}
 
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
-                {p.location && (
-                  <span className="inline-flex items-center gap-1">
-                    <MapPinIcon className="h-3.5 w-3.5" />
-                    {p.location}
-                  </span>
-                )}
-                {p.manager_name && (
-                  <span className="inline-flex items-center gap-1">
-                    <UserIcon className="h-3.5 w-3.5" />
-                    {p.manager_name}
-                  </span>
-                )}
-              </div>
+            {projects.map((p, i) => {
+              const st = PROJECT_STATUS[p.status] ?? PROJECT_STATUS.PLANNING;
+              const fin = profit[p.id];
+              const positive = fin ? Number(fin.profit) >= 0 : true;
+              return (
+                <tr
+                  key={p.id}
+                  onClick={() => router.push(`/projects/${p.id}`)}
+                  className="cursor-pointer transition-colors odd:bg-white even:bg-paper/40 hover:bg-amber/10"
+                >
+                  <td className={`${TD} text-center text-muted tnum`}>{i + 1}</td>
+                  <td className={`${TD} font-mono text-[12px] text-steel whitespace-nowrap`}>{p.code}</td>
+                  <td className={`${TD} font-semibold text-ink`}>{p.name}</td>
+                  <td className={`${TD} text-muted`}>{p.location || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.manager_name || "—"}</td>
+                  <td className={TD}>
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
+                      {st.label}
+                    </span>
+                  </td>
+                  {showFinance && (
+                    <td className={`${TD} text-right tnum whitespace-nowrap`}>
+                      {fin ? formatCompactVND(fin.contract_value) : "—"}
+                    </td>
+                  )}
+                  {showFinance && (
+                    <td className={`${TD} text-right tnum whitespace-nowrap`}>
+                      {fin ? formatCompactVND(fin.cost) : "—"}
+                    </td>
+                  )}
+                  {showFinance && (
+                    <td className={`${TD} text-right tnum whitespace-nowrap font-semibold ${positive ? "text-ok" : "text-bad"}`}>
+                      {fin ? formatCompactVND(fin.profit) : "—"}
+                    </td>
+                  )}
+                  {showFinance && (
+                    <td className={`${TD} text-right tnum whitespace-nowrap font-semibold ${positive ? "text-ok" : "text-bad"}`}>
+                      {fin ? `${Number(fin.margin_percent).toFixed(1)}%` : "—"}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
 
-              {fin && (
-                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
-                  <div>
-                    <p className="text-[10px] text-muted">Giá trị HĐ</p>
-                    <p className="text-xs font-semibold text-ink">
-                      {formatCompactVND(fin.contract_value)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted">Chi phí</p>
-                    <p className="text-xs font-semibold text-ink">
-                      {formatCompactVND(fin.cost)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted">Lãi/lỗ</p>
-                    <p
-                      className={`text-xs font-semibold ${
-                        fin.profit >= 0 ? "text-ok" : "text-bad"
-                      }`}
-                    >
-                      {formatCompactVND(fin.profit)}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </Link>
-          );
-        })}
+            {/* Dòng TỔNG CỘNG (chỉ Giám đốc) */}
+            {showFinance && projects.length > 0 && (
+              <tr className="bg-ink/5 font-bold text-ink">
+                <td className={`${TD} text-right`} colSpan={infoCols}>
+                  TỔNG CỘNG
+                </td>
+                <td className={`${TD} text-right tnum whitespace-nowrap`}>{formatCompactVND(totals.contract)}</td>
+                <td className={`${TD} text-right tnum whitespace-nowrap`}>{formatCompactVND(totals.cost)}</td>
+                <td className={`${TD} text-right tnum whitespace-nowrap ${totals.profit >= 0 ? "text-ok" : "text-bad"}`}>
+                  {formatCompactVND(totals.profit)}
+                </td>
+                <td className={`${TD} text-right tnum whitespace-nowrap ${totalMargin >= 0 ? "text-ok" : "text-bad"}`}>
+                  {totalMargin.toFixed(1)}%
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
+
+      <p className="mt-2 text-[11px] text-muted">Bấm vào một hàng để xem chi tiết dự án.</p>
     </AppShell>
   );
 }
