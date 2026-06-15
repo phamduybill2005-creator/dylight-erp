@@ -22,6 +22,24 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Đổi mật khẩu
+  const [oldPw, setOldPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [pwMsg, setPwMsg] = useState("");
+  const [pwErr, setPwErr] = useState(false);
+  const [changing, setChanging] = useState(false);
+
+  async function changePassword() {
+    if (newPw.length < 6) { setPwErr(true); setPwMsg("Mật khẩu mới tối thiểu 6 ký tự."); return; }
+    setChanging(true); setPwMsg(""); setPwErr(false);
+    try {
+      await api.changePassword(oldPw, newPw);
+      setPwMsg("Đổi mật khẩu thành công."); setOldPw(""); setNewPw("");
+    } catch (e: any) {
+      setPwErr(true); setPwMsg(e?.message || "Không đổi được mật khẩu.");
+    } finally { setChanging(false); }
+  }
+
   useEffect(() => {
     api.me()
       .then((u) => {
@@ -133,6 +151,29 @@ export default function ProfilePage() {
               Chưa cập nhật thông tin sơ yếu lý lịch.
             </p>
           )}
+        </section>
+
+        {/* Đổi mật khẩu */}
+        <section className="rounded-xl2 bg-white p-5 shadow-card space-y-3 lg:p-6 lg:max-w-md">
+          <h2 className="text-sm font-bold text-ink border-b border-line pb-2 flex items-center gap-2">
+            <IdentificationIcon className="h-5 w-5 text-steel" />
+            Đổi mật khẩu
+          </h2>
+          <div>
+            <label className="block text-[11px] font-semibold text-muted">Mật khẩu hiện tại</label>
+            <input type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-muted">Mật khẩu mới (tối thiểu 6 ký tự)</label>
+            <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+          </div>
+          {pwMsg && <p className={`text-[11px] font-semibold ${pwErr ? "text-bad" : "text-ok"}`}>{pwMsg}</p>}
+          <button onClick={changePassword} disabled={changing || !oldPw || !newPw}
+            className="w-full rounded-xl2 bg-ink py-2.5 text-xs font-semibold text-white disabled:opacity-50">
+            {changing ? "Đang đổi…" : "Đổi mật khẩu"}
+          </button>
         </section>
       </div>
     </AppShell>

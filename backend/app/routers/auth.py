@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import User, UserRole, Company
-from app.schemas import Token, UserOut, UserUpdate, UserCreate, GoogleLoginRequest
+from app.schemas import Token, UserOut, UserUpdate, UserCreate, GoogleLoginRequest, ChangePassword
 from app.security import create_access_token, verify_password, hash_password
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
@@ -112,6 +112,19 @@ def login_google(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
 def read_me(current: User = Depends(get_current_user)):
     """Trả về thông tin tài khoản đang đăng nhập (để frontend hiển thị)."""
     return current
+
+
+@router.post("/change-password", status_code=204)
+def change_password(
+    payload: ChangePassword,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Người dùng tự đổi mật khẩu của mình (cần nhập mật khẩu hiện tại)."""
+    if not verify_password(payload.old_password, current.hashed_password):
+        raise HTTPException(status_code=400, detail="Mật khẩu hiện tại không đúng.")
+    current.hashed_password = hash_password(payload.new_password)
+    db.commit()
 
 
 @router.get("/users", response_model=list[UserOut])

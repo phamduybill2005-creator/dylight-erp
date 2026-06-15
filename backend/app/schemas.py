@@ -14,6 +14,7 @@ from app.models import (
     UserRole, BidStatus, ProjectStatus, ContractStatus,
     InvoiceStatus, PaymentType, PaymentDirection,
     AttendanceSource, EvaluationDirection, PartnerType, SalaryType,
+    LeaveStatus, StockMovementType,
 )
 
 
@@ -465,3 +466,202 @@ class PayrollOut(BaseModel):
     note: str | None = None
     created_at: datetime
     user_name: str | None = None
+
+
+# ------------------------- AUTH (đổi mật khẩu) -------------------------
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=6)
+
+
+# ------------------------- LEAVE (nghỉ phép) -------------------------
+class LeaveCreate(BaseModel):
+    from_date: date
+    to_date: date
+    reason: str | None = None
+
+
+class LeaveDecision(BaseModel):
+    status: LeaveStatus   # APPROVED / REJECTED
+
+
+class LeaveOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    user_id: int
+    from_date: date
+    to_date: date
+    reason: str | None = None
+    status: LeaveStatus
+    decided_by_id: int | None = None
+    decided_at: datetime | None = None
+    created_at: datetime
+    user_name: str | None = None
+    days: int = 0
+
+
+# ------------------------- MATERIAL & KHO -------------------------
+class MaterialBase(BaseModel):
+    code: str | None = None
+    name: str = Field(min_length=1)
+    unit: str | None = None
+    note: str | None = None
+
+
+class MaterialCreate(MaterialBase):
+    pass
+
+
+class MaterialUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
+    unit: str | None = None
+    note: str | None = None
+
+
+class MaterialOut(MaterialBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    stock_qty: Decimal
+    created_at: datetime
+
+
+class StockMovementCreate(BaseModel):
+    material_id: int
+    project_id: int | None = None
+    type: StockMovementType
+    quantity: Decimal
+    unit_price: Decimal = Decimal(0)
+    moved_at: date | None = None
+    note: str | None = None
+
+
+class StockMovementOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    material_id: int
+    project_id: int | None = None
+    type: StockMovementType
+    quantity: Decimal
+    unit_price: Decimal
+    moved_at: date | None = None
+    note: str | None = None
+    created_at: datetime
+    material_name: str | None = None
+    project_name: str | None = None
+
+
+# ------------------------- EQUIPMENT (thiết bị) -------------------------
+class EquipmentBase(BaseModel):
+    code: str | None = None
+    name: str = Field(min_length=1)
+    status: str = "IDLE"
+    note: str | None = None
+
+
+class EquipmentCreate(EquipmentBase):
+    pass
+
+
+class EquipmentUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
+    status: str | None = None
+    note: str | None = None
+
+
+class EquipmentOut(EquipmentBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    created_at: datetime
+
+
+class EquipmentLogCreate(BaseModel):
+    equipment_id: int
+    project_id: int | None = None
+    log_date: date | None = None
+    hours_used: Decimal = Decimal(0)
+    fuel: Decimal = Decimal(0)
+    note: str | None = None
+
+
+class EquipmentLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    equipment_id: int
+    project_id: int | None = None
+    log_date: date | None = None
+    hours_used: Decimal
+    fuel: Decimal
+    note: str | None = None
+    created_at: datetime
+    equipment_name: str | None = None
+    project_name: str | None = None
+
+
+# ------------------------- DAILY LOG (nhật ký thi công) -------------------------
+class DailyLogCreate(BaseModel):
+    project_id: int
+    log_date: date
+    weather: str | None = None
+    workforce: int = 0
+    equipment_note: str | None = None
+    work_done: str | None = None
+    issues: str | None = None
+
+
+class DailyLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    project_id: int
+    log_date: date
+    weather: str | None = None
+    workforce: int
+    equipment_note: str | None = None
+    work_done: str | None = None
+    issues: str | None = None
+    created_at: datetime
+    project_name: str | None = None
+    created_by_name: str | None = None
+
+
+# ------------------------- AUDIT LOG -------------------------
+class ActivityLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    user_id: int | None = None
+    action: str
+    entity_type: str | None = None
+    entity_id: int | None = None
+    detail: str | None = None
+    created_at: datetime
+    user_name: str | None = None
+
+
+# ------------------------- FINANCE (tài chính) -------------------------
+class FinanceSummary(BaseModel):
+    """Tổng quan dòng tiền (chỉ Giám đốc)."""
+    total_in: Decimal = Decimal(0)            # tổng thu
+    total_out: Decimal = Decimal(0)           # tổng chi
+    balance: Decimal = Decimal(0)             # số dư
+    total_contract_value: Decimal = Decimal(0)  # tổng giá trị HĐ (gồm VAT)
+    total_cost: Decimal = Decimal(0)          # tổng chi phí hóa đơn đã duyệt
+
+
+class DebtRow(BaseModel):
+    """Công nợ phải thu theo hợp đồng/chủ đầu tư (chỉ Giám đốc)."""
+    contract_id: int
+    contract_code: str
+    project_name: str | None = None
+    partner: str | None = None
+    contract_value: Decimal       # giá trị có VAT
+    collected: Decimal            # đã thu
+    remaining: Decimal            # còn phải thu
+    collect_percent: Decimal

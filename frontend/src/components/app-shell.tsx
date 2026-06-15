@@ -23,6 +23,12 @@ import {
   ScaleIcon,
   BanknotesIcon,
   ClipboardDocumentListIcon,
+  CurrencyDollarIcon,
+  CalendarDaysIcon,
+  ArchiveBoxIcon,
+  TruckIcon,
+  ClipboardDocumentCheckIcon,
+  ShieldCheckIcon,
   ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { api, tokenStore } from "@/lib/api";
@@ -40,6 +46,7 @@ function deskNav(tier: Tier): NavLink[] {
     return [
       { href: "/", label: "Trang chủ", icon: HomeIcon },
       { href: "/attendance", label: "Chấm công", icon: ClockIcon },
+      { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
       { href: "/evaluations", label: "Đánh giá quản lý", icon: StarIcon },
       { href: "/profile", label: "Cá nhân", icon: UserCircleIcon },
     ];
@@ -50,15 +57,21 @@ function deskNav(tier: Tier): NavLink[] {
     { href: "/projects", label: "Dự án & Hợp đồng", icon: FolderIcon },
     { href: "/invoices", label: "Hóa đơn", icon: DocumentTextIcon },
     { href: "/attendance", label: "Chấm công", icon: ClockIcon },
+    { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
     { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon },
+    { href: "/materials", label: "Vật tư & Kho", icon: ArchiveBoxIcon },
+    { href: "/equipment", label: "Thiết bị", icon: TruckIcon },
+    { href: "/site-log", label: "Nhật ký thi công", icon: ClipboardDocumentCheckIcon },
     { href: "/employees", label: "Nhân sự", icon: UsersIcon },
   ];
   if (tier === "DIRECTOR") {
     items.push(
       { href: "/partners", label: "Đối tác", icon: BuildingOffice2Icon },
       { href: "/payroll", label: "Bảng lương", icon: UsersIcon },
+      { href: "/finance", label: "Tài chính & Công nợ", icon: CurrencyDollarIcon },
       { href: "/reconciliation", label: "Đối soát quyết toán", icon: ScaleIcon },
-      { href: "/reports", label: "Báo cáo lãi / lỗ", icon: BanknotesIcon }
+      { href: "/reports", label: "Báo cáo lãi / lỗ", icon: BanknotesIcon },
+      { href: "/audit", label: "Nhật ký hoạt động", icon: ShieldCheckIcon }
     );
   }
   return items;

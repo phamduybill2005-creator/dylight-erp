@@ -21,6 +21,12 @@ import {
   StarIcon,
   BuildingOffice2Icon,
   UsersIcon,
+  CurrencyDollarIcon,
+  CalendarDaysIcon,
+  ArchiveBoxIcon,
+  TruckIcon,
+  ClipboardDocumentCheckIcon,
+  ShieldCheckIcon,
   ArrowRightCircleIcon,
   ArrowLeftEndOnRectangleIcon,
 } from "@heroicons/react/24/outline";
@@ -47,10 +53,16 @@ const MODULES: ModuleDef[] = [
   { href: "/projects", label: "Quản lý tiến độ", icon: ChartBarIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/attendance", label: "Chấm công", icon: ClockIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
+  { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
+  { href: "/materials", label: "Vật tư & Kho", icon: ArchiveBoxIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
+  { href: "/equipment", label: "Thiết bị", icon: TruckIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
+  { href: "/site-log", label: "Nhật ký thi công", icon: ClipboardDocumentCheckIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/partners", label: "Đối tác", icon: BuildingOffice2Icon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR"] },
   { href: "/payroll", label: "Bảng lương", icon: UsersIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
+  { href: "/finance", label: "Tài chính & Công nợ", icon: CurrencyDollarIcon, tint: "bg-ok/10 text-ok", tiers: ["DIRECTOR"] },
   { href: "/reconciliation", label: "Đối soát quyết toán", icon: ScaleIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR"] },
   { href: "/reports", label: "Báo cáo lãi / lỗ", icon: BanknotesIcon, tint: "bg-ok/10 text-ok", tiers: ["DIRECTOR"] },
+  { href: "/audit", label: "Nhật ký hoạt động", icon: ShieldCheckIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
 ];
 
 const todayStr = () => new Date().toISOString().split("T")[0];
@@ -197,6 +209,25 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-semibold text-ink">Đánh giá quản lý</p>
                 <p className="text-[11px] text-muted">Chấm điểm & nhận xét quản lý trực tiếp</p>
+              </div>
+            </div>
+            <span className="text-steel">→</span>
+          </Link>
+        </section>
+
+        {/* Đơn nghỉ phép */}
+        <section className="mt-3">
+          <Link
+            href="/leave"
+            className="flex items-center justify-between rounded-xl2 bg-white p-4 shadow-card border-l-4 border-steel"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl2 bg-steel/10 text-steel">
+                <CalendarDaysIcon className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-ink">Đơn nghỉ phép</p>
+                <p className="text-[11px] text-muted">Xin nghỉ & theo dõi trạng thái duyệt</p>
               </div>
             </div>
             <span className="text-steel">→</span>

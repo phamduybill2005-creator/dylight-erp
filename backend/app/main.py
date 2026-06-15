@@ -18,6 +18,7 @@ from app.database import Base, engine
 from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, partners, payroll,
+    leave, materials, equipment, site_log, finance, audit,
 )
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
@@ -91,5 +92,6 @@ def health():
 # --- Đăng ký router theo tiền tố /api/v1 ---
 P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
-          project_items, attendance, evaluations, partners, payroll):
+          project_items, attendance, evaluations, partners, payroll,
+          leave, materials, equipment, site_log, finance, audit):
     app.include_router(r.router, prefix=P)

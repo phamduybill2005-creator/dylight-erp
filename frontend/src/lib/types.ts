@@ -237,6 +237,65 @@ export interface Payroll {
   user_name?: string | null;
 }
 
+// Nghỉ phép
+export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED";
+export interface LeaveRequest {
+  id: number; company_id: number; user_id: number;
+  from_date: string; to_date: string; reason?: string | null;
+  status: LeaveStatus; decided_by_id?: number | null; decided_at?: string | null;
+  created_at: string; user_name?: string | null; days: number;
+}
+
+// Vật tư & kho
+export type StockMovementType = "IN" | "OUT";
+export interface Material {
+  id: number; company_id: number; code?: string | null; name: string;
+  unit?: string | null; stock_qty: number; note?: string | null; created_at: string;
+}
+export interface StockMovement {
+  id: number; company_id: number; material_id: number; project_id?: number | null;
+  type: StockMovementType; quantity: number; unit_price: number;
+  moved_at?: string | null; note?: string | null; created_at: string;
+  material_name?: string | null; project_name?: string | null;
+}
+
+// Thiết bị
+export interface Equipment {
+  id: number; company_id: number; code?: string | null; name: string;
+  status: string; note?: string | null; created_at: string;
+}
+export interface EquipmentLog {
+  id: number; company_id: number; equipment_id: number; project_id?: number | null;
+  log_date?: string | null; hours_used: number; fuel: number; note?: string | null;
+  created_at: string; equipment_name?: string | null; project_name?: string | null;
+}
+
+// Nhật ký thi công
+export interface DailyLog {
+  id: number; company_id: number; project_id: number; log_date: string;
+  weather?: string | null; workforce: number; equipment_note?: string | null;
+  work_done?: string | null; issues?: string | null; created_at: string;
+  project_name?: string | null; created_by_name?: string | null;
+}
+
+// Nhật ký hoạt động (audit)
+export interface ActivityLog {
+  id: number; company_id: number; user_id?: number | null; action: string;
+  entity_type?: string | null; entity_id?: number | null; detail?: string | null;
+  created_at: string; user_name?: string | null;
+}
+
+// Tài chính
+export interface FinanceSummary {
+  total_in: number; total_out: number; balance: number;
+  total_contract_value: number; total_cost: number;
+}
+export interface DebtRow {
+  contract_id: number; contract_code: string; project_name?: string | null;
+  partner?: string | null; contract_value: number; collected: number;
+  remaining: number; collect_percent: number;
+}
+
 // Hạng mục dự toán (BOQ) — mô hình 2 cấp: nhóm cha (parent_id=null) + đầu việc con.
 export interface ProjectItem {
   id: number;
