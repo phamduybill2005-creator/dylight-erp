@@ -296,6 +296,17 @@ export interface DebtRow {
   remaining: number; collect_percent: number;
 }
 
+// Hồ sơ thiết kế (đặc thù cty thiết kế cầu đường)
+export type DesignPhase = "SURVEY" | "BASIC" | "TECHNICAL" | "SHOP";
+export type DesignDocStatus = "DRAFT" | "SUBMITTED" | "REVIEWING" | "APPROVED" | "REVISE";
+export interface DesignDocument {
+  id: number; company_id: number; project_id: number;
+  phase: DesignPhase; code?: string | null; name: string;
+  discipline?: string | null; version?: string | null; status: DesignDocStatus;
+  file_url?: string | null; note?: string | null;
+  created_at: string; project_name?: string | null; created_by_name?: string | null;
+}
+
 // Hạng mục dự toán (BOQ) — mô hình 2 cấp: nhóm cha (parent_id=null) + đầu việc con.
 export interface ProjectItem {
   id: number;

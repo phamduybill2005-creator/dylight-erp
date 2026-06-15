@@ -27,6 +27,7 @@ import {
   TruckIcon,
   ClipboardDocumentCheckIcon,
   ShieldCheckIcon,
+  RectangleStackIcon,
   ArrowRightCircleIcon,
   ArrowLeftEndOnRectangleIcon,
 } from "@heroicons/react/24/outline";
@@ -51,6 +52,7 @@ const MODULES: ModuleDef[] = [
   { href: "/projects", label: "Dự án & Hợp đồng", icon: FolderOpenIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/invoices", label: "Hóa đơn AI", icon: SparklesIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/projects", label: "Quản lý tiến độ", icon: ChartBarIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
+  { href: "/design-docs", label: "Hồ sơ thiết kế", icon: RectangleStackIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/attendance", label: "Chấm công", icon: ClockIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },

@@ -641,3 +641,51 @@ class DailyLog(Base):
     @property
     def created_by_name(self) -> str | None:
         return self.created_by.full_name if self.created_by else None
+
+
+class DesignPhase(str, enum.Enum):
+    SURVEY = "SURVEY"          # Khảo sát
+    BASIC = "BASIC"            # Thiết kế cơ sở
+    TECHNICAL = "TECHNICAL"    # Thiết kế kỹ thuật
+    SHOP = "SHOP"              # Bản vẽ thi công (BVTC)
+
+
+class DesignDocStatus(str, enum.Enum):
+    DRAFT = "DRAFT"            # Nháp
+    SUBMITTED = "SUBMITTED"    # Đã trình CĐT
+    REVIEWING = "REVIEWING"    # Đang thẩm tra/thẩm định
+    APPROVED = "APPROVED"      # Đã phê duyệt
+    REVISE = "REVISE"          # Yêu cầu sửa
+
+
+# --------------------------------------------------------------------------
+# 18. DESIGN_DOCUMENTS — hồ sơ thiết kế & bản vẽ (đặc thù cty thiết kế cầu đường)
+#     Theo giai đoạn TK (khảo sát/cơ sở/kỹ thuật/BVTC) + phiên bản + trạng thái duyệt.
+# --------------------------------------------------------------------------
+class DesignDocument(Base):
+    __tablename__ = "design_documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    phase: Mapped[DesignPhase] = mapped_column(SAEnum(DesignPhase), index=True)
+    code: Mapped[str | None] = mapped_column(String(80))        # mã bản vẽ/hồ sơ
+    name: Mapped[str] = mapped_column(String(500))              # tên hồ sơ/bản vẽ
+    discipline: Mapped[str | None] = mapped_column(String(100))  # bộ môn: Cầu/Đường/Thủy văn/ATGT…
+    version: Mapped[str | None] = mapped_column(String(30))     # phiên bản: Rev.A/B/C
+    status: Mapped[DesignDocStatus] = mapped_column(SAEnum(DesignDocStatus), default=DesignDocStatus.DRAFT)
+    file_url: Mapped[str | None] = mapped_column(String(1000))  # link file (Drive/cloud) DWG/RVT/PDF
+    note: Mapped[str | None] = mapped_column(Text)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    project: Mapped["Project"] = relationship("Project")
+    created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])
+
+    @property
+    def project_name(self) -> str | None:
+        return self.project.name if self.project else None
+
+    @property
+    def created_by_name(self) -> str | None:
+        return self.created_by.full_name if self.created_by else None

@@ -14,7 +14,7 @@ from app.models import (
     UserRole, BidStatus, ProjectStatus, ContractStatus,
     InvoiceStatus, PaymentType, PaymentDirection,
     AttendanceSource, EvaluationDirection, PartnerType, SalaryType,
-    LeaveStatus, StockMovementType,
+    LeaveStatus, StockMovementType, DesignPhase, DesignDocStatus,
 )
 
 
@@ -665,3 +665,40 @@ class DebtRow(BaseModel):
     collected: Decimal            # đã thu
     remaining: Decimal            # còn phải thu
     collect_percent: Decimal
+
+
+# ------------------- DESIGN DOCUMENTS (hồ sơ thiết kế) -------------------
+class DesignDocBase(BaseModel):
+    project_id: int
+    phase: DesignPhase
+    code: str | None = None
+    name: str = Field(min_length=1)
+    discipline: str | None = None
+    version: str | None = None
+    status: DesignDocStatus = DesignDocStatus.DRAFT
+    file_url: str | None = None
+    note: str | None = None
+
+
+class DesignDocCreate(DesignDocBase):
+    pass
+
+
+class DesignDocUpdate(BaseModel):
+    phase: DesignPhase | None = None
+    code: str | None = None
+    name: str | None = None
+    discipline: str | None = None
+    version: str | None = None
+    status: DesignDocStatus | None = None
+    file_url: str | None = None
+    note: str | None = None
+
+
+class DesignDocOut(DesignDocBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    created_at: datetime
+    project_name: str | None = None
+    created_by_name: str | None = None

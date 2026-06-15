@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Material, StockMovement, Equipment, EquipmentLog, DailyLog, ActivityLog, FinanceSummary, DebtRow } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Material, StockMovement, Equipment, EquipmentLog, DailyLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -266,6 +266,22 @@ export const api = {
   // --- Đổi mật khẩu ---
   changePassword: (old_password: string, new_password: string) =>
     request<void>("/auth/change-password", { method: "POST", body: JSON.stringify({ old_password, new_password }) }),
+
+  // --- Hồ sơ thiết kế (cầu đường) — xem: mọi người; sửa: Quản lý+ ---
+  designDocs: (params?: { project_id?: number; phase?: string; status?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.project_id) qs.set("project_id", String(params.project_id));
+    if (params?.phase) qs.set("phase", params.phase);
+    if (params?.status) qs.set("status", params.status);
+    const s = qs.toString();
+    return request<DesignDocument[]>(`/design-docs${s ? `?${s}` : ""}`);
+  },
+  createDesignDoc: (payload: Partial<DesignDocument> & { project_id: number; phase: string; name: string }) =>
+    request<DesignDocument>("/design-docs", { method: "POST", body: JSON.stringify(payload) }),
+  updateDesignDoc: (id: number, payload: Partial<DesignDocument>) =>
+    request<DesignDocument>(`/design-docs/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteDesignDoc: (id: number) =>
+    request<void>(`/design-docs/${id}`, { method: "DELETE" }),
 
   // --- Users ---
   users: () => request<User[]>("/auth/users"),

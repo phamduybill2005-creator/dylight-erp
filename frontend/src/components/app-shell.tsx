@@ -29,6 +29,7 @@ import {
   TruckIcon,
   ClipboardDocumentCheckIcon,
   ShieldCheckIcon,
+  RectangleStackIcon,
   ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { api, tokenStore } from "@/lib/api";
@@ -55,6 +56,7 @@ function deskNav(tier: Tier): NavLink[] {
     { href: "/", label: "Tổng quan", icon: HomeIcon },
     { href: "/bids", label: "Đấu thầu", icon: ClipboardDocumentListIcon },
     { href: "/projects", label: "Dự án & Hợp đồng", icon: FolderIcon },
+    { href: "/design-docs", label: "Hồ sơ thiết kế", icon: RectangleStackIcon },
     { href: "/invoices", label: "Hóa đơn", icon: DocumentTextIcon },
     { href: "/attendance", label: "Chấm công", icon: ClockIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
