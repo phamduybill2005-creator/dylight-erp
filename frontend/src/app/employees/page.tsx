@@ -217,7 +217,8 @@ export default function EmployeesPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedUser) return;
+    // Quản lý chỉ ở chế độ giao việc — không sửa hồ sơ (chặn cả khi lỡ bấm Enter).
+    if (!selectedUser || !canManage) return;
     setSaving(true);
     setSuccessMsg("");
     setErrorMsg("");
