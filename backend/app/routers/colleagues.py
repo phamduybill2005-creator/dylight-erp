@@ -58,6 +58,15 @@ def list_colleagues(db: Session = Depends(get_db), current: User = Depends(get_c
     return out
 
 
+@router.get("/nicknames")
+def nickname_map(db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    """Bản đồ {user_id: biệt danh} DO MÌNH đặt — để áp biệt danh ở mọi nơi hiển thị tên."""
+    return {
+        n.target_id: n.nickname
+        for n in db.query(Nickname).filter(Nickname.owner_id == current.id).all()
+    }
+
+
 @router.put("/{user_id}/nickname", response_model=ColleagueOut)
 def set_nickname(
     user_id: int,

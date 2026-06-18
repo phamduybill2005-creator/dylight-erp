@@ -19,10 +19,12 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/roles";
+import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment } from "@/lib/types";
 
 export default function EmployeesPage() {
   const router = useRouter();
+  const nick = useNicknames();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -358,7 +360,7 @@ export default function EmployeesPage() {
                   className="flex flex-col gap-2 rounded-xl2 bg-white p-3 shadow-card sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{u.full_name}</p>
+                    <p className="truncate text-sm font-semibold text-ink">{nick(u.id, u.full_name)}</p>
                     <p className="truncate font-mono text-[11px] text-muted">{u.email}</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -435,7 +437,7 @@ export default function EmployeesPage() {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-sm font-semibold text-ink">{u.full_name}</h3>
+                      <h3 className="text-sm font-semibold text-ink">{nick(u.id, u.full_name)}</h3>
                       <p className="text-[11px] text-muted font-mono mt-0.5">{u.email}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <span className="text-[11px] font-medium text-steel">
@@ -479,7 +481,7 @@ export default function EmployeesPage() {
             {/* Modal Header */}
             <header className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
               <div>
-                <h2 className="text-sm font-bold text-ink">{selectedUser.full_name}</h2>
+                <h2 className="text-sm font-bold text-ink">{nick(selectedUser.id, selectedUser.full_name)}</h2>
                 <p className="text-[11px] text-muted">{ROLE_LABEL[selectedUser.role]}</p>
               </div>
               <button

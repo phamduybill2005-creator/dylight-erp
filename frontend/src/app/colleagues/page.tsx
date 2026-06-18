@@ -17,6 +17,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/roles";
+import { refreshNicknames } from "@/lib/nicknames";
 import type { Colleague, User } from "@/lib/types";
 
 export default function ColleaguesPage() {
@@ -48,6 +49,7 @@ export default function ColleaguesPage() {
       const updated = await api.setNickname(c.id, draft.trim() || null);
       setList((xs) => xs.map((x) => (x.id === updated.id ? updated : x)));
       setEditId(null);
+      refreshNicknames(); // các trang khác lấy biệt danh mới ở lần mở sau
     } catch {
       /* noop */
     } finally {

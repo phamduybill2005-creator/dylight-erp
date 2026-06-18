@@ -16,6 +16,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
+import { useNicknames } from "@/lib/nicknames";
 import type { Attendance, AttendanceSummary, User } from "@/lib/types";
 
 const todayStr = () => new Date().toISOString().split("T")[0];
@@ -26,6 +27,7 @@ const fmtHours = (mins: number) => (mins / 60).toFixed(1) + "h";
 
 export default function AttendancePage() {
   const router = useRouter();
+  const nick = useNicknames();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -220,7 +222,7 @@ export default function AttendancePage() {
             dayList.map((r) => (
               <div key={r.id} className="flex items-center justify-between rounded-xl2 bg-white p-3 shadow-card">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">{r.user_name || `#${r.user_id}`}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{nick(r.user_id, r.user_name) || `#${r.user_id}`}</p>
                   {r.is_late && <span className="text-[10px] font-semibold text-bad">Đi trễ</span>}
                 </div>
                 <div className="flex items-center gap-4 text-right">
@@ -250,7 +252,7 @@ export default function AttendancePage() {
           ) : (
             summary.map((s) => (
               <div key={s.user_id} className="rounded-xl2 bg-white p-3 shadow-card">
-                <p className="text-sm font-semibold text-ink">{s.full_name}</p>
+                <p className="text-sm font-semibold text-ink">{nick(s.user_id, s.full_name)}</p>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
                   <div>
                     <p className="text-[9px] text-muted">Ngày công</p>

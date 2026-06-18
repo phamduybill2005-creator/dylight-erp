@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
+import { useNicknames } from "@/lib/nicknames";
 import type { Notification, User } from "@/lib/types";
 
 const TARGETS_DIRECTOR = [
@@ -39,6 +40,7 @@ export default function NotificationsBell() {
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState("");
 
+  const nick = useNicknames();
   const tier = me ? roleTier(me.role) : "STAFF";
   const canCompose = tier !== "STAFF";
   const targets = tier === "DIRECTOR" ? TARGETS_DIRECTOR : TARGETS_MANAGER;
@@ -241,7 +243,7 @@ export default function NotificationsBell() {
                       {!n.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber" />}
                     </div>
                     {n.body && <p className="mt-1 whitespace-pre-line text-xs text-muted">{n.body}</p>}
-                    <p className="mt-1 text-[10px] text-muted">{n.sender_name || "Hệ thống"} · {fmt(n.created_at)}</p>
+                    <p className="mt-1 text-[10px] text-muted">{nick(n.sender_id, n.sender_name) || "Hệ thống"} · {fmt(n.created_at)}</p>
                   </button>
                 ))
               )}

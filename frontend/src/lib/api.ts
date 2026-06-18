@@ -307,6 +307,7 @@ export const api = {
 
   // --- Đồng nghiệp: biệt danh riêng + gom team ---
   colleagues: () => request<Colleague[]>("/colleagues"),
+  nicknameMap: () => request<Record<string, string>>("/colleagues/nicknames"),
   setNickname: (userId: number, nickname: string | null) =>
     request<Colleague>(`/colleagues/${userId}/nickname`, { method: "PUT", body: JSON.stringify({ nickname }) }),
   addToTeam: (userId: number) => request<Colleague>(`/colleagues/${userId}/team`, { method: "POST" }),
