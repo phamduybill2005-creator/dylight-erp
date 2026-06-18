@@ -18,7 +18,7 @@ from app.database import Base, engine
 from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, partners, payroll,
-    leave, equipment, finance, audit, design_docs,
+    leave, equipment, finance, audit, design_docs, notifications, assignments,
 )
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
@@ -42,6 +42,7 @@ def _ensure_schema() -> None:
             "allowance": "ALTER TABLE users ADD COLUMN allowance NUMERIC DEFAULT 0",
             "num_dependents": "ALTER TABLE users ADD COLUMN num_dependents INTEGER DEFAULT 0",
             "is_approved": "ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT TRUE",
+            "department": "ALTER TABLE users ADD COLUMN department VARCHAR(120)",
         }
         missing = [sql for col, sql in adds.items() if col not in cols]
         if missing:
@@ -94,5 +95,5 @@ def health():
 P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
           project_items, attendance, evaluations, partners, payroll,
-          leave, equipment, finance, audit, design_docs):
+          leave, equipment, finance, audit, design_docs, notifications, assignments):
     app.include_router(r.router, prefix=P)

@@ -48,6 +48,7 @@ class UserOut(BaseModel):
     identity_card: str | None = None
     cv_details: str | None = None
     schedule: str | None = None
+    department: str | None = None
     manager_id: int | None = None
     manager_name: str | None = None
 
@@ -62,6 +63,7 @@ class UserUpdate(BaseModel):
     identity_card: str | None = None
     cv_details: str | None = None
     schedule: str | None = None
+    department: str | None = None
     manager_id: int | None = None
 
 
@@ -78,6 +80,7 @@ class UserCreate(BaseModel):
     identity_card: str | None = None
     cv_details: str | None = None
     schedule: str | None = None
+    department: str | None = None
     manager_id: int | None = None
 
 
@@ -481,6 +484,55 @@ class ChangePassword(BaseModel):
 class AdminResetPassword(BaseModel):
     """Quản trị/Giám đốc đặt lại mật khẩu cho nhân viên (không cần mật khẩu cũ)."""
     new_password: str = Field(min_length=6)
+
+
+# ------------------------- NOTIFICATIONS (thông báo) -------------------------
+class NotificationCreate(BaseModel):
+    title: str = Field(min_length=1)
+    body: str | None = None
+    target: str = "USER"            # USER | MANAGERS | STAFF | EVERYONE
+    target_user_id: int | None = None
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    sender_id: int | None = None
+    sender_name: str | None = None
+    title: str
+    body: str | None = None
+    is_read: bool
+    created_at: datetime
+
+
+# ------------------------- ASSIGNMENTS (giao việc) -------------------------
+class AssignmentCreate(BaseModel):
+    assignee_id: int
+    title: str = Field(min_length=1)
+    description: str | None = None
+    project_id: int | None = None
+
+
+class AssignmentUpdate(BaseModel):
+    status: str | None = None       # ASSIGNED | IN_PROGRESS | DONE
+    title: str | None = None
+    description: str | None = None
+
+
+class AssignmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    assigner_id: int
+    assigner_name: str | None = None
+    assignee_id: int
+    assignee_name: str | None = None
+    project_id: int | None = None
+    project_name: str | None = None
+    title: str
+    description: str | None = None
+    status: str
+    created_at: datetime
 
 
 # ------------------------- LEAVE (nghỉ phép) -------------------------

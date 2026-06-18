@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -283,5 +283,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ new_password }),
     }),
+
+  // --- Thông báo nội bộ ---
+  notifications: (limit = 50) => request<Notification[]>(`/notifications/me?limit=${limit}`),
+  unreadCount: () => request<{ count: number }>("/notifications/me/unread-count"),
+  sendNotification: (payload: { title: string; body?: string | null; target: string; target_user_id?: number | null }) =>
+    request<{ sent: number }>("/notifications", { method: "POST", body: JSON.stringify(payload) }),
+  markNotificationRead: (id: number) => request<void>(`/notifications/${id}/read`, { method: "POST" }),
+  markAllNotificationsRead: () => request<void>("/notifications/me/read-all", { method: "POST" }),
+
+  // --- Giao việc / phân công ---
+  assignments: (assigneeId?: number) =>
+    request<Assignment[]>(`/assignments${assigneeId ? `?assignee_id=${assigneeId}` : ""}`),
+  createAssignment: (payload: { assignee_id: number; title: string; description?: string | null; project_id?: number | null }) =>
+    request<Assignment>("/assignments", { method: "POST", body: JSON.stringify(payload) }),
+  updateAssignment: (id: number, payload: { status?: string; title?: string; description?: string | null }) =>
+    request<Assignment>(`/assignments/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
 };
 

@@ -16,6 +16,7 @@ export interface User {
   identity_card?: string | null;
   cv_details?: string | null;
   schedule?: string | null;
+  department?: string | null;
   manager_id?: number | null;
   manager_name?: string | null;
 }
@@ -301,6 +302,33 @@ export interface ProjectItem {
   unit_price: number;
   amount: number;          // thành tiền = khối lượng × đơn giá (đầu việc con)
   note?: string | null;
+  created_at: string;
+}
+
+// Thông báo nội bộ
+export interface Notification {
+  id: number;
+  sender_id?: number | null;
+  sender_name?: string | null;
+  title: string;
+  body?: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+// Giao việc / phân công
+export interface Assignment {
+  id: number;
+  company_id: number;
+  assigner_id: number;
+  assigner_name?: string | null;
+  assignee_id: number;
+  assignee_name?: string | null;
+  project_id?: number | null;
+  project_name?: string | null;
+  title: string;
+  description?: string | null;
+  status: string;
   created_at: string;
 }
 

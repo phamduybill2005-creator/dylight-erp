@@ -33,6 +33,7 @@ import {
 import { api, tokenStore } from "@/lib/api";
 import { ROLE_LABEL, roleTier, type Tier } from "@/lib/roles";
 import type { Company, User } from "@/lib/types";
+import NotificationsBell from "./notifications-bell";
 
 type IconType = React.ComponentType<{ className?: string }>;
 type NavLink = { href: string; label: string; icon: IconType };
@@ -287,6 +288,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
       </div>
+
+      <NotificationsBell />
     </div>
   );
 }

@@ -154,6 +154,7 @@ class User(Base):
     identity_card: Mapped[str | None] = mapped_column(String(20))
     cv_details: Mapped[str | None] = mapped_column(Text)
     schedule: Mapped[str | None] = mapped_column(Text)
+    department: Mapped[str | None] = mapped_column(String(120))   # bộ phận / phòng ban
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # --- Cấu hình lương (NHẠY CẢM: chỉ Giám đốc xem/sửa; KHÔNG trả ra UserOut chung) ---
@@ -614,3 +615,58 @@ class DesignDocument(Base):
     @property
     def created_by_name(self) -> str | None:
         return self.created_by.full_name if self.created_by else None
+
+
+# --------------------------------------------------------------------------
+# 19. NOTIFICATIONS — thông báo nội bộ (Giám đốc↔Quản lý↔Nhân viên)
+# --------------------------------------------------------------------------
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    sender_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    body: Mapped[str | None] = mapped_column(Text)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    sender: Mapped["User | None"] = relationship("User", foreign_keys=[sender_id])
+
+    @property
+    def sender_name(self) -> str | None:
+        return self.sender.full_name if self.sender else None
+
+
+# --------------------------------------------------------------------------
+# 20. ASSIGNMENTS — phân công việc / giao dự án (Giám đốc→Quản lý→Nhân viên)
+# --------------------------------------------------------------------------
+class Assignment(Base):
+    __tablename__ = "assignments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    assigner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    assignee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"))
+    title: Mapped[str] = mapped_column(String(500))
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="ASSIGNED")  # ASSIGNED/IN_PROGRESS/DONE
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    assigner: Mapped["User"] = relationship("User", foreign_keys=[assigner_id])
+    assignee: Mapped["User"] = relationship("User", foreign_keys=[assignee_id])
+    project: Mapped["Project | None"] = relationship("Project")
+
+    @property
+    def assigner_name(self) -> str | None:
+        return self.assigner.full_name if self.assigner else None
+
+    @property
+    def assignee_name(self) -> str | None:
+        return self.assignee.full_name if self.assignee else None
+
+    @property
+    def project_name(self) -> str | None:
+        return self.project.name if self.project else None

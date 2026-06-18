@@ -13,11 +13,13 @@ import {
   CheckIcon,
   ShieldCheckIcon,
   KeyIcon,
+  BriefcaseIcon,
+  BuildingOffice2Icon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/roles";
-import type { User, Role } from "@/lib/types";
+import type { User, Role, Project, Assignment } from "@/lib/types";
 
 export default function EmployeesPage() {
   const router = useRouter();
@@ -35,6 +37,7 @@ export default function EmployeesPage() {
     identity_card: "",
     cv_details: "",
     schedule: "",
+    department: "",
     manager_id: "",
     role: "" as Role | "",
     is_active: true,
@@ -51,6 +54,7 @@ export default function EmployeesPage() {
     password: "",
     role: "FIELD_STAFF" as Role,
     phone: "",
+    department: "",
     manager_id: "",
   };
   const [showCreate, setShowCreate] = useState(false);
@@ -68,6 +72,15 @@ export default function EmployeesPage() {
   const [resetMsg, setResetMsg] = useState("");
   const [resetting, setResetting] = useState(false);
 
+  // Giao việc cho nhân viên đang chọn (Giám đốc/Quản lý) + danh sách việc đã giao.
+  const [projectsList, setProjectsList] = useState<Project[]>([]);
+  const [assignmentsList, setAssignmentsList] = useState<Assignment[]>([]);
+  const [assignTitle, setAssignTitle] = useState("");
+  const [assignProjectId, setAssignProjectId] = useState("");
+  const [assignDesc, setAssignDesc] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [assignMsg, setAssignMsg] = useState("");
+
   useEffect(() => {
     // 1. Get current logged in user to check permission
     api.me()
@@ -77,6 +90,8 @@ export default function EmployeesPage() {
           setLoading(false);
           return;
         }
+        // Danh sách dự án (cho ô chọn khi giao việc).
+        api.projects().then(setProjectsList).catch(() => {});
         // 2. Fetch all company users
         api.users()
           .then((data) => {
@@ -103,11 +118,17 @@ export default function EmployeesPage() {
         manager_id: selectedUser.manager_id ? String(selectedUser.manager_id) : "",
         role: selectedUser.role || "",
         is_active: selectedUser.is_active,
+        department: selectedUser.department || "",
       });
       setSuccessMsg("");
       setErrorMsg("");
       setNewPassword("");
       setResetMsg("");
+      setAssignTitle("");
+      setAssignDesc("");
+      setAssignProjectId("");
+      setAssignMsg("");
+      api.assignments(selectedUser.id).then(setAssignmentsList).catch(() => setAssignmentsList([]));
     }
   }, [selectedUser]);
 
@@ -212,6 +233,7 @@ export default function EmployeesPage() {
         manager_id: formData.manager_id ? Number(formData.manager_id) : null,
         role: formData.role ? (formData.role as Role) : undefined,
         is_active: formData.is_active,
+        department: formData.department || null,
       };
 
       const updated = await api.updateUser(selectedUser.id, payload);
@@ -239,6 +261,7 @@ export default function EmployeesPage() {
         password: createData.password ? createData.password : undefined,
         role: createData.role,
         phone: createData.phone || null,
+        department: createData.department || null,
         manager_id: createData.manager_id ? Number(createData.manager_id) : null,
       });
       setUsers((prev) => [...prev, created]);
@@ -248,6 +271,42 @@ export default function EmployeesPage() {
       setCreateError(err.message || "Không thể tạo nhân viên mới.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  // Giám đốc/Quản lý mới được giao việc (khớp quyền backend require_roles(DIRECTOR, MANAGER)).
+  const canAssign =
+    currentUser?.role === "ADMIN" || currentUser?.role === "DIRECTOR" || currentUser?.role === "MANAGER";
+
+  async function handleAddAssignment() {
+    if (!selectedUser || !assignTitle.trim()) return;
+    setAssigning(true);
+    setAssignMsg("");
+    try {
+      const created = await api.createAssignment({
+        assignee_id: selectedUser.id,
+        title: assignTitle.trim(),
+        description: assignDesc.trim() || null,
+        project_id: assignProjectId ? Number(assignProjectId) : null,
+      });
+      setAssignmentsList((prev) => [created, ...prev]);
+      setAssignTitle("");
+      setAssignDesc("");
+      setAssignProjectId("");
+      setAssignMsg("Đã giao việc & gửi thông báo cho nhân viên.");
+    } catch (err: any) {
+      setAssignMsg(err.message || "Không giao được việc.");
+    } finally {
+      setAssigning(false);
+    }
+  }
+
+  async function handleAssignmentStatus(a: Assignment, status: string) {
+    try {
+      const updated = await api.updateAssignment(a.id, { status });
+      setAssignmentsList((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch {
+      /* noop */
     }
   }
 
@@ -392,10 +451,17 @@ export default function EmployeesPage() {
                       </span>
                     )}
                   </div>
-                  {u.manager_name && (
-                    <div className="mt-2 border-t border-line/50 pt-2 text-[10px] text-muted flex items-center gap-1">
-                      <span>Quản lý trực tiếp:</span>
-                      <span className="font-semibold text-ink">{u.manager_name}</span>
+                  {(u.department || u.manager_name) && (
+                    <div className="mt-2 flex flex-col gap-0.5 border-t border-line/50 pt-2 text-[10px] text-muted">
+                      {u.department && (
+                        <span className="flex items-center gap-1">
+                          <BuildingOffice2Icon className="h-3 w-3" /> Phòng ban:{" "}
+                          <span className="font-semibold text-ink">{u.department}</span>
+                        </span>
+                      )}
+                      {u.manager_name && (
+                        <span>Quản lý trực tiếp: <span className="font-semibold text-ink">{u.manager_name}</span></span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -547,6 +613,17 @@ export default function EmployeesPage() {
                     ))}
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted">Bộ phận / Phòng ban</label>
+                  <input
+                    type="text"
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    placeholder="VD: Phòng Thiết kế cầu / Tổ Khảo sát"
+                  />
+                </div>
               </div>
 
               {/* Đặt lại mật khẩu (admin cấp lại khi nhân viên quên) */}
@@ -577,6 +654,80 @@ export default function EmployeesPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Phần việc / Giao việc (Giám đốc/Quản lý giao cho người này) */}
+              {canAssign && (
+                <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
+                  <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-steel">
+                    <BriefcaseIcon className="h-4 w-4" />
+                    Phần việc / Giao việc
+                  </h3>
+                  <div className="space-y-2 rounded-lg bg-paper p-3">
+                    <input
+                      value={assignTitle}
+                      onChange={(e) => setAssignTitle(e.target.value)}
+                      placeholder="Tên phần việc / nhiệm vụ *"
+                      className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
+                    <select
+                      value={assignProjectId}
+                      onChange={(e) => setAssignProjectId(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
+                    >
+                      <option value="">— Gắn dự án (tùy chọn) —</option>
+                      {projectsList.map((p) => (
+                        <option key={p.id} value={p.id}>{p.code ? `${p.code} — ` : ""}{p.name}</option>
+                      ))}
+                    </select>
+                    <textarea
+                      value={assignDesc}
+                      onChange={(e) => setAssignDesc(e.target.value)}
+                      rows={2}
+                      placeholder="Mô tả (tùy chọn)"
+                      className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
+                    {assignMsg && <p className="text-[11px] font-medium text-ok">{assignMsg}</p>}
+                    <button
+                      type="button"
+                      onClick={handleAddAssignment}
+                      disabled={assigning || !assignTitle.trim()}
+                      className="w-full rounded-xl2 bg-ink py-2 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50"
+                    >
+                      {assigning ? "Đang giao…" : `Giao việc cho ${selectedUser.full_name}`}
+                    </button>
+                  </div>
+                  {assignmentsList.length === 0 ? (
+                    <p className="text-center text-[11px] text-muted">Chưa giao việc nào cho người này.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {assignmentsList.map((a) => (
+                        <div key={a.id} className="rounded-lg border border-line p-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-semibold text-ink">{a.title}</p>
+                            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${a.status === "DONE" ? "bg-ok/10 text-ok" : a.status === "IN_PROGRESS" ? "bg-amber/15 text-amber-deep" : "bg-line text-muted"}`}>
+                              {a.status === "DONE" ? "Hoàn thành" : a.status === "IN_PROGRESS" ? "Đang làm" : "Mới giao"}
+                            </span>
+                          </div>
+                          {a.project_name && <p className="mt-0.5 text-[10px] text-steel">Dự án: {a.project_name}</p>}
+                          {a.description && <p className="mt-0.5 text-[10px] text-muted">{a.description}</p>}
+                          <div className="mt-1.5 flex gap-1.5">
+                            {["ASSIGNED", "IN_PROGRESS", "DONE"].map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => handleAssignmentStatus(a, s)}
+                                className={`rounded-md px-2 py-0.5 text-[9px] font-semibold ${a.status === s ? "bg-ink text-white" : "bg-paper text-muted hover:bg-line"}`}
+                              >
+                                {s === "ASSIGNED" ? "Mới" : s === "IN_PROGRESS" ? "Đang làm" : "Xong"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Lịch làm việc */}
               <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
@@ -723,6 +874,17 @@ export default function EmployeesPage() {
                     onChange={(e) => setCreateData({ ...createData, phone: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     placeholder="Nhập số điện thoại"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted">Bộ phận / Phòng ban</label>
+                  <input
+                    type="text"
+                    value={createData.department}
+                    onChange={(e) => setCreateData({ ...createData, department: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    placeholder="VD: Phòng Thiết kế cầu"
                   />
                 </div>
               </div>
