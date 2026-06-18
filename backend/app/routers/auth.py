@@ -82,7 +82,8 @@ def login(
     Đăng nhập bằng email + mật khẩu (OAuth2 password flow).
     Trường 'username' của form chính là email người dùng.
     """
-    user = db.query(User).filter(User.email == form.username).first()
+    # Email không phân biệt hoa/thường: chuẩn hóa về chữ thường trước khi tra cứu.
+    user = db.query(User).filter(User.email == form.username.strip().lower()).first()
     if not user or not verify_password(form.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
