@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Material, StockMovement, Equipment, EquipmentLog, DailyLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -235,17 +235,6 @@ export const api = {
   decideLeave: (id: number, status: "APPROVED" | "REJECTED") =>
     request<LeaveRequest>(`/leave/${id}/decide`, { method: "POST", body: JSON.stringify({ status }) }),
 
-  // --- Vật tư & Kho (Quản lý+) ---
-  materials: () => request<Material[]>("/materials"),
-  createMaterial: (payload: Partial<Material> & { name: string }) =>
-    request<Material>("/materials", { method: "POST", body: JSON.stringify(payload) }),
-  updateMaterial: (id: number, payload: Partial<Material>) =>
-    request<Material>(`/materials/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
-  stockMovements: (materialId?: number) =>
-    request<StockMovement[]>(`/materials/movements${materialId ? `?material_id=${materialId}` : ""}`),
-  createMovement: (payload: { material_id: number; type: "IN" | "OUT"; quantity: number; unit_price?: number; project_id?: number | null; moved_at?: string | null; note?: string | null }) =>
-    request<StockMovement>("/materials/movements", { method: "POST", body: JSON.stringify(payload) }),
-
   // --- Thiết bị (Quản lý+) ---
   equipment: () => request<Equipment[]>("/equipment"),
   createEquipment: (payload: Partial<Equipment> & { name: string }) =>
@@ -256,12 +245,6 @@ export const api = {
     request<EquipmentLog[]>(`/equipment/logs${equipmentId ? `?equipment_id=${equipmentId}` : ""}`),
   createEquipmentLog: (payload: { equipment_id: number; project_id?: number | null; log_date?: string | null; hours_used?: number; fuel?: number; note?: string | null }) =>
     request<EquipmentLog>("/equipment/logs", { method: "POST", body: JSON.stringify(payload) }),
-
-  // --- Nhật ký thi công (Quản lý+) ---
-  siteLogs: (projectId?: number) =>
-    request<DailyLog[]>(`/site-log${projectId ? `?project_id=${projectId}` : ""}`),
-  createSiteLog: (payload: { project_id: number; log_date: string; weather?: string | null; workforce?: number; equipment_note?: string | null; work_done?: string | null; issues?: string | null }) =>
-    request<DailyLog>("/site-log", { method: "POST", body: JSON.stringify(payload) }),
 
   // --- Đổi mật khẩu ---
   changePassword: (old_password: string, new_password: string) =>

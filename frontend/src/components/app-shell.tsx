@@ -25,9 +25,7 @@ import {
   ClipboardDocumentListIcon,
   CurrencyDollarIcon,
   CalendarDaysIcon,
-  ArchiveBoxIcon,
   TruckIcon,
-  ClipboardDocumentCheckIcon,
   ShieldCheckIcon,
   RectangleStackIcon,
   ArrowRightOnRectangleIcon,
@@ -61,9 +59,7 @@ function deskNav(tier: Tier): NavLink[] {
     { href: "/attendance", label: "Chấm công", icon: ClockIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
     { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon },
-    { href: "/materials", label: "Vật tư & Kho", icon: ArchiveBoxIcon },
     { href: "/equipment", label: "Thiết bị", icon: TruckIcon },
-    { href: "/site-log", label: "Nhật ký thi công", icon: ClipboardDocumentCheckIcon },
     { href: "/employees", label: "Nhân sự", icon: UsersIcon },
   ];
   if (tier === "DIRECTOR") {

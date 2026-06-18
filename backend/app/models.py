@@ -498,11 +498,6 @@ class LeaveStatus(str, enum.Enum):
     REJECTED = "REJECTED"
 
 
-class StockMovementType(str, enum.Enum):
-    IN = "IN"        # nhập kho
-    OUT = "OUT"      # xuất kho (dùng cho công trình)
-
-
 # --------------------------------------------------------------------------
 # 14. LEAVE_REQUESTS — đơn nghỉ phép/nghỉ ốm, duyệt theo cấp quản lý
 # --------------------------------------------------------------------------
@@ -529,48 +524,6 @@ class LeaveRequest(Base):
     @property
     def days(self) -> int:
         return (self.to_date - self.from_date).days + 1 if self.from_date and self.to_date else 0
-
-
-# --------------------------------------------------------------------------
-# 15. MATERIALS + STOCK_MOVEMENTS — vật tư & nhập/xuất kho theo công trình
-# --------------------------------------------------------------------------
-class Material(Base):
-    __tablename__ = "materials"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    code: Mapped[str | None] = mapped_column(String(50))
-    name: Mapped[str] = mapped_column(String(255))
-    unit: Mapped[str | None] = mapped_column(String(50))
-    stock_qty: Mapped[Decimal] = mapped_column(Numeric(18, 3), default=0)   # tồn kho hiện tại
-    note: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-
-class StockMovement(Base):
-    __tablename__ = "stock_movements"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    material_id: Mapped[int] = mapped_column(ForeignKey("materials.id"), index=True)
-    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"))
-    type: Mapped[StockMovementType] = mapped_column(SAEnum(StockMovementType))
-    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 3), default=0)
-    unit_price: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)
-    note: Mapped[str | None] = mapped_column(Text)
-    moved_at: Mapped[date | None] = mapped_column(Date)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-    material: Mapped["Material"] = relationship("Material")
-    project: Mapped["Project | None"] = relationship("Project")
-
-    @property
-    def material_name(self) -> str | None:
-        return self.material.name if self.material else None
-
-    @property
-    def project_name(self) -> str | None:
-        return self.project.name if self.project else None
 
 
 # --------------------------------------------------------------------------
@@ -611,36 +564,6 @@ class EquipmentLog(Base):
     @property
     def project_name(self) -> str | None:
         return self.project.name if self.project else None
-
-
-# --------------------------------------------------------------------------
-# 17. DAILY_LOGS — nhật ký thi công công trình hàng ngày (NĐ 06/2021)
-# --------------------------------------------------------------------------
-class DailyLog(Base):
-    __tablename__ = "daily_logs"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
-    log_date: Mapped[date] = mapped_column(Date, index=True)
-    weather: Mapped[str | None] = mapped_column(String(100))
-    workforce: Mapped[int] = mapped_column(Integer, default=0)          # số nhân lực
-    equipment_note: Mapped[str | None] = mapped_column(Text)
-    work_done: Mapped[str | None] = mapped_column(Text)                 # khối lượng/công việc đã làm
-    issues: Mapped[str | None] = mapped_column(Text)                    # sự cố/vướng mắc
-    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-    project: Mapped["Project"] = relationship("Project")
-    created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])
-
-    @property
-    def project_name(self) -> str | None:
-        return self.project.name if self.project else None
-
-    @property
-    def created_by_name(self) -> str | None:
-        return self.created_by.full_name if self.created_by else None
 
 
 class DesignPhase(str, enum.Enum):

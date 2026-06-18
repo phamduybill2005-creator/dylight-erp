@@ -246,19 +246,6 @@ export interface LeaveRequest {
   created_at: string; user_name?: string | null; days: number;
 }
 
-// Vật tư & kho
-export type StockMovementType = "IN" | "OUT";
-export interface Material {
-  id: number; company_id: number; code?: string | null; name: string;
-  unit?: string | null; stock_qty: number; note?: string | null; created_at: string;
-}
-export interface StockMovement {
-  id: number; company_id: number; material_id: number; project_id?: number | null;
-  type: StockMovementType; quantity: number; unit_price: number;
-  moved_at?: string | null; note?: string | null; created_at: string;
-  material_name?: string | null; project_name?: string | null;
-}
-
 // Thiết bị
 export interface Equipment {
   id: number; company_id: number; code?: string | null; name: string;
@@ -268,14 +255,6 @@ export interface EquipmentLog {
   id: number; company_id: number; equipment_id: number; project_id?: number | null;
   log_date?: string | null; hours_used: number; fuel: number; note?: string | null;
   created_at: string; equipment_name?: string | null; project_name?: string | null;
-}
-
-// Nhật ký thi công
-export interface DailyLog {
-  id: number; company_id: number; project_id: number; log_date: string;
-  weather?: string | null; workforce: number; equipment_note?: string | null;
-  work_done?: string | null; issues?: string | null; created_at: string;
-  project_name?: string | null; created_by_name?: string | null;
 }
 
 // Nhật ký hoạt động (audit)

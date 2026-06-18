@@ -14,7 +14,7 @@ from app.models import (
     UserRole, BidStatus, ProjectStatus, ContractStatus,
     InvoiceStatus, PaymentType, PaymentDirection,
     AttendanceSource, EvaluationDirection, PartnerType, SalaryType,
-    LeaveStatus, StockMovementType, DesignPhase, DesignDocStatus,
+    LeaveStatus, DesignPhase, DesignDocStatus,
 )
 
 
@@ -501,59 +501,6 @@ class LeaveOut(BaseModel):
     days: int = 0
 
 
-# ------------------------- MATERIAL & KHO -------------------------
-class MaterialBase(BaseModel):
-    code: str | None = None
-    name: str = Field(min_length=1)
-    unit: str | None = None
-    note: str | None = None
-
-
-class MaterialCreate(MaterialBase):
-    pass
-
-
-class MaterialUpdate(BaseModel):
-    code: str | None = None
-    name: str | None = None
-    unit: str | None = None
-    note: str | None = None
-
-
-class MaterialOut(MaterialBase):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    company_id: int
-    stock_qty: Decimal
-    created_at: datetime
-
-
-class StockMovementCreate(BaseModel):
-    material_id: int
-    project_id: int | None = None
-    type: StockMovementType
-    quantity: Decimal
-    unit_price: Decimal = Decimal(0)
-    moved_at: date | None = None
-    note: str | None = None
-
-
-class StockMovementOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    company_id: int
-    material_id: int
-    project_id: int | None = None
-    type: StockMovementType
-    quantity: Decimal
-    unit_price: Decimal
-    moved_at: date | None = None
-    note: str | None = None
-    created_at: datetime
-    material_name: str | None = None
-    project_name: str | None = None
-
-
 # ------------------------- EQUIPMENT (thiết bị) -------------------------
 class EquipmentBase(BaseModel):
     code: str | None = None
@@ -602,33 +549,6 @@ class EquipmentLogOut(BaseModel):
     created_at: datetime
     equipment_name: str | None = None
     project_name: str | None = None
-
-
-# ------------------------- DAILY LOG (nhật ký thi công) -------------------------
-class DailyLogCreate(BaseModel):
-    project_id: int
-    log_date: date
-    weather: str | None = None
-    workforce: int = 0
-    equipment_note: str | None = None
-    work_done: str | None = None
-    issues: str | None = None
-
-
-class DailyLogOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    company_id: int
-    project_id: int
-    log_date: date
-    weather: str | None = None
-    workforce: int
-    equipment_note: str | None = None
-    work_done: str | None = None
-    issues: str | None = None
-    created_at: datetime
-    project_name: str | None = None
-    created_by_name: str | None = None
 
 
 # ------------------------- AUDIT LOG -------------------------
