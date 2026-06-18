@@ -9,6 +9,7 @@ export interface User {
   full_name: string;
   role: Role;
   is_active: boolean;
+  is_approved: boolean;
   phone?: string | null;
   address?: string | null;
   dob?: string | null;

@@ -36,7 +36,7 @@ def get_current_user(
     if user_id is None:
         raise _CRED_ERROR
     user = db.get(User, int(user_id))
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or not user.is_approved:
         raise _CRED_ERROR
     return user
 

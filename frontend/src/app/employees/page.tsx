@@ -57,6 +57,11 @@ export default function EmployeesPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
+  // Duyệt tài khoản chờ (đăng nhập Google lần đầu): chọn vị trí cho từng người.
+  const [pendingRole, setPendingRole] = useState<Record<number, Role>>({});
+  const [pendingError, setPendingError] = useState("");
+  const [busyId, setBusyId] = useState<number | null>(null);
+
   useEffect(() => {
     // 1. Get current logged in user to check permission
     api.me()
@@ -129,10 +134,42 @@ export default function EmployeesPage() {
     (u) => (u.role === "ADMIN" || u.role === "DIRECTOR" || u.role === "MANAGER") && u.id !== selectedUser?.id
   );
 
-  const filteredUsers = users.filter((u) =>
+  // Chờ duyệt = tự đăng ký Google, chưa được duyệt và chưa bị từ chối.
+  const pendingUsers = users.filter((u) => !u.is_approved && u.is_active);
+  const approvedUsers = users.filter((u) => u.is_approved);
+
+  const filteredUsers = approvedUsers.filter((u) =>
     u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Duyệt: cấp quyền + phân vị trí. Từ chối: khóa tài khoản (rời khỏi danh sách chờ).
+  async function handleApprove(u: User) {
+    setBusyId(u.id);
+    setPendingError("");
+    try {
+      const role = pendingRole[u.id] || "FIELD_STAFF";
+      const updated = await api.updateUser(u.id, { is_approved: true, is_active: true, role });
+      setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err: any) {
+      setPendingError(err.message || "Không duyệt được tài khoản.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleReject(u: User) {
+    setBusyId(u.id);
+    setPendingError("");
+    try {
+      const updated = await api.updateUser(u.id, { is_active: false });
+      setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err: any) {
+      setPendingError(err.message || "Không từ chối được tài khoản.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -201,7 +238,7 @@ export default function EmployeesPage() {
             <h1 className="text-base lg:text-xl font-bold">Danh sách Nhân sự</h1>
           </div>
           <span className="rounded-full bg-white/10 px-3 py-0.5 text-xs text-white/80">
-            {users.length} thành viên
+            {approvedUsers.length} thành viên
           </span>
         </section>
 
@@ -215,6 +252,58 @@ export default function EmployeesPage() {
               : "Chỉ Giám đốc & Quản trị web mới được thêm/sửa người được truy cập."}
           </p>
         </section>
+
+        {/* Hàng chờ duyệt — người đăng nhập Google lần đầu */}
+        {canManage && pendingUsers.length > 0 && (
+          <section className="rounded-xl2 border border-amber/40 bg-amber/5 p-4 shadow-card">
+            <div className="flex items-center gap-2">
+              <ClockIcon className="h-5 w-5 text-amber-deep" />
+              <h2 className="text-sm font-bold text-ink">Chờ duyệt ({pendingUsers.length})</h2>
+            </div>
+            <p className="mt-1 text-[11px] text-muted">
+              Người đăng nhập Google lần đầu — chọn vị trí rồi bấm <b>Duyệt</b> để cấp quyền vào hệ thống. Lần sau họ vào thẳng.
+            </p>
+            {pendingError && <p className="mt-2 text-[11px] font-medium text-bad">{pendingError}</p>}
+            <div className="mt-3 space-y-2">
+              {pendingUsers.map((u) => (
+                <div
+                  key={u.id}
+                  className="flex flex-col gap-2 rounded-xl2 bg-white p-3 shadow-card sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{u.full_name}</p>
+                    <p className="truncate font-mono text-[11px] text-muted">{u.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={pendingRole[u.id] || "FIELD_STAFF"}
+                      onChange={(e) => setPendingRole({ ...pendingRole, [u.id]: e.target.value as Role })}
+                      className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel"
+                    >
+                      {Object.keys(ROLE_LABEL).map((r) => (
+                        <option key={r} value={r}>{ROLE_LABEL[r as Role]}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handleApprove(u)}
+                      disabled={busyId === u.id}
+                      className="rounded-xl2 bg-ok px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      Duyệt
+                    </button>
+                    <button
+                      onClick={() => handleReject(u)}
+                      disabled={busyId === u.id}
+                      className="rounded-xl2 border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:bg-paper disabled:opacity-50"
+                    >
+                      Từ chối
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Tìm kiếm + Thêm nhân viên */}
         <section className="flex items-center gap-2">

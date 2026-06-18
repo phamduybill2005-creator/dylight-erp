@@ -41,6 +41,7 @@ class UserOut(BaseModel):
     full_name: str
     role: UserRole
     is_active: bool
+    is_approved: bool
     phone: str | None = None
     address: str | None = None
     dob: date | None = None
@@ -54,6 +55,7 @@ class UserUpdate(BaseModel):
     full_name: str | None = None
     role: UserRole | None = None
     is_active: bool | None = None   # khóa/mở quyền truy cập web
+    is_approved: bool | None = None # duyệt tài khoản đang chờ (cấp quyền vào hệ thống)
     phone: str | None = None
     address: str | None = None
     dob: date | None = None

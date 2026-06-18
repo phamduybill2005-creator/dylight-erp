@@ -40,7 +40,10 @@ def _verify_google_credential(credential: str) -> dict:
 
 
 def provision_google_user(db: Session, email: str, name: str) -> User:
-    """Tìm nhân viên theo email; nếu chưa có thì tự tạo (theo cấu hình GOOGLE_AUTO_CREATE)."""
+    """
+    Tìm nhân viên theo email Google; nếu chưa có thì tự tạo tài khoản CHỜ DUYỆT
+    (is_approved=False) — Giám đốc/Quản trị web phải duyệt & phân vị trí trước khi vào được.
+    """
     user = db.query(User).filter(User.email == email).first()
     if user:
         return user
@@ -62,6 +65,7 @@ def provision_google_user(db: Session, email: str, name: str) -> User:
         # Mật khẩu ngẫu nhiên không ai biết -> tài khoản này chỉ đăng nhập bằng Google.
         hashed_password=hash_password(secrets.token_urlsafe(32)),
         role=role,
+        is_approved=False,   # CHỜ DUYỆT: chưa vào được tới khi Giám đốc/Quản trị duyệt & phân vị trí
     )
     db.add(user)
     db.commit()
@@ -86,6 +90,8 @@ def login(
         )
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Tài khoản đã bị khóa.")
+    if not user.is_approved:
+        raise HTTPException(status_code=403, detail="Tài khoản đang chờ duyệt.")
 
     token = create_access_token(
         subject=user.id,
@@ -101,6 +107,12 @@ def login_google(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     user = provision_google_user(db, info["email"], info["name"])
     if not user.is_active:
         raise HTTPException(403, "Tài khoản đã bị khóa.")
+    if not user.is_approved:
+        raise HTTPException(
+            403,
+            "Tài khoản của bạn đã được ghi nhận, đang chờ Giám đốc/Quản trị duyệt và "
+            "phân vị trí. Vui lòng đăng nhập lại sau khi được duyệt.",
+        )
     token = create_access_token(
         subject=user.id,
         extra={"company_id": user.company_id, "role": user.role.value},

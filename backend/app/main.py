@@ -41,6 +41,7 @@ def _ensure_schema() -> None:
             "salary_type": "ALTER TABLE users ADD COLUMN salary_type VARCHAR(20) DEFAULT 'MONTHLY'",
             "allowance": "ALTER TABLE users ADD COLUMN allowance NUMERIC DEFAULT 0",
             "num_dependents": "ALTER TABLE users ADD COLUMN num_dependents INTEGER DEFAULT 0",
+            "is_approved": "ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT TRUE",
         }
         missing = [sql for col, sql in adds.items() if col not in cols]
         if missing:
