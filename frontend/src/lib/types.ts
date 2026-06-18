@@ -332,3 +332,15 @@ export interface Assignment {
   created_at: string;
 }
 
+// Đồng nghiệp (danh bạ) + biệt danh riêng tư của mình
+export interface Colleague {
+  id: number;
+  full_name: string;
+  role: Role;
+  department?: string | null;
+  manager_id?: number | null;
+  manager_name?: string | null;
+  my_nickname?: string | null;
+  in_my_team: boolean;
+}
+

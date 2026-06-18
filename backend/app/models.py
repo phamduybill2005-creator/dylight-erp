@@ -672,3 +672,18 @@ class Assignment(Base):
     @property
     def project_name(self) -> str | None:
         return self.project.name if self.project else None
+
+
+# --------------------------------------------------------------------------
+# 21. NICKNAMES — biệt danh RIÊNG TƯ (chỉ người đặt nhìn thấy)
+#     1 dòng = owner đặt biệt danh cho target. Mỗi (owner,target) tối đa 1 dòng.
+# --------------------------------------------------------------------------
+class Nickname(Base):
+    __tablename__ = "nicknames"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)    # người đặt
+    target_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)   # người được đặt
+    nickname: Mapped[str] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

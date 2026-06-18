@@ -546,6 +546,22 @@ class AssignmentOut(BaseModel):
     created_at: datetime
 
 
+# ------------------------- COLLEAGUES / NICKNAMES -------------------------
+class ColleagueOut(BaseModel):
+    id: int
+    full_name: str
+    role: UserRole
+    department: str | None = None
+    manager_id: int | None = None
+    manager_name: str | None = None
+    my_nickname: str | None = None    # biệt danh DO MÌNH đặt cho người này (chỉ mình thấy)
+    in_my_team: bool = False          # người này đang thuộc team của mình (mình là quản lý)
+
+
+class NicknameSet(BaseModel):
+    nickname: str | None = None       # để trống = xóa biệt danh
+
+
 # ------------------------- LEAVE (nghỉ phép) -------------------------
 class LeaveCreate(BaseModel):
     from_date: date

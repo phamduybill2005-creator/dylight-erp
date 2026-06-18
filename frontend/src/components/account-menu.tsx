@@ -166,6 +166,13 @@ export default function AccountMenu({
 
       <div className="border-t border-line p-2">
         <Link
+          href="/colleagues"
+          onClick={() => setOpen(false)}
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink hover:bg-paper"
+        >
+          <UserGroupIcon className="h-4 w-4 text-steel" /> Đồng nghiệp &amp; biệt danh
+        </Link>
+        <Link
           href="/profile"
           onClick={() => setOpen(false)}
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink hover:bg-paper"

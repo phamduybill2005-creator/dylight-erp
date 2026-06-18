@@ -19,6 +19,7 @@ import {
   BuildingOffice2Icon,
   ClockIcon,
   UsersIcon,
+  UserGroupIcon,
   StarIcon,
   ScaleIcon,
   BanknotesIcon,
@@ -48,6 +49,7 @@ function deskNav(tier: Tier): NavLink[] {
       { href: "/attendance", label: "Chấm công", icon: ClockIcon },
       { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
       { href: "/evaluations", label: "Đánh giá quản lý", icon: StarIcon },
+      { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
       { href: "/profile", label: "Cá nhân", icon: UserCircleIcon },
     ];
   }
@@ -62,6 +64,7 @@ function deskNav(tier: Tier): NavLink[] {
     { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon },
     { href: "/equipment", label: "Thiết bị", icon: TruckIcon },
     { href: "/employees", label: "Nhân sự", icon: UsersIcon },
+    { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
   ];
   if (tier === "DIRECTOR") {
     items.push(
