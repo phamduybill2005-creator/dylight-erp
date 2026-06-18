@@ -8,10 +8,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  SparklesIcon,
-  CameraIcon,
-  ChartBarIcon,
-  ClockIcon,
+  MapIcon,
+  PencilSquareIcon,
+  Square3Stack3DIcon,
+  CubeIcon,
+  HomeModernIcon,
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 
@@ -22,10 +23,13 @@ const DEMO = [
   { role: "Nhân viên", email: "hientruong@dosco.vn" },
 ];
 
-const FEATURES = [
-  { icon: CameraIcon, text: "Chụp & bóc tách hóa đơn bằng AI ngay tại công trường" },
-  { icon: ChartBarIcon, text: "Theo dõi tiến độ, lãi/lỗ từng dự án theo thời gian thực" },
-  { icon: ClockIcon, text: "Chấm công, đánh giá hiệu quả nhân sự" },
+// Các hạng mục công ty DOSCO đảm nhiệm (nguồn: dosco.vn).
+const SERVICES = [
+  { icon: MapIcon, title: "Khảo sát & xử lý dữ liệu không gian", desc: "Bay UAV/drone, ảnh trực giao, dữ liệu địa hình & mô hình điểm mây phục vụ thiết kế, BIM." },
+  { icon: PencilSquareIcon, title: "Thiết kế hạ tầng – cầu đường", desc: "Thiết kế đường bộ, cải tạo địa hình, cân bằng khối lượng đất theo tiêu chuẩn Nhật Bản." },
+  { icon: Square3Stack3DIcon, title: "Tường chắn & thoát nước", desc: "Tường đất có cốt, cấu kiện bê tông đúc sẵn, hệ thống thoát nước." },
+  { icon: CubeIcon, title: "Mô hình CIM / BIM 3D", desc: "Mô hình 3D độ chính xác cao theo chuẩn Nhật, đạt tới LOD 400." },
+  { icon: HomeModernIcon, title: "Thiết kế nhà gỗ kiểu Nhật", desc: "Thiết kế nhà ở từ phác thảo kiến trúc, đạt tiêu chuẩn xây dựng Nhật Bản." },
 ];
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -103,24 +107,34 @@ export default function LoginPage() {
           <img src="/logo.png" alt="DOSCO" className="h-12 w-auto rounded-xl2 bg-white px-4 py-2 object-contain" />
         </div>
         <div className="max-w-md">
-          <h1 className="text-3xl font-bold leading-tight">
-            Hệ thống quản lý <span className="text-amber">dự án xây dựng</span>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber">
+            Hợp tác &amp; phát triển Việt Nam – Nhật Bản
+          </p>
+          <h1 className="mt-3 text-3xl font-bold leading-tight">
+            Tư vấn – thiết kế <span className="text-amber">hạ tầng &amp; khảo sát</span>
           </h1>
           <p className="mt-3 text-sm text-white/60">
-            Đấu thầu · Hợp đồng · Hóa đơn AI · Tiến độ · Chấm công · Báo cáo lãi/lỗ.
+            DOSCO CO., LTD — đơn vị tư vấn thiết kế công trình hạ tầng, khảo sát không gian
+            và mô hình BIM/CIM theo tiêu chuẩn Nhật Bản.
           </p>
-          <ul className="mt-8 space-y-4">
-            {FEATURES.map((f, i) => (
+          <p className="mt-6 text-[11px] font-semibold uppercase tracking-wider text-white/40">
+            Các hạng mục đảm nhiệm
+          </p>
+          <ul className="mt-3 space-y-3">
+            {SERVICES.map((s, i) => (
               <li key={i} className="flex items-start gap-3">
                 <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl2 bg-amber/15 text-amber">
-                  <f.icon className="h-5 w-5" />
+                  <s.icon className="h-5 w-5" />
                 </span>
-                <span className="text-sm text-white/80">{f.text}</span>
+                <div>
+                  <p className="text-sm font-semibold text-white/90">{s.title}</p>
+                  <p className="text-[11px] leading-snug text-white/55">{s.desc}</p>
+                </div>
               </li>
             ))}
           </ul>
         </div>
-        <p className="text-xs text-white/40">© Công ty CP Xây dựng DOSCO</p>
+        <p className="text-xs text-white/40">© DOSCO CO., LTD · Coma Building, 125D Minh Khai, Hà Nội</p>
       </div>
 
       {/* ============ PANEL FORM ============ */}
@@ -138,9 +152,9 @@ export default function LoginPage() {
               alt="DOSCO Logo"
               className="mx-auto mb-3 h-14 w-auto rounded-xl2 bg-white px-5 py-2.5 object-contain lg:hidden"
             />
-            <p className="text-sm text-white/60 lg:hidden">Hệ thống quản lý dự án xây dựng</p>
+            <p className="text-sm text-white/60 lg:hidden">Tư vấn – thiết kế hạ tầng &amp; khảo sát · Việt Nam – Nhật Bản</p>
             <h2 className="hidden text-2xl font-bold text-ink lg:block">Đăng nhập</h2>
-            <p className="hidden text-sm text-muted lg:block">Đăng nhập để vào hệ thống quản lý.</p>
+            <p className="hidden text-sm text-muted lg:block">Đăng nhập để truy cập hệ thống nội bộ DOSCO.</p>
           </div>
 
           <div className="rounded-xl2 bg-white p-5 shadow-card lg:border lg:border-line">
