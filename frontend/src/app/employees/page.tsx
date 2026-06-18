@@ -12,6 +12,7 @@ import {
   XMarkIcon,
   CheckIcon,
   ShieldCheckIcon,
+  KeyIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
@@ -62,6 +63,11 @@ export default function EmployeesPage() {
   const [pendingError, setPendingError] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  // Admin đặt lại mật khẩu cho nhân viên đang chọn.
+  const [newPassword, setNewPassword] = useState("");
+  const [resetMsg, setResetMsg] = useState("");
+  const [resetting, setResetting] = useState(false);
+
   useEffect(() => {
     // 1. Get current logged in user to check permission
     api.me()
@@ -100,6 +106,8 @@ export default function EmployeesPage() {
       });
       setSuccessMsg("");
       setErrorMsg("");
+      setNewPassword("");
+      setResetMsg("");
     }
   }, [selectedUser]);
 
@@ -168,6 +176,21 @@ export default function EmployeesPage() {
       setPendingError(err.message || "Không từ chối được tài khoản.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!selectedUser || newPassword.length < 6) return;
+    setResetting(true);
+    setResetMsg("");
+    try {
+      await api.resetUserPassword(selectedUser.id, newPassword);
+      setResetMsg(`Đã đặt lại mật khẩu cho ${selectedUser.full_name}. Hãy gửi mật khẩu mới cho nhân viên.`);
+      setNewPassword("");
+    } catch (err: any) {
+      setResetMsg(err.message || "Không đặt lại được mật khẩu.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -246,10 +269,14 @@ export default function EmployeesPage() {
         <section className="flex items-start gap-2 rounded-xl2 border border-line bg-white p-3 text-[11px] text-muted shadow-card">
           <ShieldCheckIcon className="h-4 w-4 shrink-0 text-steel" />
           <p>
-            Người dùng đăng nhập bằng <span className="font-semibold text-ink">tài khoản Google cá nhân</span>.{" "}
-            {canManage
-              ? "Bạn (Quản trị web / Giám đốc) có thể thêm người mới bằng email Gmail của họ, đổi vai trò, hoặc khóa quyền truy cập."
-              : "Chỉ Giám đốc & Quản trị web mới được thêm/sửa người được truy cập."}
+            {canManage ? (
+              <>
+                Cấp quyền bằng cách <span className="font-semibold text-ink">tạo tài khoản (email + mật khẩu) và phân vị trí</span>,
+                rồi gửi thông tin đăng nhập cho nhân viên. Chỉ Giám đốc &amp; Quản trị web được thêm / sửa / khóa / đặt lại mật khẩu.
+              </>
+            ) : (
+              "Chỉ Giám đốc & Quản trị web mới được thêm/sửa người được truy cập."
+            )}
           </p>
         </section>
 
@@ -522,6 +549,35 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
+              {/* Đặt lại mật khẩu (admin cấp lại khi nhân viên quên) */}
+              <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
+                <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-steel">
+                  <KeyIcon className="h-4 w-4" />
+                  Đặt lại mật khẩu
+                </h3>
+                {resetMsg && <p className="text-[11px] font-medium text-ok">{resetMsg}</p>}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[11px] font-semibold text-muted">Mật khẩu mới (≥6 ký tự)</label>
+                    <input
+                      type="text"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                      placeholder="Nhập mật khẩu mới rồi gửi cho nhân viên"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    disabled={resetting || newPassword.length < 6}
+                    className="shrink-0 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {resetting ? "Đang lưu…" : "Đặt lại"}
+                  </button>
+                </div>
+              </div>
+
               {/* Lịch làm việc */}
               <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
                 <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
@@ -630,32 +686,32 @@ export default function EmployeesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Email Google (Gmail) *</label>
+                  <label className="block text-[11px] font-semibold text-muted">Email đăng nhập *</label>
                   <input
                     type="email"
                     required
                     value={createData.email}
                     onChange={(e) => setCreateData({ ...createData, email: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                    placeholder="ten@gmail.com"
+                    placeholder="ten@dosco.vn"
                   />
                   <p className="mt-1 text-[10px] text-muted">
-                    Nhập đúng địa chỉ Gmail người này dùng để đăng nhập. Chỉ email đã thêm ở đây mới vào được web.
+                    Email để nhân viên đăng nhập. (Nếu sau này bật đăng nhập Google thì đây cũng là email Google của họ.)
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Mật khẩu (tùy chọn)</label>
+                  <label className="block text-[11px] font-semibold text-muted">Mật khẩu đăng nhập</label>
                   <input
                     type="text"
                     minLength={6}
                     value={createData.password}
                     onChange={(e) => setCreateData({ ...createData, password: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                    placeholder="Để trống nếu chỉ đăng nhập bằng Google"
+                    placeholder="VD: dosco@2026"
                   />
                   <p className="mt-1 text-[10px] text-muted">
-                    Bỏ trống ⇒ tài khoản chỉ đăng nhập bằng Google. Nhập (≥6 ký tự) nếu muốn cấp thêm đăng nhập bằng mật khẩu.
+                    Đặt mật khẩu rồi gửi cho nhân viên (đăng nhập xong họ có thể tự đổi). Bỏ trống nếu chỉ dùng Google.
                   </p>
                 </div>
 

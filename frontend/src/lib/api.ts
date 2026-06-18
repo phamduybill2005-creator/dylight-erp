@@ -278,5 +278,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  resetUserPassword: (id: number, new_password: string) =>
+    request<void>(`/auth/users/${id}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ new_password }),
+    }),
 };
 

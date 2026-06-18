@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import User, UserRole, Company
-from app.schemas import Token, UserOut, UserUpdate, UserCreate, GoogleLoginRequest, ChangePassword
+from app.schemas import Token, UserOut, UserUpdate, UserCreate, GoogleLoginRequest, ChangePassword, AdminResetPassword
 from app.security import create_access_token, verify_password, hash_password
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
@@ -207,8 +207,24 @@ def update_user(
 
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(user, k, v)
-        
+
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.post("/users/{user_id}/reset-password", status_code=204)
+def admin_reset_password(
+    user_id: int,
+    payload: AdminResetPassword,
+    db: Session = Depends(get_db),
+    # CHỈ Giám đốc & Quản trị web (ADMIN) mới được đặt lại mật khẩu cho người khác.
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+):
+    """Đặt lại mật khẩu cho nhân viên (admin cấp lại khi nhân viên quên), không cần mật khẩu cũ."""
+    user = db.get(User, user_id)
+    if not user or user.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy nhân viên.")
+    user.hashed_password = hash_password(payload.new_password)
+    db.commit()
 

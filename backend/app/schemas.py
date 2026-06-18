@@ -478,6 +478,11 @@ class ChangePassword(BaseModel):
     new_password: str = Field(min_length=6)
 
 
+class AdminResetPassword(BaseModel):
+    """Quản trị/Giám đốc đặt lại mật khẩu cho nhân viên (không cần mật khẩu cũ)."""
+    new_password: str = Field(min_length=6)
+
+
 # ------------------------- LEAVE (nghỉ phép) -------------------------
 class LeaveCreate(BaseModel):
     from_date: date
