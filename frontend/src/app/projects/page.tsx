@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PlusIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
@@ -25,6 +26,12 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [profit, setProfit] = useState<Record<number, ProjectProfit>>({});
   const [showFinance, setShowFinance] = useState(false);
+
+  // Thêm nhanh nhiều dự án (dán từ Excel / gõ mỗi dòng 1 dự án).
+  const [showAdd, setShowAdd] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [addResult, setAddResult] = useState("");
 
   useEffect(() => {
     api.projects().then(setProjects).catch(() => {});
@@ -58,6 +65,52 @@ export default function ProjectsPage() {
   );
   const totalMargin = totals.contract > 0 ? (totals.profit / totals.contract) * 100 : 0;
 
+  // Mỗi dòng 1 dự án; các cột ngăn cách bằng dấu phẩy / Tab / ; / | : Mã, Tên, Địa điểm, Quản lý.
+  function parseBulk(text: string, startIndex: number) {
+    return text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((line, idx) => {
+        const parts = line.split(/[\t,;|]/).map((s) => s.trim());
+        let code = "";
+        let name = "";
+        let location = "";
+        let manager_name = "";
+        if (parts.length === 1) {
+          name = parts[0];
+        } else {
+          code = parts[0] || "";
+          name = parts[1] || "";
+          location = parts[2] || "";
+          manager_name = parts[3] || "";
+        }
+        if (!name) name = code;
+        if (!code) code = `DA${String(startIndex + idx + 1).padStart(3, "0")}`;
+        return { code, name, location: location || null, manager_name: manager_name || null };
+      })
+      .filter((p) => p.name);
+  }
+
+  const previewCount = parseBulk(bulkText, projects.length).length;
+
+  async function handleBulkCreate() {
+    const items = parseBulk(bulkText, projects.length);
+    if (items.length === 0) return;
+    setCreating(true);
+    setAddResult("");
+    const results = await Promise.allSettled(items.map((it) => api.createProject(it)));
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    const fails = items.filter((_, i) => results[i].status === "rejected").map((it) => it.name);
+    const fresh = await api.projects().catch(() => null);
+    if (fresh) setProjects(fresh);
+    setAddResult(
+      `Đã tạo ${ok}/${items.length} dự án.` + (fails.length ? ` Lỗi: ${fails.join(", ")}` : "")
+    );
+    if (fails.length === 0) setBulkText("");
+    setCreating(false);
+  }
+
   const TH = "border border-line px-3 py-2 font-semibold whitespace-nowrap";
   const TD = "border border-line px-3 py-2 align-middle";
   // Số cột phần "thông tin" (trước các cột tiền) để gộp ô cho dòng TỔNG CỘNG.
@@ -65,10 +118,20 @@ export default function ProjectsPage() {
 
   return (
     <AppShell>
-      <h1 className="text-lg font-semibold text-ink lg:text-2xl">Dự án & Hợp đồng</h1>
-      <p className="mt-0.5 text-xs text-muted lg:text-sm">
-        Theo dõi vòng đời dự án từ đấu thầu tới quyết toán.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-ink lg:text-2xl">Dự án & Hợp đồng</h1>
+          <p className="mt-0.5 text-xs text-muted lg:text-sm">
+            Theo dõi vòng đời dự án từ đấu thầu tới quyết toán.
+          </p>
+        </div>
+        <button
+          onClick={() => { setShowAdd(true); setAddResult(""); }}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-3.5 py-2.5 text-xs font-semibold text-white shadow-card hover:bg-steel transition-colors"
+        >
+          <PlusIcon className="h-4 w-4" /> Thêm dự án
+        </button>
+      </div>
 
       <div className="mt-4 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
         <table className="w-full min-w-[680px] border-collapse text-sm">
@@ -160,6 +223,62 @@ export default function ProjectsPage() {
       </div>
 
       <p className="mt-2 text-[11px] text-muted">Bấm vào một hàng để xem chi tiết dự án.</p>
+
+      {/* Thêm nhanh nhiều dự án — dán từ Excel, mỗi dòng 1 dự án */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-ink/50 backdrop-blur-sm">
+          <div className="flex h-full w-full max-w-lg flex-col bg-paper shadow-2xl animate-slide-in">
+            <header className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
+              <div className="flex items-center gap-2">
+                <PlusIcon className="h-5 w-5 text-steel" />
+                <h2 className="text-sm font-bold text-ink">Thêm nhanh dự án</h2>
+              </div>
+              <button onClick={() => setShowAdd(false)} className="rounded-full p-1.5 text-muted hover:bg-paper hover:text-ink">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </header>
+
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              <p className="text-xs text-muted">
+                Dán hoặc gõ <b className="text-ink">mỗi dòng một dự án</b>. Mỗi dòng theo thứ tự:{" "}
+                <b className="text-ink">Mã, Tên dự án, Địa điểm, Quản lý</b> — ngăn cách bằng dấu phẩy hoặc Tab
+                (dán thẳng từ Excel được). Mã / Địa điểm / Quản lý có thể bỏ trống (mã tự sinh nếu thiếu).
+              </p>
+              <div className="rounded-xl2 bg-white p-3 font-mono text-[11px] leading-relaxed text-muted shadow-card">
+                CĐ-01, Cầu Sông Hàn, Đà Nẵng, Nguyễn Văn A<br />
+                ĐB-02, Đường tránh QL1, Quảng Nam<br />
+                , Kè chống sạt lở Sông Thu
+              </div>
+              <textarea
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                rows={12}
+                className="w-full rounded-xl2 border border-line bg-white px-3 py-2 font-mono text-xs outline-none focus:border-steel"
+                placeholder={"CĐ-01, Cầu Sông Hàn, Đà Nẵng\nĐB-02, Đường tránh QL1, Quảng Nam"}
+              />
+              {addResult && <p className="text-xs font-medium text-ink">{addResult}</p>}
+            </div>
+
+            <footer className="flex items-center justify-between gap-3 border-t border-line bg-white p-4">
+              <span className="text-[11px] text-muted">
+                Sẽ tạo <b className="text-ink">{previewCount}</b> dự án
+              </span>
+              <div className="flex gap-2">
+                <button onClick={() => setShowAdd(false)} className="rounded-xl2 border border-line px-4 py-2.5 text-xs font-semibold text-muted hover:bg-paper">
+                  Đóng
+                </button>
+                <button
+                  onClick={handleBulkCreate}
+                  disabled={creating || previewCount === 0}
+                  className="inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50"
+                >
+                  {creating ? "Đang tạo…" : <><CheckIcon className="h-4 w-4" /> Tạo {previewCount} dự án</>}
+                </button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
