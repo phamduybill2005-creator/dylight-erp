@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import Evaluation, EvaluationDirection, User, UserRole
-from app.schemas import EvaluationCreate, EvaluationOut
+from app.schemas import EvaluationCreate, EvaluationOut, EvaluationSummary
 
 router = APIRouter(prefix="/evaluations", tags=["Đánh giá"])
 
@@ -94,6 +94,47 @@ def evaluations_given(
         .order_by(Evaluation.period.desc())
         .all()
     )
+
+
+@router.get("/all", response_model=list[EvaluationOut])
+def all_evaluations(
+    period: str | None = None,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+):
+    """TẤT CẢ phiếu đánh giá trong công ty (Giám đốc) — lọc theo kỳ (tuần) nếu có."""
+    q = db.query(Evaluation).filter(Evaluation.company_id == current.company_id)
+    if period:
+        q = q.filter(Evaluation.period == period)
+    return q.order_by(Evaluation.period.desc(), Evaluation.id.desc()).all()
+
+
+@router.get("/summary", response_model=list[EvaluationSummary])
+def evaluations_summary(
+    period: str | None = None,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+):
+    """Tổng hợp điểm trung bình MỖI NGƯỜI NHẬN trong kỳ (Giám đốc) — số liệu được đẩy lên."""
+    q = db.query(Evaluation).filter(Evaluation.company_id == current.company_id)
+    if period:
+        q = q.filter(Evaluation.period == period)
+    evals = q.all()
+    users = {u.id: u for u in db.query(User).filter(User.company_id == current.company_id).all()}
+    ratings: dict[int, list[int]] = {}
+    for e in evals:
+        ratings.setdefault(e.evaluatee_id, []).append(e.rating)
+    out = []
+    for uid, rs in ratings.items():
+        u = users.get(uid)
+        if not u:
+            continue
+        out.append(EvaluationSummary(
+            user_id=uid, full_name=u.full_name, role=u.role,
+            avg_rating=round(sum(rs) / len(rs), 2), num_ratings=len(rs),
+        ))
+    # Điểm thấp lên đầu để Giám đốc chú ý trước.
+    return sorted(out, key=lambda s: (s.avg_rating, -s.num_ratings))
 
 
 @router.get("", response_model=list[EvaluationOut])

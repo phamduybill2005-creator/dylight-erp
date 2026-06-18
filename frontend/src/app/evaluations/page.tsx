@@ -12,9 +12,16 @@ import { ChatBubbleLeftRightIcon, UserCircleIcon } from "@heroicons/react/24/out
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
-import type { Evaluation, User } from "@/lib/types";
+import type { Evaluation, EvaluationSummary, User } from "@/lib/types";
 
-const monthStr = () => new Date().toISOString().slice(0, 7);
+// Kỳ đánh giá theo TUẦN = ngày Thứ 7 của tuần đó (YYYY-MM-DD).
+function weekSaturday(d: Date = new Date()): string {
+  const x = new Date(d);
+  x.setDate(x.getDate() + (6 - x.getDay())); // CN(0)…T7(6) -> tới Thứ 7 cùng tuần
+  return x.toISOString().slice(0, 10);
+}
+const fmtSat = (s: string) =>
+  new Date(s + "T00:00:00").toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 function Stars({ value, onChange }: { value: number; onChange?: (n: number) => void }) {
   return (
@@ -69,12 +76,20 @@ export default function EvaluationsPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // director: phiếu của 1 người đang xem
-  const [viewing, setViewing] = useState<User | null>(null);
-  const [viewEvals, setViewEvals] = useState<Evaluation[]>([]);
+  // director: tổng hợp + tất cả phiếu theo tuần
+  const [selPeriod, setSelPeriod] = useState(weekSaturday());
+  const [summary, setSummary] = useState<EvaluationSummary[]>([]);
+  const [allEvals, setAllEvals] = useState<Evaluation[]>([]);
 
-  const period = monthStr();
+  const period = weekSaturday();
   const tier = user ? roleTier(user.role) : "STAFF";
+
+  // Giám đốc: nạp số liệu tổng hợp + tất cả phiếu khi đổi tuần.
+  useEffect(() => {
+    if (!user || roleTier(user.role) !== "DIRECTOR") return;
+    api.evaluationsSummary(selPeriod).then(setSummary).catch(() => {});
+    api.allEvaluations(selPeriod).then(setAllEvals).catch(() => {});
+  }, [user, selPeriod]);
 
   useEffect(() => {
     api.me()
@@ -125,16 +140,6 @@ export default function EvaluationsPage() {
     }
   }
 
-  async function viewUser(u: User) {
-    setViewing(u);
-    setViewEvals([]);
-    try {
-      setViewEvals(await api.evaluationsForUser(u.id));
-    } catch {
-      /* bỏ qua */
-    }
-  }
-
   if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper">
@@ -158,7 +163,7 @@ export default function EvaluationsPage() {
         <section className="mt-4 rounded-xl2 bg-white p-4 shadow-card lg:p-6">
           {user.manager_id ? (
             <>
-              <p className="text-xs text-muted">Kỳ đánh giá {period} · Quản lý trực tiếp</p>
+              <p className="text-xs text-muted">Đánh giá tuần · hạn <b className="text-ink">Thứ 7 {fmtSat(period)}</b> · Quản lý trực tiếp</p>
               <p className="mt-1 text-base font-bold text-ink">{user.manager_name || "Quản lý"}</p>
 
               <p className="mt-4 text-[11px] font-semibold text-muted">Mức độ hài lòng</p>
@@ -237,45 +242,100 @@ export default function EvaluationsPage() {
     );
   }
 
-  // ==================== GIÁM ĐỐC (chỉ xem) ====================
+  // ============ GIÁM ĐỐC (xem số liệu đánh giá được đẩy lên) ============
   if (tier === "DIRECTOR") {
+    const avgAll = summary.length
+      ? (summary.reduce((a, s) => a + s.avg_rating, 0) / summary.length).toFixed(2)
+      : "—";
     return (
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
-          <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự (xem)</h1>
+          <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự — số liệu</h1>
         </header>
 
-        <section className="mt-4">
-          <h2 className="mb-2 text-sm font-semibold text-ink">Chọn nhân sự để xem phiếu</h2>
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
-            {users.map((u) => (
-              <button
-                key={u.id}
-                onClick={() => viewUser(u)}
-                className={`flex w-full items-center justify-between rounded-xl2 bg-white p-3 text-left shadow-card ${viewing?.id === u.id ? "border-l-4 border-amber" : ""}`}
-              >
-                <span className="text-sm font-semibold text-ink">{u.full_name}</span>
-                <span className="text-[11px] text-muted">{u.email}</span>
-              </button>
-            ))}
+        {/* Chọn tuần */}
+        <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-3 shadow-card">
+          <div className="text-xs text-muted">
+            Tuần đánh giá đến hết <b className="text-ink">Thứ 7 {fmtSat(selPeriod)}</b>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={selPeriod}
+              onChange={(e) => e.target.value && setSelPeriod(weekSaturday(new Date(e.target.value + "T00:00:00")))}
+              className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel"
+            />
+            <button
+              onClick={() => setSelPeriod(weekSaturday())}
+              className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper"
+            >
+              Tuần này
+            </button>
           </div>
         </section>
 
-        {viewing && (
-          <section className="mt-5">
-            <h2 className="mb-2 text-sm font-semibold text-ink">Phiếu đánh giá: {viewing.full_name}</h2>
-            <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-              {viewEvals.length === 0 ? (
-                <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2">
-                  Chưa có phiếu đánh giá nào.
-                </p>
-              ) : (
-                viewEvals.map((e) => <EvalCard key={e.id} e={e} who="evaluator" />)
-              )}
-            </div>
-          </section>
-        )}
+        {/* Điểm trung bình mỗi người (điểm thấp lên đầu) */}
+        <section className="mt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink">Điểm trung bình mỗi người ({summary.length})</h2>
+            <span className="text-[11px] text-muted">
+              TB chung: <b className="text-amber-deep">{avgAll}★</b>
+            </span>
+          </div>
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
+            {summary.length === 0 ? (
+              <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2 xl:col-span-3">
+                Chưa có đánh giá nào trong tuần này.
+              </p>
+            ) : (
+              summary.map((s) => (
+                <div key={s.user_id} className="flex items-center justify-between rounded-xl2 bg-white p-3 shadow-card">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{s.full_name}</p>
+                    <p className="text-[10px] text-muted">{s.num_ratings} phiếu</p>
+                  </div>
+                  <span
+                    className={`flex shrink-0 items-center gap-1 text-sm font-bold ${
+                      s.avg_rating >= 4 ? "text-ok" : s.avg_rating >= 2.5 ? "text-amber-deep" : "text-bad"
+                    }`}
+                  >
+                    {s.avg_rating.toFixed(1)} <StarIcon className="h-4 w-4" />
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Tất cả phiếu trong tuần */}
+        <section className="mt-5">
+          <div className="mb-2 flex items-center gap-2">
+            <ChatBubbleLeftRightIcon className="h-5 w-5 text-steel" />
+            <h2 className="text-sm font-semibold text-ink">Tất cả phiếu trong tuần ({allEvals.length})</h2>
+          </div>
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
+            {allEvals.length === 0 ? (
+              <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2">
+                Chưa có phiếu nào.
+              </p>
+            ) : (
+              allEvals.map((e) => (
+                <div key={e.id} className="rounded-xl2 bg-white p-3 shadow-card">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate text-xs text-ink">
+                      <b>{e.evaluator_name}</b> <span className="text-muted">đánh giá</span> <b>{e.evaluatee_name}</b>
+                    </p>
+                    <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-amber">
+                      {e.rating} <StarIcon className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                  {e.comment && <p className="mt-1 text-[11px] text-muted">{e.comment}</p>}
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </AppShell>
     );
   }
@@ -313,7 +373,7 @@ export default function EvaluationsPage() {
 
                   {target?.id === u.id && (
                     <div className="mt-3 border-t border-line pt-3">
-                      <p className="text-[11px] font-semibold text-muted">Kỳ {period} · Mức điểm</p>
+                      <p className="text-[11px] font-semibold text-muted">Tuần (hạn T7 {fmtSat(period)}) · Mức điểm</p>
                       <div className="mt-1">
                         <Stars value={rating} onChange={setRating} />
                       </div>

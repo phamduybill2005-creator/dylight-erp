@@ -381,7 +381,8 @@ class AttendanceSummary(BaseModel):
 
 # ------------------------- EVALUATION (ĐÁNH GIÁ) -------------------------
 class EvaluationCreate(BaseModel):
-    period: str = Field(pattern=r"^\d{4}-\d{2}$", description="Kỳ đánh giá 'YYYY-MM'")
+    # Kỳ đánh giá theo TUẦN = ngày Thứ 7 của tuần đó 'YYYY-MM-DD'.
+    period: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Kỳ đánh giá tuần = ngày Thứ 7 'YYYY-MM-DD'")
     evaluatee_id: int
     rating: int = Field(ge=1, le=5)
     comment: str | None = None
@@ -400,6 +401,15 @@ class EvaluationOut(BaseModel):
     created_at: datetime
     evaluator_name: str | None = None
     evaluatee_name: str | None = None
+
+
+class EvaluationSummary(BaseModel):
+    """Tổng hợp điểm 1 người NHẬN được trong kỳ — cho Giám đốc xem."""
+    user_id: int
+    full_name: str
+    role: UserRole
+    avg_rating: float
+    num_ratings: int
 
 
 # ------------------------- PARTNER (ĐỐI TÁC) -------------------------

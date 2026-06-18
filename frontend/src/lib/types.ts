@@ -344,3 +344,12 @@ export interface Colleague {
   in_my_team: boolean;
 }
 
+// Tổng hợp điểm đánh giá 1 người nhận trong kỳ (cho Giám đốc)
+export interface EvaluationSummary {
+  user_id: number;
+  full_name: string;
+  role: Role;
+  avg_rating: number;
+  num_ratings: number;
+}
+
