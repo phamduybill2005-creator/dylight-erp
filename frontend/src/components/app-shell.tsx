@@ -29,12 +29,14 @@ import {
   TruckIcon,
   ShieldCheckIcon,
   RectangleStackIcon,
+  PresentationChartLineIcon,
 } from "@heroicons/react/24/outline";
 import { api, tokenStore } from "@/lib/api";
 import { ROLE_LABEL, roleTier, type Tier } from "@/lib/roles";
 import type { Company, User } from "@/lib/types";
 import NotificationsBell from "./notifications-bell";
 import AccountMenu from "./account-menu";
+import DeadlineAlert from "./deadline-alert";
 
 type IconType = React.ComponentType<{ className?: string }>;
 type NavLink = { href: string; label: string; icon: IconType };
@@ -68,6 +70,7 @@ function deskNav(tier: Tier): NavLink[] {
   ];
   if (tier === "DIRECTOR") {
     items.push(
+      { href: "/project-progress", label: "Tiến độ dự án", icon: PresentationChartLineIcon },
       { href: "/partners", label: "Đối tác", icon: BuildingOffice2Icon },
       { href: "/payroll", label: "Bảng lương", icon: UsersIcon },
       { href: "/finance", label: "Tài chính & Công nợ", icon: CurrencyDollarIcon },
@@ -273,6 +276,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <NotificationsBell />
+      <DeadlineAlert user={user} />
     </div>
   );
 }
