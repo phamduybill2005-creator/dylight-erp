@@ -28,12 +28,12 @@ import {
   TruckIcon,
   ShieldCheckIcon,
   RectangleStackIcon,
-  ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { api, tokenStore } from "@/lib/api";
 import { ROLE_LABEL, roleTier, type Tier } from "@/lib/roles";
 import type { Company, User } from "@/lib/types";
 import NotificationsBell from "./notifications-bell";
+import AccountMenu from "./account-menu";
 
 type IconType = React.ComponentType<{ className?: string }>;
 type NavLink = { href: string; label: string; icon: IconType };
@@ -170,23 +170,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Người dùng + Đăng xuất */}
+        {/* Tài khoản — bấm vào ảnh + tên để xem thông tin cá nhân / đổi mật khẩu / đăng xuất */}
         <div className="border-t border-white/10 px-3 py-3">
-          <div className="flex items-center gap-2 px-2 py-1">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber text-ink">
-              <UserCircleIcon className="h-6 w-6" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-white">{user?.full_name ?? "—"}</p>
-              <p className="truncate text-[10px] text-white/50">{user?.role ? ROLE_LABEL[user.role] : ""}</p>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            className="mt-2 flex w-full items-center gap-2 rounded-xl2 px-3 py-2 text-xs text-white/70 hover:bg-white/10 hover:text-white"
-          >
-            <ArrowRightOnRectangleIcon className="h-4 w-4" /> Đăng xuất
-          </button>
+          <AccountMenu user={user} onLogout={logout} variant="sidebar" />
         </div>
       </aside>
 
@@ -232,13 +218,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
               </div>
-              <button
-                onClick={logout}
-                className="flex h-[30px] w-[30px] items-center justify-center rounded-xl2 bg-white/10 text-white hover:bg-white/20 transition-colors"
-                title="Đăng xuất"
-              >
-                <ArrowRightOnRectangleIcon className="h-4 w-4" />
-              </button>
+              <AccountMenu user={user} onLogout={logout} variant="header" />
             </div>
           </div>
         </header>
