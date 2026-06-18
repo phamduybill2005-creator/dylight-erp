@@ -427,8 +427,8 @@ export default function EmployeesPage() {
               return (
                 <div
                   key={u.id}
-                  onClick={() => canManage && setSelectedUser(u)}
-                  className={`rounded-xl2 bg-white p-4 shadow-card transition-all border-l-4 ${canManage ? "cursor-pointer" : ""} ${
+                  onClick={() => canAssign && setSelectedUser(u)}
+                  className={`rounded-xl2 bg-white p-4 shadow-card transition-all border-l-4 ${canAssign ? "cursor-pointer" : ""} ${
                     isSelected ? "border-amber bg-amber/5" : "border-transparent hover:border-slate-300"
                   } ${u.is_active ? "" : "opacity-60"}`}
                 >
@@ -445,7 +445,7 @@ export default function EmployeesPage() {
                         </span>
                       </div>
                     </div>
-                    {canManage && (
+                    {canAssign && (
                       <span className="rounded-md bg-paper p-1.5 text-muted hover:text-ink">
                         <PencilSquareIcon className="h-4 w-4" />
                       </span>
@@ -504,6 +504,14 @@ export default function EmployeesPage() {
                 </div>
               )}
 
+              {!canManage && (
+                <div className="rounded-xl2 bg-white p-3 text-[11px] text-muted shadow-card">
+                  Bạn đang ở chế độ <b className="text-ink">giao việc</b>. Chỉ Giám đốc/Quản trị mới sửa được hồ sơ, vai trò, mật khẩu.
+                </div>
+              )}
+
+              {canManage && (
+              <>
               {/* Thông tin hồ sơ */}
               <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
                 <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
@@ -654,6 +662,8 @@ export default function EmployeesPage() {
                   </button>
                 </div>
               </div>
+              </>
+              )}
 
               {/* Phần việc / Giao việc (Giám đốc/Quản lý giao cho người này) */}
               {canAssign && (
@@ -729,6 +739,8 @@ export default function EmployeesPage() {
                 </div>
               )}
 
+              {canManage && (
+              <>
               {/* Lịch làm việc */}
               <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
                 <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
@@ -762,6 +774,8 @@ export default function EmployeesPage() {
                   />
                 </div>
               </div>
+              </>
+              )}
             </form>
 
             {/* Modal Actions */}
@@ -773,21 +787,23 @@ export default function EmployeesPage() {
               >
                 Hủy bỏ
               </button>
-              <button
-                type="submit"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 rounded-xl2 bg-ink text-white py-2.5 text-xs font-semibold hover:bg-steel transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
-              >
-                {saving ? (
-                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-amber" />
-                ) : (
-                  <>
-                    <CheckIcon className="h-4 w-4" />
-                    Lưu thay đổi
-                  </>
-                )}
-              </button>
+              {canManage && (
+                <button
+                  type="submit"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 rounded-xl2 bg-ink text-white py-2.5 text-xs font-semibold hover:bg-steel transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+                >
+                  {saving ? (
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-amber" />
+                  ) : (
+                    <>
+                      <CheckIcon className="h-4 w-4" />
+                      Lưu thay đổi
+                    </>
+                  )}
+                </button>
+              )}
             </footer>
           </div>
         </div>
