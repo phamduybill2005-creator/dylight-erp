@@ -25,19 +25,27 @@ export default function PayrollPage() {
   const [period, setPeriod] = useState(monthStr());
   const [rows, setRows] = useState<Payroll[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [sharingBusy, setSharingBusy] = useState(false);
 
   useEffect(() => {
     api.me()
       .then((u) => {
         setMe(u);
         if (!isDirector(u.role)) { setDenied(true); setLoading(false); return; }
-        Promise.all([api.salaryStaff(), api.payrollList(monthStr())])
-          .then(([s, p]) => { setStaff(s); setRows(p); })
+        Promise.all([api.salaryStaff(), api.payrollList(monthStr()), api.payrollSharing()])
+          .then(([s, p, sh]) => { setStaff(s); setRows(p); setShared(sh.shared); })
           .catch(() => {})
           .finally(() => setLoading(false));
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  async function toggleSharing() {
+    setSharingBusy(true);
+    try { const r = await api.setPayrollSharing(!shared); setShared(r.shared); }
+    catch { /* noop */ } finally { setSharingBusy(false); }
+  }
 
   function patchLocal(id: number, field: keyof SalaryConfig, value: any) {
     setStaff((xs) => xs.map((s) => (s.id === id ? { ...s, [field]: value } : s)));
@@ -96,6 +104,27 @@ export default function PayrollPage() {
         <BanknotesIcon className="h-5 w-5 text-amber" />
         <h1 className="text-base lg:text-xl font-bold">Bảng lương</h1>
       </header>
+
+      {/* Công tắc chia sẻ phiếu lương cho nhân viên */}
+      <section className="mt-3 flex items-center justify-between gap-3 rounded-xl2 border border-line bg-white p-4 shadow-card">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink">Chia sẻ phiếu lương cho nhân viên</p>
+          <p className="mt-0.5 text-[11px] text-muted">
+            {shared
+              ? "Đang bật: mỗi người tự xem phiếu lương CỦA MÌNH ở mục Cá nhân (không thấy của người khác)."
+              : "Đang tắt: chỉ Giám đốc thấy bảng lương. Bật để mỗi nhân viên xem được phiếu lương của chính họ."}
+          </p>
+        </div>
+        <button
+          onClick={toggleSharing}
+          disabled={sharingBusy}
+          role="switch"
+          aria-checked={shared}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${shared ? "bg-ok" : "bg-line"}`}
+        >
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${shared ? "left-[22px]" : "left-0.5"}`} />
+        </button>
+      </section>
 
       {/* 1. Cấu hình lương */}
       <section className="mt-4">

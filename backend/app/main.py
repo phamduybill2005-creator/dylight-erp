@@ -49,6 +49,13 @@ def _ensure_schema() -> None:
             with engine.begin() as conn:
                 for sql in missing:
                     conn.execute(text(sql))
+
+        # Bảng companies: cờ chia sẻ phiếu lương.
+        if "companies" in insp.get_table_names():
+            ccols = {c["name"] for c in insp.get_columns("companies")}
+            if "payroll_shared" not in ccols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE companies ADD COLUMN payroll_shared BOOLEAN DEFAULT FALSE"))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] bo qua: {_e}")
 

@@ -219,6 +219,11 @@ export const api = {
     request<Payroll[]>(`/payroll/generate?period=${period}`, { method: "POST" }),
   payrollList: (period?: string) =>
     request<Payroll[]>(`/payroll${period ? `?period=${period}` : ""}`),
+  payrollSharing: () => request<{ shared: boolean }>("/payroll/sharing"),
+  setPayrollSharing: (shared: boolean) =>
+    request<{ shared: boolean }>("/payroll/sharing", { method: "PATCH", body: JSON.stringify({ shared }) }),
+  myPayroll: (period?: string) =>
+    request<{ shared: boolean; items: Payroll[] }>(`/payroll/me${period ? `?period=${period}` : ""}`),
 
   // --- Tài chính (Giám đốc) ---
   financeSummary: () => request<FinanceSummary>("/finance/summary"),

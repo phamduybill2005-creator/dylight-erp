@@ -475,6 +475,17 @@ class PayrollOut(BaseModel):
     user_name: str | None = None
 
 
+class PayrollSharing(BaseModel):
+    """Trạng thái chia sẻ phiếu lương (Giám đốc bật/tắt cho cả công ty)."""
+    shared: bool
+
+
+class MyPayrollResponse(BaseModel):
+    """Phiếu lương của chính người đăng nhập + cờ đã được chia sẻ chưa."""
+    shared: bool
+    items: list[PayrollOut] = []
+
+
 # ------------------------- AUTH (đổi mật khẩu) -------------------------
 class ChangePassword(BaseModel):
     old_password: str

@@ -11,16 +11,22 @@ import {
   AcademicCapIcon,
   BriefcaseIcon,
   UserGroupIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/roles";
-import type { User } from "@/lib/types";
+import { formatVND } from "@/lib/format";
+import type { User, Payroll } from "@/lib/types";
 
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Phiếu lương của tôi (chỉ hiện khi Giám đốc đã bật chia sẻ).
+  const [salaryShared, setSalaryShared] = useState(false);
+  const [payslips, setPayslips] = useState<Payroll[]>([]);
 
   // Đổi mật khẩu
   const [oldPw, setOldPw] = useState("");
@@ -49,6 +55,9 @@ export default function ProfilePage() {
       .catch(() => {
         router.push("/login");
       });
+    api.myPayroll()
+      .then((r) => { setSalaryShared(r.shared); setPayslips(r.items); })
+      .catch(() => {});
   }, [router]);
 
   if (loading) {
@@ -135,6 +144,39 @@ export default function ProfilePage() {
             </div>
           </div>
         </section>
+
+        {/* Phiếu lương của tôi — chỉ hiện khi Giám đốc đã bật chia sẻ */}
+        {salaryShared && (
+          <section className="rounded-xl2 bg-white p-5 shadow-card space-y-4 lg:p-6">
+            <h2 className="text-sm font-bold text-ink border-b border-line pb-2 flex items-center gap-2">
+              <BanknotesIcon className="h-5 w-5 text-steel" />
+              Phiếu lương của tôi
+            </h2>
+            {payslips.length === 0 ? (
+              <p className="text-center text-xs text-muted py-3">Chưa có phiếu lương nào.</p>
+            ) : (
+              <div className="space-y-3">
+                {payslips.map((r) => (
+                  <div key={r.id} className="rounded-xl2 border border-line p-3.5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-ink">Kỳ {r.period}</p>
+                      <p className="text-base font-bold text-ok">{formatVND(r.net)}</p>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                      <span className="text-muted">Ngày công: <b className="text-ink">{Number(r.working_days)}</b></span>
+                      <span className="text-muted">Tổng thu nhập: <b className="text-ink">{formatVND(r.gross)}</b></span>
+                      <span className="text-muted">Bảo hiểm (10,5%): <b className="text-ink">{formatVND(r.insurance)}</b></span>
+                      <span className="text-muted">Thuế TNCN: <b className="text-ink">{formatVND(r.personal_income_tax)}</b></span>
+                    </div>
+                    <p className="mt-2 border-t border-line/60 pt-2 text-xs text-muted">
+                      Thực nhận: <b className="text-ok">{formatVND(r.net)}</b>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Sơ yếu lý lịch (CV) */}
         <section className="rounded-xl2 bg-white p-5 shadow-card space-y-4 lg:p-6">

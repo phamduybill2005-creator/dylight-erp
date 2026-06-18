@@ -20,9 +20,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import require_roles
-from app.models import Attendance, Payroll, SalaryType, User, UserRole
-from app.schemas import PayrollOut, SalaryConfig, SalaryConfigUpdate
+from app.deps import get_current_user, require_roles
+from app.models import Attendance, Company, Payroll, SalaryType, User, UserRole
+from app.schemas import (
+    PayrollOut, SalaryConfig, SalaryConfigUpdate, PayrollSharing, MyPayrollResponse,
+)
 
 router = APIRouter(prefix="/payroll", tags=["Bảng lương"])
 
@@ -159,3 +161,44 @@ def list_payroll(
     if period:
         q = q.filter(Payroll.period == period)
     return q.order_by(Payroll.period.desc()).all()
+
+
+@router.get("/sharing", response_model=PayrollSharing)
+def get_sharing(db: Session = Depends(get_db), current: User = Depends(_GUARD)):
+    """Trạng thái chia sẻ phiếu lương của công ty (chỉ Giám đốc)."""
+    company = db.get(Company, current.company_id)
+    return PayrollSharing(shared=bool(company and company.payroll_shared))
+
+
+@router.patch("/sharing", response_model=PayrollSharing)
+def set_sharing(payload: PayrollSharing, db: Session = Depends(get_db), current: User = Depends(_GUARD)):
+    """Giám đốc bật/tắt chia sẻ phiếu lương cho nhân viên (mỗi người xem lương của mình)."""
+    company = db.get(Company, current.company_id)
+    if not company:
+        raise HTTPException(404, "Không tìm thấy công ty.")
+    company.payroll_shared = payload.shared
+    db.commit()
+    return PayrollSharing(shared=company.payroll_shared)
+
+
+@router.get("/me", response_model=MyPayrollResponse)
+def my_payroll(
+    period: str | None = None,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """
+    Phiếu lương CỦA CHÍNH MÌNH — mọi nhân viên xem được KHI Giám đốc đã bật chia sẻ.
+    Chưa bật -> shared=False, items rỗng (không lộ lương).
+    """
+    company = db.get(Company, current.company_id)
+    shared = bool(company and company.payroll_shared)
+    items: list[Payroll] = []
+    if shared:
+        q = db.query(Payroll).filter(
+            Payroll.company_id == current.company_id, Payroll.user_id == current.id
+        )
+        if period:
+            q = q.filter(Payroll.period == period)
+        items = q.order_by(Payroll.period.desc()).all()
+    return MyPayrollResponse(shared=shared, items=items)

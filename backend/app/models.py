@@ -125,6 +125,8 @@ class Company(Base):
     address: Mapped[str | None] = mapped_column(Text)
     phone: Mapped[str | None] = mapped_column(String(30))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Giám đốc bật để chia sẻ phiếu lương — mỗi nhân viên xem được lương CỦA MÌNH.
+    payroll_shared: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     users: Mapped[list["User"]] = relationship(back_populates="company")
