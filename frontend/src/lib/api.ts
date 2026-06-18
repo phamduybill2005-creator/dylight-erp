@@ -268,7 +268,7 @@ export const api = {
 
   // --- Users ---
   users: () => request<User[]>("/auth/users"),
-  createUser: (payload: Partial<User> & { email: string; full_name: string; password: string }) =>
+  createUser: (payload: Partial<User> & { email: string; full_name: string; password?: string }) =>
     request<User>("/auth/users", {
       method: "POST",
       body: JSON.stringify(payload),

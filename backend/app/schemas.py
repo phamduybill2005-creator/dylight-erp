@@ -53,6 +53,7 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     full_name: str | None = None
     role: UserRole | None = None
+    is_active: bool | None = None   # khóa/mở quyền truy cập web
     phone: str | None = None
     address: str | None = None
     dob: date | None = None
@@ -66,7 +67,8 @@ class UserCreate(BaseModel):
     """Dữ liệu tạo tài khoản nhân viên mới (company_id lấy từ người tạo)."""
     email: EmailStr
     full_name: str = Field(min_length=1)
-    password: str = Field(min_length=6, description="Mật khẩu đăng nhập (tối thiểu 6 ký tự)")
+    # Để TRỐNG nếu tài khoản chỉ đăng nhập bằng Google (hệ thống tự sinh mật khẩu ngẫu nhiên).
+    password: str | None = Field(default=None, min_length=6, description="Mật khẩu (>=6 ký tự); bỏ trống nếu dùng Google")
     role: UserRole = UserRole.FIELD_STAFF
     phone: str | None = None
     address: str | None = None

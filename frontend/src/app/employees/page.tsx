@@ -36,6 +36,7 @@ export default function EmployeesPage() {
     schedule: "",
     manager_id: "",
     role: "" as Role | "",
+    is_active: true,
   });
   
   const [saving, setSaving] = useState(false);
@@ -90,6 +91,7 @@ export default function EmployeesPage() {
         schedule: selectedUser.schedule || "",
         manager_id: selectedUser.manager_id ? String(selectedUser.manager_id) : "",
         role: selectedUser.role || "",
+        is_active: selectedUser.is_active,
       });
       setSuccessMsg("");
       setErrorMsg("");
@@ -117,9 +119,10 @@ export default function EmployeesPage() {
     );
   }
 
-  // Chỉ Quản trị / Giám đốc / Chỉ huy trưởng được tạo & sửa nhân sự (khớp quyền backend)
+  // CHỈ Quản trị web (ADMIN) & Giám đốc được thêm/sửa người truy cập (khớp quyền backend).
+  // Các vai trò khác chỉ XEM danh sách (không thêm/sửa/khóa).
   const canManage =
-    currentUser.role === "ADMIN" || currentUser.role === "DIRECTOR" || currentUser.role === "MANAGER";
+    currentUser.role === "ADMIN" || currentUser.role === "DIRECTOR";
 
   // Filter possible managers: ADMIN, DIRECTOR, MANAGER
   const potentialManagers = users.filter(
@@ -148,6 +151,7 @@ export default function EmployeesPage() {
         schedule: formData.schedule || null,
         manager_id: formData.manager_id ? Number(formData.manager_id) : null,
         role: formData.role ? (formData.role as Role) : undefined,
+        is_active: formData.is_active,
       };
 
       const updated = await api.updateUser(selectedUser.id, payload);
@@ -169,9 +173,10 @@ export default function EmployeesPage() {
     setCreateError("");
     try {
       const created = await api.createUser({
-        email: createData.email.trim(),
+        email: createData.email.trim().toLowerCase(),
         full_name: createData.full_name.trim(),
-        password: createData.password,
+        // Bỏ trống = tài khoản chỉ đăng nhập bằng Google (backend tự sinh mật khẩu).
+        password: createData.password ? createData.password : undefined,
         role: createData.role,
         phone: createData.phone || null,
         manager_id: createData.manager_id ? Number(createData.manager_id) : null,
@@ -198,6 +203,17 @@ export default function EmployeesPage() {
           <span className="rounded-full bg-white/10 px-3 py-0.5 text-xs text-white/80">
             {users.length} thành viên
           </span>
+        </section>
+
+        {/* Quy tắc cấp quyền truy cập web */}
+        <section className="flex items-start gap-2 rounded-xl2 border border-line bg-white p-3 text-[11px] text-muted shadow-card">
+          <ShieldCheckIcon className="h-4 w-4 shrink-0 text-steel" />
+          <p>
+            Người dùng đăng nhập bằng <span className="font-semibold text-ink">tài khoản Google cá nhân</span>.{" "}
+            {canManage
+              ? "Bạn (Quản trị web / Giám đốc) có thể thêm người mới bằng email Gmail của họ, đổi vai trò, hoặc khóa quyền truy cập."
+              : "Chỉ Giám đốc & Quản trị web mới được thêm/sửa người được truy cập."}
+          </p>
         </section>
 
         {/* Tìm kiếm + Thêm nhân viên */}
@@ -236,22 +252,29 @@ export default function EmployeesPage() {
               return (
                 <div
                   key={u.id}
-                  onClick={() => setSelectedUser(u)}
-                  className={`cursor-pointer rounded-xl2 bg-white p-4 shadow-card transition-all border-l-4 ${
+                  onClick={() => canManage && setSelectedUser(u)}
+                  className={`rounded-xl2 bg-white p-4 shadow-card transition-all border-l-4 ${canManage ? "cursor-pointer" : ""} ${
                     isSelected ? "border-amber bg-amber/5" : "border-transparent hover:border-slate-300"
-                  }`}
+                  } ${u.is_active ? "" : "opacity-60"}`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-sm font-semibold text-ink">{u.full_name}</h3>
                       <p className="text-[11px] text-muted font-mono mt-0.5">{u.email}</p>
-                      <p className="mt-1 text-[11px] font-medium text-steel">
-                        {ROLE_LABEL[u.role] || u.role}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-medium text-steel">
+                          {ROLE_LABEL[u.role] || u.role}
+                        </span>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${u.is_active ? "bg-ok/10 text-ok" : "bg-bad/10 text-bad"}`}>
+                          {u.is_active ? "Đang truy cập" : "Đã khóa"}
+                        </span>
+                      </div>
                     </div>
-                    <span className="rounded-md bg-paper p-1.5 text-muted hover:text-ink">
-                      <PencilSquareIcon className="h-4 w-4" />
-                    </span>
+                    {canManage && (
+                      <span className="rounded-md bg-paper p-1.5 text-muted hover:text-ink">
+                        <PencilSquareIcon className="h-4 w-4" />
+                      </span>
+                    )}
                   </div>
                   {u.manager_name && (
                     <div className="mt-2 border-t border-line/50 pt-2 text-[10px] text-muted flex items-center gap-1">
@@ -370,6 +393,27 @@ export default function EmployeesPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted">Quyền truy cập web</label>
+                  <div className="mt-1 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, is_active: true })}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${formData.is_active ? "border-ok bg-ok/10 text-ok" : "border-line text-muted hover:bg-paper"}`}
+                    >
+                      Cho phép
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, is_active: false })}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${!formData.is_active ? "border-bad bg-bad/10 text-bad" : "border-line text-muted hover:bg-paper"}`}
+                    >
+                      Khóa truy cập
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted">Khóa ⇒ người này không đăng nhập được nữa (cả Google lẫn mật khẩu).</p>
                 </div>
 
                 <div>
@@ -497,28 +541,33 @@ export default function EmployeesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Email đăng nhập *</label>
+                  <label className="block text-[11px] font-semibold text-muted">Email Google (Gmail) *</label>
                   <input
                     type="email"
                     required
                     value={createData.email}
                     onChange={(e) => setCreateData({ ...createData, email: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                    placeholder="ten@dosco.vn"
+                    placeholder="ten@gmail.com"
                   />
+                  <p className="mt-1 text-[10px] text-muted">
+                    Nhập đúng địa chỉ Gmail người này dùng để đăng nhập. Chỉ email đã thêm ở đây mới vào được web.
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Mật khẩu * (tối thiểu 6 ký tự)</label>
+                  <label className="block text-[11px] font-semibold text-muted">Mật khẩu (tùy chọn)</label>
                   <input
                     type="text"
-                    required
                     minLength={6}
                     value={createData.password}
                     onChange={(e) => setCreateData({ ...createData, password: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                    placeholder="VD: 123456"
+                    placeholder="Để trống nếu chỉ đăng nhập bằng Google"
                   />
+                  <p className="mt-1 text-[10px] text-muted">
+                    Bỏ trống ⇒ tài khoản chỉ đăng nhập bằng Google. Nhập (≥6 ký tự) nếu muốn cấp thêm đăng nhập bằng mật khẩu.
+                  </p>
                 </div>
 
                 <div>

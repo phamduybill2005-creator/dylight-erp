@@ -140,10 +140,12 @@ def list_users(
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)),
+    # CHỈ Giám đốc & Quản trị web (ADMIN luôn được phép) mới được cấp quyền truy cập.
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
 ):
-    """Tạo tài khoản nhân viên mới trong cùng công ty với người tạo."""
-    if db.query(User).filter(User.email == payload.email).first():
+    """Cấp quyền truy cập web cho một người (tạo tài khoản trong cùng công ty)."""
+    email = payload.email.lower()
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(400, "Email này đã được sử dụng.")
 
     # Người quản lý (nếu có) phải thuộc cùng công ty
@@ -152,11 +154,14 @@ def create_user(
         if not mgr or mgr.company_id != current.company_id:
             raise HTTPException(400, "Người quản lý không hợp lệ.")
 
-    data = payload.model_dump(exclude={"password"})
+    data = payload.model_dump(exclude={"password", "email"})
+    # Bỏ trống mật khẩu = tài khoản chỉ đăng nhập bằng Google -> sinh mật khẩu ngẫu nhiên.
+    raw_pw = payload.password or secrets.token_urlsafe(32)
     user = User(
         **data,
+        email=email,
         company_id=current.company_id,
-        hashed_password=hash_password(payload.password),
+        hashed_password=hash_password(raw_pw),
     )
     db.add(user)
     db.commit()
@@ -169,17 +174,25 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)),
+    # CHỈ Giám đốc & Quản trị web (ADMIN) mới được đổi vai trò / khóa-mở truy cập.
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
 ):
-    """Cập nhật thông tin hồ sơ, lịch làm việc, người quản lý của nhân viên."""
+    """Cập nhật vai trò, trạng thái truy cập, hồ sơ, lịch làm việc của nhân viên."""
     user = db.get(User, user_id)
     if not user or user.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy nhân viên.")
-    
+
     # Không cho phép tự phân cấp làm quản lý của chính mình
     if payload.manager_id == user.id:
         raise HTTPException(400, "Không thể gán nhân viên tự quản lý chính mình.")
-        
+
+    # Chống tự khóa / tự hạ quyền chính mình -> tránh mất quyền quản trị.
+    if user.id == current.id:
+        if payload.is_active is False:
+            raise HTTPException(400, "Không thể tự khóa tài khoản của chính mình.")
+        if payload.role is not None and payload.role not in (UserRole.ADMIN, UserRole.DIRECTOR):
+            raise HTTPException(400, "Không thể tự hạ quyền quản trị của chính mình.")
+
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(user, k, v)
         

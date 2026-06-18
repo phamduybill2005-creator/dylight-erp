@@ -54,9 +54,10 @@ class Settings(BaseSettings):
     # --- Đăng nhập bằng Google (OAuth2 / Google Identity) ---
     # Dán OAuth Client ID (....apps.googleusercontent.com) vào để BẬT tính năng.
     GOOGLE_CLIENT_ID: str = ""
-    # True: bất kỳ tài khoản Google nào -> tự tạo nhân viên mới.
-    # Đổi thành False sau này nếu muốn siết: chỉ email đã có trong hệ thống mới vào được.
-    GOOGLE_AUTO_CREATE: bool = True
+    # False (MẶC ĐỊNH - siết quyền): CHỈ những email đã được Giám đốc/Quản trị web
+    #   thêm trước vào hệ thống mới đăng nhập Google được; email lạ bị từ chối.
+    # True: bất kỳ tài khoản Google nào -> tự tạo nhân viên mới (KHÔNG khuyến nghị).
+    GOOGLE_AUTO_CREATE: bool = False
     GOOGLE_DEFAULT_COMPANY_ID: int = 1          # công ty gán cho người tự tạo
     GOOGLE_DEFAULT_ROLE: str = "FIELD_STAFF"    # vai trò mặc định (thấp nhất) cho người tự tạo
 
