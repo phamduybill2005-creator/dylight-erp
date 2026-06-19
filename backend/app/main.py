@@ -19,6 +19,7 @@ from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
+    iclock,
 )
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
@@ -113,3 +114,6 @@ for r in (auth, companies, bids, projects, contracts, invoices, payments, progre
           project_items, attendance, evaluations, partners, payroll,
           leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues):
     app.include_router(r.router, prefix=P)
+
+# Máy chấm công đẩy trực tiếp (ZKTeco PUSH/ADMS) gọi đúng /iclock/... -> KHÔNG thêm tiền tố /api/v1.
+app.include_router(iclock.router)

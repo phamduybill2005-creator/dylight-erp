@@ -51,6 +51,13 @@ class Settings(BaseSettings):
     # Mốc giờ bắt đầu làm việc (giờ địa phương) để tính "đi trễ".
     WORK_START_HOUR: int = 8
 
+    # --- Máy chấm công ĐẨY TRỰC TIẾP qua giao thức ZKTeco PUSH/ADMS (/iclock) ---
+    # Trỏ "địa chỉ máy chủ" trên máy về domain ERP; máy tự gọi /iclock/cdata.
+    # CHỈ nhận các số sê-ri (SN) liệt kê ở đây (cách nhau dấu phẩy). Trống = TỪ CHỐI hết (an toàn).
+    IATT_DEVICE_SNS: str = ""
+    IATT_COMPANY_ID: int = 0     # 0 = gán vào công ty đầu tiên
+    IATT_TIMEZONE: int = 7       # múi giờ trả về cho máy (VN = 7)
+
     # --- Đăng nhập bằng Google (OAuth2 / Google Identity) ---
     # Dán OAuth Client ID (....apps.googleusercontent.com) vào để BẬT tính năng.
     GOOGLE_CLIENT_ID: str = ""
