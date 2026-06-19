@@ -189,6 +189,11 @@ export const api = {
   },
   attendanceSummary: (period?: string) =>
     request<AttendanceSummary[]>(`/attendance/summary${period ? `?period=${period}` : ""}`),
+  importAttendance: (punches: { employee_ref: string; timestamp: string }[]) =>
+    request<{ rows: number; matched: number; days_updated: number; days_no_checkout: number; unmatched: string[] }>(
+      "/attendance/import",
+      { method: "POST", body: JSON.stringify({ punches }) }
+    ),
 
   // --- Evaluations (Đánh giá) ---
   evaluationsReceived: () => request<Evaluation[]>("/evaluations/received"),

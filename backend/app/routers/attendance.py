@@ -14,12 +14,37 @@ from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import Attendance, AttendanceSource, PaymentDirection, User, UserRole
-from app.schemas import AttendanceOut, AttendanceSummary, MachinePunch
+from app.schemas import (
+    AttendanceOut, AttendanceSummary, MachinePunch,
+    AttendanceImportRequest, AttendanceImportResult,
+)
 
 router = APIRouter(prefix="/attendance", tags=["Chấm công"])
 
 # Vai trò được xem chấm công toàn công ty (ADMIN tự được phép trong require_roles).
 _MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
+
+
+def _resolve_user(db: Session, company_id: int, ref: str) -> User | None:
+    """Tìm nhân viên TRONG CÔNG TY theo user_id (số) / email / số CCCD."""
+    ref = (ref or "").strip()
+    if not ref:
+        return None
+    user = None
+    if ref.isdigit():
+        u = db.get(User, int(ref))
+        if u and u.company_id == company_id:
+            user = u
+    if user is None:
+        user = (
+            db.query(User)
+            .filter(
+                User.company_id == company_id,
+                (User.email == ref.lower()) | (User.identity_card == ref),
+            )
+            .first()
+        )
+    return user
 
 
 def _today_record(db: Session, user: User) -> Attendance | None:
@@ -135,6 +160,67 @@ def attendance_summary(
     return sorted(by_user.values(), key=lambda s: s.full_name)
 
 
+@router.post("/import", response_model=AttendanceImportResult)
+def import_attendance(
+    payload: AttendanceImportRequest,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+):
+    """
+    NHẬP CHẤM CÔNG HÀNG LOẠT từ file (CSV xuất từ phần mềm máy chấm công).
+    Gom các lần quẹt theo (nhân viên, ngày): sớm nhất = giờ VÀO, muộn nhất = giờ RA;
+    gộp với dữ liệu sẵn có. Khớp nhân viên theo CCCD / email / user_id trong cùng công ty.
+    """
+    cid = current.company_id
+    rows = 0
+    matched = 0
+    unmatched: set[str] = set()
+    cache: dict[str, User | None] = {}
+    by_day: dict[tuple[int, date], list[datetime]] = {}
+
+    for r in payload.punches:
+        rows += 1
+        ref = (r.employee_ref or "").strip()
+        if not ref:
+            continue
+        if ref not in cache:
+            cache[ref] = _resolve_user(db, cid, ref)
+        u = cache[ref]
+        if u is None:
+            unmatched.add(ref)
+            continue
+        matched += 1
+        by_day.setdefault((u.id, r.timestamp.date()), []).append(r.timestamp)
+
+    days = 0
+    days_no_checkout = 0
+    for (uid, d), times in by_day.items():
+        uniq = sorted(set(times))   # bỏ mốc trùng hệt nhau
+        tmin, tmax = uniq[0], uniq[-1]
+        rec = (
+            db.query(Attendance)
+            .filter(Attendance.user_id == uid, Attendance.work_date == d)
+            .first()
+        )
+        if rec is None:
+            rec = Attendance(company_id=cid, user_id=uid, work_date=d, source=AttendanceSource.MACHINE)
+            db.add(rec)
+        if rec.check_in is None or tmin < rec.check_in:
+            rec.check_in = tmin
+        if tmax > tmin and (rec.check_out is None or tmax > rec.check_out):
+            rec.check_out = tmax
+        rec.source = AttendanceSource.MACHINE
+        days += 1
+        if rec.check_out is None or rec.check_out <= rec.check_in:
+            days_no_checkout += 1
+
+    db.commit()
+    return AttendanceImportResult(
+        rows=rows, matched=matched, days_updated=days,
+        days_no_checkout=days_no_checkout, unmatched=sorted(unmatched),
+    )
+
+
 @router.post("/punch", response_model=AttendanceOut)
 def machine_punch(
     payload: MachinePunch,
@@ -156,9 +242,11 @@ def machine_punch(
     if ref.isdigit():
         user = db.get(User, int(ref))
     if user is None:
+        # Email không phân biệt hoa/thường (khớp _resolve_user). Lưu ý: ATTENDANCE_API_KEY
+        # là khóa CHUNG toàn hệ thống (chưa tách theo công ty) — cần bảo mật/đổi định kỳ.
         user = (
             db.query(User)
-            .filter((User.email == ref) | (User.identity_card == ref))
+            .filter((User.email == ref.lower()) | (User.identity_card == ref))
             .first()
         )
     if user is None:

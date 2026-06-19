@@ -56,6 +56,15 @@ def _ensure_schema() -> None:
             if "payroll_shared" not in ccols:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE companies ADD COLUMN payroll_shared BOOLEAN DEFAULT FALSE"))
+
+        # Nới rộng evaluations.period (đánh giá đổi sang kỳ TUẦN 'YYYY-MM-DD' = 10 ký tự).
+        # Postgres ép độ dài VARCHAR; SQLite bỏ qua nên không cần. Chỉ ALTER khi đang < 20.
+        if engine.dialect.name == "postgresql" and "evaluations" in insp.get_table_names():
+            pcol = next((c for c in insp.get_columns("evaluations") if c["name"] == "period"), None)
+            plen = getattr(pcol["type"], "length", None) if pcol else None
+            if plen is not None and plen < 20:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE evaluations ALTER COLUMN period TYPE VARCHAR(20)"))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] bo qua: {_e}")
 

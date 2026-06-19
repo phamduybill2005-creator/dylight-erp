@@ -12,6 +12,8 @@ import {
   ArrowLeftEndOnRectangleIcon,
   CalendarDaysIcon,
   UsersIcon,
+  ArrowUpTrayIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
@@ -24,6 +26,82 @@ const monthStr = () => new Date().toISOString().slice(0, 7);
 const fmtTime = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—";
 const fmtHours = (mins: number) => (mins / 60).toFixed(1) + "h";
+
+// ---------- Nhập chấm công từ file CSV (xuất từ phần mềm máy chấm công) ----------
+function detectDelim(line: string): string {
+  const c = [
+    [",", (line.match(/,/g) || []).length] as [string, number],
+    [";", (line.match(/;/g) || []).length] as [string, number],
+    ["\t", (line.match(/\t/g) || []).length] as [string, number],
+  ];
+  c.sort((a, b) => b[1] - a[1]);
+  return c[0][1] > 0 ? c[0][0] : ",";
+}
+function parseCSV(text: string, delim: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false;
+      } else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === delim) { row.push(field); field = ""; }
+    else if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (ch !== "\r") field += ch;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((cell) => cell.trim() !== ""));
+}
+type DateOrder = "dmy" | "mdy";
+// Tạo Date theo GIỜ ĐỊA PHƯƠNG (không lệch múi giờ). Hỗ trợ dd/mm/yyyy, mm/dd/yyyy, ISO,
+// có/không có AM-PM; TỪ CHỐI (null) ngày-giờ không hợp lệ thay vì để "tràn" sang ngày khác.
+function buildDate(yy: number, mon: number, day: number, h: number, mi: number, se: number): Date | null {
+  if (yy < 100) yy += 2000;
+  if (mon < 1 || mon > 12 || day < 1 || day > 31 || h > 23 || mi > 59 || se > 59) return null;
+  const d = new Date(yy, mon - 1, day, h, mi, se);
+  // round-trip: loại ngày bị JS tự "cuộn" (vd 31/02 -> 03/03)
+  return d.getFullYear() === yy && d.getMonth() === mon - 1 && d.getDate() === day ? d : null;
+}
+function parseDateTime(dateStr: string, timeStr: string, order: DateOrder = "dmy"): Date | null {
+  let s = (dateStr || "").trim();
+  if (timeStr && timeStr.trim()) s += " " + timeStr.trim();
+  s = s.trim();
+  if (!s) return null;
+  // tách AM/PM nếu có
+  let mer = "";
+  const mm = s.match(/\b([AaPp])\.?[Mm]\.?\b/);
+  if (mm) { mer = mm[1].toLowerCase(); s = (s.slice(0, mm.index) + s.slice((mm.index || 0) + mm[0].length)).trim(); }
+  const applyMer = (h: number) => (mer === "p" && h < 12 ? h + 12 : mer === "a" && h === 12 ? 0 : h);
+
+  // ISO: yyyy-mm-dd [hh:mm[:ss]]
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) return buildDate(+m[1], +m[2], +m[3], applyMer(+(m[4] || 0)), +(m[5] || 0), +(m[6] || 0));
+
+  // dd/mm/yyyy hoặc mm/dd/yyyy (theo `order`)
+  m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) {
+    const g1 = +m[1], g2 = +m[2];
+    const day = order === "mdy" ? g2 : g1;
+    const mon = order === "mdy" ? g1 : g2;
+    return buildDate(+m[3], mon, day, applyMer(+(m[4] || 0)), +(m[5] || 0), +(m[6] || 0));
+  }
+  return null;
+}
+function toLocalISO(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function guessCol(headers: string[], keys: string[]): number {
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i].toLowerCase();
+    if (keys.some((k) => h.includes(k))) return i;
+  }
+  return -1;
+}
 
 export default function AttendancePage() {
   const router = useRouter();
@@ -39,6 +117,54 @@ export default function AttendancePage() {
   const [date, setDate] = useState(todayStr());
   const [dayList, setDayList] = useState<Attendance[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary[]>([]);
+
+  // Nhập chấm công từ file CSV
+  const [showImport, setShowImport] = useState(false);
+  const [csvRows, setCsvRows] = useState<string[][]>([]);
+  const [hasHeader, setHasHeader] = useState(true);
+  const [empCol, setEmpCol] = useState(-1);
+  const [dateCol, setDateCol] = useState(-1);
+  const [timeCol, setTimeCol] = useState(-1);
+  const [dateOrder, setDateOrder] = useState<DateOrder>("dmy");
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+
+  function resetImport() {
+    setShowImport(false);
+    setCsvRows([]);
+    setEmpCol(-1);
+    setDateCol(-1);
+    setTimeCol(-1);
+    setHasHeader(true);
+    setImportMsg("");
+  }
+
+  function onCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setImportMsg("");
+    if (f.size > 10 * 1024 * 1024) {
+      setImportMsg("File quá lớn (tối đa 10MB). Vui lòng kiểm tra lại file CSV.");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => setImportMsg("Không đọc được file (có thể đang bị khóa hoặc lỗi). Vui lòng thử lại.");
+    reader.onload = () => {
+      const text = String(reader.result || "").replace(/^﻿/, ""); // bỏ BOM UTF-8
+      const firstLine = text.split(/\r?\n/)[0] || "";
+      const rows = parseCSV(text, detectDelim(firstLine));
+      setCsvRows(rows);
+      const head = rows[0] || [];
+      setEmpCol(guessCol(head, ["mã", "ma ", "cccd", "nhân", "nhan", "employee", "user", "id"]));
+      const dc = guessCol(head, ["ngày", "ngay", "date", "thời gian", "thoi gian", "datetime"]);
+      setDateCol(dc);
+      let tc = guessCol(head, ["giờ", "gio", "time"]);
+      if (tc === dc) tc = -1; // cột "Ngày giờ" gộp -> không map nhầm làm cột giờ riêng
+      setTimeCol(tc);
+    };
+    reader.readAsText(f, "utf-8");
+  }
 
   useEffect(() => {
     api.me()
@@ -190,6 +316,43 @@ export default function AttendancePage() {
   }
 
   // ==================== QUẢN LÝ / GIÁM ĐỐC ====================
+  const colNames: string[] = csvRows.length
+    ? hasHeader
+      ? csvRows[0].map((s) => s.trim() || "(trống)")
+      : csvRows[0].map((_, i) => `Cột ${i + 1}`)
+    : [];
+  const dataRows = hasHeader ? csvRows.slice(1) : csvRows;
+  const punches =
+    empCol >= 0 && dateCol >= 0
+      ? dataRows.flatMap((r) => {
+          const ref = (r[empCol] || "").trim();
+          const d = parseDateTime(r[dateCol] || "", timeCol >= 0 ? r[timeCol] || "" : "", dateOrder);
+          return ref && d ? [{ employee_ref: ref, timestamp: toLocalISO(d) }] : [];
+        })
+      : [];
+  const droppedCount = empCol >= 0 && dateCol >= 0 ? dataRows.length - punches.length : 0;
+  const noTimeWarn = punches.length > 0 && punches.every((p) => p.timestamp.endsWith("T00:00:00"));
+
+  async function doImport() {
+    if (!punches.length) return;
+    setImporting(true);
+    setImportMsg("");
+    try {
+      const res = await api.importAttendance(punches);
+      setImportMsg(
+        `✓ Đã nhập ${res.days_updated} ngày công (khớp ${res.matched}/${res.rows} dòng).` +
+          (res.days_no_checkout ? ` · ${res.days_no_checkout} ngày chỉ có 1 mốc (chưa tính được giờ làm).` : "") +
+          (res.unmatched.length ? ` Không khớp: ${res.unmatched.join(", ")}` : "")
+      );
+      api.attendanceList({ work_date: date }).then(setDayList).catch(() => {});
+      api.attendanceSummary(monthStr()).then(setSummary).catch(() => {});
+    } catch (e: unknown) {
+      setImportMsg(e instanceof Error ? e.message : "Nhập thất bại.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <AppShell>
       <header className="flex items-center justify-between rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
@@ -197,6 +360,12 @@ export default function AttendancePage() {
           <UsersIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
           <h1 className="text-base font-bold lg:text-xl">Chấm công toàn đội</h1>
         </div>
+        <button
+          onClick={() => { setShowImport(true); setImportMsg(""); }}
+          className="flex items-center gap-1.5 rounded-xl2 bg-amber px-3 py-2 text-xs font-semibold text-ink"
+        >
+          <ArrowUpTrayIcon className="h-4 w-4" /> Nhập từ file
+        </button>
       </header>
 
       {/* Bảng theo ngày */}
@@ -272,6 +441,109 @@ export default function AttendancePage() {
           )}
         </div>
       </section>
+
+      {/* Nhập chấm công từ file CSV */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-ink/50 backdrop-blur-sm">
+          <div className="flex h-full w-full max-w-lg flex-col bg-paper shadow-2xl animate-slide-in">
+            <header className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
+              <div className="flex items-center gap-2">
+                <ArrowUpTrayIcon className="h-5 w-5 text-steel" />
+                <h2 className="text-sm font-bold text-ink">Nhập chấm công từ file</h2>
+              </div>
+              <button onClick={resetImport} className="rounded-full p-1.5 text-muted hover:bg-paper hover:text-ink">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </header>
+
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              <p className="text-xs text-muted">
+                Xuất dữ liệu từ phần mềm máy chấm công ra <b className="text-ink">file CSV</b> (Excel → "Lưu thành" .csv) rồi tải lên.
+                Cần cột <b className="text-ink">mã nhân viên</b> (= CCCD / email / mã đã nhập ở Nhân sự) và cột <b className="text-ink">ngày giờ</b> quẹt.
+              </p>
+              <input type="file" accept=".csv,text/csv" onChange={onCsvFile} className="block w-full text-xs" />
+
+              {csvRows.length > 0 && (
+                <>
+                  <label className="flex items-center gap-2 text-xs text-ink">
+                    <input type="checkbox" checked={hasHeader} onChange={(e) => setHasHeader(e.target.checked)} /> Dòng đầu là tiêu đề
+                  </label>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-muted">Cột mã nhân viên *</label>
+                    <select value={empCol} onChange={(e) => setEmpCol(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel">
+                      <option value={-1}>— Chọn cột —</option>
+                      {colNames.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-muted">Cột ngày (hoặc ngày giờ) *</label>
+                    <select value={dateCol} onChange={(e) => setDateCol(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel">
+                      <option value={-1}>— Chọn cột —</option>
+                      {colNames.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-muted">Cột giờ (nếu tách riêng cột)</label>
+                    <select value={timeCol} onChange={(e) => setTimeCol(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel">
+                      <option value={-1}>— Không có —</option>
+                      {colNames.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-muted">Định dạng ngày</label>
+                    <select value={dateOrder} onChange={(e) => setDateOrder(e.target.value as DateOrder)}
+                      className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel">
+                      <option value="dmy">Ngày/Tháng/Năm — dd/mm/yyyy</option>
+                      <option value="mdy">Tháng/Ngày/Năm — mm/dd/yyyy</option>
+                    </select>
+                    <p className="mt-1 text-[10px] text-muted">Kiểu ISO (yyyy-mm-dd) tự nhận, không phụ thuộc lựa chọn này.</p>
+                  </div>
+
+                  <div className="rounded-lg bg-white p-2.5 shadow-card">
+                    <p className="text-[11px] text-muted">
+                      Sẽ nhập <b className="text-ink">{punches.length}</b> dòng hợp lệ / {dataRows.length} dòng.
+                      {droppedCount > 0 && (
+                        <span className="text-bad"> · {droppedCount} dòng bị bỏ (thiếu mã hoặc ngày/giờ không đọc được)</span>
+                      )}
+                    </p>
+                    {punches.length === 0 && dataRows.length > 0 && (
+                      <p className="mt-1 text-[11px] font-semibold text-bad">Có thể bạn chọn sai cột ngày/giờ hoặc sai định dạng ngày.</p>
+                    )}
+                    {noTimeWarn && (
+                      <p className="mt-1 text-[11px] font-semibold text-amber-deep">Các dòng không có giờ — chỉ ghi nhận ngày công, không tính được giờ làm.</p>
+                    )}
+                    {punches.length > 0 && (
+                      <div className="mt-1.5 border-t border-line/60 pt-1.5 text-[10px] text-muted">
+                        <p className="font-semibold">Xem trước:</p>
+                        {punches.slice(0, 3).map((p, i) => (
+                          <p key={i} className="font-mono">{p.employee_ref} · {p.timestamp.replace("T", " ")}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              {importMsg && <p className="text-[11px] font-medium text-ink">{importMsg}</p>}
+            </div>
+
+            <footer className="flex gap-2 border-t border-line bg-white p-4">
+              <button onClick={resetImport} className="flex-1 rounded-xl2 border border-line py-2.5 text-xs font-semibold text-muted hover:bg-paper">
+                Đóng
+              </button>
+              <button
+                onClick={doImport}
+                disabled={importing || punches.length === 0}
+                className="flex-1 rounded-xl2 bg-ink py-2.5 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50"
+              >
+                {importing ? "Đang nhập…" : `Nhập ${punches.length} dòng`}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

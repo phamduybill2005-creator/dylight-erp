@@ -427,7 +427,7 @@ class Evaluation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    period: Mapped[str] = mapped_column(String(7), index=True)    # "YYYY-MM"
+    period: Mapped[str] = mapped_column(String(20), index=True)   # tuần = ngày Thứ 7 "YYYY-MM-DD"
     evaluator_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)  # người chấm
     evaluatee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)  # người được chấm
     direction: Mapped[EvaluationDirection] = mapped_column(SAEnum(EvaluationDirection))

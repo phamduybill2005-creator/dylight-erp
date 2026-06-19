@@ -370,6 +370,24 @@ class MachinePunch(BaseModel):
     device_id: str | None = None
 
 
+class AttendanceImportRow(BaseModel):
+    """1 dòng quẹt khi NHẬP TỪ FILE (xuất từ phần mềm máy chấm công)."""
+    employee_ref: str            # email / CCCD / user_id / mã NV
+    timestamp: datetime          # mốc quẹt (ISO)
+
+
+class AttendanceImportRequest(BaseModel):
+    punches: list[AttendanceImportRow] = Field(default_factory=list)
+
+
+class AttendanceImportResult(BaseModel):
+    rows: int               # số dòng hợp lệ nhận được
+    matched: int            # số dòng khớp được nhân viên
+    days_updated: int       # số bản ghi chấm công (người–ngày) đã tạo/cập nhật
+    days_no_checkout: int = 0  # số ngày chỉ có 1 mốc (không tính được giờ ra)
+    unmatched: list[str] = []  # các mã KHÔNG tìm được nhân viên (để báo lại)
+
+
 class AttendanceSummary(BaseModel):
     """Tổng hợp chấm công theo người trong 1 kỳ (cho màn quản lý)."""
     user_id: int
