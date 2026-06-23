@@ -117,6 +117,7 @@ export default function AttendancePage() {
   const [date, setDate] = useState(todayStr());
   const [dayList, setDayList] = useState<Attendance[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary[]>([]);
+  const [summaryPeriod, setSummaryPeriod] = useState(monthStr());  // tháng đang xem tổng hợp
 
   // Nhập chấm công từ file CSV
   const [showImport, setShowImport] = useState(false);
@@ -188,11 +189,11 @@ export default function AttendancePage() {
     api.attendanceList({ work_date: date }).then(setDayList).catch(() => {});
   }, [user, date]);
 
-  // Tải tổng hợp kỳ hiện tại (cho quản lý/giám đốc)
+  // Tải tổng hợp theo tháng đang chọn (cho quản lý/giám đốc)
   useEffect(() => {
     if (!user || roleTier(user.role) === "STAFF") return;
-    api.attendanceSummary(monthStr()).then(setSummary).catch(() => {});
-  }, [user]);
+    api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
+  }, [user, summaryPeriod]);
 
   async function punch(kind: "in" | "out") {
     setBusy(true);
@@ -333,6 +334,13 @@ export default function AttendancePage() {
   const droppedCount = empCol >= 0 && dateCol >= 0 ? dataRows.length - punches.length : 0;
   const noTimeWarn = punches.length > 0 && punches.every((p) => p.timestamp.endsWith("T00:00:00"));
 
+  // KPI tổng hợp tháng — để Ban Giám đốc nắm nhanh toàn đội.
+  const sumDays = summary.reduce((a, s) => a + s.present_days, 0);
+  const sumLate = summary.reduce((a, s) => a + s.late_days, 0);
+  const sumHours = summary.reduce((a, s) => a + s.total_hours, 0);
+  const avgHours = summary.length ? sumHours / summary.length : 0;
+  const maxDays = summary.reduce((m, s) => Math.max(m, s.present_days), 0) || 1;
+
   async function doImport() {
     if (!punches.length) return;
     setImporting(true);
@@ -410,18 +418,65 @@ export default function AttendancePage() {
         </div>
       </section>
 
-      {/* Tổng hợp kỳ này */}
+      {/* Tổng hợp tháng — TỔNG QUAN cho Ban Giám đốc */}
       <section className="mt-5">
-        <h2 className="mb-2 text-sm font-semibold text-ink lg:text-base">Tổng hợp tháng {monthStr()}</h2>
-        <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink lg:text-base">Tổng hợp chấm công</h2>
+          <div className="flex items-center gap-1.5 rounded-xl2 bg-white px-2 py-1 shadow-card">
+            <CalendarDaysIcon className="h-4 w-4 text-muted" />
+            <input
+              type="month"
+              value={summaryPeriod}
+              onChange={(e) => setSummaryPeriod(e.target.value || monthStr())}
+              className="bg-transparent text-xs text-ink outline-none"
+            />
+          </div>
+        </div>
+
+        {/* 4 chỉ số nhanh */}
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3">
+          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
+            <p className="text-[10px] text-muted">Nhân viên có công</p>
+            <p className="mt-1 text-xl font-bold text-ink tnum">{summary.length}</p>
+          </div>
+          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
+            <p className="text-[10px] text-muted">Tổng ngày công</p>
+            <p className="mt-1 text-xl font-bold text-steel tnum">{sumDays}</p>
+          </div>
+          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
+            <p className="text-[10px] text-muted">TB giờ/người</p>
+            <p className="mt-1 text-xl font-bold text-ink tnum">{avgHours.toFixed(1)}h</p>
+          </div>
+          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
+            <p className="text-[10px] text-muted">Lượt đi trễ</p>
+            <p className={`mt-1 text-xl font-bold tnum ${sumLate ? "text-bad" : "text-ink"}`}>{sumLate}</p>
+          </div>
+        </div>
+
+        {/* Chi tiết từng người */}
+        <div className="mt-3 space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
           {summary.length === 0 ? (
             <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2 xl:col-span-3">
-              Chưa có dữ liệu tổng hợp.
+              Chưa có dữ liệu tổng hợp cho tháng này.
             </p>
           ) : (
             summary.map((s) => (
               <div key={s.user_id} className="rounded-xl2 bg-white p-3 shadow-card">
-                <p className="text-sm font-semibold text-ink">{nick(s.user_id, s.full_name)}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-semibold text-ink">{nick(s.user_id, s.full_name)}</p>
+                  {s.late_days > 0 && (
+                    <span className="shrink-0 rounded-full bg-bad/10 px-2 py-0.5 text-[10px] font-semibold text-bad">
+                      trễ {s.late_days}
+                    </span>
+                  )}
+                </div>
+                {/* thanh trực quan số ngày công so với người cao nhất */}
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-paper">
+                  <div
+                    className="h-full rounded-full bg-steel"
+                    style={{ width: `${Math.round((s.present_days / maxDays) * 100)}%` }}
+                  />
+                </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
                   <div>
                     <p className="text-[9px] text-muted">Ngày công</p>
@@ -440,6 +495,10 @@ export default function AttendancePage() {
             ))
           )}
         </div>
+
+        <p className="mt-2 text-[11px] text-muted">
+          Nguồn: máy chấm công khuôn mặt (Yunatt) — tự đồng bộ 20:00 hằng ngày (hoặc bấm “Đồng bộ ngay” ở trang Máy chấm công).
+        </p>
       </section>
 
       {/* Nhập chấm công từ file CSV */}
