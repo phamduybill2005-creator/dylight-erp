@@ -14,3 +14,5 @@ python-multipart==0.0.19                # Nhận file upload (ảnh hóa đơn)
 python-dotenv==1.0.1
 httpx==0.28.1                           # Gọi API OCR (OpenAI / Google Vision)
 openai==1.57.0                          # GPT-4o Vision (tùy chọn)
+playwright==1.49.1                      # Trình duyệt ẩn: đăng nhập & lấy chấm công Yunatt
+APScheduler==3.10.4                     # Lịch tự đồng bộ Yunatt mỗi ngày (20:00)

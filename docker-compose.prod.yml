@@ -44,6 +44,12 @@ services:
       OCR_PROVIDER: ${OCR_PROVIDER:-mock}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GOOGLE_VISION_API_KEY: ${GOOGLE_VISION_API_KEY:-}
+      # Đồng bộ tự động chấm công Yunatt (mỗi ngày 20:00)
+      YUNATT_ENABLED: ${YUNATT_ENABLED:-false}
+      YUNATT_EMAIL: ${YUNATT_EMAIL:-}
+      YUNATT_PASSWORD: ${YUNATT_PASSWORD:-}
+      YUNATT_SYNC_HOUR: ${YUNATT_SYNC_HOUR:-20}
+      YUNATT_COMPANY_ID: ${YUNATT_COMPANY_ID:-0}
     volumes:
       - dylight_uploads:/code/uploads
 

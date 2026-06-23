@@ -40,6 +40,15 @@ services:
         value: mock
       - key: FRONTEND_ORIGINS      # origin của frontend (sửa nếu Render cấp URL khác)
         value: https://dosco-erp-web.onrender.com
+      # --- Đồng bộ tự động chấm công Yunatt (mỗi ngày 20:00) ---
+      - key: YUNATT_ENABLED        # true = bật đồng bộ + lịch chạy
+        value: "true"
+      - key: YUNATT_EMAIL          # tài khoản Yunatt — ĐẶT TRONG DASHBOARD (không commit)
+        sync: false
+      - key: YUNATT_PASSWORD       # mật khẩu Yunatt — ĐẶT TRONG DASHBOARD (không commit)
+        sync: false
+      - key: YUNATT_SYNC_HOUR      # giờ chạy hằng ngày (20 = 8h tối)
+        value: "20"
 
   # ---------- FRONTEND (Next.js) ----------
   - type: web

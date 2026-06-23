@@ -58,6 +58,20 @@ class Settings(BaseSettings):
     IATT_COMPANY_ID: int = 0     # 0 = gán vào công ty đầu tiên
     IATT_TIMEZONE: int = 7       # múi giờ trả về cho máy (VN = 7)
 
+    # --- Đồng bộ TỰ ĐỘNG từ cổng chấm công Yunatt (global.yunatt.com) ---
+    # Máy chấm công khuôn mặt DOSCO đẩy dữ liệu lên Yunatt cloud. Backend dùng
+    # trình duyệt ẩn (Playwright) đăng nhập Yunatt, lấy lượt quẹt cả tháng rồi
+    # ghi vào bảng Attendance (tự hiện ở tổng hợp của sếp & cá nhân từng người).
+    YUNATT_ENABLED: bool = False                       # True = bật đồng bộ + lịch chạy
+    YUNATT_BASE_URL: str = "https://global.yunatt.com"
+    YUNATT_EMAIL: str = ""                             # tài khoản Yunatt (email)
+    YUNATT_PASSWORD: str = ""                          # mật khẩu Yunatt (đặt ở ENV server, KHÔNG commit)
+    YUNATT_COMPANY_ID: int = 0                         # công ty ERP nhận dữ liệu (0 = công ty đầu tiên)
+    YUNATT_SYNC_HOUR: int = 20                         # giờ chạy tự động hằng ngày (20 = 8h tối)
+    YUNATT_SYNC_MINUTE: int = 0
+    YUNATT_TIMEZONE: str = "Asia/Ho_Chi_Minh"         # múi giờ cho lịch chạy
+    YUNATT_HEADLESS: bool = True                       # False để debug (mở trình duyệt thật)
+
     # --- Đăng nhập bằng Google (OAuth2 / Google Identity) ---
     # Dán OAuth Client ID (....apps.googleusercontent.com) vào để BẬT tính năng.
     GOOGLE_CLIENT_ID: str = ""

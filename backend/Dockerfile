@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Trình duyệt Chromium + thư viện hệ thống cho Playwright (đồng bộ chấm công Yunatt).
+# Đặt sau pip install để tận dụng cache; --with-deps tự cài các gói apt cần thiết.
+RUN playwright install --with-deps chromium
+
 COPY . .
 
 EXPOSE 8000

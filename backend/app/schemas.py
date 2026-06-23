@@ -51,6 +51,7 @@ class UserOut(BaseModel):
     department: str | None = None
     manager_id: int | None = None
     manager_name: str | None = None
+    yunatt_code: str | None = None   # mã trên máy chấm công Yunatt (để map đồng bộ)
 
 class UserUpdate(BaseModel):
     full_name: str | None = None
@@ -65,6 +66,7 @@ class UserUpdate(BaseModel):
     schedule: str | None = None
     department: str | None = None
     manager_id: int | None = None
+    yunatt_code: str | None = None   # mã nhân viên trên máy chấm công Yunatt
 
 
 class UserCreate(BaseModel):
@@ -386,6 +388,31 @@ class AttendanceImportResult(BaseModel):
     days_updated: int       # số bản ghi chấm công (người–ngày) đã tạo/cập nhật
     days_no_checkout: int = 0  # số ngày chỉ có 1 mốc (không tính được giờ ra)
     unmatched: list[str] = []  # các mã KHÔNG tìm được nhân viên (để báo lại)
+
+
+# ---------------- ĐỒNG BỘ TỰ ĐỘNG TỪ YUNATT (máy chấm công cloud) ----------------
+class YunattUnmatched(BaseModel):
+    """1 người trên Yunatt CHƯA ghép được với nhân viên ERP (cần map)."""
+    staff_number: str
+    staff_name: str | None = None
+
+
+class YunattSyncResult(BaseModel):
+    """Kết quả 1 lần đồng bộ từ Yunatt về ERP."""
+    months: list[str] = []        # các tháng đã kéo (YYYY-MM)
+    rows: int = 0                 # tổng số lượt quẹt nhận được
+    matched: int = 0             # số lượt quẹt ghép được người
+    days_updated: int = 0        # số bản ghi (người–ngày) đã tạo/cập nhật
+    days_no_checkout: int = 0    # số ngày chỉ có 1 mốc (chưa tính được giờ làm)
+    unmatched: list[YunattUnmatched] = []  # người Yunatt chưa map sang ERP
+
+
+class YunattPerson(BaseModel):
+    """1 người trên Yunatt + trạng thái đã map sang nhân viên ERP hay chưa."""
+    staff_number: str
+    staff_name: str | None = None
+    user_id: int | None = None        # nhân viên ERP đã map (nếu có)
+    user_name: str | None = None
 
 
 class AttendanceSummary(BaseModel):

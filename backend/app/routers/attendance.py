@@ -17,7 +17,9 @@ from app.models import Attendance, AttendanceSource, PaymentDirection, User, Use
 from app.schemas import (
     AttendanceOut, AttendanceSummary, MachinePunch,
     AttendanceImportRequest, AttendanceImportResult,
+    YunattSyncResult, YunattPerson,
 )
+from app.services import yunatt_service
 
 router = APIRouter(prefix="/attendance", tags=["Chấm công"])
 
@@ -219,6 +221,38 @@ def import_attendance(
         rows=rows, matched=matched, days_updated=days,
         days_no_checkout=days_no_checkout, unmatched=sorted(unmatched),
     )
+
+
+@router.post("/sync-yunatt", response_model=YunattSyncResult)
+def sync_yunatt(
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+):
+    """
+    ĐỒNG BỘ NGAY từ cổng Yunatt: backend đăng nhập (Playwright), kéo lượt quẹt
+    tháng này + tháng trước rồi ghi vào bảng Attendance của công ty người đăng nhập.
+    Endpoint khai báo `def` (chạy ở threadpool) để Playwright sync hoạt động.
+    """
+    if not settings.YUNATT_ENABLED:
+        raise HTTPException(503, "Tính năng đồng bộ Yunatt đang tắt (đặt YUNATT_ENABLED=true).")
+    try:
+        return yunatt_service.run_sync(db, current.company_id)
+    except yunatt_service.YunattError as e:
+        raise HTTPException(502, str(e))
+
+
+@router.get("/yunatt/persons", response_model=list[YunattPerson])
+def yunatt_persons(
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+):
+    """Liệt kê người trên Yunatt + trạng thái đã map sang nhân viên ERP (để gán yunatt_code)."""
+    if not settings.YUNATT_ENABLED:
+        raise HTTPException(503, "Tính năng đồng bộ Yunatt đang tắt (đặt YUNATT_ENABLED=true).")
+    try:
+        return yunatt_service.list_persons(db, current.company_id)
+    except yunatt_service.YunattError as e:
+        raise HTTPException(502, str(e))
 
 
 @router.post("/punch", response_model=AttendanceOut)

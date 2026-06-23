@@ -44,6 +44,7 @@ def _ensure_schema() -> None:
             "num_dependents": "ALTER TABLE users ADD COLUMN num_dependents INTEGER DEFAULT 0",
             "is_approved": "ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT TRUE",
             "department": "ALTER TABLE users ADD COLUMN department VARCHAR(120)",
+            "yunatt_code": "ALTER TABLE users ADD COLUMN yunatt_code VARCHAR(50)",
         }
         missing = [sql for col, sql in adds.items() if col not in cols]
         if missing:
@@ -100,6 +101,16 @@ app.add_middleware(
 # --- Phục vụ ảnh hóa đơn đã upload tại /static ---
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
+
+
+@app.on_event("startup")
+def _start_yunatt_scheduler() -> None:
+    """Bật lịch tự đồng bộ chấm công Yunatt (mỗi ngày 1 lần) khi app khởi động."""
+    try:
+        from app.services.scheduler import start_scheduler
+        start_scheduler()
+    except Exception as _e:  # noqa: BLE001
+        print(f"[startup] khong bat duoc lich Yunatt: {_e}")
 
 
 @app.get("/", tags=["Health"])

@@ -19,6 +19,7 @@ export interface User {
   department?: string | null;
   manager_id?: number | null;
   manager_name?: string | null;
+  yunatt_code?: string | null;   // mã nhân viên trên máy chấm công Yunatt
 }
 
 export interface Company {
@@ -173,6 +174,26 @@ export interface AttendanceSummary {
   present_days: number;
   late_days: number;
   total_hours: number;
+}
+
+// Đồng bộ tự động từ Yunatt (máy chấm công cloud).
+export interface YunattUnmatched {
+  staff_number: string;
+  staff_name?: string | null;
+}
+export interface YunattSyncResult {
+  months: string[];
+  rows: number;
+  matched: number;
+  days_updated: number;
+  days_no_checkout: number;
+  unmatched: YunattUnmatched[];
+}
+export interface YunattPerson {
+  staff_number: string;
+  staff_name?: string | null;
+  user_id?: number | null;     // nhân viên ERP đã map (nếu có)
+  user_name?: string | null;
 }
 
 // Đánh giá 2 chiều nhân viên <-> quản lý trực tiếp.
