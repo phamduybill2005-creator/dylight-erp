@@ -116,12 +116,16 @@ def update_invoice(
     invoice_id: int,
     payload: InvoiceUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    # Chỉ Quản lý/Kế toán/Giám đốc được sửa hóa đơn (nhân viên hiện trường chỉ upload).
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
 ):
     """Chỉnh sửa dữ liệu hóa đơn (kế toán đối chiếu lại số AI đọc)."""
     inv = db.get(Invoice, invoice_id)
     if not inv or inv.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy hóa đơn.")
+    # Đã duyệt thì khóa sửa (số tiền đã vào chi phí/báo cáo) — muốn sửa phải /reject trước.
+    if inv.status == InvoiceStatus.VERIFIED:
+        raise HTTPException(409, "Hóa đơn đã duyệt — không thể sửa. Hãy từ chối (reject) trước nếu cần chỉnh.")
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(inv, k, v)
     db.commit()

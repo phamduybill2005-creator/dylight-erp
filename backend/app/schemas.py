@@ -169,8 +169,8 @@ class ContractBase(BaseModel):
     code: str
     name: str
     partner: str | None = None
-    value_no_vat: Decimal = Decimal(0)
-    vat_percent: Decimal = Decimal(10)
+    value_no_vat: Decimal = Field(default=Decimal(0), ge=0)
+    vat_percent: Decimal = Field(default=Decimal(10), ge=0, le=100)
     status: ContractStatus = ContractStatus.DRAFT
     sign_date: date | None = None
 
@@ -182,8 +182,8 @@ class ContractCreate(ContractBase):
 class ContractUpdate(BaseModel):
     name: str | None = None
     partner: str | None = None
-    value_no_vat: Decimal | None = None
-    vat_percent: Decimal | None = None
+    value_no_vat: Decimal | None = Field(default=None, ge=0)
+    vat_percent: Decimal | None = Field(default=None, ge=0, le=100)
     status: ContractStatus | None = None
     sign_date: date | None = None
 
@@ -210,18 +210,18 @@ class OcrResult(BaseModel):
 
 
 class InvoiceUpdate(BaseModel):
-    """Kế toán chỉnh sửa/duyệt dữ liệu sau khi AI bóc tách."""
+    """Kế toán chỉnh sửa số liệu AI bóc tách. KHÔNG cho đổi 'status' ở đây —
+    duyệt/từ chối phải qua /verify, /reject (có kiểm soát vai trò) để chống tự duyệt."""
     supplier_name: str | None = None
     supplier_tax_code: str | None = None
     invoice_number: str | None = None
     invoice_date: date | None = None
-    amount_no_vat: Decimal | None = None
-    vat_amount: Decimal | None = None
-    total_amount: Decimal | None = None
+    amount_no_vat: Decimal | None = Field(default=None, ge=0)
+    vat_amount: Decimal | None = Field(default=None, ge=0)
+    total_amount: Decimal | None = Field(default=None, ge=0)
     category: str | None = None
     project_id: int | None = None
     contract_id: int | None = None
-    status: InvoiceStatus | None = None
 
 
 class InvoiceOut(BaseModel):
@@ -251,7 +251,7 @@ class PaymentBase(BaseModel):
     code: str | None = None
     payment_type: PaymentType = PaymentType.PROGRESS
     direction: PaymentDirection = PaymentDirection.IN
-    amount: Decimal = Decimal(0)
+    amount: Decimal = Field(default=Decimal(0), ge=0)
     payment_date: date | None = None
     note: str | None = None
 
@@ -271,7 +271,7 @@ class PaymentOut(PaymentBase):
 class ProgressBase(BaseModel):
     project_id: int
     title: str
-    percent_complete: Decimal = Decimal(0)
+    percent_complete: Decimal = Field(default=Decimal(0), ge=0, le=100)
     planned_date: date | None = None
     actual_date: date | None = None
     note: str | None = None
@@ -522,10 +522,10 @@ class SalaryConfig(BaseModel):
 
 
 class SalaryConfigUpdate(BaseModel):
-    base_salary: Decimal | None = None
+    base_salary: Decimal | None = Field(default=None, ge=0)
     salary_type: SalaryType | None = None
-    allowance: Decimal | None = None
-    num_dependents: int | None = None
+    allowance: Decimal | None = Field(default=None, ge=0)
+    num_dependents: int | None = Field(default=None, ge=0)
 
 
 class PayrollOut(BaseModel):

@@ -43,8 +43,11 @@ def kpi_summary(db: Session = Depends(get_db), current: User = Depends(_FINANCE_
         .filter(Contract.company_id == cid)
         .scalar()
     )
+    # Chi phí lấy GIÁ CHƯA VAT (amount_no_vat) để cùng đơn vị với giá trị HĐ chưa VAT
+    # bên trên (VAT đầu vào được khấu trừ). Trước đây dùng total_amount (đã gồm VAT)
+    # khiến chi phí bị thổi ~10% -> lãi/lỗ sai lệch.
     total_invoice_cost = _d(
-        db.query(func.coalesce(func.sum(Invoice.total_amount), 0))
+        db.query(func.coalesce(func.sum(Invoice.amount_no_vat), 0))
         .filter(Invoice.company_id == cid, Invoice.status == InvoiceStatus.VERIFIED)
         .scalar()
     )
@@ -88,8 +91,8 @@ def profit_by_project(db: Session = Depends(get_db), current: User = Depends(_FI
             .filter(Contract.project_id == p.id)
             .scalar()
         )
-        cost = _d(
-            db.query(func.coalesce(func.sum(Invoice.total_amount), 0))
+        cost = _d(  # chưa VAT, cùng đơn vị với contract_value (xem ghi chú ở kpi_summary)
+            db.query(func.coalesce(func.sum(Invoice.amount_no_vat), 0))
             .filter(Invoice.project_id == p.id, Invoice.status == InvoiceStatus.VERIFIED)
             .scalar()
         )

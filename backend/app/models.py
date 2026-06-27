@@ -22,7 +22,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     String, Text, ForeignKey, Numeric, Integer, Date, DateTime, Boolean,
-    Enum as SAEnum, func, JSON, Table, Column
+    Enum as SAEnum, func, JSON, Table, Column, UniqueConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -385,6 +385,8 @@ class ActivityLog(Base):
 # --------------------------------------------------------------------------
 class Attendance(Base):
     __tablename__ = "attendance"
+    # Mỗi người chỉ có 1 bản ghi/ngày -> chống tạo bản ghi trùng (đếm công/lương sai).
+    __table_args__ = (UniqueConstraint("user_id", "work_date", name="uq_attendance_user_day"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)

@@ -12,9 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Trình duyệt Chromium + thư viện hệ thống cho Playwright (đồng bộ chấm công Yunatt).
-# Đặt sau pip install để tận dụng cache; --with-deps tự cài các gói apt cần thiết.
-RUN playwright install --with-deps chromium
+# LƯU Ý: KHÔNG cài Chromium ở đây. Việc cào Yunatt (Playwright) đã chuyển sang
+# GitHub Actions (.github/workflows/yunatt-sync.yml). Bước "playwright install
+# --with-deps chromium" rất nặng, làm build BACKEND HỎNG trên gói Render free.
+# yunatt_service import Playwright kiểu lazy nên ảnh không có Chromium vẫn chạy
+# bình thường (chỉ nút "Đồng bộ ngay" thủ công là không dùng được — đã tắt qua
+# YUNATT_ENABLED=false; đồng bộ tự động do Actions lo).
 
 COPY . .
 

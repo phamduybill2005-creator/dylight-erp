@@ -4,7 +4,13 @@ Cấu hình trung tâm của ứng dụng.
 trên nhiều môi trường (dev / staging / production) mà không sửa code.
 """
 from functools import lru_cache
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Giá trị SECRET_KEY mặc định (CHỈ dùng cho dev). Nếu PROD (DEBUG=False) mà vẫn
+# còn giá trị này -> app TỪ CHỐI khởi động, tránh việc ai biết khóa nằm sẵn trong
+# git tự ký token giả mạo Giám đốc/Quản trị.
+_DEFAULT_SECRET = "doi-secret-key-nay-trong-production-rat-quan-trong"
 
 
 class Settings(BaseSettings):
@@ -20,7 +26,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg2://dylight:dylight@db:5432/dylight"
 
     # --- Bảo mật / JWT ---
-    SECRET_KEY: str = "doi-secret-key-nay-trong-production-rat-quan-trong"
+    SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 ngày
 
@@ -81,6 +87,16 @@ class Settings(BaseSettings):
     GOOGLE_AUTO_CREATE: bool = True
     GOOGLE_DEFAULT_COMPANY_ID: int = 1          # công ty gán cho người tự tạo
     GOOGLE_DEFAULT_ROLE: str = "FIELD_STAFF"    # vai trò mặc định (thấp nhất) cho người tự tạo
+
+    @model_validator(mode="after")
+    def _enforce_prod_secret(self):
+        """PROD (DEBUG=False): cấm dùng SECRET_KEY mặc định -> chống giả mạo token."""
+        if not self.DEBUG and self.SECRET_KEY == _DEFAULT_SECRET:
+            raise ValueError(
+                "SECRET_KEY dang la gia tri mac dinh tren moi truong PROD (DEBUG=False). "
+                "Hay dat bien moi truong SECRET_KEY bang mot chuoi ngau nhien dai (>=32 ky tu)."
+            )
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

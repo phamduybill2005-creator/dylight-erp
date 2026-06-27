@@ -17,6 +17,7 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -111,16 +112,18 @@ def generate_payroll(
         if base <= 0 and allowance <= 0:
             continue  # bỏ qua người chưa cấu hình lương
 
+        # Đếm theo SỐ NGÀY (distinct work_date) có chấm vào — không đếm số bản ghi,
+        # để bản ghi trùng (nếu có) không làm phồng ngày công -> trả thừa lương.
         working_days = (
-            db.query(Attendance)
+            db.query(func.count(func.distinct(Attendance.work_date)))
             .filter(
                 Attendance.user_id == u.id,
                 Attendance.work_date >= start,
                 Attendance.work_date <= end,
                 Attendance.check_in.isnot(None),
             )
-            .count()
-        )
+            .scalar()
+        ) or 0
         wd = Decimal(working_days)
 
         if u.salary_type == SalaryType.DAILY:

@@ -172,11 +172,12 @@ export default function ProjectDetailPage() {
     }
   }
 
-  // Financial Summaries
+  // Financial Summaries — dùng GIÁ CHƯA VAT cho cả doanh thu lẫn chi phí để cùng đơn vị
+  // (trước đây cộng total_amount đã gồm VAT khiến chi phí bị thổi ~10%, dự án trông lỗ hơn thực).
   const totalContractValue = contracts.reduce((acc, c) => acc + Number(c.value_no_vat), 0);
   const totalCost = invoices
     .filter((i) => i.status === "VERIFIED")
-    .reduce((acc, i) => acc + Number(i.total_amount), 0);
+    .reduce((acc, i) => acc + Number(i.amount_no_vat), 0);
   const totalProfit = totalContractValue - totalCost;
   const marginPercent = totalContractValue > 0 ? (totalProfit / totalContractValue) * 100 : 0;
 

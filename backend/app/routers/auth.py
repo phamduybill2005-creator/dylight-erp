@@ -195,6 +195,11 @@ def update_user(
     if not user or user.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy nhân viên.")
 
+    # Chỉ ADMIN (quản trị hệ thống) mới được cấp quyền ADMIN cho người khác.
+    # Chặn Giám đốc (DIRECTOR) tự tạo thêm ADMIN -> leo thang quyền tối đa.
+    if payload.role == UserRole.ADMIN and current.role != UserRole.ADMIN:
+        raise HTTPException(403, "Chỉ Quản trị hệ thống (ADMIN) mới được cấp quyền ADMIN.")
+
     # Không cho phép tự phân cấp làm quản lý của chính mình
     if payload.manager_id == user.id:
         raise HTTPException(400, "Không thể gán nhân viên tự quản lý chính mình.")

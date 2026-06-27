@@ -38,17 +38,19 @@ services:
         generateValue: true
       - key: OCR_PROVIDER
         value: mock
+      - key: DEBUG                 # PROD: tắt debug + bắt buộc SECRET_KEY thật (chặn khóa mặc định)
+        value: "false"
+      - key: AUTO_SEED             # PROD: TẮT tự nạp dữ liệu mẫu (chống backdoor tài khoản demo 123456)
+        value: "false"
       - key: FRONTEND_ORIGINS      # origin của frontend (sửa nếu Render cấp URL khác)
         value: https://dosco-erp-web.onrender.com
-      # --- Đồng bộ tự động chấm công Yunatt (mỗi ngày 20:00) ---
-      - key: YUNATT_ENABLED        # true = bật đồng bộ + lịch chạy
-        value: "true"
-      - key: YUNATT_EMAIL          # tài khoản Yunatt — ĐẶT TRONG DASHBOARD (không commit)
-        sync: false
-      - key: YUNATT_PASSWORD       # mật khẩu Yunatt — ĐẶT TRONG DASHBOARD (không commit)
-        sync: false
-      - key: YUNATT_SYNC_HOUR      # giờ chạy hằng ngày (20 = 8h tối)
-        value: "20"
+      # --- Đồng bộ chấm công Yunatt ---
+      # TẮT lịch trong app: việc cào Playwright/Chromium chuyển sang GitHub Actions
+      # (.github/workflows/yunatt-sync.yml, 20:00 VN) -> backend KHÔNG cần Chromium,
+      # build nhẹ + không chạy đồng bộ 2 lần. Banner "lần đồng bộ gần nhất" vẫn hiện
+      # (đọc YunattSyncLog mà Action ghi vào DB).
+      - key: YUNATT_ENABLED
+        value: "false"
 
   # ---------- FRONTEND (Next.js) ----------
   - type: web

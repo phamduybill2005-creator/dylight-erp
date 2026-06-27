@@ -67,6 +67,26 @@ def _ensure_schema() -> None:
             if plen is not None and plen < 20:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE evaluations ALTER COLUMN period TYPE VARCHAR(20)"))
+
+        # Chống bản ghi chấm công TRÙNG (user_id, work_date): thêm UNIQUE INDEX nếu bảng
+        # đã tồn tại mà chưa có. AN TOÀN: KHÔNG xóa dữ liệu — nếu đang còn dòng trùng thì
+        # BỎ QUA + cảnh báo để admin tự gộp (tránh tự ý xóa chấm công trên prod).
+        if "attendance" in insp.get_table_names():
+            have = {ix["name"] for ix in insp.get_indexes("attendance")}
+            have |= {uc["name"] for uc in insp.get_unique_constraints("attendance")}
+            if "uq_attendance_user_day" not in have:
+                with engine.begin() as conn:
+                    dup = conn.execute(text(
+                        "SELECT 1 FROM attendance GROUP BY user_id, work_date HAVING COUNT(*) > 1 LIMIT 1"
+                    )).first()
+                    if dup:
+                        print("[ensure-schema] CANH BAO: con ban ghi cham cong trung "
+                              "(user_id, work_date) -> CHUA them rang buoc duy nhat. "
+                              "Hay gop thu cong roi khoi dong lai de bao ve.")
+                    else:
+                        conn.execute(text(
+                            "CREATE UNIQUE INDEX uq_attendance_user_day ON attendance (user_id, work_date)"
+                        ))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] bo qua: {_e}")
 
