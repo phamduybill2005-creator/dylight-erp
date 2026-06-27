@@ -17,7 +17,7 @@ from app.models import Attendance, AttendanceSource, PaymentDirection, User, Use
 from app.schemas import (
     AttendanceOut, AttendanceSummary, MachinePunch,
     AttendanceImportRequest, AttendanceImportResult,
-    YunattSyncResult, YunattPerson,
+    YunattSyncResult, YunattPerson, YunattSyncStatus,
 )
 from app.services import yunatt_service
 
@@ -236,9 +236,20 @@ def sync_yunatt(
     if not settings.YUNATT_ENABLED:
         raise HTTPException(503, "Tính năng đồng bộ Yunatt đang tắt (đặt YUNATT_ENABLED=true).")
     try:
-        return yunatt_service.run_sync(db, current.company_id)
+        return yunatt_service.run_sync(db, current.company_id, trigger="manual")
     except yunatt_service.YunattError as e:
+        db.rollback()
+        yunatt_service.record_failure(db, current.company_id, str(e), trigger="manual")
         raise HTTPException(502, str(e))
+
+
+@router.get("/yunatt/status", response_model=YunattSyncStatus | None)
+def yunatt_status(
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+):
+    """Trạng thái lần đồng bộ Yunatt gần nhất (None nếu chưa từng chạy) — để theo dõi job 20:00."""
+    return yunatt_service.latest_status(db, current.company_id)
 
 
 @router.get("/yunatt/persons", response_model=list[YunattPerson])

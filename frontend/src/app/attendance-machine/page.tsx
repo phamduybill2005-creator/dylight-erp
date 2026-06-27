@@ -23,9 +23,19 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
-import type { User, YunattSyncResult, YunattPerson } from "@/lib/types";
+import type { User, YunattSyncResult, YunattPerson, YunattSyncStatus } from "@/lib/types";
 
 const YUNATT_URL = "https://global.yunatt.com";
+
+// "2026-06-27T20:00:13" -> "20:00 27/06/2026"
+function fmtDateTime(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString("vi-VN", {
+    hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric",
+  });
+}
 
 export default function AttendanceMachinePage() {
   const router = useRouter();
@@ -35,6 +45,7 @@ export default function AttendanceMachinePage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<YunattSyncResult | null>(null);
   const [syncMsg, setSyncMsg] = useState("");
+  const [status, setStatus] = useState<YunattSyncStatus | null>(null);
 
   // Ghép nhân viên Yunatt ↔ ERP
   const [persons, setPersons] = useState<YunattPerson[] | null>(null);
@@ -43,7 +54,15 @@ export default function AttendanceMachinePage() {
   const [mapMsg, setMapMsg] = useState("");
 
   useEffect(() => {
-    api.me().then(setUser).catch(() => router.push("/login"));
+    api.me()
+      .then((u) => {
+        setUser(u);
+        // Quản lý trở lên: tải trạng thái lần đồng bộ gần nhất (theo dõi job 20:00).
+        if (roleTier(u.role) !== "STAFF") {
+          api.yunattStatus().then(setStatus).catch(() => {});
+        }
+      })
+      .catch(() => router.push("/login"));
   }, [router]);
 
   async function doSync() {
@@ -52,6 +71,7 @@ export default function AttendanceMachinePage() {
     try {
       const res = await api.syncYunatt();
       setSyncResult(res);
+      api.yunattStatus().then(setStatus).catch(() => {});
       setSyncMsg(
         `✓ Đã đồng bộ ${res.days_updated} ngày công (khớp ${res.matched}/${res.rows} lượt quẹt, tháng ${res.months.join(", ")}).` +
           (res.days_no_checkout ? ` · ${res.days_no_checkout} ngày chỉ có 1 mốc.` : "") +
@@ -59,6 +79,7 @@ export default function AttendanceMachinePage() {
       );
     } catch (e: unknown) {
       setSyncMsg(e instanceof Error ? e.message : "Đồng bộ thất bại.");
+      api.yunattStatus().then(setStatus).catch(() => {});  // lỗi đã được ghi nhật ký ở server
     } finally {
       setSyncing(false);
     }
@@ -164,6 +185,40 @@ export default function AttendanceMachinePage() {
             <ArrowPathIcon className={`h-5 w-5 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Đang đồng bộ… (có thể mất ~30 giây)" : "Đồng bộ ngay"}
           </button>
+
+          {/* Trạng thái lần đồng bộ GẦN NHẤT — cho biết job 20:00 có chạy/đúng không */}
+          {status ? (
+            <div
+              className={`mt-3 rounded-lg border p-3 text-[11px] ${
+                status.ok ? "border-ok/40 bg-ok/5" : "border-bad/40 bg-bad/5"
+              }`}
+            >
+              <p className="flex items-center gap-1.5 font-semibold text-ink">
+                {status.ok ? (
+                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-ok" />
+                ) : (
+                  <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-bad" />
+                )}
+                Lần đồng bộ gần nhất: {fmtDateTime(status.ran_at)}
+                <span className="font-normal text-muted">
+                  ({status.trigger === "auto" ? "tự động 20:00" : "bấm tay"})
+                </span>
+              </p>
+              {status.ok ? (
+                <p className="mt-1 text-muted">
+                  ✓ {status.days_updated} ngày công · khớp {status.matched}/{status.rows} lượt quẹt
+                  {status.months ? ` · tháng ${status.months}` : ""}
+                  {status.unmatched_count
+                    ? ` · ${status.unmatched_count} người chưa ghép`
+                    : ""}
+                </p>
+              ) : (
+                <p className="mt-1 text-bad">✗ Lỗi: {status.message || "không rõ nguyên nhân"}</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-3 text-[11px] text-muted">Chưa có lần đồng bộ nào được ghi nhận.</p>
+          )}
 
           {syncMsg && (
             <p className="mt-3 flex items-start gap-1.5 text-[12px] font-medium text-ink">

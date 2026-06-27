@@ -50,6 +50,10 @@ Thiếu ai thì vào **Nhân sự** tạo trước (chỉ Giám đốc/Quản tr
 Mỗi ngày **20:00**, server tự đăng nhập Yunatt, kéo chấm công **tháng này + tháng
 trước** và ghi vào ERP.
 
+> **Kiểm tra job đã chạy chưa:** menu **Máy chấm công** → ô **"Đồng bộ tự động"** có
+> dòng **"Lần đồng bộ gần nhất: …"** (xanh = OK, đỏ = lỗi kèm nguyên nhân). Nhờ vậy
+> Ban Giám đốc biết được job 20:00 có chạy đúng không mà không cần xem log server.
+
 ### B2. Cập nhật ngay lập tức (khi cần xem liền)
 1. Menu **Máy chấm công** → bấm **"Đồng bộ ngay"** (chờ ~15–30 giây).
 2. Xem dòng kết quả: *đã đồng bộ X ngày công, khớp Y/Z lượt quẹt*. Nếu báo "N người

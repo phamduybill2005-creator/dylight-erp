@@ -195,6 +195,19 @@ export interface YunattPerson {
   user_id?: number | null;     // nhân viên ERP đã map (nếu có)
   user_name?: string | null;
 }
+// Trạng thái lần đồng bộ Yunatt gần nhất (theo dõi job tự động 20:00).
+export interface YunattSyncStatus {
+  ran_at: string;              // ISO datetime
+  ok: boolean;
+  trigger: "auto" | "manual";
+  months?: string | null;
+  rows: number;
+  matched: number;
+  days_updated: number;
+  days_no_checkout: number;
+  unmatched_count: number;
+  message?: string | null;     // nội dung lỗi nếu ok=false
+}
 
 // Đánh giá 2 chiều nhân viên <-> quản lý trực tiếp.
 export type EvaluationDirection = "STAFF_TO_MANAGER" | "MANAGER_TO_STAFF";

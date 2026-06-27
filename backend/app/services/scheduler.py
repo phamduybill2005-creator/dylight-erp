@@ -24,12 +24,13 @@ def _run_daily_sync() -> None:
     from app.services import yunatt_service
 
     db = SessionLocal()
+    company_id = None
     try:
         company_id = yunatt_service.resolve_company_id(db)
         if not company_id:
             print("[yunatt-sync] khong tim thay cong ty -> bo qua.")
             return
-        res = yunatt_service.run_sync(db, company_id)
+        res = yunatt_service.run_sync(db, company_id, trigger="auto")
         print(
             f"[yunatt-sync] OK months={res['months']} rows={res['rows']} "
             f"matched={res['matched']} days={res['days_updated']} "
@@ -37,6 +38,9 @@ def _run_daily_sync() -> None:
         )
     except Exception as e:  # noqa: BLE001
         print(f"[yunatt-sync] LOI khi dong bo: {e}")
+        if company_id:
+            db.rollback()
+            yunatt_service.record_failure(db, company_id, str(e), trigger="auto")
     finally:
         db.close()
 

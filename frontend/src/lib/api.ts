@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, YunattSyncResult, YunattPerson } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, YunattSyncResult, YunattPerson, YunattSyncStatus } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -197,6 +197,7 @@ export const api = {
   // Đồng bộ tự động từ Yunatt (backend đăng nhập + kéo dữ liệu). Chạy lâu (~15-30s).
   syncYunatt: () => request<YunattSyncResult>("/attendance/sync-yunatt", { method: "POST" }),
   yunattPersons: () => request<YunattPerson[]>("/attendance/yunatt/persons"),
+  yunattStatus: () => request<YunattSyncStatus | null>("/attendance/yunatt/status"),
 
   // --- Evaluations (Đánh giá) ---
   evaluationsReceived: () => request<Evaluation[]>("/evaluations/received"),
