@@ -74,7 +74,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     full_name: str = Field(min_length=1)
     # Để TRỐNG nếu tài khoản chỉ đăng nhập bằng Google (hệ thống tự sinh mật khẩu ngẫu nhiên).
-    password: str | None = Field(default=None, min_length=6, description="Mật khẩu (>=6 ký tự); bỏ trống nếu dùng Google")
+    password: str | None = Field(default=None, min_length=8, description="Mật khẩu (>=8 ký tự); bỏ trống nếu dùng Google")
     role: UserRole = UserRole.FIELD_STAFF
     phone: str | None = None
     address: str | None = None
@@ -560,12 +560,12 @@ class MyPayrollResponse(BaseModel):
 # ------------------------- AUTH (đổi mật khẩu) -------------------------
 class ChangePassword(BaseModel):
     old_password: str
-    new_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=8)
 
 
 class AdminResetPassword(BaseModel):
     """Quản trị/Giám đốc đặt lại mật khẩu cho nhân viên (không cần mật khẩu cũ)."""
-    new_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=8)
 
 
 # ------------------------- NOTIFICATIONS (thông báo) -------------------------

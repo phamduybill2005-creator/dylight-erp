@@ -5,6 +5,7 @@ Router Chấm công (Attendance).
 - Quản lý / Giám đốc xem bảng chấm công toàn đội + tổng hợp giờ làm để đánh giá hiệu quả.
 - Máy chấm công gọi /attendance/punch (xác thực bằng X-API-Key, KHÔNG dùng JWT).
 """
+import hmac
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -279,7 +280,10 @@ def machine_punch(
     """
     if not settings.ATTENDANCE_API_KEY:
         raise HTTPException(503, "Chưa cấu hình ATTENDANCE_API_KEY cho máy chấm công.")
-    if x_api_key != settings.ATTENDANCE_API_KEY:
+    # So sánh khóa kiểu hằng-thời-gian (chống dò khóa qua timing). Lưu ý: đây vẫn là
+    # khóa CHUNG toàn hệ thống — cần tách khóa theo công ty/thiết bị (xem audit) để
+    # chặn việc dùng khóa chấm công hộ người ở công ty khác.
+    if not hmac.compare_digest(str(x_api_key or ""), settings.ATTENDANCE_API_KEY):
         raise HTTPException(401, "X-API-Key không hợp lệ.")
 
     ref = payload.employee_ref.strip()
