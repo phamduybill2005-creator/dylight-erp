@@ -353,7 +353,7 @@ export default function AttendancePage() {
           (res.unmatched.length ? ` Không khớp: ${res.unmatched.join(", ")}` : "")
       );
       api.attendanceList({ work_date: date }).then(setDayList).catch(() => {});
-      api.attendanceSummary(monthStr()).then(setSummary).catch(() => {});
+      api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
     } catch (e: unknown) {
       setImportMsg(e instanceof Error ? e.message : "Nhập thất bại.");
     } finally {

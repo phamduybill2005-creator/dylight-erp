@@ -415,6 +415,22 @@ class YunattPerson(BaseModel):
     user_name: str | None = None
 
 
+class YunattSyncStatus(BaseModel):
+    """Trạng thái lần đồng bộ Yunatt GẦN NHẤT (để hiển thị cho Ban Giám đốc)."""
+    ran_at: datetime
+    ok: bool
+    trigger: str                  # "auto" (lịch 20:00) / "manual" (bấm tay)
+    months: str | None = None
+    rows: int = 0
+    matched: int = 0
+    days_updated: int = 0
+    days_no_checkout: int = 0
+    unmatched_count: int = 0
+    message: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AttendanceSummary(BaseModel):
     """Tổng hợp chấm công theo người trong 1 kỳ (cho màn quản lý)."""
     user_id: int

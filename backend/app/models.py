@@ -421,6 +421,30 @@ class Attendance(Base):
         )
 
 
+class YunattSyncLog(Base):
+    """
+    Nhật ký MỖI LẦN đồng bộ chấm công từ Yunatt (tự động 20:00 hoặc bấm tay).
+
+    Mục đích: cho Ban Giám đốc THẤY được lần đồng bộ gần nhất đã chạy chưa, kết quả
+    ra sao, có lỗi (sai mật khẩu Yunatt / Yunatt đổi giao diện) hay còn người chưa
+    ghép hay không — vì job 20:00 chạy ngầm, trước đây chỉ ghi ra log server.
+    """
+    __tablename__ = "yunatt_sync_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    ran_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    ok: Mapped[bool] = mapped_column(Boolean, default=True)        # True = đồng bộ thành công
+    trigger: Mapped[str] = mapped_column(String(10), default="manual")  # "auto" (lịch) / "manual"
+    months: Mapped[str | None] = mapped_column(String(120))        # các tháng đã kéo, vd "2026-05, 2026-06"
+    rows: Mapped[int] = mapped_column(Integer, default=0)
+    matched: Mapped[int] = mapped_column(Integer, default=0)
+    days_updated: Mapped[int] = mapped_column(Integer, default=0)
+    days_no_checkout: Mapped[int] = mapped_column(Integer, default=0)
+    unmatched_count: Mapped[int] = mapped_column(Integer, default=0)
+    message: Mapped[str | None] = mapped_column(Text)             # nội dung lỗi (nếu ok=False)
+
+
 # --------------------------------------------------------------------------
 # 11. EVALUATIONS — đánh giá 2 chiều giữa nhân viên ↔ quản lý trực tiếp
 #     Mỗi kỳ (period "YYYY-MM") một người chấm một người: điểm 1–5 + nhận xét.

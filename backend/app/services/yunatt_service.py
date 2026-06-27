@@ -244,7 +244,32 @@ def _resolve(matcher, staff_number: str, staff_name: str | None):
 # --------------------------------------------------------------------------
 # API cho router / scheduler dùng
 # --------------------------------------------------------------------------
-def run_sync(db: Session, company_id: int, months: list[str] | None = None) -> dict:
+def record_failure(db: Session, company_id: int, message: str, trigger: str = "manual") -> None:
+    """Ghi 1 dòng nhật ký đồng bộ THẤT BẠI (để Ban Giám đốc thấy lỗi job ngầm)."""
+    from app.models import YunattSyncLog
+    try:
+        db.add(YunattSyncLog(
+            company_id=company_id, ok=False, trigger=trigger,
+            message=(message or "")[:1000],
+        ))
+        db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+
+
+def latest_status(db: Session, company_id: int):
+    """Dòng nhật ký đồng bộ GẦN NHẤT của công ty (None nếu chưa từng chạy)."""
+    from app.models import YunattSyncLog
+    return (
+        db.query(YunattSyncLog)
+        .filter(YunattSyncLog.company_id == company_id)
+        .order_by(YunattSyncLog.ran_at.desc(), YunattSyncLog.id.desc())
+        .first()
+    )
+
+
+def run_sync(db: Session, company_id: int, months: list[str] | None = None,
+             trigger: str = "manual") -> dict:
     """Kéo dữ liệu Yunatt -> ghi vào bảng Attendance. Trả về kết quả tổng hợp."""
     from app.models import Attendance, AttendanceSource
 
@@ -289,6 +314,14 @@ def run_sync(db: Session, company_id: int, months: list[str] | None = None) -> d
         if rec.check_out is None or rec.check_out <= rec.check_in:
             days_no_checkout += 1
 
+    # Ghi nhật ký lần đồng bộ thành công (để Ban Giám đốc theo dõi job ngầm 20:00).
+    from app.models import YunattSyncLog
+    db.add(YunattSyncLog(
+        company_id=company_id, ok=True, trigger=trigger,
+        months=", ".join(months), rows=len(punches), matched=matched,
+        days_updated=days, days_no_checkout=days_no_checkout,
+        unmatched_count=len(unmatched),
+    ))
     db.commit()
     return {
         "months": months,
