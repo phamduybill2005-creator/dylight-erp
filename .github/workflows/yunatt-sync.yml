@@ -1,0 +1,61 @@
+name: Yunatt attendance sync (daily 20:00 VN)
+
+# Kéo chấm công từ cổng Yunatt qua Playwright (Python) và ghi vào Postgres external.
+# Chạy mỗi ngày 20:00 giờ Việt Nam và có thể bấm chạy tay từ tab Actions.
+on:
+  schedule:
+    # 20:00 Asia/Ho_Chi_Minh == 13:00 UTC (Việt Nam cố định UTC+7, không có DST).
+    # Cron của GitHub theo UTC và là "best-effort" (có thể trễ 10-30 phút khi tải cao).
+    - cron: '0 13 * * *'
+  workflow_dispatch: {}   # chạy tay (Actions tab -> Run workflow)
+
+# Không chồng nhiều lần chạy (vd lần chạy tay trùng lần theo lịch).
+concurrency:
+  group: yunatt-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read   # tối thiểu quyền: job chỉ đọc repo
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20   # đăng nhập + kéo dữ liệu tháng khá nhanh; chặn job treo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Install Playwright Chromium (+ OS deps)
+        # playwright==1.49.1 đến từ requirements.txt; bước này tải bản Chromium khớp
+        # và các thư viện apt đi kèm. Dùng CLI của Python (KHÔNG dùng npx).
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run Yunatt sync
+        # cd vào backend để "import app.*" phân giải y như khi server chạy.
+        working-directory: backend
+        env:
+          # Cấu hình không bí mật
+          PYTHONIOENCODING: 'utf-8'
+          TZ: 'Asia/Ho_Chi_Minh'   # default_months()/current_month() dùng giờ local để chọn tháng cần kéo
+          # Bí mật (GitHub tự che *** trong log; truyền qua env, không bao giờ echo)
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          YUNATT_EMAIL: ${{ secrets.YUNATT_EMAIL }}
+          YUNATT_PASSWORD: ${{ secrets.YUNATT_PASSWORD }}
+          # KHÔNG khai báo YUNATT_COMPANY_ID nếu muốn dùng "công ty đầu tiên".
+          # Truyền chuỗi RỖNG sẽ làm pydantic ép kiểu int LỖI -> sập script ngay khi import.
+          # Nếu CẦN chỉ định: bỏ comment dòng dưới và đặt vars.YUNATT_COMPANY_ID = một SỐ NGUYÊN.
+          # YUNATT_COMPANY_ID: ${{ vars.YUNATT_COMPANY_ID }}
+        run: python scripts/yunatt_sync_ci.py
