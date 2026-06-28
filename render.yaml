@@ -28,10 +28,9 @@ services:
     plan: free
     healthCheckPath: /
     envVars:
-      - key: DATABASE_URL          # tự nối từ CSDL ở trên — không cần điền tay
-        fromDatabase:
-          name: dosco-erp-db
-          property: connectionString
+      - key: DATABASE_URL          # DB ĐÃ CHUYỂN SANG NEON (bền, không hết hạn 90 ngày).
+        sync: false                # Đặt chuỗi kết nối Neon trong Render Dashboard, KHÔNG commit secret.
+                                   # (DB cũ dosco-erp-db trên Render không còn dùng — có thể xóa sau.)
       - key: SECRET_KEY            # tự sinh chuỗi ngẫu nhiên an toàn
         generateValue: true
       - key: ATTENDANCE_API_KEY    # tự sinh key cho máy chấm công
