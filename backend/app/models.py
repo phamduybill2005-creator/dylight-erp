@@ -801,3 +801,22 @@ class ChatMessage(Base):
     @property
     def sender_name(self) -> str | None:
         return self.sender.full_name if self.sender else None
+
+
+# --------------------------------------------------------------------------
+# 25. MESSAGE_REACTIONS — cảm xúc (emoji) trên tin nhắn; mỗi người 1 emoji/tin
+# --------------------------------------------------------------------------
+class MessageReaction(Base):
+    __tablename__ = "message_reactions"
+    __table_args__ = (
+        UniqueConstraint("message_id", "user_id", name="uq_reaction_msg_user"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    message_id: Mapped[int] = mapped_column(
+        ForeignKey("chat_messages.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    emoji: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

@@ -845,6 +845,16 @@ class MessageCreate(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
 
 
+class ReactionCreate(BaseModel):
+    emoji: str = Field(min_length=1, max_length=16)
+
+
+class ReactionAgg(BaseModel):
+    emoji: str
+    count: int
+    mine: bool = False
+
+
 class MessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -853,3 +863,12 @@ class MessageOut(BaseModel):
     sender_name: str | None = None
     body: str
     created_at: datetime
+    reactions: list[ReactionAgg] = []
+
+
+class ConversationRename(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+
+
+class ConversationAddMembers(BaseModel):
+    member_ids: list[int] = Field(default_factory=list)

@@ -112,6 +112,18 @@ def _ensure_schema() -> None:
                         "CREATE UNIQUE INDEX IF NOT EXISTS uq_conversations_direct_key "
                         "ON conversations (company_id, direct_key) WHERE direct_key IS NOT NULL"
                     ))
+
+        # CHAT: mỗi người 1 cảm xúc / 1 tin -> UNIQUE (message_id, user_id).
+        # create_all đã tạo bảng + ràng buộc; đây chỉ phòng hờ DB cũ thiếu index.
+        if "message_reactions" in insp.get_table_names():
+            have = {ix["name"] for ix in insp.get_indexes("message_reactions")}
+            have |= {uc["name"] for uc in insp.get_unique_constraints("message_reactions")}
+            if "uq_reaction_msg_user" not in have:
+                with engine.begin() as conn:
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_reaction_msg_user "
+                        "ON message_reactions (message_id, user_id)"
+                    ))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] bo qua: {_e}")
 

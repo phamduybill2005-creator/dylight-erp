@@ -412,6 +412,12 @@ export interface Conversation {
   created_at: string;
 }
 
+export interface ReactionAgg {
+  emoji: string;
+  count: number;
+  mine: boolean;
+}
+
 export interface ChatMessage {
   id: number;
   conversation_id: number;
@@ -419,5 +425,6 @@ export interface ChatMessage {
   sender_name?: string | null;
   body: string;
   created_at: string;
+  reactions?: ReactionAgg[];
 }
 

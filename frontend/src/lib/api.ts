@@ -360,5 +360,24 @@ export const api = {
     request<void>(`/chat/conversations/${id}/read`, { method: "POST" }),
   projectConversation: (projectId: number) =>
     request<Conversation>(`/chat/project/${projectId}`),
+  reactToMessage: (messageId: number, emoji: string) =>
+    request<ChatMessage>(`/chat/messages/${messageId}/reaction`, {
+      method: "PUT",
+      body: JSON.stringify({ emoji }),
+    }),
+  removeReaction: (messageId: number) =>
+    request<ChatMessage>(`/chat/messages/${messageId}/reaction`, { method: "DELETE" }),
+  renameConversation: (id: number, title: string) =>
+    request<Conversation>(`/chat/conversations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    }),
+  addConversationMembers: (id: number, memberIds: number[]) =>
+    request<Conversation>(`/chat/conversations/${id}/members`, {
+      method: "POST",
+      body: JSON.stringify({ member_ids: memberIds }),
+    }),
+  removeConversationMember: (id: number, userId: number) =>
+    request<void>(`/chat/conversations/${id}/members/${userId}`, { method: "DELETE" }),
 };
 
