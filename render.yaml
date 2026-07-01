@@ -35,8 +35,14 @@ services:
         generateValue: true
       - key: ATTENDANCE_API_KEY    # tự sinh key cho máy chấm công
         generateValue: true
+      # AI đọc hóa đơn thật (GPT-4o Vision). Đặt OPENAI_API_KEY trong Dashboard.
+      # Nếu chưa có key -> ô tiền để TRỐNG cho kế toán nhập tay (KHÔNG bịa số).
       - key: OCR_PROVIDER
-        value: mock
+        value: openai
+      - key: OPENAI_API_KEY      # ĐẶT trong Render Dashboard (sk-...), KHÔNG commit vào repo.
+        sync: false
+      - key: OPENAI_VISION_MODEL
+        value: gpt-4o
       - key: DEBUG                 # PROD: tắt debug + bắt buộc SECRET_KEY thật (chặn khóa mặc định)
         value: "false"
       - key: AUTO_SEED             # PROD: TẮT tự nạp dữ liệu mẫu (chống backdoor tài khoản demo 123456)

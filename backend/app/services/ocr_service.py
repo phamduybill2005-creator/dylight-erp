@@ -28,17 +28,35 @@ from app.schemas import OcrResult
 # HÀM CÔNG KHAI — router chỉ cần gọi extract_invoice(...)
 # --------------------------------------------------------------------------
 async def extract_invoice(image_bytes: bytes, mime_type: str = "image/jpeg") -> OcrResult:
-    """Chọn nhà cung cấp OCR theo cấu hình và trả về dữ liệu chuẩn hóa."""
+    """Chọn nhà cung cấp OCR theo cấu hình và trả về dữ liệu chuẩn hóa.
+
+    QUAN TRỌNG (toàn vẹn số liệu): KHI DÙNG THẬT tuyệt đối KHÔNG bịa số. Nếu AI lỗi
+    hoặc chưa cấu hình khóa -> trả kết quả TRỐNG (số = 0) để kế toán nhập tay, thay vì
+    sinh số ngẫu nhiên. Dữ liệu demo ngẫu nhiên CHỈ chạy khi OCR_PROVIDER == "mock".
+    """
     provider = settings.OCR_PROVIDER.lower()
-    try:
-        if provider == "openai" and settings.OPENAI_API_KEY:
+    if provider == "openai" and settings.OPENAI_API_KEY:
+        try:
             return await _extract_openai(image_bytes, mime_type)
-        if provider == "google" and settings.GOOGLE_VISION_API_KEY:
+        except Exception as exc:  # noqa: BLE001 — không để AI lỗi làm sập upload
+            print(f"[OCR] Lỗi OpenAI: {exc}. Trả kết quả TRỐNG để kế toán nhập tay.")
+            return _empty_result()
+    if provider == "google" and settings.GOOGLE_VISION_API_KEY:
+        try:
             return await _extract_google(image_bytes)
-    except Exception as exc:  # pragma: no cover - bảo vệ pipeline khi API lỗi
-        # Không để toàn bộ luồng upload sập chỉ vì AI lỗi: ghi nhận và fallback.
-        print(f"[OCR] Lỗi nhà cung cấp '{provider}': {exc}. Dùng dữ liệu mock.")
-    return _extract_mock()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[OCR] Lỗi Google Vision: {exc}. Trả kết quả TRỐNG để nhập tay.")
+            return _empty_result()
+    if provider == "mock":
+        return _extract_mock()   # CHỈ chế độ demo mới sinh dữ liệu ngẫu nhiên
+    # Chọn provider thật nhưng THIẾU API key -> để trống (KHÔNG bịa số).
+    print(f"[OCR] Provider '{provider}' chưa có API key -> trả kết quả trống (nhập tay).")
+    return _empty_result()
+
+
+def _empty_result() -> OcrResult:
+    """Không đọc được -> để trống cho kế toán nhập tay (KHÔNG bịa số tiền)."""
+    return OcrResult(confidence=Decimal(0))
 
 
 # --------------------------------------------------------------------------
