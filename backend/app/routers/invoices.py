@@ -25,7 +25,27 @@ from app.services.ocr_service import extract_invoice
 
 router = APIRouter(prefix="/invoices", tags=["Hóa đơn (AI)"])
 
-_ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+# Đuôi tệp suy TỪ content-type đã whitelist (KHÔNG tin file.filename) -> chống lưu .html/.svg.
+_EXT_BY_MIME = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "application/pdf": ".pdf",
+}
+_ALLOWED_MIME = set(_EXT_BY_MIME)
+
+
+def _sniff_ok(raw: bytes, content_type: str) -> bool:
+    """Kiểm 'magic bytes' để chắc NỘI DUNG khớp loại khai báo (không tin content-type client)."""
+    if content_type == "image/png":
+        return raw[:8] == b"\x89PNG\r\n\x1a\n"
+    if content_type == "image/jpeg":
+        return raw[:3] == b"\xff\xd8\xff"
+    if content_type == "image/webp":
+        return raw[:4] == b"RIFF" and raw[8:12] == b"WEBP"
+    if content_type == "application/pdf":
+        return raw[:5] == b"%PDF-"
+    return False
 
 
 @router.post("/upload", response_model=InvoiceOut, status_code=201)
@@ -40,14 +60,27 @@ async def upload_invoice(
     if file.content_type not in _ALLOWED_MIME:
         raise HTTPException(415, "Định dạng tệp không hỗ trợ (chỉ JPG/PNG/WEBP/PDF).")
 
-    raw = await file.read()
-    size_mb = len(raw) / (1024 * 1024)
-    if size_mb > settings.MAX_UPLOAD_MB:
-        raise HTTPException(413, f"Tệp vượt quá {settings.MAX_UPLOAD_MB}MB.")
+    # Đọc theo KHỐI, chặn 413 SỚM khi vượt hạn -> không nạp hết file khổng lồ vào RAM (chống DoS).
+    max_bytes = int(settings.MAX_UPLOAD_MB * 1024 * 1024)
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(413, f"Tệp vượt quá {settings.MAX_UPLOAD_MB}MB.")
+        chunks.append(chunk)
+    raw = b"".join(chunks)
+
+    # Nội dung phải ĐÚNG là ảnh/PDF thật (chống chèn HTML/SVG có script -> stored XSS).
+    if not _sniff_ok(raw, file.content_type):
+        raise HTTPException(415, "Nội dung tệp không phải ảnh/PDF hợp lệ.")
 
     # --- Lưu ảnh vào ổ đĩa (production nên đẩy lên S3/Cloud Storage) ---
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    ext = os.path.splitext(file.filename or "")[1] or ".jpg"
+    ext = _EXT_BY_MIME[file.content_type]   # đuôi an toàn theo MIME, KHÔNG lấy từ filename
     stored_name = f"{uuid.uuid4().hex}{ext}"
     stored_path = os.path.join(settings.UPLOAD_DIR, stored_name)
     with open(stored_path, "wb") as f:

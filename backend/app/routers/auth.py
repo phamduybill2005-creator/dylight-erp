@@ -2,7 +2,7 @@
 import secrets
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import distinct
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user, require_roles
+from app.ratelimit import check_login_allowed, record_login_failure, clear_login_failures
 from app.models import User, UserRole, Company
 from app.schemas import Token, UserOut, UserUpdate, UserCreate, GoogleLoginRequest, ChangePassword, AdminResetPassword
 from app.security import create_access_token, verify_password, hash_password
@@ -76,6 +77,7 @@ def provision_google_user(db: Session, email: str, name: str) -> User:
 
 @router.post("/login", response_model=Token)
 def login(
+    request: Request,
     form: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
@@ -84,12 +86,17 @@ def login(
     Trường 'username' của form chính là email người dùng.
     """
     # Email không phân biệt hoa/thường: chuẩn hóa về chữ thường trước khi tra cứu.
-    user = db.query(User).filter(User.email == form.username.strip().lower()).first()
+    email = form.username.strip().lower()
+    # Chống dò mật khẩu: chặn tạm nếu đã sai quá nhiều lần gần đây (theo tài khoản + IP).
+    check_login_allowed(request, email)
+    user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(form.password, user.hashed_password):
+        record_login_failure(request, email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email hoặc mật khẩu không đúng.",
         )
+    clear_login_failures(email)
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Tài khoản đã bị khóa.")
     if not user.is_approved:
@@ -103,9 +110,15 @@ def login(
 
 
 @router.post("/google", response_model=Token)
-def login_google(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
+def login_google(request: Request, payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     """Đăng nhập bằng tài khoản Google: xác minh token, tìm/tạo nhân viên, cấp JWT."""
-    info = _verify_google_credential(payload.credential)
+    # Giới hạn tần suất theo IP để chống spam/dò token.
+    check_login_allowed(request, None)
+    try:
+        info = _verify_google_credential(payload.credential)
+    except HTTPException:
+        record_login_failure(request, None)
+        raise
     user = provision_google_user(db, info["email"], info["name"])
     if not user.is_active:
         raise HTTPException(403, "Tài khoản đã bị khóa.")
@@ -248,6 +261,17 @@ def admin_reset_password(
     user = db.get(User, user_id)
     if not user or user.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy nhân viên.")
+    # Chống LEO THANG qua đường vòng reset-password: DIRECTOR không được đặt lại mật khẩu
+    # của ADMIN hay của DIRECTOR khác (nếu không sẽ tự đặt mật khẩu rồi chiếm tài khoản
+    # quản trị). Chỉ ADMIN mới reset ngang/trên cấp; ai cũng có thể reset của chính mình.
+    if (
+        current.role != UserRole.ADMIN
+        and user.id != current.id
+        and user.role in (UserRole.ADMIN, UserRole.DIRECTOR)
+    ):
+        raise HTTPException(
+            403, "Chỉ Quản trị hệ thống mới được đặt lại mật khẩu của tài khoản quản trị/giám đốc khác."
+        )
     user.hashed_password = hash_password(payload.new_password)
     db.commit()
 

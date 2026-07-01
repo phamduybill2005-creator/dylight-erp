@@ -155,6 +155,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# --- Security headers cho MỌI response (gồm cả /static) ---
+# nosniff: chặn trình duyệt "đoán" kiểu file -> giảm nhẹ stored-XSS ở ảnh hóa đơn.
+# X-Frame-Options DENY: chống clickjacking (nhúng màn duyệt hóa đơn vào iframe lừa bấm).
+# HSTS: ép HTTPS (Render đã HTTPS). Referrer/Permissions: hạn chế rò rỉ + quyền trình duyệt.
+@app.middleware("http")
+async def _security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    response.headers.setdefault(
+        "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+    )
+    return response
+
 # --- Phục vụ ảnh hóa đơn đã upload tại /static ---
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")

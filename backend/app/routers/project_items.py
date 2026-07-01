@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, can_see_money
 from app.models import ProjectItem, Project, User
+from app.routers.projects import _can_view
 from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut
 
 router = APIRouter(prefix="/project-items", tags=["Hạng mục dự toán"])
@@ -19,6 +20,23 @@ def _assert_project(db: Session, current: User, project_id: int) -> Project:
     if not project or project.company_id != current.company_id:
         raise HTTPException(400, "Dự án không hợp lệ.")
     return project
+
+
+def _assert_member(db: Session, current: User, project_id: int) -> Project:
+    """Cùng công ty + là THÀNH VIÊN/chủ trì/giám đốc của dự án mới được đụng BOQ.
+    404 (không phải 403) để không lộ dự án của người khác."""
+    project = _assert_project(db, current, project_id)
+    if not _can_view(db, project, current):
+        raise HTTPException(404, "Không tìm thấy dự án.")
+    return project
+
+
+def _strip_money_if_needed(data: dict, current: User) -> dict:
+    """Không được thấy tiền -> không được GHI đơn giá/khối lượng (chỉ Giám đốc đặt tiền)."""
+    if not can_see_money(current):
+        data.pop("unit_price", None)
+        data.pop("quantity", None)
+    return data
 
 
 def _out(item: ProjectItem, current: User) -> ProjectItemOut:
@@ -56,7 +74,7 @@ def list_items(
     current: User = Depends(get_current_user),
 ):
     """Liệt kê toàn bộ hạng mục của một dự án (dạng phẳng, đã sắp thứ tự)."""
-    _assert_project(db, current, project_id)
+    _assert_member(db, current, project_id)   # chỉ thành viên dự án mới xem được BOQ
     rows = (
         db.query(ProjectItem)
         .filter(
@@ -78,10 +96,11 @@ def create_item(
     current: User = Depends(get_current_user),
 ):
     """Thêm một nhóm cha (parent_id=null) hoặc một đầu việc con (parent_id=<nhóm>)."""
-    _assert_project(db, current, payload.project_id)
+    _assert_member(db, current, payload.project_id)   # chặn IDOR: chỉ thành viên dự án
     _validate_parent(db, current, payload.project_id, payload.parent_id)
 
-    item = ProjectItem(**payload.model_dump(), company_id=current.company_id)
+    data = _strip_money_if_needed(payload.model_dump(), current)  # non-director không đặt được tiền
+    item = ProjectItem(**data, company_id=current.company_id)
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -99,8 +118,9 @@ def update_item(
     item = db.get(ProjectItem, item_id)
     if not item or item.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy hạng mục.")
+    _assert_member(db, current, item.project_id)   # chặn IDOR: chỉ thành viên dự án
 
-    data = payload.model_dump(exclude_unset=True)
+    data = _strip_money_if_needed(payload.model_dump(exclude_unset=True), current)
     # Nếu client đổi parent_id thì phải kiểm tra như khi tạo (cùng công ty/dự án, 2 cấp).
     if "parent_id" in data:
         _validate_parent(db, current, item.project_id, data["parent_id"], self_id=item.id)
@@ -123,6 +143,7 @@ def delete_item(
     item = db.get(ProjectItem, item_id)
     if not item or item.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy hạng mục.")
+    _assert_member(db, current, item.project_id)   # chặn IDOR: chỉ thành viên dự án
 
     if item.parent_id is None:
         db.query(ProjectItem).filter(
