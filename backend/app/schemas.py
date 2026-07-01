@@ -135,6 +135,7 @@ class ProjectBase(BaseModel):
     name: str
     location: str | None = None
     manager_name: str | None = None
+    lead_id: int | None = None            # người chủ trì (chỉ huy trưởng)
     status: ProjectStatus = ProjectStatus.PLANNING
     start_date: date | None = None
     end_date: date | None = None
@@ -149,10 +150,21 @@ class ProjectUpdate(BaseModel):
     name: str | None = None
     location: str | None = None
     manager_name: str | None = None
+    lead_id: int | None = None            # đặt/gỡ người chủ trì
     status: ProjectStatus | None = None
     start_date: date | None = None
     end_date: date | None = None
     member_ids: list[int] | None = None
+
+
+class ProjectMemberChange(BaseModel):
+    """Thêm/bớt 1 thành viên khỏi dự án."""
+    user_id: int
+
+
+class ProjectLeadSet(BaseModel):
+    """Đặt/gỡ người chủ trì dự án (lead_id=None để gỡ)."""
+    lead_id: int | None = None
 
 
 class ProjectOut(ProjectBase):
@@ -161,6 +173,9 @@ class ProjectOut(ProjectBase):
     company_id: int
     created_at: datetime
     members: list[UserOut] = []
+    lead_name: str | None = None          # tên người chủ trì (tiện hiển thị)
+    # % tiến độ THỰC = trung bình % của các mốc Progress (bơm ở router, mặc định 0).
+    progress_percent: Decimal = Decimal(0)
 
 
 # --------------------------- CONTRACT ---------------------------
@@ -279,6 +294,14 @@ class ProgressBase(BaseModel):
 
 class ProgressCreate(ProgressBase):
     pass
+
+
+class ProgressUpdate(BaseModel):
+    title: str | None = None
+    percent_complete: Decimal | None = Field(default=None, ge=0, le=100)
+    planned_date: date | None = None
+    actual_date: date | None = None
+    note: str | None = None
 
 
 class ProgressOut(ProgressBase):
@@ -802,6 +825,7 @@ class ConversationOut(BaseModel):
     id: int
     type: ConversationType
     title: str | None = None            # với DIRECT: FE hiển thị tên người kia
+    project_id: int | None = None       # != None => nhóm chat gắn dự án
     members: list[ChatMemberOut] = []
     last_message: str | None = None     # preview text của tin cuối
     last_message_at: datetime | None = None

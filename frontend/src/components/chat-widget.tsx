@@ -78,6 +78,27 @@ export default function ChatWidget() {
     api.me().then(setMe).catch(() => {});
   }, []);
 
+  // Cho phép các trang khác mở nhóm chat của 1 dự án qua sự kiện toàn cục
+  // (vd nút "Chat dự án" ở trang chi tiết dự án). detail.projectId = id dự án.
+  useEffect(() => {
+    async function onOpenProject(e: Event) {
+      const projectId = (e as CustomEvent<{ projectId: number }>).detail?.projectId;
+      if (!projectId) return;
+      setOpen(true);
+      refreshList();
+      try {
+        const conv = await api.projectConversation(projectId);
+        await openConversation(conv);
+      } catch {
+        /* noop — không mở được nhóm dự án (không thuộc dự án) */
+      }
+    }
+    window.addEventListener("open-project-chat", onOpenProject as EventListener);
+    return () => window.removeEventListener("open-project-chat", onOpenProject as EventListener);
+    // openConversation/refreshList ổn định trong vòng đời component.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Tự làm mới định kỳ ~8s: badge; nếu mở panel làm mới danh sách; nếu đang trong 1
   // phòng thì làm mới cả tin nhắn phòng đó (poll-based, không WebSocket).
   useEffect(() => {

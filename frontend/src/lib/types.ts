@@ -59,11 +59,14 @@ export interface Project {
   name: string;
   location?: string | null;
   manager_name?: string | null;
+  lead_id?: number | null;
+  lead_name?: string | null;
   status: ProjectStatus;
   start_date?: string | null;
   end_date?: string | null;
   created_at: string;
   members?: User[];
+  progress_percent?: number; // % tiến độ THỰC (trung bình các mốc), do BE tính
 }
 
 export type InvoiceStatus =
@@ -399,6 +402,7 @@ export interface Conversation {
   id: number;
   type: ConversationType;
   title?: string | null;          // DIRECT: FE hiển thị tên người kia
+  project_id?: number | null;     // != null => nhóm chat gắn dự án
   members: ChatMember[];
   last_message?: string | null;   // preview tin cuối
   last_message_at?: string | null;

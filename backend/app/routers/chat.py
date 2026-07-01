@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import (
-    ChatMessage, Conversation, ConversationMember, ConversationType, User,
+    ChatMessage, Conversation, ConversationMember, ConversationType, Project,
+    User, UserRole, project_members,
 )
 from app.schemas import (
     ChatMemberOut, ConversationCreate, ConversationOut, MessageCreate, MessageOut,
@@ -100,6 +101,7 @@ def _build_out(db: Session, conv: Conversation, current: User) -> ConversationOu
         id=conv.id,
         type=conv.type,
         title=conv.title,
+        project_id=conv.project_id,
         members=member_out,
         last_message=last.body if last else None,
         last_message_at=conv.last_message_at,
@@ -208,6 +210,83 @@ def create_conversation(
             user_id=uid,
             last_read_message_id=0,
         ))
+    db.commit()
+    db.refresh(conv)
+    return _build_out(db, conv, current)
+
+
+def _project_member_ids(db: Session, project: Project) -> list[int]:
+    """Danh sách user_id thuộc dự án = thành viên + người chủ trì (dedup)."""
+    ids = [
+        row[0]
+        for row in db.query(project_members.c.user_id)
+        .filter(project_members.c.project_id == project.id)
+        .all()
+    ]
+    if project.lead_id:
+        ids.append(project.lead_id)
+    return list(dict.fromkeys(ids))
+
+
+@router.get("/project/{project_id}", response_model=ConversationOut)
+def project_conversation(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """
+    Get-or-create NHÓM CHAT của một dự án.
+    - Chỉ người liên quan dự án (Director/Admin, người chủ trì, hoặc thành viên) mới vào.
+    - Nhóm dùng lại theo project_id (không tạo trùng); đồng bộ thành viên nhóm = thành
+      viên dự án + người chủ trì mỗi lần gọi (kết nạp người mới, KHÔNG tự loại bỏ ai để
+      giữ lịch sử — chỉ thêm cho đơn giản & an toàn).
+    """
+    project = db.get(Project, project_id)
+    if not project or project.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy dự án.")
+
+    is_director = current.role in (UserRole.DIRECTOR, UserRole.ADMIN)
+    pmember_ids = _project_member_ids(db, project)
+    if not is_director and current.id not in pmember_ids:
+        raise HTTPException(403, "Bạn không thuộc dự án này.")
+
+    # Nhóm chat của dự án (get-or-create theo project_id).
+    conv = (
+        db.query(Conversation)
+        .filter(
+            Conversation.company_id == current.company_id,
+            Conversation.project_id == project_id,
+        )
+        .first()
+    )
+    if not conv:
+        conv = Conversation(
+            company_id=current.company_id,
+            type=ConversationType.GROUP,
+            title=f"Dự án: {project.name}",
+            created_by_id=current.id,
+            direct_key=None,
+            project_id=project_id,
+        )
+        db.add(conv)
+        db.flush()
+
+    # Đồng bộ thành viên: thêm mọi người thuộc dự án + Giám đốc đang mở (nếu chưa có).
+    want_ids = list(dict.fromkeys([*pmember_ids, current.id]))
+    existing_ids = {
+        m.user_id
+        for m in db.query(ConversationMember)
+        .filter(ConversationMember.conversation_id == conv.id)
+        .all()
+    }
+    for uid in want_ids:
+        if uid not in existing_ids:
+            db.add(ConversationMember(
+                company_id=current.company_id,
+                conversation_id=conv.id,
+                user_id=uid,
+                last_read_message_id=0,
+            ))
     db.commit()
     db.refresh(conv)
     return _build_out(db, conv, current)

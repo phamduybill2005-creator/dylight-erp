@@ -17,6 +17,10 @@ import {
   XMarkIcon,
   UsersIcon,
   TableCellsIcon,
+  ChatBubbleLeftRightIcon,
+  StarIcon,
+  TrashIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
@@ -69,8 +73,12 @@ export default function ProjectDetailPage() {
   const [paymentModal, setPaymentModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [savingMembers, setSavingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sửa mốc tiến độ (null = đang tạo mới, khác null = đang sửa mốc này).
+  const [editingProgressId, setEditingProgressId] = useState<number | null>(null);
 
   // New item form states
   const [newContract, setNewContract] = useState({
@@ -130,24 +138,37 @@ export default function ProjectDetailPage() {
       .finally(() => setLoading(false));
   }
 
-  // Load current user and all company users once
+  // Quyền quản trị dự án (thêm/bớt thành viên, đặt chủ trì, sửa/xóa mốc):
+  // Giám đốc/Admin HOẶC chính người chủ trì.
+  // Backend là nguồn chân lý (chỉ Director/Admin hoặc lead) — FE gate để ẩn nút cho khớp.
+  const canManage =
+    !!currentUser &&
+    (currentUser.role === "DIRECTOR" ||
+      currentUser.role === "ADMIN" ||
+      project?.lead_id === currentUser.id);
+
+  // Load current user once.
   useEffect(() => {
     api.me()
-      .then((me) => {
-        setCurrentUser(me);
-        if (me.role !== "FIELD_STAFF") {
-          api.users().then(setAllUsers).catch(() => {});
-        }
-      })
+      .then((me) => setCurrentUser(me))
       .catch(() => {});
   }, []);
 
+  // Nạp danh sách nhân sự để chọn thành viên/chủ trì — chỉ khi user có quyền quản trị
+  // dự án này (Director/Admin hoặc chính người chủ trì, kể cả người chủ trì là cấp trung).
+  useEffect(() => {
+    if (canManage && allUsers.length === 0) {
+      api.users().then(setAllUsers).catch(() => {});
+    }
+  }, [canManage, allUsers.length]);
+
   useEffect(loadData, [projectId]);
 
-  // Sync selectedMemberIds when project changes
+  // Sync selectedMemberIds / lead when project changes
   useEffect(() => {
     if (project) {
       setSelectedMemberIds(project.members?.map((m) => m.id) ?? []);
+      setSelectedLeadId(project.lead_id ?? null);
     }
   }, [project]);
 
@@ -162,7 +183,12 @@ export default function ProjectDetailPage() {
     setSavingMembers(true);
     setError(null);
     try {
-      await api.updateProject(project.id, { member_ids: selectedMemberIds });
+      // Người chủ trì phải nằm trong danh sách thành viên (nếu có) để nhất quán.
+      const memberIds =
+        selectedLeadId != null && !selectedMemberIds.includes(selectedLeadId)
+          ? [...selectedMemberIds, selectedLeadId]
+          : selectedMemberIds;
+      await api.updateProject(project.id, { member_ids: memberIds, lead_id: selectedLeadId });
       setMembersModal(false);
       loadData();
     } catch (err) {
@@ -170,6 +196,41 @@ export default function ProjectDetailPage() {
     } finally {
       setSavingMembers(false);
     }
+  }
+
+  // Mở nhóm chat của dự án (ChatWidget lắng nghe sự kiện này để get-or-create nhóm).
+  function openProjectChat() {
+    window.dispatchEvent(new CustomEvent("open-project-chat", { detail: { projectId } }));
+  }
+
+  async function handleDeleteProgress(id: number) {
+    if (!window.confirm("Xóa mốc tiến độ này?")) return;
+    try {
+      await api.deleteProgress(id);
+      loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xóa mốc tiến độ thất bại.");
+    }
+  }
+
+  function openEditProgress(p: Progress) {
+    setEditingProgressId(p.id);
+    setNewProgress({
+      title: p.title,
+      percent_complete: Number(p.percent_complete),
+      planned_date: p.planned_date ?? "",
+      actual_date: p.actual_date ?? "",
+      note: p.note ?? "",
+    });
+    setError(null);
+    setProgressModal(true);
+  }
+
+  function openCreateProgress() {
+    setEditingProgressId(null);
+    setNewProgress({ title: "", percent_complete: 0, planned_date: "", actual_date: "", note: "" });
+    setError(null);
+    setProgressModal(true);
   }
 
   // Financial Summaries — dùng GIÁ CHƯA VAT cho cả doanh thu lẫn chi phí để cùng đơn vị
@@ -221,14 +282,20 @@ export default function ProjectDetailPage() {
       return;
     }
     try {
-      await api.createProgress({
-        ...newProgress,
-        project_id: projectId,
+      const payload = {
         percent_complete: Number(newProgress.percent_complete),
+        title: newProgress.title,
+        note: newProgress.note,
         planned_date: newProgress.planned_date || null,
         actual_date: newProgress.actual_date || null,
-      });
+      };
+      if (editingProgressId != null) {
+        await api.updateProgress(editingProgressId, payload);
+      } else {
+        await api.createProgress({ ...payload, project_id: projectId });
+      }
       setProgressModal(false);
+      setEditingProgressId(null);
       setNewProgress({
         title: "",
         percent_complete: 0,
@@ -238,7 +305,7 @@ export default function ProjectDetailPage() {
       });
       loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Thêm tiến độ thất bại.");
+      setError(err instanceof Error ? err.message : "Lưu tiến độ thất bại.");
     }
   }
 
@@ -307,14 +374,23 @@ export default function ProjectDetailPage() {
 
       {/* Thông tin chung dự án */}
       <div className="rounded-xl2 bg-white p-4 lg:p-6 shadow-card border border-line/50">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <span className="font-mono text-[10px] text-muted">{project.code}</span>
             <h1 className="text-base lg:text-xl font-bold text-ink leading-tight">{project.name}</h1>
           </div>
-          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}>
-            {PROJECT_STATUS[project.status]?.label}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={openProjectChat}
+              className="inline-flex items-center gap-1 rounded-xl2 bg-steel px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-card hover:bg-ink transition-colors"
+            >
+              <ChatBubbleLeftRightIcon className="h-4 w-4" />
+              Chat dự án
+            </button>
+            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}>
+              {PROJECT_STATUS[project.status]?.label}
+            </span>
+          </div>
         </div>
 
         <div className="mt-3 grid grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-4 text-xs text-muted">
@@ -328,6 +404,12 @@ export default function ProjectDetailPage() {
             <p className="flex items-center gap-1.5">
               <UserIcon className="h-4 w-4 text-muted/80" />
               {project.manager_name}
+            </p>
+          )}
+          {project.lead_name && (
+            <p className="flex items-center gap-1.5">
+              <StarIcon className="h-4 w-4 text-amber" />
+              Chủ trì: <span className="font-medium text-ink">{project.lead_name}</span>
             </p>
           )}
           {project.start_date && (
@@ -346,13 +428,13 @@ export default function ProjectDetailPage() {
               <UsersIcon className="h-4 w-4" />
               Thành viên thực hiện ({project.members?.length ?? 0})
             </h3>
-            {currentUser?.role !== "FIELD_STAFF" && (
+            {canManage && (
               <button
                 onClick={() => setMembersModal(true)}
                 className="text-[11px] font-semibold text-steel hover:text-ink underline flex items-center gap-0.5"
               >
                 <PlusIcon className="h-3 w-3" />
-                Cập nhật thành viên
+                Thành viên & chủ trì
               </button>
             )}
           </div>
@@ -361,17 +443,25 @@ export default function ProjectDetailPage() {
             {!project.members || project.members.length === 0 ? (
               <p className="text-[11px] text-muted italic">Chưa phân công thành viên thực hiện.</p>
             ) : (
-              project.members.map((member) => (
-                <span
-                  key={member.id}
-                  className="inline-flex items-center gap-1 rounded-md bg-paper border border-line/50 px-2 py-0.5 text-[10px] font-semibold text-ink"
-                  title={`${ROLE_LABEL[member.role] || member.role} - ${member.phone || "Không có SĐT"}`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-                  {member.full_name}
-                  <span className="text-[9px] text-muted">({ROLE_LABEL[member.role] || member.role})</span>
-                </span>
-              ))
+              project.members.map((member) => {
+                const isLead = project.lead_id === member.id;
+                return (
+                  <span
+                    key={member.id}
+                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold text-ink ${isLead ? "bg-amber/15 border-amber/50" : "bg-paper border-line/50"}`}
+                    title={`${ROLE_LABEL[member.role] || member.role} - ${member.phone || "Không có SĐT"}`}
+                  >
+                    {isLead ? (
+                      <StarIcon className="h-3 w-3 text-amber" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber" />
+                    )}
+                    {member.full_name}
+                    {isLead && <span className="text-[9px] font-bold text-amber-deep">(Chủ trì)</span>}
+                    <span className="text-[9px] text-muted">({ROLE_LABEL[member.role] || member.role})</span>
+                  </span>
+                );
+              })
             )}
           </div>
         </div>
@@ -483,7 +573,7 @@ export default function ProjectDetailPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-muted uppercase">Nhật ký tiến độ ({progressLogs.length})</h3>
               <button
-                onClick={() => setProgressModal(true)}
+                onClick={openCreateProgress}
                 className="flex items-center gap-1 text-xs font-semibold text-amber hover:text-amber-deep"
               >
                 <PlusIcon className="h-4 w-4" />
@@ -505,11 +595,31 @@ export default function ProjectDetailPage() {
                       <span className={`absolute -left-[23px] top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full ring-4 ring-paper ${completed ? "bg-ok" : "bg-amber"}`} />
                       
                       <div className="rounded-xl2 bg-white p-3 shadow-card border border-line/40">
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-2">
                           <h4 className="text-sm font-semibold text-ink leading-tight">{p.title}</h4>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${completed ? "bg-ok/10 text-ok" : "bg-amber/10 text-amber-deep"}`}>
-                            {p.percent_complete}%
-                          </span>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {canManage && (
+                              <>
+                                <button
+                                  onClick={() => openEditProgress(p)}
+                                  className="rounded-full p-1 text-muted hover:bg-paper hover:text-steel"
+                                  title="Sửa mốc"
+                                >
+                                  <PencilSquareIcon className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteProgress(p.id)}
+                                  className="rounded-full p-1 text-muted hover:bg-paper hover:text-bad"
+                                  title="Xóa mốc"
+                                >
+                                  <TrashIcon className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${completed ? "bg-ok/10 text-ok" : "bg-amber/10 text-amber-deep"}`}>
+                              {p.percent_complete}%
+                            </span>
+                          </div>
                         </div>
                         {p.note && <p className="mt-1 text-xs text-muted">{p.note}</p>}
                         <div className="mt-2.5 pt-2 border-t border-line flex justify-between text-[10px] text-muted">
@@ -765,8 +875,10 @@ export default function ProjectDetailPage() {
               className="w-full max-w-md lg:max-w-lg rounded-t-xl2 bg-white p-5 lg:p-6 shadow-card"
             >
               <div className="flex items-center justify-between border-b border-line pb-3">
-                <h2 className="text-sm font-bold text-ink">Cập nhật tiến độ dự án</h2>
-                <button onClick={() => setProgressModal(false)} className="rounded-full p-1 hover:bg-paper">
+                <h2 className="text-sm font-bold text-ink">
+                  {editingProgressId != null ? "Sửa mốc tiến độ" : "Cập nhật tiến độ dự án"}
+                </h2>
+                <button onClick={() => { setProgressModal(false); setEditingProgressId(null); }} className="rounded-full p-1 hover:bg-paper">
                   <XMarkIcon className="h-5 w-5 text-muted" />
                 </button>
               </div>
@@ -835,11 +947,11 @@ export default function ProjectDetailPage() {
                     type="submit"
                     className="flex-1 rounded-xl2 bg-amber py-2.5 text-xs font-semibold text-ink text-center"
                   >
-                    Ghi nhận tiến độ
+                    {editingProgressId != null ? "Lưu thay đổi" : "Ghi nhận tiến độ"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setProgressModal(false)}
+                    onClick={() => { setProgressModal(false); setEditingProgressId(null); }}
                     className="rounded-xl2 bg-paper px-4 py-2.5 text-xs text-muted font-medium"
                   >
                     Hủy
@@ -994,7 +1106,7 @@ export default function ProjectDetailPage() {
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h3 className="text-sm font-bold text-ink flex items-center gap-1.5">
                   <UsersIcon className="h-5 w-5 text-steel" />
-                  Thành viên dự án
+                  Thành viên & chủ trì
                 </h3>
                 <button
                   onClick={() => setMembersModal(false)}
@@ -1004,33 +1116,50 @@ export default function ProjectDetailPage() {
                 </button>
               </div>
 
-              {/* Danh sách checklist thành viên */}
-              <div className="mt-4 max-h-60 overflow-y-auto space-y-2.5 pr-1">
+              <p className="mt-3 text-[11px] text-muted">
+                Tick chọn thành viên. Bấm <StarIcon className="inline h-3 w-3 text-amber" /> để đặt
+                <b className="text-ink"> người chủ trì</b> (chỉ 1 người). Bấm lại ngôi sao đang bật để gỡ chủ trì.
+              </p>
+
+              {/* Danh sách checklist thành viên + chọn chủ trì */}
+              <div className="mt-3 max-h-60 overflow-y-auto space-y-2.5 pr-1">
                 {allUsers.length === 0 ? (
                   <p className="text-center text-xs text-muted py-4">Đang tải danh sách nhân viên…</p>
                 ) : (
                   allUsers.map((u) => {
                     const isChecked = selectedMemberIds.includes(u.id);
+                    const isLead = selectedLeadId === u.id;
                     return (
-                      <label
+                      <div
                         key={u.id}
-                        className="flex items-center justify-between rounded-lg border border-line/60 p-3 hover:bg-paper cursor-pointer transition-colors"
+                        className={`flex items-center justify-between rounded-lg border p-3 transition-colors ${isLead ? "border-amber/50 bg-amber/10" : "border-line/60 hover:bg-paper"}`}
                       >
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-ink truncate">{u.full_name}</p>
-                          <p className="text-[10px] text-muted">{ROLE_LABEL[u.role] || u.role} · {u.email}</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleMember(u.id)}
-                          className="h-4 w-4 rounded border-line text-steel focus:ring-steel cursor-pointer"
-                        />
-                      </label>
+                        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleMember(u.id)}
+                            className="h-4 w-4 rounded border-line text-steel focus:ring-steel cursor-pointer"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-xs font-semibold text-ink truncate">{u.full_name}</span>
+                            <span className="block text-[10px] text-muted">{ROLE_LABEL[u.role] || u.role} · {u.email}</span>
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLeadId((prev) => (prev === u.id ? null : u.id))}
+                          title={isLead ? "Gỡ chủ trì" : "Đặt làm chủ trì"}
+                          className={`ml-2 shrink-0 rounded-full p-1.5 transition-colors ${isLead ? "text-amber" : "text-muted hover:bg-paper hover:text-amber"}`}
+                        >
+                          <StarIcon className={`h-4 w-4 ${isLead ? "fill-amber" : ""}`} />
+                        </button>
+                      </div>
                     );
                   })
                 )}
               </div>
+              {error && <p className="mt-2 text-[11px] text-bad">{error}</p>}
 
               {/* Actions */}
               <div className="mt-5 flex gap-3 border-t border-line pt-3">

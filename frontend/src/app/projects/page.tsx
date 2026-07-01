@@ -9,9 +9,9 @@ import { useRouter } from "next/navigation";
 import { PlusIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { isDirector } from "@/lib/roles";
+import { isDirector, isManagerUp } from "@/lib/roles";
 import { formatCompactVND } from "@/lib/format";
-import type { Project, ProjectProfit } from "@/lib/types";
+import type { Project, ProjectProfit, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -33,11 +33,21 @@ export default function ProjectsPage() {
   const [creating, setCreating] = useState(false);
   const [addResult, setAddResult] = useState("");
 
+  // Người chủ trì (lead) áp dụng cho các dự án tạo trong đợt này (tùy chọn).
+  const [leadId, setLeadId] = useState<number | "">("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [canManage, setCanManage] = useState(false);
+
   useEffect(() => {
     api.projects().then(setProjects).catch(() => {});
     // Số liệu lãi/lỗ theo dự án chỉ dành cho Giám đốc — Quản lý không tải (tránh 403).
     api.me()
       .then((me) => {
+        if (isManagerUp(me.role)) {
+          setCanManage(true);
+          // Danh sách nhân sự để chọn người chủ trì khi tạo dự án.
+          api.users().then(setUsers).catch(() => {});
+        }
         if (!isDirector(me.role)) return;
         setShowFinance(true);
         api
@@ -99,7 +109,8 @@ export default function ProjectsPage() {
     if (items.length === 0) return;
     setCreating(true);
     setAddResult("");
-    const results = await Promise.allSettled(items.map((it) => api.createProject(it)));
+    const lead = leadId === "" ? {} : { lead_id: Number(leadId) };
+    const results = await Promise.allSettled(items.map((it) => api.createProject({ ...it, ...lead })));
     const ok = results.filter((r) => r.status === "fulfilled").length;
     const fails = items.filter((_, i) => results[i].status === "rejected").map((it) => it.name);
     const fresh = await api.projects().catch(() => null);
@@ -249,6 +260,25 @@ export default function ProjectsPage() {
                 ĐB-02, Đường tránh QL1, Quảng Nam<br />
                 , Kè chống sạt lở Sông Thu
               </div>
+              {canManage && (
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">
+                    Người chủ trì (chỉ huy trưởng) — áp dụng cho tất cả dự án tạo lần này
+                  </label>
+                  <select
+                    value={leadId}
+                    onChange={(e) => setLeadId(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
+                  >
+                    <option value="">— Chưa chỉ định —</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <textarea
                 value={bulkText}
                 onChange={(e) => setBulkText(e.target.value)}

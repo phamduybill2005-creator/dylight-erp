@@ -212,6 +212,9 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(255))
     location: Mapped[str | None] = mapped_column(String(255))
     manager_name: Mapped[str | None] = mapped_column(String(255))
+    # Người CHỦ TRÌ dự án (chỉ huy trưởng) — có toàn quyền quản lý thành viên & tiến độ.
+    # Cột trên bảng ĐÃ TỒN TẠI -> phải ALTER ở _ensure_schema (create_all không tự thêm).
+    lead_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(SAEnum(ProjectStatus), default=ProjectStatus.PLANNING)
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
@@ -223,6 +226,11 @@ class Project(Base):
     invoices: Mapped[list["Invoice"]] = relationship(back_populates="project")
     progress_logs: Mapped[list["Progress"]] = relationship(back_populates="project")
     members: Mapped[list["User"]] = relationship("User", secondary=project_members, back_populates="projects")
+    lead: Mapped["User | None"] = relationship("User", foreign_keys=[lead_id])
+
+    @property
+    def lead_name(self) -> str | None:
+        return self.lead.full_name if self.lead else None
 
 
 # --------------------------------------------------------------------------
@@ -739,6 +747,9 @@ class Conversation(Base):
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     # dedup 1-1: cặp uid nhỏ:uid lớn "12:45"; NULL với nhóm. UNIQUE ở _ensure_schema.
     direct_key: Mapped[str | None] = mapped_column(String(40), index=True)
+    # Nhóm chat GẮN với 1 dự án (get-or-create ở /chat/project/{id}); NULL với phòng thường.
+    # Cột trên bảng ĐÃ TỒN TẠI -> phải ALTER ở _ensure_schema.
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), index=True, nullable=True)
     # để sort danh sách phòng theo tin mới nhất mà không JOIN nặng
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

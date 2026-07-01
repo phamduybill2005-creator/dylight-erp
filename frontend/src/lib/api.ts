@@ -126,6 +126,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  addProjectMember: (projectId: number, userId: number) =>
+    request<Project>(`/projects/${projectId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId }),
+    }),
+  removeProjectMember: (projectId: number, userId: number) =>
+    request<Project>(`/projects/${projectId}/members/${userId}`, { method: "DELETE" }),
+  setProjectLead: (projectId: number, leadId: number | null) =>
+    request<Project>(`/projects/${projectId}/lead`, {
+      method: "PUT",
+      body: JSON.stringify({ lead_id: leadId }),
+    }),
 
   // --- Contracts ---
   contracts: (projectId?: number) =>
@@ -153,6 +165,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  updateProgress: (id: number, payload: Partial<Progress>) =>
+    request<Progress>(`/progress/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteProgress: (id: number) =>
+    request<void>(`/progress/${id}`, { method: "DELETE" }),
 
   // --- Project Items (Hạng mục dự toán / BOQ) ---
   projectItems: (projectId: number) =>
@@ -337,5 +356,7 @@ export const api = {
     request<ChatMessage>(`/chat/conversations/${id}/messages`, { method: "POST", body: JSON.stringify({ body }) }),
   markConversationRead: (id: number) =>
     request<void>(`/chat/conversations/${id}/read`, { method: "POST" }),
+  projectConversation: (projectId: number) =>
+    request<Conversation>(`/chat/project/${projectId}`),
 };
 

@@ -83,7 +83,7 @@ export default function ProjectProgressPage() {
               <th className={`${TH} text-center`}>Bắt đầu</th>
               <th className={`${TH} text-center`}>Hạn</th>
               <th className={`${TH} text-center`}>Thời gian</th>
-              <th className={TH}>Tiến độ (thời gian)</th>
+              <th className={TH}>Tiến độ (thực tế)</th>
               <th className={`${TH} text-center`}>Còn lại</th>
               <th className={`${TH} text-center`}>Trạng thái</th>
             </tr>
@@ -96,9 +96,11 @@ export default function ProjectProgressPage() {
               const st = STATUS[p.status] ?? STATUS.PLANNING;
               const done = p.status === "COMPLETED";
               const total = diffDays(p.end_date, p.start_date);
-              const elapsed = diffDays(todayISO(), p.start_date);
               const left = diffDays(p.end_date, todayISO());
-              const pct = done ? 100 : total && total > 0 && elapsed != null ? Math.max(0, Math.min(100, Math.round((elapsed / total) * 100))) : 0;
+              // % TIẾN ĐỘ THỰC = trung bình % các mốc (BE tính, field progress_percent).
+              // Dự án đã hoàn thành coi như 100% dù chưa nhập đủ mốc.
+              const realPct = Math.max(0, Math.min(100, Math.round(Number(p.progress_percent ?? 0))));
+              const pct = done ? 100 : realPct;
               const overdue = !done && left != null && left < 0;
               const soon = !done && left != null && left >= 0 && left <= 5;
               const rowCls = overdue ? "bg-bad/5" : soon ? "bg-amber/10" : i % 2 ? "bg-paper/40" : "bg-white";
