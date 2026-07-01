@@ -60,6 +60,10 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
+      # Giới hạn RAM heap của Node khi build (gói free 512MB) -> tránh "next build"
+      # bị OOM-kill trên Render. Bản build ở máy dev nhiều RAM nên không lộ lỗi này.
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=512
       # Trỏ tới backend ở trên (sửa nếu Render cấp URL khác). Next "nướng" lúc build.
       - key: NEXT_PUBLIC_API_BASE
         value: https://dosco-erp-api.onrender.com/api/v1
