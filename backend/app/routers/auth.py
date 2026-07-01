@@ -20,6 +20,14 @@ router = APIRouter(prefix="/auth", tags=["Xác thực"])
 GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 
+def _issue_token(user: User) -> str:
+    """Cấp JWT kèm token_version (tv) hiện tại -> đổi/reset mật khẩu vô hiệu token cũ."""
+    return create_access_token(
+        subject=user.id,
+        extra={"company_id": user.company_id, "role": user.role.value, "tv": user.token_version or 0},
+    )
+
+
 def _verify_google_credential(credential: str) -> dict:
     """Xác minh ID token của Google, trả về {email, name}. Ném HTTPException nếu sai."""
     if not settings.GOOGLE_CLIENT_ID:
@@ -102,11 +110,7 @@ def login(
     if not user.is_approved:
         raise HTTPException(status_code=403, detail="Tài khoản đang chờ duyệt.")
 
-    token = create_access_token(
-        subject=user.id,
-        extra={"company_id": user.company_id, "role": user.role.value},
-    )
-    return Token(access_token=token)
+    return Token(access_token=_issue_token(user))
 
 
 @router.post("/google", response_model=Token)
@@ -128,11 +132,7 @@ def login_google(request: Request, payload: GoogleLoginRequest, db: Session = De
             "Tài khoản của bạn đã được ghi nhận, đang chờ Giám đốc/Quản trị duyệt và "
             "phân vị trí. Vui lòng đăng nhập lại sau khi được duyệt.",
         )
-    token = create_access_token(
-        subject=user.id,
-        extra={"company_id": user.company_id, "role": user.role.value},
-    )
-    return Token(access_token=token)
+    return Token(access_token=_issue_token(user))
 
 
 @router.get("/me", response_model=UserOut)
@@ -148,17 +148,33 @@ def read_me(
     return current
 
 
-@router.post("/change-password", status_code=204)
+@router.post("/change-password", response_model=Token)
 def change_password(
     payload: ChangePassword,
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    """Người dùng tự đổi mật khẩu của mình (cần nhập mật khẩu hiện tại)."""
+    """Người dùng tự đổi mật khẩu của mình (cần nhập mật khẩu hiện tại).
+    Vô hiệu token cũ ở MỌI thiết bị khác; trả token mới cho thiết bị hiện tại."""
     if not verify_password(payload.old_password, current.hashed_password):
         raise HTTPException(status_code=400, detail="Mật khẩu hiện tại không đúng.")
     current.hashed_password = hash_password(payload.new_password)
+    current.token_version = (current.token_version or 0) + 1
     db.commit()
+    db.refresh(current)
+    return Token(access_token=_issue_token(current))
+
+
+@router.post("/logout-all", response_model=Token)
+def logout_all_devices(
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Đăng xuất khỏi MỌI thiết bị (vô hiệu mọi token cũ); giữ phiên hiện tại bằng token mới."""
+    current.token_version = (current.token_version or 0) + 1
+    db.commit()
+    db.refresh(current)
+    return Token(access_token=_issue_token(current))
 
 
 @router.get("/users", response_model=list[UserOut])
@@ -273,5 +289,7 @@ def admin_reset_password(
             403, "Chỉ Quản trị hệ thống mới được đặt lại mật khẩu của tài khoản quản trị/giám đốc khác."
         )
     user.hashed_password = hash_password(payload.new_password)
+    # Đặt lại mật khẩu -> vô hiệu MỌI token cũ của người bị reset (buộc đăng nhập lại).
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
 

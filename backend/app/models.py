@@ -148,6 +148,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # False = tài khoản tự đăng ký bằng Google, đang CHỜ Giám đốc/Quản trị duyệt & phân vị trí.
     is_approved: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Tăng 1 mỗi khi đổi/đặt-lại mật khẩu hoặc "đăng xuất mọi thiết bị" -> token cũ
+    # (nhúng tv khác) lập tức vô hiệu. Token cũ KHÔNG có claim tv -> coi như 0 (khớp mặc định).
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     phone: Mapped[str | None] = mapped_column(String(30))

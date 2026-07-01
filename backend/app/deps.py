@@ -38,6 +38,10 @@ def get_current_user(
     user = db.get(User, int(user_id))
     if user is None or not user.is_active or not user.is_approved:
         raise _CRED_ERROR
+    # Token bị thu hồi khi đổi/đặt-lại mật khẩu hoặc đăng-xuất-mọi-thiết-bị:
+    # tv trong token phải khớp token_version hiện tại. Token cũ (không có tv) -> 0.
+    if int(payload.get("tv", 0)) != int(user.token_version or 0):
+        raise _CRED_ERROR
     return user
 
 

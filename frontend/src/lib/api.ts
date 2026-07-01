@@ -285,9 +285,21 @@ export const api = {
   createEquipmentLog: (payload: { equipment_id: number; project_id?: number | null; log_date?: string | null; hours_used?: number; fuel?: number; note?: string | null }) =>
     request<EquipmentLog>("/equipment/logs", { method: "POST", body: JSON.stringify(payload) }),
 
-  // --- Đổi mật khẩu ---
-  changePassword: (old_password: string, new_password: string) =>
-    request<void>("/auth/change-password", { method: "POST", body: JSON.stringify({ old_password, new_password }) }),
+  // --- Đổi mật khẩu (BE trả token mới -> lưu lại để giữ phiên hiện tại, thiết bị khác bị đăng xuất) ---
+  changePassword: async (old_password: string, new_password: string) => {
+    const data = await request<{ access_token: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ old_password, new_password }),
+    });
+    if (data?.access_token) tokenStore.set(data.access_token);
+    return data;
+  },
+  // Đăng xuất khỏi mọi thiết bị (vô hiệu token cũ); giữ phiên hiện tại bằng token mới.
+  logoutAllDevices: async () => {
+    const data = await request<{ access_token: string }>("/auth/logout-all", { method: "POST" });
+    if (data?.access_token) tokenStore.set(data.access_token);
+    return data;
+  },
 
   // --- Hồ sơ thiết kế (cầu đường) — xem: mọi người; sửa: Quản lý+ ---
   designDocs: (params?: { project_id?: number; phase?: string; status?: string }) => {
