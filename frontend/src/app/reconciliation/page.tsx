@@ -14,7 +14,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
-import { formatVND, formatDate } from "@/lib/format";
+import { formatVND, formatDate, dateLocal } from "@/lib/format";
 import type { Project, Contract, Payment, Invoice } from "@/lib/types";
 
 export default function ReconciliationPage() {
@@ -127,7 +127,7 @@ export default function ReconciliationPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Doi_soat_quyet_toan_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute("download", `Doi_soat_quyet_toan_${dateLocal(new Date())}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

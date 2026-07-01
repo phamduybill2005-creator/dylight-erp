@@ -12,13 +12,14 @@ import { ChatBubbleLeftRightIcon, UserCircleIcon } from "@heroicons/react/24/out
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
+import { dateLocal } from "@/lib/format";
 import type { Evaluation, EvaluationSummary, User } from "@/lib/types";
 
 // Kỳ đánh giá theo TUẦN = ngày Thứ 7 của tuần đó (YYYY-MM-DD).
 function weekSaturday(d: Date = new Date()): string {
   const x = new Date(d);
   x.setDate(x.getDate() + (6 - x.getDay())); // CN(0)…T7(6) -> tới Thứ 7 cùng tuần
-  return x.toISOString().slice(0, 10);
+  return dateLocal(x);
 }
 const fmtSat = (s: string) =>
   new Date(s + "T00:00:00").toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });

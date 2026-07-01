@@ -8,9 +8,10 @@ import Link from "next/link";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
+import { todayLocal } from "@/lib/format";
 import type { Project, User } from "@/lib/types";
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = todayLocal;
 const SHOWN_KEY = "deadlineAlertShown";
 
 function daysLeft(end?: string | null): number | null {

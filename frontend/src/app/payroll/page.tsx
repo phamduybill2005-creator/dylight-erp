@@ -9,10 +9,10 @@ import { BanknotesIcon, XMarkIcon, CalculatorIcon, CheckIcon, ArrowDownTrayIcon 
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
-import { formatVND } from "@/lib/format";
+import { formatVND, monthLocal } from "@/lib/format";
 import type { Payroll, SalaryConfig, SalaryType, User } from "@/lib/types";
 
-const monthStr = () => new Date().toISOString().slice(0, 7);
+const monthStr = monthLocal;
 
 export default function PayrollPage() {
   const router = useRouter();

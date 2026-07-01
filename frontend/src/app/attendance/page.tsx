@@ -20,10 +20,11 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
+import { todayLocal, monthLocal } from "@/lib/format";
 import type { Attendance, AttendanceSummary, User } from "@/lib/types";
 
-const todayStr = () => new Date().toISOString().split("T")[0];
-const monthStr = () => new Date().toISOString().slice(0, 7);
+const todayStr = todayLocal;
+const monthStr = monthLocal;
 const fmtTime = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—";
 const fmtHours = (mins: number) => (mins / 60).toFixed(1) + "h";

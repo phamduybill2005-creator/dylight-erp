@@ -32,3 +32,23 @@ export function formatDate(iso?: string | null): string {
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("vi-VN");
 }
+
+// ---- Ngày theo GIỜ ĐỊA PHƯƠNG (Việt Nam) ----
+// KHÔNG dùng new Date().toISOString() để lấy ngày: toISOString() trả GIỜ UTC,
+// nên lúc rạng sáng ở VN (UTC vẫn là hôm trước) sẽ ra SAI NGÀY. Dùng các hàm dưới.
+
+/** Một Date -> "YYYY-MM-DD" theo giờ địa phương (không qua UTC). */
+export function dateLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Hôm nay theo giờ địa phương, "YYYY-MM-DD". */
+export function todayLocal(): string {
+  return dateLocal(new Date());
+}
+
+/** Tháng hiện tại theo giờ địa phương, "YYYY-MM". */
+export function monthLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}

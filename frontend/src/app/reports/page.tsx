@@ -15,7 +15,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
-import { formatCompactVND, formatVND } from "@/lib/format";
+import { formatCompactVND, formatVND, dateLocal } from "@/lib/format";
 import type { ProjectProfit } from "@/lib/types";
 
 export default function ReportsPage() {
@@ -115,7 +115,7 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Bao_cao_lai_lo_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute("download", `Bao_cao_lai_lo_${dateLocal(new Date())}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

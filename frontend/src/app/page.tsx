@@ -31,7 +31,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, roleTitle, type Tier } from "@/lib/roles";
-import { formatCompactVND, formatVND } from "@/lib/format";
+import { formatCompactVND, formatVND, todayLocal } from "@/lib/format";
 import type { Invoice, KpiSummary, ProjectProfit, User, Project, Attendance } from "@/lib/types";
 
 type ModuleDef = {
@@ -61,7 +61,7 @@ const MODULES: ModuleDef[] = [
   { href: "/audit", label: "Nhật ký hoạt động", icon: ShieldCheckIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
 ];
 
-const todayStr = () => new Date().toISOString().split("T")[0];
+const todayStr = todayLocal;
 const fmtTime = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—";
 

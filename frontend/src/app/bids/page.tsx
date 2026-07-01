@@ -16,7 +16,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { canSeeMoney } from "@/lib/roles";
-import { formatVND, formatDate } from "@/lib/format";
+import { formatVND, formatDate, todayLocal } from "@/lib/format";
 import type { Bid, BidStatus, Project, User } from "@/lib/types";
 
 const STATUS_CONFIG: Record<BidStatus, { label: string; cls: string }> = {
@@ -257,7 +257,7 @@ export default function BidsPage() {
                             name: b.name.replace("Gói thầu ", "").replace("gói ", ""),
                             location: "",
                             manager_name: "",
-                            start_date: new Date().toISOString().split("T")[0],
+                            start_date: todayLocal(),
                           });
                           setProjectModalOpen(true);
                         }}

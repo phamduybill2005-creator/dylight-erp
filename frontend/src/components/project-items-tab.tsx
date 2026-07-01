@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
-import { formatVND } from "@/lib/format";
+import { formatVND, dateLocal } from "@/lib/format";
 import type { ProjectItem } from "@/lib/types";
 
 const num = (v: unknown) => {
@@ -197,7 +197,7 @@ export default function ProjectItemsTab({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Du_toan_du_an_${projectId}_${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `Du_toan_du_an_${projectId}_${dateLocal(new Date())}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

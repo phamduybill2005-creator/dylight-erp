@@ -9,6 +9,7 @@ import { PresentationChartLineIcon, XMarkIcon } from "@heroicons/react/24/outlin
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
+import { todayLocal } from "@/lib/format";
 import type { Project, User } from "@/lib/types";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -25,7 +26,7 @@ const diffDays = (a?: string | null, b?: string | null) => {
   if (!a || !b) return null;
   return Math.round((new Date(a + "T00:00:00").getTime() - new Date(b + "T00:00:00").getTime()) / DAY);
 };
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = todayLocal;
 
 export default function ProjectProgressPage() {
   const router = useRouter();
