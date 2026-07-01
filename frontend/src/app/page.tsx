@@ -134,7 +134,7 @@ export default function DashboardPage() {
           <div className="mt-4 flex flex-col gap-1.5 text-xs text-white/80">
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-              <span>Vai trò: <span className="font-semibold text-white">Cán bộ hiện trường</span></span>
+              <span>Vai trò: <span className="font-semibold text-white">Quản lý cấp trung</span></span>
             </div>
             {user.manager_name && (
               <div className="flex items-center gap-2">

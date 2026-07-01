@@ -27,9 +27,9 @@ import type { Project, Contract, Payment, Progress, Invoice, PaymentType, Paymen
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Quản trị hệ thống",
   DIRECTOR: "Giám đốc",
-  MANAGER: "Chỉ huy trưởng",
+  MANAGER: "Quản lý cấp cao",
   ACCOUNTANT: "Kế toán",
-  FIELD_STAFF: "Cán bộ hiện trường",
+  FIELD_STAFF: "Quản lý cấp trung",
 };
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {

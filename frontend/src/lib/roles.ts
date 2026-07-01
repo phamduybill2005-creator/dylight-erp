@@ -24,9 +24,9 @@ export const isDirector = (role: Role | undefined | null) => roleTier(role) === 
 export const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Quản trị hệ thống",
   DIRECTOR: "Giám đốc",
-  MANAGER: "Chỉ huy trưởng",
+  MANAGER: "Quản lý cấp cao",
   ACCOUNTANT: "Kế toán",
-  FIELD_STAFF: "Cán bộ hiện trường",
+  FIELD_STAFF: "Quản lý cấp trung",
 };
 
 export const TIER_LABEL: Record<Tier, string> = {
