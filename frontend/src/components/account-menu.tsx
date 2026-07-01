@@ -22,7 +22,7 @@ import {
   EnvelopeIcon,
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
-import { ROLE_LABEL } from "@/lib/roles";
+import { roleTitle } from "@/lib/roles";
 import type { User } from "@/lib/types";
 
 type IconType = React.ComponentType<{ className?: string }>;
@@ -91,7 +91,7 @@ export default function AccountMenu({
     }
   }
 
-  const role = user?.role ? ROLE_LABEL[user.role] : "";
+  const role = roleTitle(user?.role, user?.has_subordinates);
 
   const panel = (
     <div

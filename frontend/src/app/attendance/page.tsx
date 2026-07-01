@@ -188,18 +188,44 @@ export default function AttendancePage() {
       .catch(() => router.push("/login"));
   }, [router]);
 
-  // Tải bảng đội theo ngày (cho quản lý/giám đốc)
+  // Tải bảng đội theo ngày (cho quản lý/giám đốc) + poll ~20s để cập nhật quẹt thẻ mới.
   useEffect(() => {
     if (!user || roleTier(user.role) === "STAFF") return;
-    api.attendanceList({ work_date: date }).then(setDayList).catch(() => {});
+    let alive = true;
+    const load = () => api.attendanceList({ work_date: date }).then((d) => alive && setDayList(d)).catch(() => {});
+    load();
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 20_000);
+    return () => { alive = false; clearInterval(id); };
   }, [user, date]);
 
-  // Tải tổng hợp theo tháng đang chọn (cho quản lý/giám đốc)
+  // Tải tổng hợp theo tháng đang chọn (cho quản lý/giám đốc) + poll ~20s.
   useEffect(() => {
     if (!user || roleTier(user.role) === "STAFF") return;
-    api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
+    let alive = true;
+    api.attendanceSummary(summaryPeriod).then((d) => alive && setSummary(d)).catch(() => {});
     setExpandedUser(null);   // đổi tháng thì thu gọn chi tiết đang mở
+    const id = setInterval(() => {
+      // Chỉ làm mới số liệu tổng hợp; KHÔNG đụng expandedUser/detail để không giật khi đang xem chi tiết.
+      if (document.visibilityState === "visible") {
+        api.attendanceSummary(summaryPeriod).then((d) => alive && setSummary(d)).catch(() => {});
+      }
+    }, 20_000);
+    return () => { alive = false; clearInterval(id); };
   }, [user, summaryPeriod]);
+
+  // STAFF: poll lịch sử chấm công của mình (~20s) để phản ánh quẹt thẻ / đồng bộ mới.
+  useEffect(() => {
+    if (!user || roleTier(user.role) !== "STAFF") return;
+    let alive = true;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        api.attendanceMe(monthStr() + "-01", todayStr()).then((d) => alive && setMyRecords(d)).catch(() => {});
+      }
+    }, 20_000);
+    return () => { alive = false; clearInterval(id); };
+  }, [user]);
 
   // Bấm vào 1 người trong bảng tổng hợp -> mở/đóng chi tiết từng ngày trong tháng.
   async function toggleDetail(userId: number) {

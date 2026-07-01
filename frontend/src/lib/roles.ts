@@ -28,9 +28,9 @@ export const isDirector = (role: Role | undefined | null) => roleTier(role) === 
 export const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Quản trị hệ thống",
   DIRECTOR: "Giám đốc",
-  MANAGER: "Quản lý cấp cao",
+  MANAGER: "Quản lý",
   ACCOUNTANT: "Kế toán",
-  FIELD_STAFF: "Quản lý cấp trung",
+  FIELD_STAFF: "Nhân viên",
 };
 
 export const TIER_LABEL: Record<Tier, string> = {
@@ -38,3 +38,21 @@ export const TIER_LABEL: Record<Tier, string> = {
   MANAGER: "Quản lý",
   STAFF: "Nhân viên",
 };
+
+/**
+ * CHỨC VỤ hiển thị theo 3 tầng (khác ROLE_LABEL — vai trò hệ thống dùng cho dropdown):
+ *   MANAGER                         -> "Quản lý cấp cao"
+ *   FIELD_STAFF CÓ cấp dưới trực tiếp -> "Quản lý cấp trung"
+ *   FIELD_STAFF KHÔNG cấp dưới        -> "Nhân viên"
+ * ADMIN/DIRECTOR/ACCOUNTANT giữ nhãn vai trò gốc.
+ * `hasSubordinates` do backend tính (User.has_subordinates).
+ */
+export function roleTitle(
+  role: Role | undefined | null,
+  hasSubordinates?: boolean | null,
+): string {
+  if (!role) return "";
+  if (role === "MANAGER") return "Quản lý cấp cao";
+  if (role === "FIELD_STAFF") return hasSubordinates ? "Quản lý cấp trung" : "Nhân viên";
+  return ROLE_LABEL[role] || role;
+}

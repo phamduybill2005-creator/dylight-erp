@@ -16,7 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { ROLE_LABEL } from "@/lib/roles";
+import { roleTitle } from "@/lib/roles";
 import { refreshNicknames } from "@/lib/nicknames";
 import type { Colleague, User } from "@/lib/types";
 
@@ -129,7 +129,7 @@ export default function ColleaguesPage() {
                         )}
                       </p>
                       <p className="truncate text-[11px] text-muted">
-                        {ROLE_LABEL[c.role]}
+                        {roleTitle(c.role, c.has_subordinates)}
                         {c.department ? ` · ${c.department}` : ""}
                       </p>
                     </div>

@@ -21,10 +21,14 @@ def _to_colleague(db: Session, current: User, u: User) -> ColleagueOut:
         .first()
     )
     mgr = db.get(User, u.manager_id) if u.manager_id else None
+    has_sub = db.query(User.id).filter(
+        User.manager_id == u.id, User.company_id == current.company_id
+    ).first() is not None
     return ColleagueOut(
         id=u.id, full_name=u.full_name, role=u.role, department=u.department,
         manager_id=u.manager_id, manager_name=mgr.full_name if mgr else None,
         my_nickname=nn.nickname if nn else None, in_my_team=(u.manager_id == current.id),
+        has_subordinates=has_sub,
     )
 
 
@@ -47,6 +51,8 @@ def list_colleagues(db: Session = Depends(get_db), current: User = Depends(get_c
         for n in db.query(Nickname).filter(Nickname.owner_id == current.id).all()
     }
     umap = {u.id: u for u in db.query(User).filter(User.company_id == current.company_id).all()}
+    # Tập id đang được ai đó nhận làm quản lý trực tiếp -> để tính has_subordinates (không thêm query).
+    manager_ids = {u.manager_id for u in umap.values() if u.manager_id is not None}
     out = []
     for u in users:
         mgr = umap.get(u.manager_id) if u.manager_id else None
@@ -54,6 +60,7 @@ def list_colleagues(db: Session = Depends(get_db), current: User = Depends(get_c
             id=u.id, full_name=u.full_name, role=u.role, department=u.department,
             manager_id=u.manager_id, manager_name=mgr.full_name if mgr else None,
             my_nickname=my_nn.get(u.id), in_my_team=(u.manager_id == current.id),
+            has_subordinates=(u.id in manager_ids),
         ))
     return out
 

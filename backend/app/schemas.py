@@ -52,6 +52,7 @@ class UserOut(BaseModel):
     manager_id: int | None = None
     manager_name: str | None = None
     yunatt_code: str | None = None   # mã trên máy chấm công Yunatt (để map đồng bộ)
+    has_subordinates: bool = False   # người này đang là quản lý trực tiếp của ≥1 người
 
 class UserUpdate(BaseModel):
     full_name: str | None = None
@@ -654,6 +655,7 @@ class ColleagueOut(BaseModel):
     manager_name: str | None = None
     my_nickname: str | None = None    # biệt danh DO MÌNH đặt cho người này (chỉ mình thấy)
     in_my_team: bool = False          # người này đang thuộc team của mình (mình là quản lý)
+    has_subordinates: bool = False    # người này đang là quản lý trực tiếp của ≥1 người
 
 
 class NicknameSet(BaseModel):

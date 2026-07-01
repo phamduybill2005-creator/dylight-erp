@@ -27,13 +27,12 @@ import {
   ClipboardDocumentListIcon,
   CurrencyDollarIcon,
   CalendarDaysIcon,
-  TruckIcon,
   ShieldCheckIcon,
   RectangleStackIcon,
   PresentationChartLineIcon,
 } from "@heroicons/react/24/outline";
 import { api, tokenStore } from "@/lib/api";
-import { ROLE_LABEL, roleTier, type Tier } from "@/lib/roles";
+import { roleTitle, roleTier, type Tier } from "@/lib/roles";
 import type { Company, User } from "@/lib/types";
 import NotificationsBell from "./notifications-bell";
 import ChatWidget from "./chat-widget";
@@ -68,7 +67,6 @@ function deskNav(tier: Tier): NavLink[] {
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
     { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon },
-    { href: "/equipment", label: "Thiết bị", icon: TruckIcon },
     { href: "/employees", label: "Nhân sự", icon: UsersIcon },
     { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
   ];
@@ -223,7 +221,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       </button>
                     ))}
                     <div className="border-t border-line px-4 py-2 text-[11px] text-muted font-normal text-slate-700">
-                      Đăng nhập: {user?.full_name} · {user?.role ? ROLE_LABEL[user.role] : ""}
+                      Đăng nhập: {user?.full_name} · {roleTitle(user?.role, user?.has_subordinates)}
                     </div>
                   </div>
                 )}

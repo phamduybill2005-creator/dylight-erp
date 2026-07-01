@@ -23,7 +23,6 @@ import {
   UsersIcon,
   CurrencyDollarIcon,
   CalendarDaysIcon,
-  TruckIcon,
   ShieldCheckIcon,
   RectangleStackIcon,
   ArrowRightCircleIcon,
@@ -31,7 +30,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { roleTier, type Tier } from "@/lib/roles";
+import { roleTier, roleTitle, type Tier } from "@/lib/roles";
 import { formatCompactVND, formatVND } from "@/lib/format";
 import type { Invoice, KpiSummary, ProjectProfit, User, Project, Attendance } from "@/lib/types";
 
@@ -54,7 +53,6 @@ const MODULES: ModuleDef[] = [
   { href: "/attendance", label: "Chấm công", icon: ClockIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
-  { href: "/equipment", label: "Thiết bị", icon: TruckIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/partners", label: "Đối tác", icon: BuildingOffice2Icon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR"] },
   { href: "/payroll", label: "Bảng lương", icon: UsersIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
   { href: "/finance", label: "Tài chính & Công nợ", icon: CurrencyDollarIcon, tint: "bg-ok/10 text-ok", tiers: ["DIRECTOR"] },
@@ -78,27 +76,40 @@ export default function DashboardPage() {
   const [attBusy, setAttBusy] = useState(false);
 
   useEffect(() => {
-    api.me().then((u) => {
-      setUser(u);
-      const tier = roleTier(u.role);
+    let alive = true;
+    // Nạp phần dữ liệu theo tầng (không đụng /me) — dùng cho cả lần đầu lẫn polling.
+    function loadDashboard(tier: Tier) {
       if (tier === "STAFF") {
-        api.projects().then(setProjects).catch(() => {});
+        api.projects().then((d) => alive && setProjects(d)).catch(() => {});
         api.attendanceMe(todayStr(), todayStr())
-          .then((recs) => setTodayAtt(recs[0] ?? null))
+          .then((recs) => alive && setTodayAtt(recs[0] ?? null))
           .catch(() => {});
       } else if (tier === "MANAGER") {
         // Quản lý: KHÔNG gọi /dashboard/summary|profit (đã chặn ở backend) — chỉ dữ liệu vận hành.
-        api.projects().then(setProjects).catch(() => {});
-        api.invoices("EXTRACTED").then(setPending).catch(() => {});
+        api.projects().then((d) => alive && setProjects(d)).catch(() => {});
+        api.invoices("EXTRACTED").then((d) => alive && setPending(d)).catch(() => {});
       } else {
-        api.kpiSummary().then(setKpi).catch(() => {});
-        api.profitByProject().then(setProfit).catch(() => {});
-        api.invoices("EXTRACTED").then(setPending).catch(() => {});
-        api.projects().then(setProjects).catch(() => {});
+        api.kpiSummary().then((d) => alive && setKpi(d)).catch(() => {});
+        api.profitByProject().then((d) => alive && setProfit(d)).catch(() => {});
+        api.invoices("EXTRACTED").then((d) => alive && setPending(d)).catch(() => {});
+        api.projects().then((d) => alive && setProjects(d)).catch(() => {});
       }
+    }
+
+    let timer: ReturnType<typeof setInterval> | undefined;
+    api.me().then((u) => {
+      if (!alive) return;
+      setUser(u);
+      const tier = roleTier(u.role);
+      loadDashboard(tier);
+      // Cập nhật gần thời gian thực (~20s). Không nạp lại /me để tránh nháy màn hình.
+      timer = setInterval(() => {
+        if (document.visibilityState === "visible") loadDashboard(tier);
+      }, 20_000);
     }).catch(() => {
       router.push("/login");
     });
+    return () => { alive = false; if (timer) clearInterval(timer); };
   }, [router]);
 
   async function quickPunch(kind: "in" | "out") {
@@ -134,7 +145,7 @@ export default function DashboardPage() {
           <div className="mt-4 flex flex-col gap-1.5 text-xs text-white/80">
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-              <span>Vai trò: <span className="font-semibold text-white">Quản lý cấp trung</span></span>
+              <span>Vai trò: <span className="font-semibold text-white">{roleTitle(user.role, user.has_subordinates)}</span></span>
             </div>
             {user.manager_name && (
               <div className="flex items-center gap-2">

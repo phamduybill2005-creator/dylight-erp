@@ -4,6 +4,7 @@ import secrets
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import distinct
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -122,8 +123,15 @@ def login_google(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOut)
-def read_me(current: User = Depends(get_current_user)):
+def read_me(
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
     """Trả về thông tin tài khoản đang đăng nhập (để frontend hiển thị)."""
+    # 1 query (LIMIT 1 nhờ .first()): người này có đang là quản lý trực tiếp của ai không.
+    current.has_subordinates = db.query(User.id).filter(
+        User.manager_id == current.id, User.company_id == current.company_id
+    ).first() is not None
     return current
 
 
@@ -146,7 +154,16 @@ def list_users(
     current: User = Depends(require_roles(UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER, UserRole.ACCOUNTANT)),
 ):
     """Liệt kê toàn bộ nhân sự cùng công ty."""
-    return db.query(User).filter(User.company_id == current.company_id).all()
+    users = db.query(User).filter(User.company_id == current.company_id).all()
+    # 1 query gộp: tập các manager_id đang được tham chiếu trong công ty (không N+1).
+    manager_ids = {
+        mid for (mid,) in db.query(distinct(User.manager_id))
+        .filter(User.company_id == current.company_id, User.manager_id.isnot(None))
+        .all()
+    }
+    for u in users:
+        u.has_subordinates = u.id in manager_ids   # gán runtime attr, Pydantic đọc được
+    return users
 
 
 @router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)

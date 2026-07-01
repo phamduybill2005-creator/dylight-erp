@@ -34,12 +34,22 @@ export default function ProjectProgressPage() {
   const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setInterval> | undefined;
     api.me()
       .then((u: User) => {
+        if (!alive) return;
         if (!isDirector(u.role)) { setDenied(true); setLoading(false); return; }
-        api.projects().then(setProjects).catch(() => {}).finally(() => setLoading(false));
+        api.projects().then((d) => alive && setProjects(d)).catch(() => {}).finally(() => alive && setLoading(false));
+        // Poll lại % tiến độ (BE tính) mỗi ~20s, không bật spinner để tránh nháy.
+        timer = setInterval(() => {
+          if (document.visibilityState === "visible") {
+            api.projects().then((d) => alive && setProjects(d)).catch(() => {});
+          }
+        }, 20_000);
       })
       .catch(() => router.push("/login"));
+    return () => { alive = false; if (timer) clearInterval(timer); };
   }, [router]);
 
   if (denied) {

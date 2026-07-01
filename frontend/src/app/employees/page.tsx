@@ -18,7 +18,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { ROLE_LABEL } from "@/lib/roles";
+import { ROLE_LABEL, roleTitle } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment } from "@/lib/types";
 
@@ -84,27 +84,38 @@ export default function EmployeesPage() {
   const [assignMsg, setAssignMsg] = useState("");
 
   useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setInterval> | undefined;
     // 1. Get current logged in user to check permission
     api.me()
       .then((me) => {
+        if (!alive) return;
         setCurrentUser(me);
         if (me.role === "FIELD_STAFF") {
           setLoading(false);
           return;
         }
         // Danh sách dự án (cho ô chọn khi giao việc).
-        api.projects().then(setProjectsList).catch(() => {});
-        // 2. Fetch all company users
+        api.projects().then((d) => alive && setProjectsList(d)).catch(() => {});
+        // 2. Fetch all company users (lần đầu bật spinner, poll thì không).
         api.users()
           .then((data) => {
+            if (!alive) return;
             setUsers(data);
             setLoading(false);
           })
-          .catch(() => setLoading(false));
+          .catch(() => alive && setLoading(false));
+        // Poll ~20s: cập nhật danh sách chờ duyệt + cờ has_subordinates.
+        timer = setInterval(() => {
+          if (document.visibilityState === "visible") {
+            api.users().then((d) => alive && setUsers(d)).catch(() => {});
+          }
+        }, 20_000);
       })
       .catch(() => {
         router.push("/login");
       });
+    return () => { alive = false; if (timer) clearInterval(timer); };
   }, [router]);
 
   // Update form data when selected user changes
@@ -441,7 +452,7 @@ export default function EmployeesPage() {
                       <p className="text-[11px] text-muted font-mono mt-0.5">{u.email}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <span className="text-[11px] font-medium text-steel">
-                          {ROLE_LABEL[u.role] || u.role}
+                          {roleTitle(u.role, u.has_subordinates)}
                         </span>
                         <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${u.is_active ? "bg-ok/10 text-ok" : "bg-bad/10 text-bad"}`}>
                           {u.is_active ? "Đang truy cập" : "Đã khóa"}
@@ -482,7 +493,7 @@ export default function EmployeesPage() {
             <header className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
               <div>
                 <h2 className="text-sm font-bold text-ink">{nick(selectedUser.id, selectedUser.full_name)}</h2>
-                <p className="text-[11px] text-muted">{ROLE_LABEL[selectedUser.role]}</p>
+                <p className="text-[11px] text-muted">{roleTitle(selectedUser.role, selectedUser.has_subordinates)}</p>
               </div>
               <button
                 onClick={() => setSelectedUser(null)}

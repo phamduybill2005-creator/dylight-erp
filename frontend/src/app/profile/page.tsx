@@ -15,7 +15,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { ROLE_LABEL } from "@/lib/roles";
+import { roleTitle } from "@/lib/roles";
 import { formatVND } from "@/lib/format";
 import type { User, Payroll } from "@/lib/types";
 
@@ -87,7 +87,7 @@ export default function ProfilePage() {
           <h1 className="mt-4 text-xl font-bold lg:text-2xl">{user.full_name}</h1>
           <p className="text-xs text-white/60 font-mono mt-1">{user.email}</p>
           <span className="mt-3 inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-amber">
-            {ROLE_LABEL[user.role] || user.role}
+            {roleTitle(user.role, user.has_subordinates)}
           </span>
         </section>
 

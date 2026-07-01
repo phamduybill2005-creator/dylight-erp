@@ -25,17 +25,9 @@ import {
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import { api } from "@/lib/api";
-import { canSeeMoney } from "@/lib/roles";
+import { canSeeMoney, roleTitle } from "@/lib/roles";
 import { formatVND, formatDate, formatCompactVND } from "@/lib/format";
 import type { Project, Contract, Payment, Progress, Invoice, PaymentType, PaymentDirection, User } from "@/lib/types";
-
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: "Quản trị hệ thống",
-  DIRECTOR: "Giám đốc",
-  MANAGER: "Quản lý cấp cao",
-  ACCOUNTANT: "Kế toán",
-  FIELD_STAFF: "Quản lý cấp trung",
-};
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -115,12 +107,13 @@ export default function ProjectDetailPage() {
     note: "",
   });
 
-  function loadData() {
+  function loadData(silent = false) {
     if (isNaN(projectId)) return;
     // Chưa biết vai trò (chưa nạp xong /me) thì chờ — tránh gọi nhầm endpoint tiền
     // với STAFF (bị 403) rồi lại phải nạp lại.
     if (currentUser == null) return;
-    setLoading(true);
+    // Poll (silent) KHÔNG bật spinner để tránh nháy màn hình.
+    if (!silent) setLoading(true);
 
     // Nhân viên: chỉ nạp thông tin dự án + tiến độ (không có tiền).
     if (!showMoney) {
@@ -192,6 +185,19 @@ export default function ProjectDetailPage() {
   }, [canManage, allUsers.length]);
 
   useEffect(loadData, [projectId, currentUser, showMoney]);
+
+  // Poll ~20s để cập nhật tiến độ / hợp đồng / thanh toán gần thời gian thực.
+  // Tạm dừng khi có modal đang mở (tránh ghi đè state khi người dùng đang thao tác).
+  useEffect(() => {
+    if (currentUser == null || isNaN(projectId)) return;
+    const anyModalOpen = contractModal || progressModal || paymentModal || membersModal;
+    if (anyModalOpen) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") loadData(true);
+    }, 20_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, currentUser, showMoney, contractModal, progressModal, paymentModal, membersModal]);
 
   // Sync selectedMemberIds / lead when project changes
   useEffect(() => {
@@ -478,7 +484,7 @@ export default function ProjectDetailPage() {
                   <span
                     key={member.id}
                     className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold text-ink ${isLead ? "bg-amber/15 border-amber/50" : "bg-paper border-line/50"}`}
-                    title={`${ROLE_LABEL[member.role] || member.role} - ${member.phone || "Không có SĐT"}`}
+                    title={`${roleTitle(member.role, member.has_subordinates)} - ${member.phone || "Không có SĐT"}`}
                   >
                     {isLead ? (
                       <StarIcon className="h-3 w-3 text-amber" />
@@ -487,7 +493,7 @@ export default function ProjectDetailPage() {
                     )}
                     {member.full_name}
                     {isLead && <span className="text-[9px] font-bold text-amber-deep">(Chủ trì)</span>}
-                    <span className="text-[9px] text-muted">({ROLE_LABEL[member.role] || member.role})</span>
+                    <span className="text-[9px] text-muted">({roleTitle(member.role, member.has_subordinates)})</span>
                   </span>
                 );
               })
@@ -1180,7 +1186,7 @@ export default function ProjectDetailPage() {
                           />
                           <span className="min-w-0">
                             <span className="block text-xs font-semibold text-ink truncate">{u.full_name}</span>
-                            <span className="block text-[10px] text-muted">{ROLE_LABEL[u.role] || u.role} · {u.email}</span>
+                            <span className="block text-[10px] text-muted">{roleTitle(u.role, u.has_subordinates)} · {u.email}</span>
                           </span>
                         </label>
                         <button

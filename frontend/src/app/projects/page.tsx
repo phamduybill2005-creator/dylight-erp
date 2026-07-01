@@ -39,25 +39,38 @@ export default function ProjectsPage() {
   const [canManage, setCanManage] = useState(false);
 
   useEffect(() => {
-    api.projects().then(setProjects).catch(() => {});
+    let alive = true;
+    // Nạp danh sách dự án + (Giám đốc) lãi/lỗ — dùng cho lần đầu và polling.
+    function loadProjects(director: boolean) {
+      api.projects().then((d) => alive && setProjects(d)).catch(() => {});
+      if (director) {
+        api
+          .profitByProject()
+          .then((rows) => alive && setProfit(Object.fromEntries(rows.map((r) => [r.project_id, r]))))
+          .catch(() => {});
+      }
+    }
+
+    let timer: ReturnType<typeof setInterval> | undefined;
     // Số liệu lãi/lỗ theo dự án chỉ dành cho Giám đốc — Quản lý không tải (tránh 403).
     api.me()
       .then((me) => {
+        if (!alive) return;
         if (isManagerUp(me.role)) {
           setCanManage(true);
           // Danh sách nhân sự để chọn người chủ trì khi tạo dự án.
-          api.users().then(setUsers).catch(() => {});
+          api.users().then((d) => alive && setUsers(d)).catch(() => {});
         }
-        if (!isDirector(me.role)) return;
-        setShowFinance(true);
-        api
-          .profitByProject()
-          .then((rows) =>
-            setProfit(Object.fromEntries(rows.map((r) => [r.project_id, r])))
-          )
-          .catch(() => {});
+        const director = isDirector(me.role);
+        if (director) setShowFinance(true);
+        loadProjects(director);
+        // Cập nhật gần thời gian thực (~20s) — theo dõi trạng thái/tiến độ dự án.
+        timer = setInterval(() => {
+          if (document.visibilityState === "visible") loadProjects(director);
+        }, 20_000);
       })
       .catch(() => {});
+    return () => { alive = false; if (timer) clearInterval(timer); };
   }, []);
 
   // Tổng cộng các cột tài chính (chỉ tính dự án có dữ liệu lãi/lỗ).

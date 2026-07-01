@@ -20,6 +20,7 @@ export interface User {
   manager_id?: number | null;
   manager_name?: string | null;
   yunatt_code?: string | null;   // mã nhân viên trên máy chấm công Yunatt
+  has_subordinates?: boolean;    // BE tính: người này có ≥1 cấp dưới trực tiếp
 }
 
 export interface Company {
@@ -379,6 +380,7 @@ export interface Colleague {
   manager_name?: string | null;
   my_nickname?: string | null;
   in_my_team: boolean;
+  has_subordinates?: boolean;    // BE tính: người này có ≥1 cấp dưới trực tiếp
 }
 
 // Tổng hợp điểm đánh giá 1 người nhận trong kỳ (cho Giám đốc)
