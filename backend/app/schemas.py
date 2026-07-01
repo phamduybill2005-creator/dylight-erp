@@ -344,7 +344,11 @@ class ProjectItemOut(ProjectItemBase):
     id: int
     company_id: int
     project_id: int
-    amount: Decimal       # thành tiền = khối lượng × đơn giá (tính sẵn từ model)
+    # 3 field TIỀN cho phép None để mask (ẩn) với nhân viên (STAFF). Với Quản lý/
+    # Giám đốc vẫn trả số thật. Chỉ nới ở Out — Base/Create/Update giữ nguyên bắt buộc.
+    quantity: Decimal | None = None       # khối lượng
+    unit_price: Decimal | None = None     # đơn giá
+    amount: Decimal | None = None         # thành tiền = khối lượng × đơn giá (tính sẵn từ model)
     created_at: datetime
 
 

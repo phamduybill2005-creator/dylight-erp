@@ -41,6 +41,22 @@ def get_current_user(
     return user
 
 
+def is_staff_tier(user: User) -> bool:
+    """
+    True nếu người dùng ở TẦNG NHÂN VIÊN (STAFF) — KHÔNG được xem tiền.
+
+    Dùng whitelist 4 vai trò được xem tiền (ADMIN/DIRECTOR/MANAGER/ACCOUNTANT),
+    khớp đúng roleTier ở frontend. Vai trò mới thêm sau này mặc định bị coi là
+    STAFF (ẩn tiền) — an toàn hơn blacklist.
+    """
+    return user.role not in (
+        UserRole.ADMIN,
+        UserRole.DIRECTOR,
+        UserRole.MANAGER,
+        UserRole.ACCOUNTANT,
+    )
+
+
 def require_roles(*roles: UserRole):
     """
     Factory tạo dependency chặn theo vai trò.

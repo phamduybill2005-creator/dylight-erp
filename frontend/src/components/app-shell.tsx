@@ -50,6 +50,7 @@ function deskNav(tier: Tier): NavLink[] {
   if (tier === "STAFF") {
     return [
       { href: "/", label: "Trang chủ", icon: HomeIcon },
+      { href: "/projects", label: "Dự án", icon: FolderIcon },
       { href: "/attendance", label: "Chấm công", icon: ClockIcon },
       { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
       { href: "/evaluations", label: "Đánh giá quản lý", icon: StarIcon },
@@ -249,9 +250,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {tier === "STAFF" ? (
               <>
                 <NavItem href="/" label="Trang chủ" icon={HomeIcon} active={pathname === "/"} />
-                <NavItem href="/attendance" label="Chấm công" icon={ClockIcon} active={pathname.startsWith("/attendance")} />
+                <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
                 <div className="w-14" aria-hidden />
-                <NavItem href="/evaluations" label="Đánh giá" icon={StarIcon} active={pathname.startsWith("/evaluations")} />
+                <NavItem href="/attendance" label="Chấm công" icon={ClockIcon} active={pathname.startsWith("/attendance")} />
                 <NavItem href="/profile" label="Cá nhân" icon={UserCircleIcon} active={pathname === "/profile"} />
               </>
             ) : (

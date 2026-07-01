@@ -18,6 +18,10 @@ export function roleTier(role: Role | undefined | null): Tier {
 /** Quản lý trở lên (thấy nhân sự, chấm công toàn đội, chấm điểm cấp dưới). */
 export const isManagerUp = (role: Role | undefined | null) => roleTier(role) !== "STAFF";
 
+/** Được xem TIỀN của dự án (giá trị HĐ, chi phí, lãi/lỗ, khối lượng, đơn giá).
+ *  Nhân viên (STAFF) KHÔNG thấy tiền. Khớp đúng is_staff_tier ở backend. */
+export const canSeeMoney = (role: Role | undefined | null) => roleTier(role) !== "STAFF";
+
 /** Chỉ Giám đốc (được xem tài chính: doanh thu, lãi/lỗ, báo cáo). */
 export const isDirector = (role: Role | undefined | null) => roleTier(role) === "DIRECTOR";
 

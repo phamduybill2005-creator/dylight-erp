@@ -92,7 +92,8 @@ def list_invoices(
     status: InvoiceStatus | None = None,
     project_id: int | None = None,
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    # Chỉ Quản lý/Kế toán/Giám đốc được xem số tiền hóa đơn (nhân viên không thấy tiền).
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
 ):
     """Liệt kê hóa đơn; lọc theo ?status= và ?project_id=."""
     q = db.query(Invoice).filter(Invoice.company_id == current.company_id)
@@ -104,7 +105,12 @@ def list_invoices(
 
 
 @router.get("/{invoice_id}", response_model=InvoiceOut)
-def get_invoice(invoice_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+def get_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    # Chỉ Quản lý/Kế toán/Giám đốc được xem chi tiết tiền hóa đơn (nhân viên không thấy tiền).
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
+):
     inv = db.get(Invoice, invoice_id)
     if not inv or inv.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy hóa đơn.")

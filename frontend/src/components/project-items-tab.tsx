@@ -64,7 +64,14 @@ function EditableCell({
   );
 }
 
-export default function ProjectItemsTab({ projectId }: { projectId: number }) {
+export default function ProjectItemsTab({
+  projectId,
+  canSeeMoney = true,
+}: {
+  projectId: number;
+  /** Nhân viên (STAFF) = false: ẩn cột Khối lượng/Đơn giá/Thành tiền, tiểu tổng, tổng, xuất Excel. */
+  canSeeMoney?: boolean;
+}) {
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -209,16 +216,20 @@ export default function ProjectItemsTab({ projectId }: { projectId: number }) {
           <h3 className="text-xs font-semibold text-muted uppercase lg:text-sm">
             Bảng dự toán chi tiết ({groups.length} nhóm)
           </h3>
-          <p className="text-[11px] text-muted lg:text-xs">Tổng dự toán: <span className="font-bold text-ink tnum">{formatVND(grandTotal)}</span></p>
+          {canSeeMoney && (
+            <p className="text-[11px] text-muted lg:text-xs">Tổng dự toán: <span className="font-bold text-ink tnum">{formatVND(grandTotal)}</span></p>
+          )}
         </div>
-        <button
-          onClick={exportCSV}
-          disabled={items.length === 0}
-          className="flex shrink-0 items-center gap-1.5 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow hover:bg-ink transition-all disabled:opacity-50"
-        >
-          <ArrowDownTrayIcon className="h-4 w-4" />
-          Xuất Excel
-        </button>
+        {canSeeMoney && (
+          <button
+            onClick={exportCSV}
+            disabled={items.length === 0}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow hover:bg-ink transition-all disabled:opacity-50"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            Xuất Excel
+          </button>
+        )}
       </div>
 
       {error && <p className="rounded-lg bg-bad/10 px-3 py-2 text-xs text-bad">{error}</p>}
@@ -240,15 +251,15 @@ export default function ProjectItemsTab({ projectId }: { projectId: number }) {
         <>
           {/* Bảng cuộn ngang trên mobile */}
           <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
-            <table className="w-full min-w-[680px] border-collapse text-xs">
+            <table className={`w-full border-collapse text-xs ${canSeeMoney ? "min-w-[680px]" : "min-w-[320px]"}`}>
               <thead>
                 <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
                   <th className="w-10 px-2 py-2 text-left font-semibold">STT</th>
                   <th className="px-2 py-2 text-left font-semibold">Tên hạng mục</th>
                   <th className="w-16 px-2 py-2 text-left font-semibold">ĐVT</th>
-                  <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>
-                  <th className="w-28 px-2 py-2 text-right font-semibold">Đơn giá</th>
-                  <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>
+                  {canSeeMoney && <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>}
+                  {canSeeMoney && <th className="w-28 px-2 py-2 text-right font-semibold">Đơn giá</th>}
+                  {canSeeMoney && <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>}
                   <th className="w-8 px-1 py-2" />
                 </tr>
               </thead>
@@ -262,6 +273,7 @@ export default function ProjectItemsTab({ projectId }: { projectId: number }) {
                       groupIndex={gi}
                       kids={kids}
                       subtotal={groupSubtotal(g.id)}
+                      canSeeMoney={canSeeMoney}
                       onPersist={persist}
                       onAddChild={addChild}
                       onRemove={remove}
@@ -270,15 +282,17 @@ export default function ProjectItemsTab({ projectId }: { projectId: number }) {
                   );
                 })}
               </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-ink bg-ink text-white">
-                  <td colSpan={5} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
-                    Tổng cộng dự toán
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(grandTotal)}</td>
-                  <td />
-                </tr>
-              </tfoot>
+              {canSeeMoney && (
+                <tfoot>
+                  <tr className="border-t-2 border-ink bg-ink text-white">
+                    <td colSpan={5} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
+                      Tổng cộng dự toán
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(grandTotal)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
 
@@ -301,6 +315,7 @@ function GroupRows({
   groupIndex,
   kids,
   subtotal,
+  canSeeMoney,
   onPersist,
   onAddChild,
   onRemove,
@@ -310,11 +325,14 @@ function GroupRows({
   groupIndex: number;
   kids: ProjectItem[];
   subtotal: number;
+  canSeeMoney: boolean;
   onPersist: (id: number, patch: Partial<ProjectItem>) => void;
   onAddChild: (g: ProjectItem) => void;
   onRemove: (i: ProjectItem) => void;
   busy: boolean;
 }) {
+  // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
+  const contentCols = canSeeMoney ? 6 : 3;
   return (
     <>
       {/* Dòng nhóm cha */}
@@ -328,9 +346,16 @@ function GroupRows({
             className="font-bold text-ink"
           />
         </td>
-        <td colSpan={2} />
-        <td className="px-2 py-1.5 text-right text-[10px] text-muted">Tiểu tổng</td>
-        <td className="whitespace-nowrap px-2 py-1.5 text-right text-xs font-bold text-ink tnum">{formatVND(subtotal)}</td>
+        {/* STAFF không có 3 cột tiền: vẫn phải chừa 1 ô cho cột ĐVT để thẳng hàng với header. */}
+        {canSeeMoney ? (
+          <>
+            <td colSpan={2} />
+            <td className="px-2 py-1.5 text-right text-[10px] text-muted">Tiểu tổng</td>
+            <td className="whitespace-nowrap px-2 py-1.5 text-right text-xs font-bold text-ink tnum">{formatVND(subtotal)}</td>
+          </>
+        ) : (
+          <td />
+        )}
         <td className="px-1 py-1 text-center">
           <button
             onClick={() => onRemove(group)}
@@ -359,23 +384,29 @@ function GroupRows({
           <td className="px-1 py-0.5">
             <EditableCell value={c.unit} onCommit={(v) => onPersist(c.id, { unit: String(v) })} placeholder="m³, m², kg..." />
           </td>
-          <td className="px-1 py-0.5">
-            <EditableCell
-              type="number"
-              value={c.quantity}
-              onCommit={(v) => onPersist(c.id, { quantity: Number(v) })}
-              className="text-right"
-            />
-          </td>
-          <td className="px-1 py-0.5">
-            <EditableCell
-              type="number"
-              value={c.unit_price}
-              onCommit={(v) => onPersist(c.id, { unit_price: Number(v) })}
-              className="text-right"
-            />
-          </td>
-          <td className="whitespace-nowrap px-2 py-1 text-right text-xs font-semibold text-ink tnum">{formatVND(lineAmount(c))}</td>
+          {canSeeMoney && (
+            <td className="px-1 py-0.5">
+              <EditableCell
+                type="number"
+                value={c.quantity}
+                onCommit={(v) => onPersist(c.id, { quantity: Number(v) })}
+                className="text-right"
+              />
+            </td>
+          )}
+          {canSeeMoney && (
+            <td className="px-1 py-0.5">
+              <EditableCell
+                type="number"
+                value={c.unit_price}
+                onCommit={(v) => onPersist(c.id, { unit_price: Number(v) })}
+                className="text-right"
+              />
+            </td>
+          )}
+          {canSeeMoney && (
+            <td className="whitespace-nowrap px-2 py-1 text-right text-xs font-semibold text-ink tnum">{formatVND(lineAmount(c))}</td>
+          )}
           <td className="px-1 py-1 text-center">
             <button
               onClick={() => onRemove(c)}
@@ -392,7 +423,7 @@ function GroupRows({
       {/* Nút thêm đầu việc vào nhóm */}
       <tr className="border-t border-line/40">
         <td />
-        <td colSpan={6} className="px-1 py-1">
+        <td colSpan={contentCols} className="px-1 py-1">
           <button
             onClick={() => onAddChild(group)}
             disabled={busy}

@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
-from app.models import Contract, Project, User
+from app.deps import get_current_user, require_roles
+from app.models import Contract, Project, User, UserRole
 from app.schemas import ContractCreate, ContractOut, ContractUpdate
 
 router = APIRouter(prefix="/contracts", tags=["Hợp đồng"])
@@ -14,7 +14,8 @@ router = APIRouter(prefix="/contracts", tags=["Hợp đồng"])
 def list_contracts(
     project_id: int | None = None,
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    # Chỉ Quản lý/Kế toán/Giám đốc được xem giá trị hợp đồng (nhân viên không thấy tiền).
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
 ):
     """Liệt kê hợp đồng; có thể lọc theo ?project_id=..."""
     q = db.query(Contract).filter(Contract.company_id == current.company_id)

@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
-from app.models import Contract, Payment, User
+from app.deps import get_current_user, require_roles
+from app.models import Contract, Payment, User, UserRole
 from app.schemas import PaymentCreate, PaymentOut
 
 router = APIRouter(prefix="/payments", tags=["Thanh toán"])
@@ -14,7 +14,8 @@ router = APIRouter(prefix="/payments", tags=["Thanh toán"])
 def list_payments(
     contract_id: int | None = None,
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    # Chỉ Quản lý/Kế toán/Giám đốc được xem số tiền thanh toán (nhân viên không thấy tiền).
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
 ):
     q = db.query(Payment).filter(Payment.company_id == current.company_id)
     if contract_id:

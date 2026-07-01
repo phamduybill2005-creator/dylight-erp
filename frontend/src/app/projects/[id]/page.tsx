@@ -25,6 +25,7 @@ import {
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import { api } from "@/lib/api";
+import { canSeeMoney } from "@/lib/roles";
 import { formatVND, formatDate, formatCompactVND } from "@/lib/format";
 import type { Project, Contract, Payment, Progress, Invoice, PaymentType, PaymentDirection, User } from "@/lib/types";
 
@@ -66,6 +67,11 @@ export default function ProjectDetailPage() {
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+
+  // Nhân viên (STAFF) không được xem TIỀN của dự án. Backend là nguồn chân lý
+  // (chặn GET hợp đồng/thanh toán/hóa đơn với STAFF, mask khối lượng/đơn giá hạng mục);
+  // FE gate để ẩn UI cho khớp và tránh gọi API bị 403.
+  const showMoney = canSeeMoney(currentUser?.role);
 
   // Modals & Member management states
   const [contractModal, setContractModal] = useState(false);
@@ -111,7 +117,26 @@ export default function ProjectDetailPage() {
 
   function loadData() {
     if (isNaN(projectId)) return;
+    // Chưa biết vai trò (chưa nạp xong /me) thì chờ — tránh gọi nhầm endpoint tiền
+    // với STAFF (bị 403) rồi lại phải nạp lại.
+    if (currentUser == null) return;
     setLoading(true);
+
+    // Nhân viên: chỉ nạp thông tin dự án + tiến độ (không có tiền).
+    if (!showMoney) {
+      Promise.all([api.getProject(projectId), api.progress(projectId)])
+        .then(([proj, prog]) => {
+          setProject(proj);
+          setProgressLogs(prog);
+          setContracts([]);
+          setInvoices([]);
+          setPayments([]);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+      return;
+    }
+
     Promise.all([
       api.getProject(projectId),
       api.contracts(projectId),
@@ -150,7 +175,11 @@ export default function ProjectDetailPage() {
   // Load current user once.
   useEffect(() => {
     api.me()
-      .then((me) => setCurrentUser(me))
+      .then((me) => {
+        setCurrentUser(me);
+        // Nhân viên không có tab tiền -> mặc định vào "Hạng mục" (không phải "Hợp đồng").
+        if (!canSeeMoney(me.role)) setActiveTab("items");
+      })
       .catch(() => {});
   }, []);
 
@@ -162,7 +191,7 @@ export default function ProjectDetailPage() {
     }
   }, [canManage, allUsers.length]);
 
-  useEffect(loadData, [projectId]);
+  useEffect(loadData, [projectId, currentUser, showMoney]);
 
   // Sync selectedMemberIds / lead when project changes
   useEffect(() => {
@@ -467,7 +496,8 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Tổng quan tài chính */}
+      {/* Tổng quan tài chính — ẩn với nhân viên (STAFF không xem tiền) */}
+      {showMoney && (
       <div className="mt-4 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
         <h2 className="text-xs font-semibold text-white/60 uppercase tracking-wider">Tình hình tài chính dự án</h2>
 
@@ -503,20 +533,27 @@ export default function ProjectDetailPage() {
           />
         </div>
       </div>
+      )}
 
-      {/* Tabs điều hướng */}
+      {/* Tabs điều hướng — nhân viên chỉ thấy Hạng mục + Tiến độ (không có tab tiền) */}
       <div className="mt-6 flex border-b border-line">
-        <TabButton active={activeTab === "contracts"} onClick={() => setActiveTab("contracts")} label="Hợp đồng" icon={DocumentTextIcon} count={contracts.length} />
+        {showMoney && (
+          <TabButton active={activeTab === "contracts"} onClick={() => setActiveTab("contracts")} label="Hợp đồng" icon={DocumentTextIcon} count={contracts.length} />
+        )}
         <TabButton active={activeTab === "items"} onClick={() => setActiveTab("items")} label="Hạng mục" icon={TableCellsIcon} />
         <TabButton active={activeTab === "progress"} onClick={() => setActiveTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
-        <TabButton active={activeTab === "invoices"} onClick={() => setActiveTab("invoices")} label="Chi phí AI" icon={CurrencyDollarIcon} count={invoices.length} />
-        <TabButton active={activeTab === "payments"} onClick={() => setActiveTab("payments")} label="Thanh toán" icon={BanknotesIcon} count={payments.length} />
+        {showMoney && (
+          <TabButton active={activeTab === "invoices"} onClick={() => setActiveTab("invoices")} label="Chi phí AI" icon={CurrencyDollarIcon} count={invoices.length} />
+        )}
+        {showMoney && (
+          <TabButton active={activeTab === "payments"} onClick={() => setActiveTab("payments")} label="Thanh toán" icon={BanknotesIcon} count={payments.length} />
+        )}
       </div>
 
       {/* Nội dung Tab */}
       <div className="mt-4">
         {/* Tab Hợp đồng */}
-        {activeTab === "contracts" && (
+        {showMoney && activeTab === "contracts" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-muted uppercase">Danh sách hợp đồng ({contracts.length})</h3>
@@ -565,7 +602,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* Tab Hạng mục (bảng dự toán Excel) */}
-        {activeTab === "items" && <ProjectItemsTab projectId={projectId} />}
+        {activeTab === "items" && <ProjectItemsTab projectId={projectId} canSeeMoney={showMoney} />}
 
         {/* Tab Tiến độ */}
         {activeTab === "progress" && (
@@ -636,7 +673,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* Tab Hóa đơn */}
-        {activeTab === "invoices" && (
+        {showMoney && activeTab === "invoices" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-muted uppercase">Hóa đơn chi phí liên kết ({invoices.length})</h3>
@@ -680,7 +717,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* Tab Thanh toán */}
-        {activeTab === "payments" && (
+        {showMoney && activeTab === "payments" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-muted uppercase">Nhật ký thu chi ({payments.length})</h3>

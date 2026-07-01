@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, is_staff_tier
 from app.models import ProjectItem, Project, User
 from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut
 
@@ -48,7 +48,7 @@ def list_items(
 ):
     """Liệt kê toàn bộ hạng mục của một dự án (dạng phẳng, đã sắp thứ tự)."""
     _assert_project(db, current, project_id)
-    return (
+    rows = (
         db.query(ProjectItem)
         .filter(
             ProjectItem.company_id == current.company_id,
@@ -57,6 +57,15 @@ def list_items(
         .order_by(ProjectItem.order_index.asc(), ProjectItem.id.asc())
         .all()
     )
+    out = [ProjectItemOut.model_validate(r) for r in rows]
+    # NHÂN VIÊN (STAFF): giữ tên/ĐVT hạng mục nhưng ẩn cột tiền.
+    # Mask trên bản Pydantic (model_copy) — TUYỆT ĐỐI không set None lên ORM.
+    if is_staff_tier(current):
+        out = [
+            r.model_copy(update={"quantity": None, "unit_price": None, "amount": None})
+            for r in out
+        ]
+    return out
 
 
 @router.post("", response_model=ProjectItemOut, status_code=201)
