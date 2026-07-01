@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, vn_now
 from app.deps import get_current_user
 from app.models import (
     ChatMessage, Conversation, ConversationMember, ConversationType, MessageReaction,
@@ -397,7 +397,7 @@ def send_message(
     )
     db.add(msg)
     db.flush()
-    conv.last_message_at = datetime.utcnow()
+    conv.last_message_at = vn_now()
     # người gửi đương nhiên đã đọc tin mình vừa gửi
     me = (
         db.query(ConversationMember)

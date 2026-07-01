@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.audit import log_activity
-from app.database import get_db
+from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.models import LeaveRequest, LeaveStatus, User, UserRole
 from app.schemas import LeaveCreate, LeaveDecision, LeaveOut
@@ -65,7 +65,7 @@ def decide_leave(
         raise HTTPException(400, "Trạng thái duyệt không hợp lệ.")
     rec.status = payload.status
     rec.decided_by_id = current.id
-    rec.decided_at = datetime.now()
+    rec.decided_at = vn_now()
     db.commit()
     db.refresh(rec)
     log_activity(db, current, f"leave.{payload.status.value.lower()}", "leave_request", rec.id,

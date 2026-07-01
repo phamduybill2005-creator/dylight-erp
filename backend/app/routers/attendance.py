@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import get_db
+from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.models import Attendance, AttendanceSource, PaymentDirection, User, UserRole
 from app.schemas import (
@@ -64,12 +64,12 @@ def check_in(db: Session = Depends(get_db), current: User = Depends(get_current_
     rec = _today_record(db, current)
     if rec is None:
         rec = Attendance(
-            company_id=current.company_id, user_id=current.id, work_date=date.today(),
-            check_in=datetime.now(), source=AttendanceSource.MANUAL,
+            company_id=current.company_id, user_id=current.id, work_date=vn_now().date(),
+            check_in=vn_now(), source=AttendanceSource.MANUAL,
         )
         db.add(rec)
     elif rec.check_in is None:
-        rec.check_in = datetime.now()
+        rec.check_in = vn_now()
     db.commit()
     db.refresh(rec)
     return rec
@@ -81,12 +81,12 @@ def check_out(db: Session = Depends(get_db), current: User = Depends(get_current
     rec = _today_record(db, current)
     if rec is None:
         rec = Attendance(
-            company_id=current.company_id, user_id=current.id, work_date=date.today(),
-            check_out=datetime.now(), source=AttendanceSource.MANUAL,
+            company_id=current.company_id, user_id=current.id, work_date=vn_now().date(),
+            check_out=vn_now(), source=AttendanceSource.MANUAL,
         )
         db.add(rec)
     else:
-        rec.check_out = datetime.now()
+        rec.check_out = vn_now()
     db.commit()
     db.refresh(rec)
     return rec
@@ -311,7 +311,7 @@ def machine_punch(
     if user is None:
         raise HTTPException(404, "Không tìm thấy nhân viên khớp employee_ref.")
 
-    ts = payload.timestamp or datetime.now()
+    ts = payload.timestamp or vn_now()
     rec = (
         db.query(Attendance)
         .filter(Attendance.user_id == user.id, Attendance.work_date == ts.date())
