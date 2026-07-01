@@ -140,8 +140,17 @@ def fetch_months(months: list[str]):
 
             # 1) Đăng nhập (điền form thật, để JS của Yunatt tự xử lý nếu có mã hoá)
             page.goto(base + "/", wait_until="domcontentloaded")
-            page.locator('input[type="text"], input[type="email"]').first.fill(settings.YUNATT_EMAIL)
-            page.locator('input[type="password"]').first.fill(settings.YUNATT_PASSWORD)
+            # Chờ JS của trang login nạp xong TRƯỚC khi điền. Nếu điền quá sớm (ngay sau
+            # domcontentloaded), form có thể chưa gắn xong handler -> submit không ăn ->
+            # bị hiểu nhầm thành "sai mật khẩu". Đây chính là điểm khác so với lần chạy
+            # tay thành công (bản chạy tay có chờ networkidle trước khi điền).
+            try:
+                page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:  # noqa: BLE001
+                pass
+            page.wait_for_selector('input[type="password"]', timeout=30000)
+            page.locator('input[type="text"], input[type="email"]').first.fill(settings.YUNATT_EMAIL.strip())
+            page.locator('input[type="password"]').first.fill(settings.YUNATT_PASSWORD.strip())
             try:
                 page.get_by_role("button", name=re.compile("login", re.I)).first.click(timeout=5000)
             except Exception:  # noqa: BLE001
@@ -153,12 +162,30 @@ def fetch_months(months: list[str]):
 
             # 2) Trang Punch Record -> đọc map tháng -> monthDataId
             page.goto(base + "/cardRecord/monthIndex", wait_until="domcontentloaded")
+            # Ô chọn tháng #fq-monthDataId được nạp bằng AJAX SAU khi trang tải xong, nên
+            # phải chờ mạng rảnh trước rồi mới chờ <option> (nếu không sẽ tưởng nhầm hỏng).
             try:
-                page.wait_for_selector("#fq-monthDataId option", timeout=15000)
+                page.wait_for_load_state("networkidle", timeout=20000)
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                # state="attached": chỉ cần <option> CÓ trong DOM (option trong select bị
+                # Playwright coi là "ẩn", nên state mặc định "visible" sẽ chờ vô ích -> timeout).
+                page.wait_for_selector("#fq-monthDataId option", state="attached", timeout=20000)
             except Exception as e:  # noqa: BLE001
+                diag = ""
+                try:
+                    still_login = page.locator('input[type="password"]').count() > 0
+                    snippet = " ".join((page.inner_text("body") or "").split())[:250]
+                    diag = (
+                        f" [chan_doan: url={page.url} con_o_login={still_login} "
+                        f"noi_dung={snippet!r}]"
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
                 raise YunattError(
                     "Không vào được trang chấm công Yunatt — sai tài khoản/mật khẩu "
-                    "hoặc giao diện Yunatt đã thay đổi."
+                    "hoặc giao diện Yunatt đã thay đổi." + diag
                 ) from e
             opts = page.eval_on_selector_all(
                 "#fq-monthDataId option",
