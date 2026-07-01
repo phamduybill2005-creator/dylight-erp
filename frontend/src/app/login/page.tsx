@@ -13,15 +13,10 @@ import {
   Square3Stack3DIcon,
   CubeIcon,
   HomeModernIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
-
-const DEMO = [
-  { role: "Giám đốc", email: "giamdoc@dosco.vn" },
-  { role: "Quản lý", email: "quanly@dosco.vn" },
-  { role: "Kế toán", email: "ketoan@dosco.vn" },
-  { role: "Nhân viên", email: "hientruong@dosco.vn" },
-];
 
 // Các hạng mục công ty DOSCO đảm nhiệm (nguồn: dosco.vn).
 const SERVICES = [
@@ -36,8 +31,9 @@ const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("giamdoc@dosco.vn");
-  const [password, setPassword] = useState("123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
@@ -169,14 +165,25 @@ export default function LoginPage() {
             />
 
             <label className="mt-4 block text-xs font-medium text-muted">Mật khẩu</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              className="mt-1 w-full rounded-xl2 border border-line px-3 py-2.5 text-sm outline-none focus:border-steel"
-              placeholder="••••••"
-            />
+            <div className="relative mt-1">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+                className="w-full rounded-xl2 border border-line px-3 py-2.5 pr-11 text-sm outline-none focus:border-steel"
+                placeholder="••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted hover:text-ink"
+              >
+                {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+              </button>
+            </div>
 
             {error && <p className="mt-3 text-xs text-bad">{error}</p>}
 
@@ -199,23 +206,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="mt-5 border-t border-line pt-4">
-              <p className="text-[11px] font-medium text-muted">Tài khoản demo (mật khẩu: 123456)</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {DEMO.map((d) => (
-                  <button
-                    key={d.email}
-                    onClick={() => {
-                      setEmail(d.email);
-                      setPassword("123456");
-                    }}
-                    className="rounded-full bg-paper px-3 py-1 text-[11px] text-steel hover:bg-line"
-                  >
-                    {d.role}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </motion.div>
       </div>
