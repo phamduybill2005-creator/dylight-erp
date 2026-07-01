@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user, require_roles
+from app.deps import require_roles
 from app.models import Contract, Project, User, UserRole
 from app.schemas import ContractCreate, ContractOut, ContractUpdate
 
@@ -14,8 +14,8 @@ router = APIRouter(prefix="/contracts", tags=["Hợp đồng"])
 def list_contracts(
     project_id: int | None = None,
     db: Session = Depends(get_db),
-    # Chỉ Quản lý/Kế toán/Giám đốc được xem giá trị hợp đồng (nhân viên không thấy tiền).
-    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
+    # CHỈ GIÁM ĐỐC được xem giá trị hợp đồng (quản lý + nhân viên đều không thấy tiền).
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
 ):
     """Liệt kê hợp đồng; có thể lọc theo ?project_id=..."""
     q = db.query(Contract).filter(Contract.company_id == current.company_id)
@@ -28,7 +28,8 @@ def list_contracts(
 def create_contract(
     payload: ContractCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    # Tiền là việc của Giám đốc: chỉ Giám đốc tạo hợp đồng (trước đây mọi user đăng nhập đều tạo được).
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
 ):
     # Kiểm tra dự án thuộc đúng công ty trước khi gắn hợp đồng.
     project = db.get(Project, payload.project_id)
@@ -46,7 +47,8 @@ def update_contract(
     contract_id: int,
     payload: ContractUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    # Chỉ Giám đốc sửa hợp đồng (trước đây mọi user đăng nhập đều sửa được).
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
 ):
     c = db.get(Contract, contract_id)
     if not c or c.company_id != current.company_id:

@@ -128,6 +128,8 @@ class BidOut(BidBase):
     id: int
     company_id: int
     created_at: datetime
+    # Có thể bị ẩn (None) khi người xem KHÔNG được thấy tiền (chỉ Giám đốc thấy giá gói thầu).
+    package_value: Decimal | None = None
 
 
 # --------------------------- PROJECT ----------------------------

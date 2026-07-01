@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user, is_staff_tier
+from app.deps import get_current_user, can_see_money
 from app.models import ProjectItem, Project, User
 from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut
 
@@ -19,6 +19,15 @@ def _assert_project(db: Session, current: User, project_id: int) -> Project:
     if not project or project.company_id != current.company_id:
         raise HTTPException(400, "Dự án không hợp lệ.")
     return project
+
+
+def _out(item: ProjectItem, current: User) -> ProjectItemOut:
+    """Chuyển sang schema, ẩn Khối lượng/Đơn giá/Thành tiền nếu người xem không được thấy tiền.
+    Mask trên bản Pydantic (model_copy) — TUYỆT ĐỐI không set None lên ORM."""
+    out = ProjectItemOut.model_validate(item)
+    if not can_see_money(current):
+        out = out.model_copy(update={"quantity": None, "unit_price": None, "amount": None})
+    return out
 
 
 def _validate_parent(
@@ -57,15 +66,9 @@ def list_items(
         .order_by(ProjectItem.order_index.asc(), ProjectItem.id.asc())
         .all()
     )
-    out = [ProjectItemOut.model_validate(r) for r in rows]
-    # NHÂN VIÊN (STAFF): giữ tên/ĐVT hạng mục nhưng ẩn cột tiền.
-    # Mask trên bản Pydantic (model_copy) — TUYỆT ĐỐI không set None lên ORM.
-    if is_staff_tier(current):
-        out = [
-            r.model_copy(update={"quantity": None, "unit_price": None, "amount": None})
-            for r in out
-        ]
-    return out
+    # CHỈ GIÁM ĐỐC thấy tiền: giữ tên/ĐVT hạng mục nhưng ẩn Khối lượng/Đơn giá/Thành tiền
+    # với mọi người khác (quản lý cấp cao/cấp trung + nhân viên).
+    return [_out(r, current) for r in rows]
 
 
 @router.post("", response_model=ProjectItemOut, status_code=201)
@@ -82,7 +85,7 @@ def create_item(
     db.add(item)
     db.commit()
     db.refresh(item)
-    return item
+    return _out(item, current)
 
 
 @router.patch("/{item_id}", response_model=ProjectItemOut)
@@ -107,7 +110,7 @@ def update_item(
 
     db.commit()
     db.refresh(item)
-    return item
+    return _out(item, current)
 
 
 @router.delete("/{item_id}", status_code=204)

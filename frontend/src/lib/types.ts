@@ -101,7 +101,7 @@ export interface Bid {
   code: string;
   name: string;
   investor?: string | null;
-  package_value: number;
+  package_value: number | null;   // null khi bị ẩn (chỉ Giám đốc thấy giá gói thầu)
   status: BidStatus;
   submit_date?: string | null;
   result_date?: string | null;

@@ -15,8 +15,9 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
+import { canSeeMoney } from "@/lib/roles";
 import { formatVND, formatDate } from "@/lib/format";
-import type { Bid, BidStatus, Project } from "@/lib/types";
+import type { Bid, BidStatus, Project, User } from "@/lib/types";
 
 const STATUS_CONFIG: Record<BidStatus, { label: string; cls: string }> = {
   DRAFT: { label: "Nháp", cls: "bg-line text-muted" },
@@ -30,7 +31,10 @@ export default function BidsPage() {
   const router = useRouter();
   const [bids, setBids] = useState<Bid[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [me, setMe] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  // Chỉ Giám đốc thấy/đặt giá gói thầu (khớp backend). Quản lý vẫn theo dõi hồ sơ thầu.
+  const showMoney = canSeeMoney(me?.role);
   
   // Filter & Search
   const [search, setSearch] = useState("");
@@ -65,10 +69,11 @@ export default function BidsPage() {
 
   function loadData() {
     setLoading(true);
-    Promise.all([api.bids(), api.projects()])
-      .then(([bidsData, projectsData]) => {
+    Promise.all([api.bids(), api.projects(), api.me()])
+      .then(([bidsData, projectsData, meData]) => {
         setBids(bidsData);
         setProjects(projectsData);
+        setMe(meData);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -218,13 +223,15 @@ export default function BidsPage() {
                       Chủ đầu tư: <span className="font-medium text-ink">{b.investor}</span>
                     </p>
                   )}
-                  <p className="flex items-center gap-1.5">
-                    <BanknotesIcon className="h-3.5 w-3.5 shrink-0 text-muted/70" />
-                    Giá gói thầu:{" "}
-                    <span className="font-semibold text-ink tnum">
-                      {formatVND(b.package_value)}
-                    </span>
-                  </p>
+                  {showMoney && (
+                    <p className="flex items-center gap-1.5">
+                      <BanknotesIcon className="h-3.5 w-3.5 shrink-0 text-muted/70" />
+                      Giá gói thầu:{" "}
+                      <span className="font-semibold text-ink tnum">
+                        {formatVND(b.package_value)}
+                      </span>
+                    </p>
+                  )}
                   {b.submit_date && (
                     <p>Ngày nộp thầu: <span className="font-medium text-ink">{formatDate(b.submit_date)}</span></p>
                   )}
@@ -340,17 +347,19 @@ export default function BidsPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Giá trị gói thầu (VND)</label>
-                    <input
-                      type="number"
-                      placeholder="VD: 5000000000"
-                      value={newBid.package_value || ""}
-                      onChange={(e) => setNewBid({ ...newBid, package_value: Number(e.target.value) })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
+                  {showMoney && (
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted block mb-1">Giá trị gói thầu (VND)</label>
+                      <input
+                        type="number"
+                        placeholder="VD: 5000000000"
+                        value={newBid.package_value || ""}
+                        onChange={(e) => setNewBid({ ...newBid, package_value: Number(e.target.value) })}
+                        className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                  )}
+                  <div className={showMoney ? "" : "col-span-2"}>
                     <label className="text-[11px] font-semibold text-muted block mb-1">Ngày nộp hồ sơ</label>
                     <input
                       type="date"

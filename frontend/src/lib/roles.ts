@@ -18,9 +18,12 @@ export function roleTier(role: Role | undefined | null): Tier {
 /** Quản lý trở lên (thấy nhân sự, chấm công toàn đội, chấm điểm cấp dưới). */
 export const isManagerUp = (role: Role | undefined | null) => roleTier(role) !== "STAFF";
 
-/** Được xem TIỀN của dự án (giá trị HĐ, chi phí, lãi/lỗ, khối lượng, đơn giá).
- *  Nhân viên (STAFF) KHÔNG thấy tiền. Khớp đúng is_staff_tier ở backend. */
-export const canSeeMoney = (role: Role | undefined | null) => roleTier(role) !== "STAFF";
+/** Được xem TIỀN của dự án (giá trị HĐ, chi phí, thanh toán/công nợ, lãi/lỗ,
+ *  khối lượng – đơn giá – thành tiền hạng mục).
+ *  Theo yêu cầu chủ doanh nghiệp: CHỈ GIÁM ĐỐC thấy tiền — quản lý cấp cao/cấp
+ *  trung + nhân viên đều KHÔNG. Khớp đúng can_see_money ở backend.
+ *  (Ngoại lệ: hóa đơn chi phí đầu vào "Hóa đơn AI" quản lý vẫn duyệt — gate riêng.) */
+export const canSeeMoney = (role: Role | undefined | null) => roleTier(role) === "DIRECTOR";
 
 /** Chỉ Giám đốc (được xem tài chính: doanh thu, lãi/lỗ, báo cáo). */
 export const isDirector = (role: Role | undefined | null) => roleTier(role) === "DIRECTOR";
