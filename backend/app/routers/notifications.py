@@ -48,6 +48,11 @@ def send_notification(
         raise HTTPException(403, "Chỉ Giám đốc/Quản trị được gửi cho nhóm này.")
     if target == "STAFF" and current.role not in _MANAGERS_UP:
         raise HTTPException(403, "Bạn không có quyền gửi cho toàn bộ nhân viên.")
+    # Nhân viên (FIELD_STAFF) chỉ được gửi thông báo cho QUẢN LÝ TRỰC TIẾP của mình
+    # (tránh spam người khác; muốn nhắn đồng nghiệp đã có Chat).
+    if target == "USER" and current.role == UserRole.FIELD_STAFF:
+        if not current.manager_id or payload.target_user_id != current.manager_id:
+            raise HTTPException(403, "Nhân viên chỉ gửi thông báo cho quản lý trực tiếp; hãy dùng Chat để nhắn người khác.")
 
     recipients = [u for u in _resolve_recipients(db, current, target, payload.target_user_id)
                   if u.id != current.id]
