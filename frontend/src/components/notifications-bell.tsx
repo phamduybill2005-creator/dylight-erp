@@ -49,12 +49,26 @@ export default function NotificationsBell() {
     api.unreadCount().then((r) => setUnread(r.count)).catch(() => {});
   }, []);
 
+  const refreshItems = useCallback(() => {
+    api.notifications().then(setItems).catch(() => {});
+  }, []);
+
+  // Nạp thông tin người đăng nhập 1 lần khi mở app.
   useEffect(() => {
     api.me().then(setMe).catch(() => {});
+  }, []);
+
+  // Tự làm mới định kỳ (KHÔNG cần F5): số tin chưa đọc cập nhật mỗi ~20s;
+  // nếu đang mở bảng thông báo thì làm mới cả danh sách để tin mới tự hiện.
+  useEffect(() => {
     refreshUnread();
-    const t = setInterval(refreshUnread, 60000);
+    if (open) refreshItems();
+    const t = setInterval(() => {
+      refreshUnread();
+      if (open) refreshItems();
+    }, 20000);
     return () => clearInterval(t);
-  }, [refreshUnread]);
+  }, [open, refreshUnread, refreshItems]);
 
   async function openPanel() {
     setOpen(true);
