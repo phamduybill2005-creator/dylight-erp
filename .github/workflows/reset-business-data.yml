@@ -1,0 +1,61 @@
+name: Reset du lieu nghiep vu (1 lan, thu cong)
+
+# Xoa du an + tien (giu tai khoan + cham cong) de dua ERP vao su dung that.
+# CHAY TAY tu tab Actions -> Run workflow. Mac dinh DRY RUN (chi sao luu + dem, khong xoa).
+# De xoa that: chon mode = apply VA go dung confirm = XOA-DU-LIEU-DU-AN.
+# Luon tai len artifact "backup-truoc-reset" (CSV moi bang bi dung) trong ca 2 che do.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dryrun = chi sao luu + dem (an toan). apply = XOA THAT.'
+        type: choice
+        options:
+          - dryrun
+          - apply
+        default: dryrun
+      confirm:
+        description: 'Chi khi apply: go dung XOA-DU-LIEU-DU-AN moi xoa.'
+        required: false
+        default: ''
+
+concurrency:
+  group: reset-business-data
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+
+      - name: Run reset (backup -> delete)
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DRY_RUN: ${{ github.event.inputs.mode == 'apply' && 'false' || 'true' }}
+          RESET_CONFIRM: ${{ github.event.inputs.confirm }}
+        run: python scripts/reset_business_data.py
+
+      - name: Upload backup (CSV) artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-truoc-reset
+          path: backend/backup/
+          if-no-files-found: warn
+          retention-days: 30
