@@ -20,6 +20,7 @@ import {
   ChevronUpDownIcon,
   ChevronDownIcon,
   EnvelopeIcon,
+  LockClosedIcon,
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { roleTitle } from "@/lib/roles";
@@ -60,6 +61,10 @@ export default function AccountMenu({
   const [pwErr, setPwErr] = useState(false);
   const [changing, setChanging] = useState(false);
 
+  // Đăng xuất khỏi mọi thiết bị khác (vô hiệu token cũ; thiết bị này vẫn giữ đăng nhập).
+  const [loBusy, setLoBusy] = useState(false);
+  const [loMsg, setLoMsg] = useState("");
+
   useEffect(() => {
     function onDoc(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -88,6 +93,19 @@ export default function AccountMenu({
       setPwMsg(e instanceof Error ? e.message : "Không đổi được mật khẩu.");
     } finally {
       setChanging(false);
+    }
+  }
+
+  async function logoutOtherDevices() {
+    setLoBusy(true);
+    setLoMsg("");
+    try {
+      await api.logoutAllDevices();
+      setLoMsg("Đã đăng xuất khỏi các thiết bị khác. Thiết bị này vẫn đăng nhập.");
+    } catch {
+      setLoMsg("Không thực hiện được, thử lại sau.");
+    } finally {
+      setLoBusy(false);
     }
   }
 
@@ -179,6 +197,15 @@ export default function AccountMenu({
         >
           <AcademicCapIcon className="h-4 w-4 text-steel" /> Hồ sơ đầy đủ (sơ yếu lý lịch)
         </Link>
+        <button
+          onClick={logoutOtherDevices}
+          disabled={loBusy}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink hover:bg-paper disabled:opacity-50"
+        >
+          <LockClosedIcon className="h-4 w-4 text-steel" />
+          {loBusy ? "Đang xử lý…" : "Đăng xuất mọi thiết bị khác"}
+        </button>
+        {loMsg && <p className="px-3 pb-1 text-[11px] font-medium text-ok">{loMsg}</p>}
         <button
           onClick={() => { setOpen(false); onLogout(); }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-bad hover:bg-bad/5"
