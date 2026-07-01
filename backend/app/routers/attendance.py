@@ -87,12 +87,12 @@ def check_out(db: Session = Depends(get_db), current: User = Depends(get_current
         db.add(rec)
     else:
         now = vn_now()
-        # Chỉ ghi giờ ra nếu HỢP LỆ (muộn hơn giờ vào) — tránh bấm nhầm / lệch đồng hồ
-        # làm giờ công về 0 và ghi đè mất mốc ra đúng trước đó.
-        if rec.check_in is None or now > rec.check_in:
+        # Chỉ CHẶN khi giờ ra SỚM HƠN giờ vào (bấm nhầm / lệch đồng hồ) làm giờ công về 0.
+        # Cho phép bằng nhau (vào-ra cùng giây) — tránh chặn oan.
+        if rec.check_in is None or now >= rec.check_in:
             rec.check_out = now
         else:
-            raise HTTPException(400, "Giờ ra phải muộn hơn giờ vào. Kiểm tra lại đồng hồ.")
+            raise HTTPException(400, "Giờ ra không được sớm hơn giờ vào. Kiểm tra lại đồng hồ.")
     db.commit()
     db.refresh(rec)
     return rec
