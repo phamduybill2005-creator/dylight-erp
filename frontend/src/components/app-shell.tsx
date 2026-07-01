@@ -36,6 +36,7 @@ import { api, tokenStore } from "@/lib/api";
 import { ROLE_LABEL, roleTier, type Tier } from "@/lib/roles";
 import type { Company, User } from "@/lib/types";
 import NotificationsBell from "./notifications-bell";
+import ChatWidget from "./chat-widget";
 import AccountMenu from "./account-menu";
 import DeadlineAlert from "./deadline-alert";
 
@@ -278,6 +279,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <NotificationsBell />
+      <ChatWidget />
       <DeadlineAlert user={user} />
     </div>
   );

@@ -19,7 +19,7 @@ from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-    iclock,
+    chat, iclock,
 )
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
@@ -87,6 +87,17 @@ def _ensure_schema() -> None:
                         conn.execute(text(
                             "CREATE UNIQUE INDEX uq_attendance_user_day ON attendance (user_id, work_date)"
                         ))
+
+        # CHAT: chống tạo trùng phòng 1-1 -> UNIQUE (company_id, direct_key) chỉ với DIRECT
+        # (direct_key IS NOT NULL). Partial index chạy được cả Postgres & SQLite.
+        if "conversations" in insp.get_table_names():
+            have = {ix["name"] for ix in insp.get_indexes("conversations")}
+            if "uq_conversations_direct_key" not in have:
+                with engine.begin() as conn:
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_conversations_direct_key "
+                        "ON conversations (company_id, direct_key) WHERE direct_key IS NOT NULL"
+                    ))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] bo qua: {_e}")
 
@@ -143,7 +154,8 @@ def health():
 P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
           project_items, attendance, evaluations, partners, payroll,
-          leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues):
+          leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
+          chat):
     app.include_router(r.router, prefix=P)
 
 # Máy chấm công đẩy trực tiếp (ZKTeco PUSH/ADMS) gọi đúng /iclock/... -> KHÔNG thêm tiền tố /api/v1.

@@ -14,7 +14,7 @@ from app.models import (
     UserRole, BidStatus, ProjectStatus, ContractStatus,
     InvoiceStatus, PaymentType, PaymentDirection,
     AttendanceSource, EvaluationDirection, PartnerType, SalaryType,
-    LeaveStatus, DesignPhase, DesignDocStatus,
+    LeaveStatus, DesignPhase, DesignDocStatus, ConversationType,
 )
 
 
@@ -781,3 +781,43 @@ class DesignDocOut(DesignDocBase):
     created_at: datetime
     project_name: str | None = None
     created_by_name: str | None = None
+
+
+# ------------------------- CHAT (nhắn tin nội bộ) -------------------------
+class ConversationCreate(BaseModel):
+    # DIRECT: truyền member_ids = [1 người kia]. GROUP: >=2 người + title.
+    type: str = "DIRECT"                 # DIRECT | GROUP
+    member_ids: list[int] = Field(default_factory=list)
+    title: str | None = None
+
+
+class ChatMemberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    user_id: int
+    user_name: str | None = None
+
+
+class ConversationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    type: ConversationType
+    title: str | None = None            # với DIRECT: FE hiển thị tên người kia
+    members: list[ChatMemberOut] = []
+    last_message: str | None = None     # preview text của tin cuối
+    last_message_at: datetime | None = None
+    unread: int = 0                     # số tin chưa đọc của current user
+    created_at: datetime
+
+
+class MessageCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
+
+
+class MessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    conversation_id: int
+    sender_id: int
+    sender_name: str | None = None
+    body: str
+    created_at: datetime

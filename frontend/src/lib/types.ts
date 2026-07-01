@@ -387,3 +387,31 @@ export interface EvaluationSummary {
   num_ratings: number;
 }
 
+// Chat nội bộ — hội thoại 1-1 (DIRECT) và nhóm tự tạo (GROUP).
+export type ConversationType = "DIRECT" | "GROUP";
+
+export interface ChatMember {
+  user_id: number;
+  user_name?: string | null;
+}
+
+export interface Conversation {
+  id: number;
+  type: ConversationType;
+  title?: string | null;          // DIRECT: FE hiển thị tên người kia
+  members: ChatMember[];
+  last_message?: string | null;   // preview tin cuối
+  last_message_at?: string | null;
+  unread: number;                 // số tin chưa đọc của mình
+  created_at: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  sender_name?: string | null;
+  body: string;
+  created_at: string;
+}
+

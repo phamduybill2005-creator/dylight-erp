@@ -716,3 +716,77 @@ class Nickname(Base):
     target_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)   # người được đặt
     nickname: Mapped[str] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# --------------------------------------------------------------------------
+# CHAT — nhắn tin nội bộ (1-1 & nhóm). Độc lập với NOTIFICATIONS.
+# --------------------------------------------------------------------------
+class ConversationType(str, enum.Enum):
+    DIRECT = "DIRECT"   # 1-1
+    GROUP = "GROUP"     # nhóm nhiều người
+
+
+# --------------------------------------------------------------------------
+# 22. CONVERSATIONS — phòng chat (1-1 hoặc nhóm), cô lập theo company
+# --------------------------------------------------------------------------
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    type: Mapped[ConversationType] = mapped_column(SAEnum(ConversationType), default=ConversationType.DIRECT)
+    title: Mapped[str | None] = mapped_column(String(255))     # tên nhóm (DIRECT để NULL, hiển thị theo người kia)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # dedup 1-1: cặp uid nhỏ:uid lớn "12:45"; NULL với nhóm. UNIQUE ở _ensure_schema.
+    direct_key: Mapped[str | None] = mapped_column(String(40), index=True)
+    # để sort danh sách phòng theo tin mới nhất mà không JOIN nặng
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    members: Mapped[list["ConversationMember"]] = relationship(back_populates="conversation")
+
+
+# --------------------------------------------------------------------------
+# 23. CONVERSATION_MEMBERS — thành viên phòng + con trỏ đã đọc
+# --------------------------------------------------------------------------
+class ConversationMember(Base):
+    __tablename__ = "conversation_members"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # tin cuối đã đọc -> tính unread = COUNT(messages.id > last_read_message_id)
+    last_read_message_id: Mapped[int | None] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="members")
+    user: Mapped["User"] = relationship("User")
+
+    @property
+    def user_name(self) -> str | None:
+        return self.user.full_name if self.user else None
+
+
+# --------------------------------------------------------------------------
+# 24. CHAT_MESSAGES — tin nhắn trong phòng
+# --------------------------------------------------------------------------
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+
+    sender: Mapped["User | None"] = relationship("User", foreign_keys=[sender_id])
+
+    @property
+    def sender_name(self) -> str | None:
+        return self.sender.full_name if self.sender else None

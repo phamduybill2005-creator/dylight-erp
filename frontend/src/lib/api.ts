@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, YunattSyncResult, YunattPerson, YunattSyncStatus } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -325,5 +325,17 @@ export const api = {
     request<Colleague>(`/colleagues/${userId}/nickname`, { method: "PUT", body: JSON.stringify({ nickname }) }),
   addToTeam: (userId: number) => request<Colleague>(`/colleagues/${userId}/team`, { method: "POST" }),
   removeFromTeam: (userId: number) => request<Colleague>(`/colleagues/${userId}/team`, { method: "DELETE" }),
+
+  // --- Chat (nhắn tin nội bộ) ---
+  chatConversations: () => request<Conversation[]>("/chat/conversations"),
+  chatUnreadCount: () => request<{ count: number }>("/chat/unread-count"),
+  createConversation: (payload: { type: string; member_ids: number[]; title?: string | null }) =>
+    request<Conversation>("/chat/conversations", { method: "POST", body: JSON.stringify(payload) }),
+  chatMessages: (id: number, before?: number) =>
+    request<ChatMessage[]>(`/chat/conversations/${id}/messages${before ? `?before=${before}` : ""}`),
+  sendChatMessage: (id: number, body: string) =>
+    request<ChatMessage>(`/chat/conversations/${id}/messages`, { method: "POST", body: JSON.stringify({ body }) }),
+  markConversationRead: (id: number) =>
+    request<void>(`/chat/conversations/${id}/read`, { method: "POST" }),
 };
 
