@@ -14,6 +14,7 @@ import {
   UsersIcon,
   ArrowUpTrayIcon,
   XMarkIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
@@ -118,6 +119,10 @@ export default function AttendancePage() {
   const [dayList, setDayList] = useState<Attendance[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary[]>([]);
   const [summaryPeriod, setSummaryPeriod] = useState(monthStr());  // tháng đang xem tổng hợp
+  // Chi tiết từng ngày của 1 người (mở khi bấm vào người trong bảng tổng hợp).
+  const [expandedUser, setExpandedUser] = useState<number | null>(null);
+  const [detailRecs, setDetailRecs] = useState<Attendance[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // Nhập chấm công từ file CSV
   const [showImport, setShowImport] = useState(false);
@@ -193,7 +198,27 @@ export default function AttendancePage() {
   useEffect(() => {
     if (!user || roleTier(user.role) === "STAFF") return;
     api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
+    setExpandedUser(null);   // đổi tháng thì thu gọn chi tiết đang mở
   }, [user, summaryPeriod]);
+
+  // Bấm vào 1 người trong bảng tổng hợp -> mở/đóng chi tiết từng ngày trong tháng.
+  async function toggleDetail(userId: number) {
+    if (expandedUser === userId) { setExpandedUser(null); return; }
+    setExpandedUser(userId);
+    setDetailLoading(true);
+    try {
+      const recs = await api.attendanceList({
+        user_id: userId,
+        from_date: `${summaryPeriod}-01`,
+        to_date: `${summaryPeriod}-31`,
+      });
+      setDetailRecs(recs);
+    } catch {
+      setDetailRecs([]);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   async function punch(kind: "in" | "out") {
     setBusy(true);
@@ -460,39 +485,80 @@ export default function AttendancePage() {
               Chưa có dữ liệu tổng hợp cho tháng này.
             </p>
           ) : (
-            summary.map((s) => (
-              <div key={s.user_id} className="rounded-xl2 bg-white p-3 shadow-card">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-semibold text-ink">{nick(s.user_id, s.full_name)}</p>
-                  {s.late_days > 0 && (
-                    <span className="shrink-0 rounded-full bg-bad/10 px-2 py-0.5 text-[10px] font-semibold text-bad">
-                      trễ {s.late_days}
-                    </span>
-                  )}
-                </div>
-                {/* thanh trực quan số ngày công so với người cao nhất */}
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-paper">
-                  <div
-                    className="h-full rounded-full bg-steel"
-                    style={{ width: `${Math.round((s.present_days / maxDays) * 100)}%` }}
-                  />
-                </div>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-                  <div>
-                    <p className="text-[9px] text-muted">Ngày công</p>
-                    <p className="font-bold text-ink tnum">{s.present_days}</p>
+            summary.map((s) => {
+              const isOpen = expandedUser === s.user_id;
+              return (
+              <div key={s.user_id} className={`rounded-xl2 bg-white shadow-card ${isOpen ? "lg:col-span-2 xl:col-span-3" : ""}`}>
+                <button onClick={() => toggleDetail(s.user_id)} className="block w-full p-3 text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-ink">
+                      <ChevronDownIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                      <span className="truncate">{nick(s.user_id, s.full_name)}</span>
+                    </p>
+                    {s.late_days > 0 && (
+                      <span className="shrink-0 rounded-full bg-bad/10 px-2 py-0.5 text-[10px] font-semibold text-bad">
+                        trễ {s.late_days}
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-[9px] text-muted">Tổng giờ</p>
-                    <p className="font-bold text-steel tnum">{s.total_hours.toFixed(1)}h</p>
+                  {/* thanh trực quan số ngày công so với người cao nhất */}
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-paper">
+                    <div
+                      className="h-full rounded-full bg-steel"
+                      style={{ width: `${Math.round((s.present_days / maxDays) * 100)}%` }}
+                    />
                   </div>
-                  <div>
-                    <p className="text-[9px] text-muted">Đi trễ</p>
-                    <p className={`font-bold tnum ${s.late_days ? "text-bad" : "text-ink"}`}>{s.late_days}</p>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div>
+                      <p className="text-[9px] text-muted">Ngày công</p>
+                      <p className="font-bold text-ink tnum">{s.present_days}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-muted">Tổng giờ</p>
+                      <p className="font-bold text-steel tnum">{s.total_hours.toFixed(1)}h</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-muted">Đi trễ</p>
+                      <p className={`font-bold tnum ${s.late_days ? "text-bad" : "text-ink"}`}>{s.late_days}</p>
+                    </div>
                   </div>
-                </div>
+                </button>
+
+                {/* Chi tiết từng ngày trong tháng (bấm để mở) */}
+                {isOpen && (
+                  <div className="border-t border-line px-3 pb-3 pt-2">
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                      Chi tiết từng ngày · tháng {summaryPeriod}
+                    </p>
+                    {detailLoading ? (
+                      <p className="py-3 text-center text-xs text-muted">Đang tải…</p>
+                    ) : detailRecs.length === 0 ? (
+                      <p className="py-3 text-center text-xs text-muted">Không có ngày công nào trong tháng này.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {[...detailRecs]
+                          .sort((a, b) => a.work_date.localeCompare(b.work_date))
+                          .map((r) => (
+                            <div key={r.id} className="flex items-center justify-between rounded-lg bg-paper px-2.5 py-1.5 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-ink">
+                                  {new Date(r.work_date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
+                                </span>
+                                {r.is_late && <span className="rounded bg-bad/10 px-1 text-[9px] font-semibold text-bad">trễ</span>}
+                              </div>
+                              <div className="flex items-center gap-3 tnum">
+                                <span className="text-ink">{fmtTime(r.check_in)} - {fmtTime(r.check_out)}</span>
+                                <span className="font-bold text-steel">{fmtHours(r.worked_minutes)}</span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
 

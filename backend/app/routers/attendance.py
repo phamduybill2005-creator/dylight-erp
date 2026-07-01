@@ -112,15 +112,25 @@ def my_attendance(
 def list_attendance(
     user_id: int | None = None,
     work_date: date | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
     db: Session = Depends(get_db),
     current: User = Depends(require_roles(*_MANAGER_ROLES)),
 ):
-    """Danh sách chấm công toàn công ty (cho Quản lý / Giám đốc)."""
+    """Danh sách chấm công toàn công ty (cho Quản lý / Giám đốc).
+
+    Lọc được theo 1 ngày (work_date) hoặc theo khoảng (from_date..to_date) —
+    dùng cho việc xem chi tiết từng ngày của một nhân viên trong tháng.
+    """
     q = db.query(Attendance).filter(Attendance.company_id == current.company_id)
     if user_id:
         q = q.filter(Attendance.user_id == user_id)
     if work_date:
         q = q.filter(Attendance.work_date == work_date)
+    if from_date:
+        q = q.filter(Attendance.work_date >= from_date)
+    if to_date:
+        q = q.filter(Attendance.work_date <= to_date)
     return q.order_by(Attendance.work_date.desc(), Attendance.user_id.asc()).all()
 
 

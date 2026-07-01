@@ -199,10 +199,12 @@ export const api = {
   },
   checkIn: () => request<Attendance>("/attendance/check-in", { method: "POST" }),
   checkOut: () => request<Attendance>("/attendance/check-out", { method: "POST" }),
-  attendanceList: (params?: { user_id?: number; work_date?: string }) => {
+  attendanceList: (params?: { user_id?: number; work_date?: string; from_date?: string; to_date?: string }) => {
     const qs = new URLSearchParams();
     if (params?.user_id) qs.set("user_id", String(params.user_id));
     if (params?.work_date) qs.set("work_date", params.work_date);
+    if (params?.from_date) qs.set("from_date", params.from_date);
+    if (params?.to_date) qs.set("to_date", params.to_date);
     const s = qs.toString();
     return request<Attendance[]>(`/attendance${s ? `?${s}` : ""}`);
   },
