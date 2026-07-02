@@ -50,7 +50,7 @@ export interface ProjectProfit {
 }
 
 export type ProjectStatus =
-  | "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "CANCELLED";
+  | "PLANNING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CLOSED";
 
 export interface Project {
   id: number;

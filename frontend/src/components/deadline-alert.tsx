@@ -33,7 +33,7 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
       .projects()
       .then((ps) => {
         const list = ps
-          .filter((p) => p.status !== "COMPLETED" && p.status !== "CANCELLED" && p.end_date)
+          .filter((p) => p.status !== "COMPLETED" && p.status !== "CLOSED" && p.end_date)
           .map((p) => ({ p, left: daysLeft(p.end_date) as number }))
           .filter((x) => x.left !== null && x.left <= 5)
           .sort((a, b) => a.left - b.left);

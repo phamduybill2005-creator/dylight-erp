@@ -32,10 +32,10 @@ import type { Project, Contract, Payment, Progress, Invoice, PaymentType, Paymen
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
-  ACTIVE: { label: "Đang thi công", cls: "bg-steel/10 text-steel" },
+  IN_PROGRESS: { label: "Đang làm", cls: "bg-steel/10 text-steel" },
   ON_HOLD: { label: "Tạm dừng", cls: "bg-amber/20 text-amber-deep" },
   COMPLETED: { label: "Hoàn thành", cls: "bg-ok/15 text-ok" },
-  CANCELLED: { label: "Đã hủy", cls: "bg-bad/15 text-bad" },
+  CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
 };
 
 const PAYMENT_TYPE_LABEL = {
@@ -253,6 +253,17 @@ export default function ProjectDetailPage() {
     window.dispatchEvent(new CustomEvent("open-project-chat", { detail: { projectId } }));
   }
 
+  async function handleStatusChange(status: string) {
+    if (!project) return;
+    setProject({ ...project, status: status as Project["status"] });   // cập nhật ngay cho mượt
+    try {
+      await api.updateProject(project.id, { status: status as Project["status"] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Đổi trạng thái thất bại.");
+      loadData();
+    }
+  }
+
   async function handleDeleteProject() {
     if (!project) return;
     if (!window.confirm(
@@ -460,9 +471,22 @@ export default function ProjectDetailPage() {
                 Xoá dự án
               </button>
             )}
-            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}>
-              {PROJECT_STATUS[project.status]?.label}
-            </span>
+            {canManage ? (
+              <select
+                value={project.status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                title="Đổi trạng thái dự án"
+                className={`cursor-pointer rounded-full border-0 px-2.5 py-1 text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber ${PROJECT_STATUS[project.status]?.cls}`}
+              >
+                <option value="PLANNING">Chuẩn bị</option>
+                <option value="IN_PROGRESS">Đang làm</option>
+                <option value="COMPLETED">Hoàn thành</option>
+              </select>
+            ) : (
+              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}>
+                {PROJECT_STATUS[project.status]?.label}
+              </span>
+            )}
           </div>
         </div>
 

@@ -14,10 +14,10 @@ import type { Project, User } from "@/lib/types";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
-  ACTIVE: { label: "Đang thực hiện", cls: "bg-steel/10 text-steel" },
+  IN_PROGRESS: { label: "Đang làm", cls: "bg-steel/10 text-steel" },
   ON_HOLD: { label: "Tạm dừng", cls: "bg-amber/20 text-amber-deep" },
   COMPLETED: { label: "Đã hoàn thành", cls: "bg-ok/15 text-ok" },
-  CANCELLED: { label: "Đã hủy", cls: "bg-bad/15 text-bad" },
+  CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
 };
 
 const DAY = 86_400_000;

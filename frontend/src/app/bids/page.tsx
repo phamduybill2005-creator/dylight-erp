@@ -126,7 +126,7 @@ export default function BidsPage() {
         name: newProject.name,
         location: newProject.location || null,
         manager_name: newProject.manager_name || null,
-        status: "ACTIVE",
+        status: "IN_PROGRESS",
         start_date: newProject.start_date || null,
         bid_id: selectedBid.id,
       });
