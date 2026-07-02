@@ -27,6 +27,10 @@ import psycopg2
 
 EXPECTED_CONFIRM = "XOA-DU-LIEU-DU-AN"
 
+# Tài khoản DEMO cũ (mật khẩu 123456) cần VÔ HIỆU khi đưa vào dùng thật.
+# CHỐT AN TOÀN: chỉ vô hiệu nếu CÒN admin/giám đốc KHÁC đang hoạt động (chống tự khóa).
+DEMO_EMAILS = ["giamdoc@dosco.vn", "admin@dosco.vn"]
+
 # Bảng sao lưu đầy đủ (SELECT * -> CSV) trước khi xóa.
 BACKUP_TABLES = [
     "projects", "bids", "contracts", "invoices", "payments", "project_items",
@@ -88,6 +92,13 @@ def main() -> int:
         "SELECT id, full_name, email, base_salary, allowance FROM users ORDER BY id",
     )
     _log("  users_salary_before_reset.csv (ảnh chụp lương trước khi reset)")
+    # Sao lưu toàn bộ users (trạng thái trước) để có thể khôi phục nếu cần.
+    backup_query(
+        cur,
+        os.path.join(BACKUP_DIR, "users_before_reset.csv"),
+        "SELECT id, full_name, email, role, is_active, is_approved FROM users ORDER BY id",
+    )
+    _log("  users_before_reset.csv (ảnh chụp toàn bộ tài khoản)")
 
     # ---------- 2. XÓA (trong transaction) ----------
     _log("\n== XÓA (child -> parent) ==")
@@ -137,6 +148,29 @@ def main() -> int:
         "UPDATE users SET base_salary = 0, allowance = 0"
     )
 
+    # 2f. VÔ HIỆU 2 tài khoản demo cũ (mật khẩu 123456) — CHỐT AN TOÀN chống tự khóa:
+    #     chỉ khóa nếu CÒN >=1 admin/giám đốc KHÁC đang hoạt động (vd duy@dosco.vn).
+    cur.execute(
+        "SELECT count(*) FROM users "
+        "WHERE role IN ('ADMIN','DIRECTOR') AND is_active = TRUE "
+        "AND lower(email) <> ALL(%s)",
+        ([e.lower() for e in DEMO_EMAILS],),
+    )
+    other_admins = cur.fetchone()[0]
+    if other_admins >= 1:
+        # is_active=FALSE chặn đăng nhập; token_version++ giết mọi phiên cũ đang mở.
+        deleted["vô hiệu tài khoản demo"] = run(
+            "UPDATE users SET is_active = FALSE, is_approved = FALSE, "
+            "token_version = COALESCE(token_version,0) + 1 "
+            "WHERE lower(email) = ANY(%s)",
+            ([e.lower() for e in DEMO_EMAILS],),
+        )
+        _log(f"  (còn {other_admins} admin/giám đốc khác -> an toàn để vô hiệu tài khoản demo)")
+    else:
+        deleted["vô hiệu tài khoản demo"] = 0
+        _log("  ⚠ BỎ QUA vô hiệu tài khoản demo: KHÔNG còn admin/giám đốc khác đang hoạt "
+             "động -> tránh tự khóa toàn hệ thống. Hãy tạo/cấp quyền tài khoản của bạn trước.")
+
     for k, v in deleted.items():
         _log(f"  {k:34s} {v:6d} dòng")
 
@@ -146,7 +180,8 @@ def main() -> int:
         _log("\n== DRY RUN: ĐÃ ROLLBACK — KHÔNG thay đổi gì. (Đặt mode=apply + confirm để xóa thật.) ==")
     else:
         conn.commit()
-        _log("\n== ĐÃ COMMIT: dữ liệu nghiệp vụ đã được reset. Tài khoản + chấm công GIỮ NGUYÊN. ==")
+        _log("\n== ĐÃ COMMIT: dữ liệu nghiệp vụ đã reset; 2 tài khoản demo đã vô hiệu (nếu đủ điều kiện). "
+             "Tài khoản nhân viên thật + chấm công GIỮ NGUYÊN. ==")
 
     cur.close()
     conn.close()
