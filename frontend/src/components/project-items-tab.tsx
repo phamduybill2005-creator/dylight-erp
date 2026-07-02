@@ -31,34 +31,45 @@ function EditableCell({
   placeholder?: string;
   className?: string;
 }) {
-  const [v, setV] = useState<string | number>(value ?? "");
+  // Giữ CHUỖI đang gõ (không ép về số mỗi phím) -> gõ mượt cả số thập phân "12.5", "0,75".
+  const [v, setV] = useState<string>(value == null ? "" : String(value));
+  const [editing, setEditing] = useState(false);
+  // Đồng bộ từ prop khi KHÔNG đang gõ (tránh bị ghi đè lúc đang nhập, vd do tự làm mới).
   useEffect(() => {
-    setV(value ?? "");
-  }, [value]);
+    if (!editing) setV(value == null ? "" : String(value));
+  }, [value, editing]);
 
-  const display = type === "number" ? (v === 0 || v === "" ? "" : v) : (v ?? "");
+  // "12,5" / "1.234.567" -> số. Chấp nhận dấu phẩy làm dấu thập phân.
+  function toNum(s: string): number {
+    const cleaned = s.replace(/\s/g, "").replace(",", ".").replace(/[^0-9.\-]/g, "");
+    const n = Number(cleaned);
+    return isNaN(n) ? 0 : n;
+  }
 
-  // Lưu khi rời ô — đọc thẳng giá trị DOM (luôn mới) và so với value đã lưu (prop).
-  // So theo SỐ với cột số để tránh "0.0" vs "0" báo sai là không đổi.
-  function commit(raw: string) {
+  // Lưu khi rời ô; chỉ gọi onCommit nếu giá trị thực sự đổi.
+  function commit() {
+    setEditing(false);
     if (type === "number") {
-      const nv = raw === "" ? 0 : Number(raw);
+      const nv = v.trim() === "" ? 0 : toNum(v);
       if (nv !== Number(value ?? 0)) onCommit(nv);
-    } else if (raw !== (value ?? "")) {
-      onCommit(raw);
+      else setV(nv === 0 ? "" : String(nv));
+    } else if (v !== (value ?? "")) {
+      onCommit(v);
     }
   }
 
+  // Khi KHÔNG gõ: ẩn số 0 cho ô trông trống (như cũ). Khi đang gõ: hiện đúng chuỗi.
+  const shown = !editing && type === "number" && (v === "" || Number(v) === 0) ? "" : v;
+
   return (
     <input
-      type={type}
+      type="text"
       inputMode={type === "number" ? "decimal" : undefined}
-      value={display as string | number}
+      value={editing ? v : shown}
       placeholder={placeholder}
-      onChange={(e) =>
-        setV(type === "number" ? (e.target.value === "" ? 0 : Number(e.target.value)) : e.target.value)
-      }
-      onBlur={(e) => commit(e.target.value)}
+      onFocus={() => { setEditing(true); if (type === "number" && Number(v) === 0) setV(""); }}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={commit}
       className={`w-full bg-transparent px-2 py-1.5 text-xs text-ink outline-none focus:bg-amber/5 focus:ring-1 focus:ring-amber rounded ${className}`}
     />
   );
