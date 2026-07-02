@@ -1,0 +1,33 @@
+name: Nap 17 du an (1 lan, thu cong)
+
+# Them 17 du an tu bang Excel Nhat-Viet vao DB. Chay tay tu tab Actions -> Run workflow.
+# An toan: tu them cot neu thieu; KHONG tao trung (bo qua Ma QL da co). Chi them, khong xoa.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: seed-projects
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+      - name: Seed projects
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/seed_projects_once.py
