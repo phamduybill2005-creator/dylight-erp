@@ -38,8 +38,8 @@ export default function ProjectsPage() {
   const [nfCode, setNfCode] = useState("");
   const [nfName, setNfName] = useState("");
   const [nfGroup, setNfGroup] = useState("");
-  const [nfGeo, setNfGeo] = useState<number | "">("");
-  const [nfDosco, setNfDosco] = useState<number | "">("");
+  const [nfGeo, setNfGeo] = useState("");
+  const [nfDosco, setNfDosco] = useState("");
 
   // Người chủ trì (lead) áp dụng cho các dự án tạo trong đợt này (tùy chọn).
   const [leadId, setLeadId] = useState<number | "">("");
@@ -96,28 +96,37 @@ export default function ProjectsPage() {
   );
   const totalMargin = totals.contract > 0 ? (totals.profit / totals.contract) * 100 : 0;
 
-  // Mỗi dòng 1 dự án; các cột ngăn cách bằng phẩy / Tab / ; / | : Mã QL, Tên dự án, Nhóm.
-  // (GEO担当 & DOSCO担当 chọn sau trong từng dự án — vì là người trong hệ thống.)
+  // Mỗi dòng 1 dự án; cột ngăn cách bằng phẩy / Tab / ; / | :
+  // Mã QL, Tên dự án, Nhóm, GEO担当, DOSCO担当 (dán thẳng từ Excel).
+  // Nếu cột ĐẦU là số thứ tự (番号) thì tự bỏ qua.
   function parseBulk(text: string, startIndex: number) {
     return text
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean)
       .map((line, idx) => {
-        const parts = line.split(/[\t,;|]/).map((s) => s.trim());
+        let parts = line.split(/[\t,;|]/).map((s) => s.trim());
+        // Bỏ cột 番号 (số thứ tự) nếu dòng có >2 cột và cột đầu chỉ là số.
+        if (parts.length > 2 && /^\d+$/.test(parts[0])) parts = parts.slice(1);
         let code = "";
         let name = "";
-        let group_name = "";
         if (parts.length === 1) {
           name = parts[0];
         } else {
           code = parts[0] || "";
           name = parts[1] || "";
-          group_name = parts[2] || "";
         }
+        const group_name = parts[2] || "";
+        const geo_manager = parts[3] || "";
+        const dosco_manager = parts[4] || "";
         if (!name) name = code;
         if (!code) code = `DA${String(startIndex + idx + 1).padStart(3, "0")}`;
-        return { code, name, group_name: group_name || null };
+        return {
+          code, name,
+          group_name: group_name || null,
+          geo_manager: geo_manager || null,
+          dosco_manager: dosco_manager || null,
+        };
       })
       .filter((p) => p.name);
   }
@@ -156,8 +165,8 @@ export default function ProjectsPage() {
         code: nfCode.trim() || `DA${String(projects.length + 1).padStart(3, "0")}`,
         name,
         group_name: nfGroup.trim() || null,
-        geo_manager_id: nfGeo === "" ? null : Number(nfGeo),
-        dosco_manager_id: nfDosco === "" ? null : Number(nfDosco),
+        geo_manager: nfGeo.trim() || null,
+        dosco_manager: nfDosco.trim() || null,
         lead_id: leadId === "" ? null : Number(leadId),
       });
       const fresh = await api.projects().catch(() => null);
@@ -236,8 +245,8 @@ export default function ProjectsPage() {
                   <td className={`${TD} font-mono text-[12px] text-steel whitespace-nowrap`}>{p.code}</td>
                   <td className={`${TD} font-semibold text-ink`}>{p.name}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.group_name || "—"}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager_name || "—"}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.dosco_manager_name || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.dosco_manager || "—"}</td>
                   <td className={TD}>
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
                       {st.label}
@@ -350,19 +359,13 @@ export default function ProjectsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</span>
-                      <select value={nfGeo} onChange={(e) => setNfGeo(e.target.value === "" ? "" : Number(e.target.value))}
-                        className="w-full rounded-xl2 border border-line bg-white px-2 py-2 text-xs outline-none focus:border-steel">
-                        <option value="">— Chưa chọn —</option>
-                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                      </select>
+                      <input value={nfGeo} onChange={(e) => setNfGeo(e.target.value)} placeholder="VD: 池上 / 宮本"
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
                     </label>
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当</span>
-                      <select value={nfDosco} onChange={(e) => setNfDosco(e.target.value === "" ? "" : Number(e.target.value))}
-                        className="w-full rounded-xl2 border border-line bg-white px-2 py-2 text-xs outline-none focus:border-steel">
-                        <option value="">— Chưa chọn —</option>
-                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                      </select>
+                      <input value={nfDosco} onChange={(e) => setNfDosco(e.target.value)} placeholder="VD: DUC / CAO"
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
                     </label>
                   </div>
                   {canManage && (
@@ -380,13 +383,13 @@ export default function ProjectsPage() {
               ) : (
                 <>
                   <p className="text-xs text-muted">
-                    Dán hoặc gõ <b className="text-ink">mỗi dòng một dự án</b>, theo thứ tự{" "}
-                    <b className="text-ink">Mã QL, Tên dự án, Nhóm</b> (ngăn cách bằng phẩy/Tab; dán thẳng từ Excel).
-                    GEO担当/DOSCO担当 gán sau trong từng dự án.
+                    Dán thẳng từ Excel, <b className="text-ink">mỗi dòng một dự án</b>, theo thứ tự{" "}
+                    <b className="text-ink">Mã QL, Tên dự án, Nhóm, GEO担当, DOSCO担当</b> (ngăn cách bằng Tab/phẩy).
+                    Nếu có cột số thứ tự (番号) ở đầu thì tự bỏ qua. Cột nào trống cứ để trống.
                   </p>
                   <div className="rounded-xl2 bg-white p-3 font-mono text-[11px] leading-relaxed text-muted shadow-card">
-                    QL-01, Cầu Sông Hàn, Nhóm A<br />
-                    QL-02, Đường tránh QL1, Nhóm B
+                    2738-0480, ERE三種五城目, 土木設計, 池上, DUC<br />
+                    2735-0214, 松阪飯南, 土木設計, 池上, CAO
                   </div>
                   {canManage && (
                     <label className="block">

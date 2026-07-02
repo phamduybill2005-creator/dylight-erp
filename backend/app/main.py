@@ -59,8 +59,10 @@ def _ensure_schema() -> None:
             padds = {
                 "lead_id": "ALTER TABLE projects ADD COLUMN lead_id INTEGER",
                 "group_name": "ALTER TABLE projects ADD COLUMN group_name VARCHAR(255)",
-                "geo_manager_id": "ALTER TABLE projects ADD COLUMN geo_manager_id INTEGER",
-                "dosco_manager_id": "ALTER TABLE projects ADD COLUMN dosco_manager_id INTEGER",
+                # GEO担当/DOSCO担当 lưu dạng TEXT (tên). (geo_manager_id/dosco_manager_id cũ
+                # nếu đã có trên DB thì để trống, không dùng nữa.)
+                "geo_manager": "ALTER TABLE projects ADD COLUMN geo_manager VARCHAR(255)",
+                "dosco_manager": "ALTER TABLE projects ADD COLUMN dosco_manager VARCHAR(255)",
             }
             pmissing = [sql for col, sql in padds.items() if col not in pcols]
             if pmissing:

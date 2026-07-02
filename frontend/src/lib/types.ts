@@ -59,10 +59,8 @@ export interface Project {
   code: string;                       // 管理番号 (mã quản lý)
   name: string;                       // プロジェクト名
   group_name?: string | null;         // グループ (nhóm)
-  geo_manager_id?: number | null;     // GEO担当
-  dosco_manager_id?: number | null;   // DOSCO担当
-  geo_manager_name?: string | null;
-  dosco_manager_name?: string | null;
+  geo_manager?: string | null;        // GEO担当 (tên, text)
+  dosco_manager?: string | null;      // DOSCO担当 (tên, text)
   location?: string | null;
   manager_name?: string | null;
   lead_id?: number | null;

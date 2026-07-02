@@ -73,8 +73,8 @@ export default function ProjectDetailPage() {
   const [membersModal, setMembersModal] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
-  const [selectedGeoId, setSelectedGeoId] = useState<number | null>(null);       // GEO担当
-  const [selectedDoscoId, setSelectedDoscoId] = useState<number | null>(null);   // DOSCO担当
+  const [geoInput, setGeoInput] = useState("");       // GEO担当 (text)
+  const [doscoInput, setDoscoInput] = useState("");   // DOSCO担当 (text)
   const [groupNameInput, setGroupNameInput] = useState<string>("");              // グループ
   const [savingMembers, setSavingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -208,8 +208,8 @@ export default function ProjectDetailPage() {
     if (project) {
       setSelectedMemberIds(project.members?.map((m) => m.id) ?? []);
       setSelectedLeadId(project.lead_id ?? null);
-      setSelectedGeoId(project.geo_manager_id ?? null);
-      setSelectedDoscoId(project.dosco_manager_id ?? null);
+      setGeoInput(project.geo_manager ?? "");
+      setDoscoInput(project.dosco_manager ?? "");
       setGroupNameInput(project.group_name ?? "");
     }
   }, [project]);
@@ -233,8 +233,8 @@ export default function ProjectDetailPage() {
       await api.updateProject(project.id, {
         member_ids: memberIds,
         lead_id: selectedLeadId,
-        geo_manager_id: selectedGeoId,
-        dosco_manager_id: selectedDoscoId,
+        geo_manager: geoInput.trim() || null,
+        dosco_manager: doscoInput.trim() || null,
         group_name: groupNameInput.trim() || null,
       });
       setMembersModal(false);
@@ -489,16 +489,16 @@ export default function ProjectDetailPage() {
               Nhóm: <span className="font-medium text-ink">{project.group_name}</span>
             </p>
           )}
-          {project.geo_manager_name && (
+          {project.geo_manager && (
             <p className="flex items-center gap-1.5">
               <UserIcon className="h-4 w-4 text-muted/80" />
-              GEO担当: <span className="font-medium text-ink">{project.geo_manager_name}</span>
+              GEO担当: <span className="font-medium text-ink">{project.geo_manager}</span>
             </p>
           )}
-          {project.dosco_manager_name && (
+          {project.dosco_manager && (
             <p className="flex items-center gap-1.5">
               <UserIcon className="h-4 w-4 text-muted/80" />
-              DOSCO担当: <span className="font-medium text-ink">{project.dosco_manager_name}</span>
+              DOSCO担当: <span className="font-medium text-ink">{project.dosco_manager}</span>
             </p>
           )}
           {project.start_date && (
@@ -1227,25 +1227,21 @@ export default function ProjectDetailPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</label>
-                    <select
-                      value={selectedGeoId ?? ""}
-                      onChange={(e) => setSelectedGeoId(e.target.value === "" ? null : Number(e.target.value))}
-                      className="w-full rounded-lg border border-line bg-white px-2 py-2 text-xs outline-none focus:border-steel"
-                    >
-                      <option value="">— Chưa chọn —</option>
-                      {allUsers.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                    </select>
+                    <input
+                      value={geoInput}
+                      onChange={(e) => setGeoInput(e.target.value)}
+                      placeholder="VD: 池上 / 宮本"
+                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当</label>
-                    <select
-                      value={selectedDoscoId ?? ""}
-                      onChange={(e) => setSelectedDoscoId(e.target.value === "" ? null : Number(e.target.value))}
-                      className="w-full rounded-lg border border-line bg-white px-2 py-2 text-xs outline-none focus:border-steel"
-                    >
-                      <option value="">— Chưa chọn —</option>
-                      {allUsers.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                    </select>
+                    <input
+                      value={doscoInput}
+                      onChange={(e) => setDoscoInput(e.target.value)}
+                      placeholder="VD: DUC / CAO"
+                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
                   </div>
                 </div>
               </div>
