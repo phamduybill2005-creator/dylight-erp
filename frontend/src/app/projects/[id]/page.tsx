@@ -60,6 +60,7 @@ export default function ProjectDetailPage() {
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [mgrs, setMgrs] = useState<{ geo: string[]; dosco: string[] }>({ geo: [], dosco: [] });
 
   // Nhân viên (STAFF) không được xem TIỀN của dự án. Backend là nguồn chân lý
   // (chặn GET hợp đồng/thanh toán/hóa đơn với STAFF, mask khối lượng/đơn giá hạng mục);
@@ -185,6 +186,7 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (canManage && allUsers.length === 0) {
       api.users().then(setAllUsers).catch(() => {});
+      api.projectManagers().then(setMgrs).catch(() => {});
     }
   }, [canManage, allUsers.length]);
 
@@ -1226,23 +1228,27 @@ export default function ProjectDetailPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</label>
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当 (chọn hoặc gõ)</label>
                     <input
+                      list="geo-mgr-list"
                       value={geoInput}
                       onChange={(e) => setGeoInput(e.target.value)}
-                      placeholder="VD: 池上 / 宮本"
+                      placeholder="Bấm để chọn…"
                       className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当</label>
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当 (chọn hoặc gõ)</label>
                     <input
+                      list="dosco-mgr-list"
                       value={doscoInput}
                       onChange={(e) => setDoscoInput(e.target.value)}
-                      placeholder="VD: DUC / CAO"
+                      placeholder="Bấm để chọn…"
                       className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     />
                   </div>
+                  <datalist id="geo-mgr-list">{mgrs.geo.map((n) => <option key={n} value={n} />)}</datalist>
+                  <datalist id="dosco-mgr-list">{mgrs.dosco.map((n) => <option key={n} value={n} />)}</datalist>
                 </div>
               </div>
 

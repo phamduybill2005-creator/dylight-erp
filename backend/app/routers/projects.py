@@ -11,7 +11,7 @@ Nguyên tắc quyền:
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -86,6 +86,19 @@ def list_projects(db: Session = Depends(get_db), current: User = Depends(get_cur
         )
     projects = q.order_by(Project.created_at.desc()).all()
     return [_to_out(db, p) for p in projects]
+
+
+@router.get("/managers")
+def list_project_managers(db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    """Danh sách các GEO担当 / DOSCO担当 ĐÃ dùng (để CHỌN khi tạo/sửa dự án, khỏi gõ tay)."""
+    def _distinct(col):
+        rows = (
+            db.query(distinct(col))
+            .filter(Project.company_id == current.company_id, col.isnot(None), col != "")
+            .all()
+        )
+        return sorted(r[0] for r in rows)
+    return {"geo": _distinct(Project.geo_manager), "dosco": _distinct(Project.dosco_manager)}
 
 
 @router.post("", response_model=ProjectOut, status_code=201)

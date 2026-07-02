@@ -135,6 +135,7 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   deleteProject: (id: number) => request<void>(`/projects/${id}`, { method: "DELETE" }),
+  projectManagers: () => request<{ geo: string[]; dosco: string[] }>("/projects/managers"),
   createProject: (payload: Partial<Project>) =>
     request<Project>("/projects", {
       method: "POST",

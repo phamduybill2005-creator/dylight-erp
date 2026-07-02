@@ -40,6 +40,8 @@ export default function ProjectsPage() {
   const [nfGroup, setNfGroup] = useState("");
   const [nfGeo, setNfGeo] = useState("");
   const [nfDosco, setNfDosco] = useState("");
+  // Danh sách GEO担当 / DOSCO担当 đã dùng -> để CHỌN (datalist) khỏi gõ tay.
+  const [mgrs, setMgrs] = useState<{ geo: string[]; dosco: string[] }>({ geo: [], dosco: [] });
 
   // Người chủ trì (lead) áp dụng cho các dự án tạo trong đợt này (tùy chọn).
   const [leadId, setLeadId] = useState<number | "">("");
@@ -68,6 +70,8 @@ export default function ProjectsPage() {
           setCanManage(true);
           // Danh sách nhân sự để chọn người chủ trì khi tạo dự án.
           api.users().then((d) => alive && setUsers(d)).catch(() => {});
+          // Danh sách GEO担当/DOSCO担当 đã dùng để chọn nhanh.
+          api.projectManagers().then((d) => alive && setMgrs(d)).catch(() => {});
         }
         const director = isDirector(me.role);
         if (director) setShowFinance(true);
@@ -358,15 +362,17 @@ export default function ProjectsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <label className="block">
-                      <span className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</span>
-                      <input value={nfGeo} onChange={(e) => setNfGeo(e.target.value)} placeholder="VD: 池上 / 宮本"
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">GEO担当 (chọn hoặc gõ)</span>
+                      <input list="geo-mgr-list" value={nfGeo} onChange={(e) => setNfGeo(e.target.value)} placeholder="Bấm để chọn…"
                         className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
                     </label>
                     <label className="block">
-                      <span className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当</span>
-                      <input value={nfDosco} onChange={(e) => setNfDosco(e.target.value)} placeholder="VD: DUC / CAO"
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当 (chọn hoặc gõ)</span>
+                      <input list="dosco-mgr-list" value={nfDosco} onChange={(e) => setNfDosco(e.target.value)} placeholder="Bấm để chọn…"
                         className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
                     </label>
+                    <datalist id="geo-mgr-list">{mgrs.geo.map((n) => <option key={n} value={n} />)}</datalist>
+                    <datalist id="dosco-mgr-list">{mgrs.dosco.map((n) => <option key={n} value={n} />)}</datalist>
                   </div>
                   {canManage && (
                     <label className="block">
