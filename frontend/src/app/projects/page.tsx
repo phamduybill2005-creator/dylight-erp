@@ -119,7 +119,10 @@ export default function ProjectsPage() {
 
   async function handleBulkCreate() {
     const items = parseBulk(bulkText, projects.length);
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      setAddResult("Hãy nhập ít nhất 1 dòng — mỗi dòng một dự án (tối thiểu là tên dự án).");
+      return;
+    }
     setCreating(true);
     setAddResult("");
     const lead = leadId === "" ? {} : { lead_id: Number(leadId) };
@@ -312,7 +315,7 @@ export default function ProjectsPage() {
                 </button>
                 <button
                   onClick={handleBulkCreate}
-                  disabled={creating || previewCount === 0}
+                  disabled={creating}
                   className="inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50"
                 >
                   {creating ? "Đang tạo…" : <><CheckIcon className="h-4 w-4" /> Tạo {previewCount} dự án</>}
