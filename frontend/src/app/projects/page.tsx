@@ -27,11 +27,19 @@ export default function ProjectsPage() {
   const [profit, setProfit] = useState<Record<number, ProjectProfit>>({});
   const [showFinance, setShowFinance] = useState(false);
 
-  // Thêm nhanh nhiều dự án (dán từ Excel / gõ mỗi dòng 1 dự án).
+  // Thêm dự án — mặc định FORM từng ô; "bulk" = dán nhiều dòng từ Excel (tùy chọn).
   const [showAdd, setShowAdd] = useState(false);
+  const [addMode, setAddMode] = useState<"form" | "bulk">("form");
   const [bulkText, setBulkText] = useState("");
   const [creating, setCreating] = useState(false);
   const [addResult, setAddResult] = useState("");
+
+  // FORM 1 dự án — từng ô riêng.
+  const [nfCode, setNfCode] = useState("");
+  const [nfName, setNfName] = useState("");
+  const [nfGroup, setNfGroup] = useState("");
+  const [nfGeo, setNfGeo] = useState<number | "">("");
+  const [nfDosco, setNfDosco] = useState<number | "">("");
 
   // Người chủ trì (lead) áp dụng cho các dự án tạo trong đợt này (tùy chọn).
   const [leadId, setLeadId] = useState<number | "">("");
@@ -135,6 +143,33 @@ export default function ProjectsPage() {
     );
     if (fails.length === 0) setBulkText("");
     setCreating(false);
+  }
+
+  // Tạo 1 dự án qua FORM từng ô riêng.
+  async function handleCreateOne() {
+    const name = nfName.trim();
+    if (!name) { setAddResult("Vui lòng nhập Tên dự án."); return; }
+    setCreating(true);
+    setAddResult("");
+    try {
+      const created = await api.createProject({
+        code: nfCode.trim() || `DA${String(projects.length + 1).padStart(3, "0")}`,
+        name,
+        group_name: nfGroup.trim() || null,
+        geo_manager_id: nfGeo === "" ? null : Number(nfGeo),
+        dosco_manager_id: nfDosco === "" ? null : Number(nfDosco),
+        lead_id: leadId === "" ? null : Number(leadId),
+      });
+      const fresh = await api.projects().catch(() => null);
+      if (fresh) setProjects(fresh);
+      // Reset để nhập dự án kế tiếp nhanh.
+      setNfCode(""); setNfName(""); setNfGroup(""); setNfGeo(""); setNfDosco("");
+      setAddResult(`✓ Đã tạo dự án "${created.name}".`);
+    } catch (e) {
+      setAddResult(e instanceof Error ? e.message : "Tạo dự án thất bại.");
+    } finally {
+      setCreating(false);
+    }
   }
 
   const TH = "border border-line px-3 py-2 font-semibold whitespace-nowrap";
@@ -276,64 +311,119 @@ export default function ProjectsPage() {
               </button>
             </header>
 
-            <div className="flex-1 space-y-3 overflow-y-auto p-4">
-              <p className="text-xs text-muted">
-                Dán hoặc gõ <b className="text-ink">mỗi dòng một dự án</b>. Mỗi dòng theo thứ tự:{" "}
-                <b className="text-ink">Mã QL, Tên dự án, Nhóm</b> — ngăn cách bằng dấu phẩy hoặc Tab
-                (dán thẳng từ Excel được). Mã QL / Nhóm có thể bỏ trống (mã tự sinh nếu thiếu).
-                <br />
-                <span className="text-[11px]">GEO担当 và DOSCO担当 chọn sau trong từng dự án (bấm vào dự án để gán).</span>
-              </p>
-              <div className="rounded-xl2 bg-white p-3 font-mono text-[11px] leading-relaxed text-muted shadow-card">
-                QL-01, Cầu Sông Hàn, Nhóm A<br />
-                QL-02, Đường tránh QL1, Nhóm B<br />
-                , Kè chống sạt lở Sông Thu
-              </div>
-              {canManage && (
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold text-muted">
-                    Người chủ trì (chỉ huy trưởng) — áp dụng cho tất cả dự án tạo lần này
-                  </label>
-                  <select
-                    value={leadId}
-                    onChange={(e) => setLeadId(e.target.value === "" ? "" : Number(e.target.value))}
-                    className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
-                  >
-                    <option value="">— Chưa chỉ định —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <textarea
-                value={bulkText}
-                onChange={(e) => setBulkText(e.target.value)}
-                rows={12}
-                className="w-full rounded-xl2 border border-line bg-white px-3 py-2 font-mono text-xs outline-none focus:border-steel"
-                placeholder={"CĐ-01, Cầu Sông Hàn, Đà Nẵng\nĐB-02, Đường tránh QL1, Quảng Nam"}
-              />
-              {addResult && <p className="text-xs font-medium text-ink">{addResult}</p>}
+            {/* Chọn cách thêm: điền từng ô (mặc định) hoặc dán nhiều dòng */}
+            <div className="flex gap-2 border-b border-line bg-white px-4 py-2">
+              <button
+                onClick={() => { setAddMode("form"); setAddResult(""); }}
+                className={`flex-1 rounded-xl2 py-1.5 text-xs font-semibold ${addMode === "form" ? "bg-ink text-white" : "border border-line text-muted hover:bg-paper"}`}
+              >
+                Điền từng ô
+              </button>
+              <button
+                onClick={() => { setAddMode("bulk"); setAddResult(""); }}
+                className={`flex-1 rounded-xl2 py-1.5 text-xs font-semibold ${addMode === "bulk" ? "bg-ink text-white" : "border border-line text-muted hover:bg-paper"}`}
+              >
+                Dán nhiều dòng (Excel)
+              </button>
             </div>
 
-            <footer className="flex items-center justify-between gap-3 border-t border-line bg-white p-4">
-              <span className="text-[11px] text-muted">
-                Sẽ tạo <b className="text-ink">{previewCount}</b> dự án
-              </span>
-              <div className="flex gap-2">
-                <button onClick={() => setShowAdd(false)} className="rounded-xl2 border border-line px-4 py-2.5 text-xs font-semibold text-muted hover:bg-paper">
-                  Đóng
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              {addMode === "form" ? (
+                <>
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-semibold text-muted">Tên dự án <span className="text-bad">*</span></span>
+                    <input value={nfName} onChange={(e) => setNfName(e.target.value)} placeholder="VD: Cầu Sông Hàn"
+                      className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">Mã QL (管理番号)</span>
+                      <input value={nfCode} onChange={(e) => setNfCode(e.target.value)} placeholder="Tự sinh nếu trống"
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</span>
+                      <input value={nfGroup} onChange={(e) => setNfGroup(e.target.value)} placeholder="VD: Nhóm A"
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</span>
+                      <select value={nfGeo} onChange={(e) => setNfGeo(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full rounded-xl2 border border-line bg-white px-2 py-2 text-xs outline-none focus:border-steel">
+                        <option value="">— Chưa chọn —</option>
+                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当</span>
+                      <select value={nfDosco} onChange={(e) => setNfDosco(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full rounded-xl2 border border-line bg-white px-2 py-2 text-xs outline-none focus:border-steel">
+                        <option value="">— Chưa chọn —</option>
+                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  {canManage && (
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">Người chủ trì (chỉ huy trưởng)</span>
+                      <select value={leadId} onChange={(e) => setLeadId(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
+                        <option value="">— Chưa chỉ định —</option>
+                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {addResult && <p className={`text-xs font-medium ${addResult.startsWith("✓") ? "text-ok" : "text-bad"}`}>{addResult}</p>}
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted">
+                    Dán hoặc gõ <b className="text-ink">mỗi dòng một dự án</b>, theo thứ tự{" "}
+                    <b className="text-ink">Mã QL, Tên dự án, Nhóm</b> (ngăn cách bằng phẩy/Tab; dán thẳng từ Excel).
+                    GEO担当/DOSCO担当 gán sau trong từng dự án.
+                  </p>
+                  <div className="rounded-xl2 bg-white p-3 font-mono text-[11px] leading-relaxed text-muted shadow-card">
+                    QL-01, Cầu Sông Hàn, Nhóm A<br />
+                    QL-02, Đường tránh QL1, Nhóm B
+                  </div>
+                  {canManage && (
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">Người chủ trì — áp dụng cho tất cả dự án tạo lần này</span>
+                      <select value={leadId} onChange={(e) => setLeadId(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
+                        <option value="">— Chưa chỉ định —</option>
+                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={10}
+                    className="w-full rounded-xl2 border border-line bg-white px-3 py-2 font-mono text-xs outline-none focus:border-steel"
+                    placeholder={"QL-01, Cầu Sông Hàn, Nhóm A\nQL-02, Đường tránh QL1, Nhóm B"} />
+                  {addResult && <p className="text-xs font-medium text-ink">{addResult}</p>}
+                </>
+              )}
+            </div>
+
+            <footer className="flex items-center justify-end gap-2 border-t border-line bg-white p-4">
+              {addMode === "bulk" && (
+                <span className="mr-auto text-[11px] text-muted">Sẽ tạo <b className="text-ink">{previewCount}</b> dự án</span>
+              )}
+              <button onClick={() => setShowAdd(false)} className="rounded-xl2 border border-line px-4 py-2.5 text-xs font-semibold text-muted hover:bg-paper">
+                Đóng
+              </button>
+              {addMode === "form" ? (
+                <button onClick={handleCreateOne} disabled={creating}
+                  className="inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50">
+                  {creating ? "Đang tạo…" : <><CheckIcon className="h-4 w-4" /> Tạo dự án</>}
                 </button>
-                <button
-                  onClick={handleBulkCreate}
-                  disabled={creating}
-                  className="inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50"
-                >
+              ) : (
+                <button onClick={handleBulkCreate} disabled={creating}
+                  className="inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50">
                   {creating ? "Đang tạo…" : <><CheckIcon className="h-4 w-4" /> Tạo {previewCount} dự án</>}
                 </button>
-              </div>
+              )}
             </footer>
           </div>
         </div>
