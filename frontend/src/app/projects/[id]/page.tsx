@@ -77,6 +77,10 @@ export default function ProjectDetailPage() {
   const [geoInput, setGeoInput] = useState("");       // GEO担当 (text)
   const [doscoInput, setDoscoInput] = useState("");   // DOSCO担当 (text)
   const [groupNameInput, setGroupNameInput] = useState<string>("");              // グループ
+  const [codeInput, setCodeInput] = useState("");     // 管理番号 (mã QL)
+  const [nameInput, setNameInput] = useState("");     // プロジェクト名 (tên dự án)
+  const [startInput, setStartInput] = useState("");   // ngày bắt đầu YYYY-MM-DD
+  const [endInput, setEndInput] = useState("");       // ngày kết thúc YYYY-MM-DD
   const [savingMembers, setSavingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -213,6 +217,10 @@ export default function ProjectDetailPage() {
       setGeoInput(project.geo_manager ?? "");
       setDoscoInput(project.dosco_manager ?? "");
       setGroupNameInput(project.group_name ?? "");
+      setCodeInput(project.code ?? "");
+      setNameInput(project.name ?? "");
+      setStartInput(project.start_date ?? "");
+      setEndInput(project.end_date ?? "");
     }
   }, [project]);
 
@@ -224,6 +232,12 @@ export default function ProjectDetailPage() {
 
   async function handleSaveMembers() {
     if (!project) return;
+    // Tên dự án bắt buộc; ngày kết thúc không được trước ngày bắt đầu.
+    if (!nameInput.trim()) { setError("Tên dự án không được để trống."); return; }
+    if (startInput && endInput && endInput < startInput) {
+      setError("Ngày kết thúc phải sau ngày bắt đầu.");
+      return;
+    }
     setSavingMembers(true);
     setError(null);
     try {
@@ -235,6 +249,10 @@ export default function ProjectDetailPage() {
       await api.updateProject(project.id, {
         member_ids: memberIds,
         lead_id: selectedLeadId,
+        name: nameInput.trim(),
+        code: codeInput.trim() || project.code,   // không để trống mã (NOT NULL)
+        start_date: startInput || null,
+        end_date: endInput || null,
         geo_manager: geoInput.trim() || null,
         dosco_manager: doscoInput.trim() || null,
         group_name: groupNameInput.trim() || null,
@@ -242,7 +260,7 @@ export default function ProjectDetailPage() {
       setMembersModal(false);
       loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cập nhật thành viên thất bại.");
+      setError(err instanceof Error ? err.message : "Cập nhật dự án thất bại.");
     } finally {
       setSavingMembers(false);
     }
@@ -548,8 +566,8 @@ export default function ProjectDetailPage() {
                 onClick={() => setMembersModal(true)}
                 className="text-[11px] font-semibold text-steel hover:text-ink underline flex items-center gap-0.5"
               >
-                <PlusIcon className="h-3 w-3" />
-                Thành viên & chủ trì
+                <PencilSquareIcon className="h-3 w-3" />
+                Sửa dự án
               </button>
             )}
           </div>
@@ -1224,12 +1242,12 @@ export default function ProjectDetailPage() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-sm rounded-xl2 bg-white p-5 shadow-card"
+              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl2 bg-white p-5 shadow-card"
             >
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h3 className="text-sm font-bold text-ink flex items-center gap-1.5">
-                  <UsersIcon className="h-5 w-5 text-steel" />
-                  Thành viên & chủ trì
+                  <PencilSquareIcon className="h-5 w-5 text-steel" />
+                  Sửa dự án
                 </h3>
                 <button
                   onClick={() => setMembersModal(false)}
@@ -1239,9 +1257,48 @@ export default function ProjectDetailPage() {
                 </button>
               </div>
 
-              {/* Nhóm (グループ) + GEO担当 + DOSCO担当 */}
+              {/* Thông tin dự án: Tên / Mã QL / Thời gian bắt đầu–kết thúc */}
               <div className="mt-3 space-y-2.5">
                 <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Tên dự án (プロジェクト名) <span className="text-bad">*</span></label>
+                  <input
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Tên dự án"
+                    className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Mã quản lý (管理番号)</label>
+                  <input
+                    value={codeInput}
+                    onChange={(e) => setCodeInput(e.target.value)}
+                    placeholder="VD: NF-001"
+                    className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">Ngày bắt đầu</label>
+                    <input
+                      type="date"
+                      value={startInput}
+                      onChange={(e) => setStartInput(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">Ngày kết thúc</label>
+                    <input
+                      type="date"
+                      value={endInput}
+                      min={startInput || undefined}
+                      onChange={(e) => setEndInput(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
+                  </div>
+                </div>
+                <div className="border-t border-line/60 pt-2.5">
                   <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</label>
                   <input
                     value={groupNameInput}

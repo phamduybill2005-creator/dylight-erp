@@ -70,6 +70,13 @@ def _ensure_schema() -> None:
                     for sql in pmissing:
                         conn.execute(text(sql))
 
+        # Project_items: cột progress (% hoàn thành đầu việc) cho DB cũ — dùng tính tiến độ.
+        if "project_items" in insp.get_table_names():
+            picols = {c["name"] for c in insp.get_columns("project_items")}
+            if "progress" not in picols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE project_items ADD COLUMN progress NUMERIC DEFAULT 0"))
+
         # Conversations: cột project_id (nhóm chat gắn dự án) cho DB cũ.
         if "conversations" in insp.get_table_names():
             cvcols = {c["name"] for c in insp.get_columns("conversations")}

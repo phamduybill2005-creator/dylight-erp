@@ -16,6 +16,16 @@ const num = (v: unknown) => {
   return isNaN(n) ? 0 : n;
 };
 const lineAmount = (i: ProjectItem) => num(i.quantity) * num(i.unit_price);
+const clampPct = (v: unknown) => Math.max(0, Math.min(100, num(v)));
+
+/** Tiến độ 1 nhóm/dự án = bình quân % đầu việc con, ưu tiên theo trọng số thành tiền
+ * (giống backend). Chưa nhập tiền -> bình quân đều. Không có đầu việc con -> 0. */
+function rollupProgress(kids: ProjectItem[]): number {
+  if (!kids.length) return 0;
+  const totalAmt = kids.reduce((s, c) => s + lineAmount(c), 0);
+  if (totalAmt > 0) return kids.reduce((s, c) => s + clampPct(c.progress) * lineAmount(c), 0) / totalAmt;
+  return kids.reduce((s, c) => s + clampPct(c.progress), 0) / kids.length;
+}
 
 /** Ô nhập có lưu cục bộ để gõ mượt; chỉ commit (lưu DB) khi giá trị đổi và rời ô. */
 function EditableCell({
@@ -119,6 +129,8 @@ export default function ProjectItemsTab({
     items.filter((i) => i.parent_id === gid).sort((a, b) => a.order_index - b.order_index || a.id - b.id);
   const groupSubtotal = (gid: number) => childrenOf(gid).reduce((s, c) => s + lineAmount(c), 0);
   const grandTotal = items.filter((i) => i.parent_id != null).reduce((s, c) => s + lineAmount(c), 0);
+  // Tiến độ TỔNG của dự án = tính TỰ ĐỘNG từ các đầu việc con (khớp % ở đầu trang & danh sách).
+  const grandProgress = rollupProgress(items.filter((i) => i.parent_id != null));
 
   // ----- Mutations -----
   async function persist(id: number, patch: Partial<ProjectItem>) {
@@ -232,12 +244,13 @@ export default function ProjectItemsTab({
 
   // ----- Xuất Excel (CSV, BOM UTF-8) -----
   function exportCSV() {
-    const headers = ["STT", "Mã", "Tên hạng mục", "ĐVT", "Khối lượng", "Đơn giá", "Thành tiền", "Ghi chú"];
+    const headers = ["STT", "Mã", "Tên hạng mục", "ĐVT", "Khối lượng", "Đơn giá", "Thành tiền", "% HT", "Ghi chú"];
     const esc = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
     const rows: string[] = [];
     groups.forEach((g, gi) => {
       rows.push(
-        [gi + 1, esc(g.code), esc(g.name), "", "", "", groupSubtotal(g.id).toFixed(0), esc(g.note)].join(",")
+        [gi + 1, esc(g.code), esc(g.name), "", "", "", groupSubtotal(g.id).toFixed(0),
+         Math.round(rollupProgress(childrenOf(g.id))), esc(g.note)].join(",")
       );
       childrenOf(g.id).forEach((c, ci) => {
         rows.push(
@@ -249,12 +262,13 @@ export default function ProjectItemsTab({
             num(c.quantity),
             num(c.unit_price).toFixed(0),
             lineAmount(c).toFixed(0),
+            Math.round(clampPct(c.progress)),
             esc(c.note),
           ].join(",")
         );
       });
     });
-    rows.push(["", "", esc("TỔNG CỘNG"), "", "", "", grandTotal.toFixed(0), ""].join(","));
+    rows.push(["", "", esc("TỔNG CỘNG"), "", "", "", grandTotal.toFixed(0), Math.round(grandProgress), ""].join(","));
 
     const csv = "﻿" + [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -385,7 +399,7 @@ export default function ProjectItemsTab({
         <>
           {/* Bảng cuộn ngang trên mobile */}
           <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
-            <table className={`w-full border-collapse text-xs ${canSeeMoney ? "min-w-[680px]" : "min-w-[320px]"}`}>
+            <table className={`w-full border-collapse text-xs ${canSeeMoney ? "min-w-[820px]" : "min-w-[440px]"}`}>
               <thead>
                 <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
                   <th className="w-10 px-2 py-2 text-left font-semibold">STT</th>
@@ -394,6 +408,7 @@ export default function ProjectItemsTab({
                   {canSeeMoney && <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>}
                   {canSeeMoney && <th className="w-28 px-2 py-2 text-right font-semibold">Đơn giá</th>}
                   {canSeeMoney && <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>}
+                  <th className="w-32 px-2 py-2 text-left font-semibold">% Hoàn thành</th>
                   <th className="w-8 px-1 py-2" />
                 </tr>
               </thead>
@@ -407,6 +422,7 @@ export default function ProjectItemsTab({
                       groupIndex={gi}
                       kids={kids}
                       subtotal={groupSubtotal(g.id)}
+                      groupProgress={rollupProgress(kids)}
                       canSeeMoney={canSeeMoney}
                       onPersist={persist}
                       onAddChild={addChild}
@@ -416,17 +432,31 @@ export default function ProjectItemsTab({
                   );
                 })}
               </tbody>
-              {canSeeMoney && (
-                <tfoot>
-                  <tr className="border-t-2 border-ink bg-ink text-white">
-                    <td colSpan={5} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
-                      Tổng cộng dự toán
+              <tfoot>
+                <tr className="border-t-2 border-ink bg-ink text-white">
+                  {canSeeMoney ? (
+                    <>
+                      <td colSpan={5} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
+                        Tổng cộng dự toán
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(grandTotal)}</td>
+                    </>
+                  ) : (
+                    <td colSpan={3} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
+                      Tiến độ dự án
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(grandTotal)}</td>
-                    <td />
-                  </tr>
-                </tfoot>
-              )}
+                  )}
+                  <td className="px-2 py-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-2 min-w-[40px] flex-1 overflow-hidden rounded-full bg-white/25">
+                        <div className="h-full bg-amber" style={{ width: `${clampPct(grandProgress)}%` }} />
+                      </div>
+                      <span className="w-9 shrink-0 text-right text-xs font-bold tnum">{Math.round(grandProgress)}%</span>
+                    </div>
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
             </table>
           </div>
 
@@ -449,6 +479,7 @@ function GroupRows({
   groupIndex,
   kids,
   subtotal,
+  groupProgress,
   canSeeMoney,
   onPersist,
   onAddChild,
@@ -459,6 +490,7 @@ function GroupRows({
   groupIndex: number;
   kids: ProjectItem[];
   subtotal: number;
+  groupProgress: number;
   canSeeMoney: boolean;
   onPersist: (id: number, patch: Partial<ProjectItem>) => void;
   onAddChild: (g: ProjectItem) => void;
@@ -466,7 +498,8 @@ function GroupRows({
   busy: boolean;
 }) {
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
-  const contentCols = canSeeMoney ? 6 : 3;
+  // +1 cho cột "% Hoàn thành" (hiện với mọi vai trò).
+  const contentCols = canSeeMoney ? 7 : 4;
   return (
     <>
       {/* Dòng nhóm cha */}
@@ -490,6 +523,15 @@ function GroupRows({
         ) : (
           <td />
         )}
+        {/* Tiến độ nhóm (tự tính từ các đầu việc con) */}
+        <td className="px-2 py-1.5">
+          <div className="flex items-center gap-1.5">
+            <div className="h-1.5 min-w-[32px] flex-1 overflow-hidden rounded-full bg-line">
+              <div className="h-full bg-steel" style={{ width: `${clampPct(groupProgress)}%` }} />
+            </div>
+            <span className="w-8 shrink-0 text-right text-[10px] font-bold text-steel tnum">{Math.round(groupProgress)}%</span>
+          </div>
+        </td>
         <td className="px-1 py-1 text-center">
           <button
             onClick={() => onRemove(group)}
@@ -541,6 +583,24 @@ function GroupRows({
           {canSeeMoney && (
             <td className="whitespace-nowrap px-2 py-1 text-right text-xs font-semibold text-ink tnum">{formatVND(lineAmount(c))}</td>
           )}
+          {/* % Hoàn thành đầu việc — gõ trực tiếp (0..100). Ai cũng sửa được (không phải tiền). */}
+          <td className="px-1 py-0.5">
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 min-w-[28px] flex-1 overflow-hidden rounded-full bg-line">
+                <div className="h-full bg-ok" style={{ width: `${clampPct(c.progress)}%` }} />
+              </div>
+              <div className="w-11 shrink-0">
+                <EditableCell
+                  type="number"
+                  value={c.progress}
+                  onCommit={(v) => onPersist(c.id, { progress: clampPct(v) })}
+                  className="text-right"
+                  placeholder="0"
+                />
+              </div>
+              <span className="text-[10px] text-muted">%</span>
+            </div>
+          </td>
           <td className="px-1 py-1 text-center">
             <button
               onClick={() => onRemove(c)}

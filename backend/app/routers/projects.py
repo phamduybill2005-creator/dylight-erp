@@ -11,7 +11,7 @@ Nguyên tắc quyền:
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import distinct, func
+from sqlalchemy import distinct
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -56,13 +56,35 @@ def _can_manage(db: Session, project: Project, user: User) -> bool:
 
 
 def _progress_percent(db: Session, project_id: int) -> Decimal:
-    """% tiến độ THỰC = trung bình % của các mốc Progress (0 nếu chưa có mốc)."""
-    avg = (
-        db.query(func.avg(Progress.percent_complete))
-        .filter(Progress.project_id == project_id)
-        .scalar()
+    """% tiến độ THỰC của dự án = tính TỰ ĐỘNG từ các HẠNG MỤC (đầu việc con) đã liệt kê.
+
+    - Chỉ tính đầu việc con (parent_id != NULL); nhóm cha bỏ qua (tự cộng từ con).
+    - Ưu tiên bình quân THEO TRỌNG SỐ thành tiền (khối lượng × đơn giá) — hạng mục
+      giá trị lớn ảnh hưởng nhiều hơn. Nếu chưa nhập tiền (tổng = 0) thì bình quân đều.
+    - Chưa có hạng mục con nào -> 0%.
+    """
+    items = (
+        db.query(ProjectItem)
+        .filter(ProjectItem.project_id == project_id, ProjectItem.parent_id.isnot(None))
+        .all()
     )
-    return Decimal(avg).quantize(Decimal("0.1")) if avg is not None else Decimal(0)
+    if not items:
+        return Decimal(0)
+
+    def _amt(it: ProjectItem) -> Decimal:
+        return (it.quantity or Decimal(0)) * (it.unit_price or Decimal(0))
+
+    def _pct(it: ProjectItem) -> Decimal:
+        p = it.progress or Decimal(0)
+        return min(Decimal(100), max(Decimal(0), p))  # kẹp 0..100
+
+    total_amt = sum((_amt(i) for i in items), Decimal(0))
+    if total_amt > 0:
+        weighted = sum((_pct(i) * _amt(i) for i in items), Decimal(0))
+        pct = weighted / total_amt
+    else:
+        pct = sum((_pct(i) for i in items), Decimal(0)) / Decimal(len(items))
+    return Decimal(pct).quantize(Decimal("0.1"))
 
 
 def _to_out(db: Session, project: Project) -> ProjectOut:

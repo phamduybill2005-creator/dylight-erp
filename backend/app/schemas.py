@@ -330,6 +330,7 @@ class ProjectItemBase(BaseModel):
     unit: str | None = None
     quantity: Decimal = Decimal(0)
     unit_price: Decimal = Decimal(0)
+    progress: Decimal = Decimal(0)   # % hoàn thành đầu việc (0..100) — dùng tính tiến độ dự án
     note: str | None = None
 
 
@@ -346,6 +347,7 @@ class ProjectItemUpdate(BaseModel):
     unit: str | None = None
     quantity: Decimal | None = None
     unit_price: Decimal | None = None
+    progress: Decimal | None = None
     note: str | None = None
 
 

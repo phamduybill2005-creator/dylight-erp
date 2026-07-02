@@ -342,6 +342,7 @@ export interface ProjectItem {
   quantity: number;
   unit_price: number;
   amount: number;          // thành tiền = khối lượng × đơn giá (đầu việc con)
+  progress: number;        // % hoàn thành đầu việc (0..100) — dùng tính tiến độ dự án
   note?: string | null;
   created_at: string;
 }
