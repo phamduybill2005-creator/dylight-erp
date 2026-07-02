@@ -687,8 +687,7 @@ export default function ChatWidget() {
                   <div className="border-t border-line bg-white px-4 py-2">
                     <button
                       onClick={createGroup}
-                      disabled={!groupName.trim() || picked.length < 1}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-xl2 bg-ink py-2 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-xl2 bg-ink py-2 text-xs font-semibold text-white hover:bg-steel"
                     >
                       <UserGroupIcon className="h-4 w-4" /> Tạo nhóm ({picked.length})
                     </button>
