@@ -26,7 +26,7 @@ import {
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import { api } from "@/lib/api";
-import { canSeeMoney, roleTitle } from "@/lib/roles";
+import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate, formatCompactVND } from "@/lib/format";
 import type { Project, Contract, Payment, Progress, Invoice, PaymentType, PaymentDirection, User } from "@/lib/types";
 
@@ -251,6 +251,19 @@ export default function ProjectDetailPage() {
     window.dispatchEvent(new CustomEvent("open-project-chat", { detail: { projectId } }));
   }
 
+  async function handleDeleteProject() {
+    if (!project) return;
+    if (!window.confirm(
+      `Xoá dự án "${project.name}" và TOÀN BỘ dữ liệu của nó (hợp đồng, hóa đơn, thanh toán, hạng mục, tiến độ, chat dự án)?\n\nKhông thể hoàn tác.`
+    )) return;
+    try {
+      await api.deleteProject(projectId);
+      router.push("/projects");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xoá dự án thất bại.");
+    }
+  }
+
   async function handleDeleteProgress(id: number) {
     if (!window.confirm("Xóa mốc tiến độ này?")) return;
     try {
@@ -435,6 +448,16 @@ export default function ProjectDetailPage() {
               <ChatBubbleLeftRightIcon className="h-4 w-4" />
               Chat dự án
             </button>
+            {isDirector(currentUser?.role) && (
+              <button
+                onClick={handleDeleteProject}
+                title="Xoá dự án"
+                className="inline-flex items-center gap-1 rounded-xl2 border border-bad/40 bg-bad/10 px-2.5 py-1.5 text-[11px] font-semibold text-bad hover:bg-bad hover:text-white transition-colors"
+              >
+                <TrashIcon className="h-4 w-4" />
+                Xoá dự án
+              </button>
+            )}
             <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}>
               {PROJECT_STATUS[project.status]?.label}
             </span>

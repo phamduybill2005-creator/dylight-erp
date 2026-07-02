@@ -134,6 +134,7 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  deleteProject: (id: number) => request<void>(`/projects/${id}`, { method: "DELETE" }),
   createProject: (payload: Partial<Project>) =>
     request<Project>("/projects", {
       method: "POST",

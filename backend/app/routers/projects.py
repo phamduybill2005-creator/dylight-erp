@@ -16,7 +16,11 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Progress, Project, User, UserRole, project_members
+from app.models import (
+    Assignment, ChatMessage, Contract, Conversation, ConversationMember, DesignDocument,
+    Invoice, MessageReaction, Payment, Progress, Project, ProjectItem, User, UserRole,
+    project_members,
+)
 from app.schemas import (
     ProjectCreate, ProjectLeadSet, ProjectMemberChange, ProjectOut, ProjectUpdate,
 )
@@ -166,6 +170,53 @@ def update_project(
     db.commit()
     db.refresh(p)
     return _to_out(db, p)
+
+
+@router.delete("/{project_id}", status_code=204)
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Xoá dự án + TOÀN BỘ dữ liệu con (hợp đồng, hóa đơn, thanh toán, hạng mục,
+    tiến độ, giao việc, hồ sơ TK, nhóm chat của dự án). CHỈ Giám đốc/Quản trị."""
+    p = db.get(Project, project_id)
+    if not p or p.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy dự án.")
+    if not _is_director(current):
+        raise HTTPException(403, "Chỉ Giám đốc/Quản trị mới được xoá dự án.")
+
+    d = lambda q: q.delete(synchronize_session=False)  # noqa: E731
+
+    # 1) Nhóm chat gắn dự án -> xoá cảm xúc/tin/thành viên rồi tới phòng (không dựa DB cascade).
+    conv_ids = [r[0] for r in db.query(Conversation.id).filter(Conversation.project_id == project_id).all()]
+    if conv_ids:
+        msg_ids = [r[0] for r in db.query(ChatMessage.id).filter(ChatMessage.conversation_id.in_(conv_ids)).all()]
+        if msg_ids:
+            d(db.query(MessageReaction).filter(MessageReaction.message_id.in_(msg_ids)))
+            d(db.query(ChatMessage).filter(ChatMessage.id.in_(msg_ids)))
+        d(db.query(ConversationMember).filter(ConversationMember.conversation_id.in_(conv_ids)))
+        d(db.query(Conversation).filter(Conversation.id.in_(conv_ids)))
+
+    # 2) Thanh toán (theo hợp đồng của dự án) -> hợp đồng -> hóa đơn.
+    contract_ids = [r[0] for r in db.query(Contract.id).filter(Contract.project_id == project_id).all()]
+    if contract_ids:
+        d(db.query(Payment).filter(Payment.contract_id.in_(contract_ids)))
+    d(db.query(Contract).filter(Contract.project_id == project_id))
+    d(db.query(Invoice).filter(Invoice.project_id == project_id))
+
+    # 3) Hạng mục (tự tham chiếu: xoá con trước, rồi cha), tiến độ, giao việc, hồ sơ TK.
+    d(db.query(ProjectItem).filter(ProjectItem.project_id == project_id, ProjectItem.parent_id.isnot(None)))
+    d(db.query(ProjectItem).filter(ProjectItem.project_id == project_id))
+    d(db.query(Progress).filter(Progress.project_id == project_id))
+    d(db.query(Assignment).filter(Assignment.project_id == project_id))
+    d(db.query(DesignDocument).filter(DesignDocument.project_id == project_id))
+
+    # 4) Bảng thành viên (M2M) + chính dự án.
+    db.execute(project_members.delete().where(project_members.c.project_id == project_id))
+    db.delete(p)
+    db.commit()
+    return None
 
 
 @router.post("/{project_id}/members", response_model=ProjectOut)
