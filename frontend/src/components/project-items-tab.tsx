@@ -88,6 +88,17 @@ export default function ProjectItemsTab({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ----- Form "Thêm hạng mục" (nhập từng ô riêng, dễ dùng trên điện thoại) -----
+  const [showForm, setShowForm] = useState(false);
+  const [fGroupId, setFGroupId] = useState<string>("");   // "" = tạo nhóm mới
+  const [fNewGroup, setFNewGroup] = useState("");
+  const [fName, setFName] = useState("");
+  const [fUnit, setFUnit] = useState("");
+  const [fQty, setFQty] = useState("");
+  const [fPrice, setFPrice] = useState("");
+  const [formBusy, setFormBusy] = useState(false);
+  const [formMsg, setFormMsg] = useState("");
+
   const load = useCallback(() => {
     setLoading(true);
     api
@@ -162,6 +173,48 @@ export default function ProjectItemsTab({
     }
   }
 
+  // Thêm 1 hạng mục qua FORM (từng ô riêng). Giữ form mở để nhập nhiều dòng nhanh.
+  async function submitAddForm() {
+    const name = fName.trim();
+    if (!name) { setFormMsg("Nhập tên hạng mục."); return; }
+    const toNum = (s: string) => Number(String(s).replace(/\s/g, "").replace(",", ".")) || 0;
+    setFormBusy(true); setFormMsg("");
+    try {
+      // Nhóm cha: chọn nhóm có sẵn, hoặc tạo nhóm mới từ tên nhập.
+      let parentId: number;
+      if (fGroupId === "" || fGroupId === "new") {
+        const gname = fNewGroup.trim() || "Hạng mục";
+        const maxOrder = Math.max(0, ...groups.map((g) => g.order_index));
+        const g = await api.createProjectItem({ project_id: projectId, name: gname, order_index: maxOrder + 1 });
+        setItems((prev) => [...prev, g]);
+        parentId = g.id;
+        setFGroupId(String(g.id));   // lần sau thêm tiếp vào nhóm vừa tạo
+        setFNewGroup("");
+      } else {
+        parentId = Number(fGroupId);
+      }
+      const sibs = items.filter((i) => i.parent_id === parentId);
+      const maxOrder = Math.max(0, ...sibs.map((s) => s.order_index));
+      const child = await api.createProjectItem({
+        project_id: projectId,
+        parent_id: parentId,
+        name,
+        unit: fUnit.trim() || undefined,
+        quantity: canSeeMoney ? toNum(fQty) : 0,
+        unit_price: canSeeMoney ? toNum(fPrice) : 0,
+        order_index: maxOrder + 1,
+      });
+      setItems((prev) => [...prev, child]);
+      // Reset các ô để nhập dòng kế (giữ nhóm đang chọn).
+      setFName(""); setFUnit(""); setFQty(""); setFPrice("");
+      setFormMsg(`✓ Đã thêm "${name}".`);
+    } catch (e) {
+      setFormMsg(e instanceof Error ? e.message : "Thêm hạng mục thất bại.");
+    } finally {
+      setFormBusy(false);
+    }
+  }
+
   async function remove(item: ProjectItem) {
     const isGroup = item.parent_id == null;
     const msg = isGroup
@@ -231,17 +284,87 @@ export default function ProjectItemsTab({
             <p className="text-[11px] text-muted lg:text-xs">Tổng dự toán: <span className="font-bold text-ink tnum">{formatVND(grandTotal)}</span></p>
           )}
         </div>
-        {canSeeMoney && (
+        <div className="flex shrink-0 items-center gap-2">
           <button
-            onClick={exportCSV}
-            disabled={items.length === 0}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow hover:bg-ink transition-all disabled:opacity-50"
+            onClick={() => { setShowForm((s) => !s); setFormMsg(""); if (fGroupId === "" && groups.length > 0) setFGroupId(String(groups[0].id)); }}
+            className="flex items-center gap-1.5 rounded-xl2 bg-amber px-3 py-2 text-xs font-semibold text-ink shadow hover:bg-amber-deep hover:text-white transition-all"
           >
-            <ArrowDownTrayIcon className="h-4 w-4" />
-            Xuất Excel
+            <PlusIcon className="h-4 w-4" />
+            Thêm hạng mục
           </button>
-        )}
+          {canSeeMoney && (
+            <button
+              onClick={exportCSV}
+              disabled={items.length === 0}
+              className="flex items-center gap-1.5 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow hover:bg-ink transition-all disabled:opacity-50"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" />
+              Xuất Excel
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* FORM thêm hạng mục — mỗi thông số một ô riêng, dễ nhập (nhất là trên điện thoại) */}
+      {showForm && (
+        <div className="rounded-xl2 border border-amber/40 bg-amber/5 p-3 shadow-card lg:p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-muted">Nhóm hạng mục</span>
+              <select
+                value={fGroupId || "new"}
+                onChange={(e) => setFGroupId(e.target.value === "new" ? "" : e.target.value)}
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
+              >
+                {groups.map((g) => <option key={g.id} value={g.id}>{g.name || "(nhóm chưa đặt tên)"}</option>)}
+                <option value="new">➕ Tạo nhóm mới…</option>
+              </select>
+            </label>
+            {(fGroupId === "" || groups.length === 0) && (
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-muted">Tên nhóm mới</span>
+                <input value={fNewGroup} onChange={(e) => setFNewGroup(e.target.value)} placeholder="VD: Phần móng"
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+              </label>
+            )}
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-[11px] font-semibold text-muted">Tên đầu việc / công tác <span className="text-bad">*</span></span>
+              <input value={fName} onChange={(e) => setFName(e.target.value)} placeholder="VD: Đổ bê tông móng M1"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-muted">Đơn vị tính (ĐVT)</span>
+              <input value={fUnit} onChange={(e) => setFUnit(e.target.value)} placeholder="m³, m², kg, cái…"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+            </label>
+            {canSeeMoney && (
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-muted">Khối lượng</span>
+                <input value={fQty} onChange={(e) => setFQty(e.target.value)} inputMode="decimal" placeholder="VD: 12.5"
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+              </label>
+            )}
+            {canSeeMoney && (
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-[11px] font-semibold text-muted">Đơn giá (VND)</span>
+                <input value={fPrice} onChange={(e) => setFPrice(e.target.value)} inputMode="decimal" placeholder="VD: 1500000"
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+              </label>
+            )}
+          </div>
+          {formMsg && <p className={`mt-2 text-[11px] font-medium ${formMsg.startsWith("✓") ? "text-ok" : "text-bad"}`}>{formMsg}</p>}
+          <div className="mt-3 flex gap-2">
+            <button onClick={submitAddForm} disabled={formBusy}
+              className="flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50">
+              <PlusIcon className="h-4 w-4" /> {formBusy ? "Đang thêm…" : "Thêm vào bảng"}
+            </button>
+            <button onClick={() => { setShowForm(false); setFormMsg(""); }}
+              className="rounded-xl2 border border-line px-4 py-2 text-xs font-semibold text-muted hover:bg-paper">
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && <p className="rounded-lg bg-bad/10 px-3 py-2 text-xs text-bad">{error}</p>}
 
