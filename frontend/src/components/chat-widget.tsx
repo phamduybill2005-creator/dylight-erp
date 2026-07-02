@@ -340,8 +340,8 @@ export default function ChatWidget() {
       setCreateMsg("Nhóm cần có tên.");
       return;
     }
-    if (picked.length < 2) {
-      setCreateMsg("Nhóm cần ít nhất 2 người (ngoài bạn).");
+    if (picked.length < 1) {
+      setCreateMsg("Chọn ít nhất 1 người cho nhóm.");
       return;
     }
     setCreateMsg("");
@@ -687,7 +687,7 @@ export default function ChatWidget() {
                   <div className="border-t border-line bg-white px-4 py-2">
                     <button
                       onClick={createGroup}
-                      disabled={!groupName.trim() || picked.length < 2}
+                      disabled={!groupName.trim() || picked.length < 1}
                       className="flex w-full items-center justify-center gap-1.5 rounded-xl2 bg-ink py-2 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50"
                     >
                       <UserGroupIcon className="h-4 w-4" /> Tạo nhóm ({picked.length})

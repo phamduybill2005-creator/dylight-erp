@@ -200,7 +200,7 @@ def create_conversation(
     """
     Tạo/lấy phòng.
     - DIRECT: nếu đã tồn tại (theo direct_key) -> trả phòng cũ (idempotent).
-    - GROUP: bắt buộc title + >=2 member; tự thêm current làm member.
+    - GROUP: bắt buộc title + >=1 người khác; tự thêm current làm member.
     Validate mọi member cùng company_id.
     """
     ctype = (payload.type or "DIRECT").upper()
@@ -248,8 +248,9 @@ def create_conversation(
         title = (payload.title or "").strip()
         if not title:
             raise HTTPException(400, "Nhóm cần có tên.")
-        if len(other_ids) < 2:
-            raise HTTPException(400, "Nhóm cần ít nhất 2 người ngoài bạn.")
+        # Cho phép nhóm 2 người (bạn + ≥1 người) — giống Zalo; other_ids đã đảm bảo ≥1 ở trên.
+        if len(other_ids) < 1:
+            raise HTTPException(400, "Nhóm cần ít nhất 1 người khác ngoài bạn.")
         conv = Conversation(
             company_id=current.company_id,
             type=ConversationType.GROUP,
