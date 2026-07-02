@@ -102,12 +102,21 @@ export default function ProjectsPage() {
 
   // Mỗi dòng 1 dự án; cột ngăn cách bằng phẩy / Tab / ; / | :
   // Mã QL, Tên dự án, Nhóm, GEO担当, DOSCO担当 (dán thẳng từ Excel).
-  // Nếu cột ĐẦU là số thứ tự (番号) thì tự bỏ qua.
+  // Tự bỏ: dòng trống, dòng TIÊU ĐỀ (番号/管理番号/プロジェクト名…), và cột số thứ tự (番号) ở đầu.
   function parseBulk(text: string, startIndex: number) {
-    return text
+    const HEADER_HINTS = [
+      "管理番号", "プロジェクト名", "GEO担当", "DOSCO担当", "グループ", "番号",
+      "mã ql", "tên dự án",
+    ];
+    const isHeader = (line: string) => {
+      const low = line.toLowerCase();
+      return HEADER_HINTS.some((h) => low.includes(h.toLowerCase()));
+    };
+    const lines = text
       .split("\n")
       .map((l) => l.trim())
-      .filter(Boolean)
+      .filter((l) => l && !isHeader(l));   // bỏ dòng trống + dòng tiêu đề
+    return lines
       .map((line, idx) => {
         let parts = line.split(/[\t,;|]/).map((s) => s.trim());
         // Bỏ cột 番号 (số thứ tự) nếu dòng có >2 cột và cột đầu chỉ là số.
