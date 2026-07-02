@@ -36,7 +36,7 @@ function StatusBadge({ s }: { s: LeaveStatus }) {
 
 export default function LeavePage() {
   const router = useRouter();
-  const [me, setMe] = useState<User | null>(null);
+  const [me, setMe] = useState<User | null>(api.cachedUser());
   const [loading, setLoading] = useState(true);
 
   const [mine, setMine] = useState<LeaveRequest[]>([]);
@@ -88,7 +88,7 @@ export default function LeavePage() {
   }
 
   if (loading || !me) {
-    return <div className="flex min-h-screen items-center justify-center bg-paper"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div>;
+    return <AppShell><div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div></AppShell>;
   }
 
   const canApprove = isManagerUp(me.role);

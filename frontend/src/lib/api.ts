@@ -13,10 +13,14 @@ export const ASSET_BASE =
 
 const TOKEN_KEY = "dylight_token";
 
+// Cache người dùng hiện tại (/me) trong bộ nhớ để KHÔNG phải chờ mạng mỗi lần
+// chuyển trang -> hết "giật màn hình trắng". Chỉ tồn tại trong phiên SPA; reset khi đăng xuất.
+let cachedMe: User | null = null;
+
 export const tokenStore = {
   get: () => (typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null),
   set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  clear: () => { cachedMe = null; localStorage.removeItem(TOKEN_KEY); },
 };
 
 /** Hàm fetch lõi: chèn token, parse JSON, ném lỗi có thông điệp tiếng Việt. */
@@ -31,6 +35,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
   if (res.status === 401) {
+    cachedMe = null;
     tokenStore.clear();
     if (typeof window !== "undefined") window.location.href = "/login";
     throw new Error("Phiên đăng nhập đã hết hạn.");
@@ -73,7 +78,15 @@ export const api = {
     tokenStore.set(data.access_token);
     return data.access_token;
   },
-  me: () => request<User>("/auth/me"),
+  // Lấy người dùng hiện tại + LƯU CACHE. Trang gọi lại khi chuyển trang nhưng
+  // dùng cachedUser() để render ngay -> không nháy trắng trong lúc chờ mạng.
+  me: async () => {
+    const u = await request<User>("/auth/me");
+    cachedMe = u;
+    return u;
+  },
+  /** Người dùng đã nạp gần nhất (đồng bộ, không gọi mạng) — dùng làm state khởi tạo. */
+  cachedUser: (): User | null => cachedMe,
 
   // --- Dữ liệu ---
   companies: () => request<Company[]>("/companies"),

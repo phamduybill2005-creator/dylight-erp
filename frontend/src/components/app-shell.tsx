@@ -87,7 +87,7 @@ function deskNav(tier: Tier): NavLink[] {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(api.cachedUser());
   const [companies, setCompanies] = useState<Company[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
 

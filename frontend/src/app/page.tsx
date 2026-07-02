@@ -67,7 +67,7 @@ const fmtTime = (iso?: string | null) =>
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(api.cachedUser());
   const [projects, setProjects] = useState<Project[]>([]);
   const [kpi, setKpi] = useState<KpiSummary | null>(null);
   const [profit, setProfit] = useState<ProjectProfit[]>([]);
@@ -126,9 +126,9 @@ export default function DashboardPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-paper">
+      <AppShell><div className="flex min-h-[70vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" />
-      </div>
+      </div></AppShell>
     );
   }
 

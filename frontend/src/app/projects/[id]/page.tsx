@@ -57,7 +57,7 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "invoices" | "payments">("contracts");
 
   // Current user & company users
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   // Nhân viên (STAFF) không được xem TIỀN của dự án. Backend là nguồn chân lý

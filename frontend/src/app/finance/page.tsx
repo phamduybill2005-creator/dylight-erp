@@ -14,7 +14,7 @@ import type { FinanceSummary, DebtRow, User } from "@/lib/types";
 
 export default function FinancePage() {
   const router = useRouter();
-  const [me, setMe] = useState<User | null>(null);
+  const [me, setMe] = useState<User | null>(api.cachedUser());
   const [denied, setDenied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
@@ -44,7 +44,7 @@ export default function FinancePage() {
     );
   }
   if (loading || !me) {
-    return <div className="flex min-h-screen items-center justify-center bg-paper"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div>;
+    return <AppShell><div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div></AppShell>;
   }
 
   const totals = debts.reduce(

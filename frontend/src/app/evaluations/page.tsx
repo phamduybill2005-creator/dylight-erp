@@ -63,7 +63,7 @@ function EvalCard({ e, who }: { e: Evaluation; who: "evaluator" | "evaluatee" })
 
 export default function EvaluationsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(api.cachedUser());
   const [loading, setLoading] = useState(true);
 
   const [received, setReceived] = useState<Evaluation[]>([]);
@@ -143,9 +143,9 @@ export default function EvaluationsPage() {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-paper">
+      <AppShell><div className="flex min-h-[70vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" />
-      </div>
+      </div></AppShell>
     );
   }
 

@@ -31,7 +31,7 @@ export default function BidsPage() {
   const router = useRouter();
   const [bids, setBids] = useState<Bid[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [me, setMe] = useState<User | null>(null);
+  const [me, setMe] = useState<User | null>(api.cachedUser());
   const [loading, setLoading] = useState(true);
   // Chỉ Giám đốc thấy/đặt giá gói thầu (khớp backend). Quản lý vẫn theo dõi hồ sơ thầu.
   const showMoney = canSeeMoney(me?.role);

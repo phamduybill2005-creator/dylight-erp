@@ -25,7 +25,7 @@ import type { User, Role, Project, Assignment } from "@/lib/types";
 export default function EmployeesPage() {
   const router = useRouter();
   const nick = useNicknames();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -147,9 +147,9 @@ export default function EmployeesPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-paper">
+      <AppShell><div className="flex min-h-[70vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" />
-      </div>
+      </div></AppShell>
     );
   }
 

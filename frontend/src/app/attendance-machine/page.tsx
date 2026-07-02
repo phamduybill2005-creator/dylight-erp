@@ -39,7 +39,7 @@ function fmtDateTime(iso?: string | null): string {
 
 export default function AttendanceMachinePage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(api.cachedUser());
 
   // Đồng bộ Yunatt
   const [syncing, setSyncing] = useState(false);
@@ -121,9 +121,9 @@ export default function AttendanceMachinePage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-paper">
+      <AppShell><div className="flex min-h-[70vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" />
-      </div>
+      </div></AppShell>
     );
   }
 

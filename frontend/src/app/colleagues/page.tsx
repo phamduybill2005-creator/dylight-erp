@@ -22,7 +22,7 @@ import type { Colleague, User } from "@/lib/types";
 
 export default function ColleaguesPage() {
   const router = useRouter();
-  const [me, setMe] = useState<User | null>(null);
+  const [me, setMe] = useState<User | null>(api.cachedUser());
   const [list, setList] = useState<Colleague[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -78,9 +78,9 @@ export default function ColleaguesPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-paper">
+      <AppShell><div className="flex min-h-[70vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" />
-      </div>
+      </div></AppShell>
     );
   }
 

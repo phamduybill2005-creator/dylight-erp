@@ -33,7 +33,7 @@ const empty = {
 
 export default function PartnersPage() {
   const router = useRouter();
-  const [me, setMe] = useState<User | null>(null);
+  const [me, setMe] = useState<User | null>(api.cachedUser());
   const [denied, setDenied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -100,7 +100,7 @@ export default function PartnersPage() {
     );
   }
   if (loading || !me) {
-    return <div className="flex min-h-screen items-center justify-center bg-paper"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div>;
+    return <AppShell><div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div></AppShell>;
   }
 
   const shown = partners.filter((p) => filter === "ALL" || p.type === filter);

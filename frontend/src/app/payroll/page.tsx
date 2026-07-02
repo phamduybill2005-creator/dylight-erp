@@ -16,7 +16,7 @@ const monthStr = monthLocal;
 
 export default function PayrollPage() {
   const router = useRouter();
-  const [me, setMe] = useState<User | null>(null);
+  const [me, setMe] = useState<User | null>(api.cachedUser());
   const [denied, setDenied] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -92,7 +92,7 @@ export default function PayrollPage() {
     );
   }
   if (loading || !me) {
-    return <div className="flex min-h-screen items-center justify-center bg-paper"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div>;
+    return <AppShell><div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div></AppShell>;
   }
 
   const totals = rows.reduce((a, r) => ({ gross: a.gross + Number(r.gross), ins: a.ins + Number(r.insurance), pit: a.pit + Number(r.personal_income_tax), net: a.net + Number(r.net) }), { gross: 0, ins: 0, pit: 0, net: 0 });

@@ -64,7 +64,7 @@ export default function ProjectProgressPage() {
     );
   }
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-paper"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div>;
+    return <AppShell><div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div></AppShell>;
   }
 
   const TH = "border border-line px-3 py-2 font-semibold whitespace-nowrap text-left";

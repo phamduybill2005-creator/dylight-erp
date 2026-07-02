@@ -21,7 +21,7 @@ import type { User, Payroll } from "@/lib/types";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(api.cachedUser());
   const [loading, setLoading] = useState(true);
 
   // Phiếu lương của tôi (chỉ hiện khi Giám đốc đã bật chia sẻ).
@@ -62,9 +62,9 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-paper">
+      <AppShell><div className="flex min-h-[70vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" />
-      </div>
+      </div></AppShell>
     );
   }
 
