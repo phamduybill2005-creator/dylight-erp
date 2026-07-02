@@ -88,7 +88,8 @@ export default function ProjectsPage() {
   );
   const totalMargin = totals.contract > 0 ? (totals.profit / totals.contract) * 100 : 0;
 
-  // Mỗi dòng 1 dự án; các cột ngăn cách bằng dấu phẩy / Tab / ; / | : Mã, Tên, Địa điểm, Quản lý.
+  // Mỗi dòng 1 dự án; các cột ngăn cách bằng phẩy / Tab / ; / | : Mã QL, Tên dự án, Nhóm.
+  // (GEO担当 & DOSCO担当 chọn sau trong từng dự án — vì là người trong hệ thống.)
   function parseBulk(text: string, startIndex: number) {
     return text
       .split("\n")
@@ -98,19 +99,17 @@ export default function ProjectsPage() {
         const parts = line.split(/[\t,;|]/).map((s) => s.trim());
         let code = "";
         let name = "";
-        let location = "";
-        let manager_name = "";
+        let group_name = "";
         if (parts.length === 1) {
           name = parts[0];
         } else {
           code = parts[0] || "";
           name = parts[1] || "";
-          location = parts[2] || "";
-          manager_name = parts[3] || "";
+          group_name = parts[2] || "";
         }
         if (!name) name = code;
         if (!code) code = `DA${String(startIndex + idx + 1).padStart(3, "0")}`;
-        return { code, name, location: location || null, manager_name: manager_name || null };
+        return { code, name, group_name: group_name || null };
       })
       .filter((p) => p.name);
   }
@@ -141,7 +140,8 @@ export default function ProjectsPage() {
   const TH = "border border-line px-3 py-2 font-semibold whitespace-nowrap";
   const TD = "border border-line px-3 py-2 align-middle";
   // Số cột phần "thông tin" (trước các cột tiền) để gộp ô cho dòng TỔNG CỘNG.
-  const infoCols = 6;
+  // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Trạng thái, Tiến độ = 8 cột.
+  const infoCols = 8;
 
   return (
     <AppShell>
@@ -165,11 +165,13 @@ export default function ProjectsPage() {
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
               <th className={`${TH} w-10 text-center`}>STT</th>
-              <th className={TH}>Mã DA</th>
+              <th className={TH}>Mã QL</th>
               <th className={TH}>Tên dự án</th>
-              <th className={TH}>Địa điểm</th>
-              <th className={TH}>Quản lý</th>
+              <th className={TH}>Nhóm</th>
+              <th className={TH}>GEO担当</th>
+              <th className={TH}>DOSCO担当</th>
               <th className={TH}>Trạng thái</th>
+              <th className={TH}>Tiến độ</th>
               {showFinance && <th className={`${TH} text-right`}>Giá trị HĐ</th>}
               {showFinance && <th className={`${TH} text-right`}>Chi phí</th>}
               {showFinance && <th className={`${TH} text-right`}>Lãi / lỗ</th>}
@@ -198,12 +200,21 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-center text-muted tnum`}>{i + 1}</td>
                   <td className={`${TD} font-mono text-[12px] text-steel whitespace-nowrap`}>{p.code}</td>
                   <td className={`${TD} font-semibold text-ink`}>{p.name}</td>
-                  <td className={`${TD} text-muted`}>{p.location || "—"}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.manager_name || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.group_name || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager_name || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.dosco_manager_name || "—"}</td>
                   <td className={TD}>
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
                       {st.label}
                     </span>
+                  </td>
+                  <td className={`${TD} whitespace-nowrap`}>
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-line">
+                        <div className="h-full bg-steel" style={{ width: `${Math.max(0, Math.min(100, Math.round(Number(p.progress_percent ?? 0))))}%` }} />
+                      </div>
+                      <span className="text-[11px] tnum text-muted">{Math.round(Number(p.progress_percent ?? 0))}%</span>
+                    </div>
                   </td>
                   {showFinance && (
                     <td className={`${TD} text-right tnum whitespace-nowrap`}>
@@ -268,12 +279,14 @@ export default function ProjectsPage() {
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
               <p className="text-xs text-muted">
                 Dán hoặc gõ <b className="text-ink">mỗi dòng một dự án</b>. Mỗi dòng theo thứ tự:{" "}
-                <b className="text-ink">Mã, Tên dự án, Địa điểm, Quản lý</b> — ngăn cách bằng dấu phẩy hoặc Tab
-                (dán thẳng từ Excel được). Mã / Địa điểm / Quản lý có thể bỏ trống (mã tự sinh nếu thiếu).
+                <b className="text-ink">Mã QL, Tên dự án, Nhóm</b> — ngăn cách bằng dấu phẩy hoặc Tab
+                (dán thẳng từ Excel được). Mã QL / Nhóm có thể bỏ trống (mã tự sinh nếu thiếu).
+                <br />
+                <span className="text-[11px]">GEO担当 và DOSCO担当 chọn sau trong từng dự án (bấm vào dự án để gán).</span>
               </p>
               <div className="rounded-xl2 bg-white p-3 font-mono text-[11px] leading-relaxed text-muted shadow-card">
-                CĐ-01, Cầu Sông Hàn, Đà Nẵng, Nguyễn Văn A<br />
-                ĐB-02, Đường tránh QL1, Quảng Nam<br />
+                QL-01, Cầu Sông Hàn, Nhóm A<br />
+                QL-02, Đường tránh QL1, Nhóm B<br />
                 , Kè chống sạt lở Sông Thu
               </div>
               {canManage && (

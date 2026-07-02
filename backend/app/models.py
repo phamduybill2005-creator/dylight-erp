@@ -215,6 +215,11 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(255))
     location: Mapped[str | None] = mapped_column(String(255))
     manager_name: Mapped[str | None] = mapped_column(String(255))
+    # グループ (nhóm dự án) — cột mới, ALTER ở _ensure_schema.
+    group_name: Mapped[str | None] = mapped_column(String(255))
+    # GEO担当 / DOSCO担当 — người phụ trách 2 bên (FK users, chọn từ nhân sự). Cột mới -> ALTER.
+    geo_manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    dosco_manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     # Người CHỦ TRÌ dự án (chỉ huy trưởng) — có toàn quyền quản lý thành viên & tiến độ.
     # Cột trên bảng ĐÃ TỒN TẠI -> phải ALTER ở _ensure_schema (create_all không tự thêm).
     lead_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -230,10 +235,20 @@ class Project(Base):
     progress_logs: Mapped[list["Progress"]] = relationship(back_populates="project")
     members: Mapped[list["User"]] = relationship("User", secondary=project_members, back_populates="projects")
     lead: Mapped["User | None"] = relationship("User", foreign_keys=[lead_id])
+    geo_manager: Mapped["User | None"] = relationship("User", foreign_keys=[geo_manager_id])
+    dosco_manager: Mapped["User | None"] = relationship("User", foreign_keys=[dosco_manager_id])
 
     @property
     def lead_name(self) -> str | None:
         return self.lead.full_name if self.lead else None
+
+    @property
+    def geo_manager_name(self) -> str | None:
+        return self.geo_manager.full_name if self.geo_manager else None
+
+    @property
+    def dosco_manager_name(self) -> str | None:
+        return self.dosco_manager.full_name if self.dosco_manager else None
 
 
 # --------------------------------------------------------------------------

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPinIcon,
   UserIcon,
+  UserGroupIcon,
   CalendarDaysIcon,
   PlusIcon,
   CheckBadgeIcon,
@@ -72,6 +73,9 @@ export default function ProjectDetailPage() {
   const [membersModal, setMembersModal] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+  const [selectedGeoId, setSelectedGeoId] = useState<number | null>(null);       // GEO担当
+  const [selectedDoscoId, setSelectedDoscoId] = useState<number | null>(null);   // DOSCO担当
+  const [groupNameInput, setGroupNameInput] = useState<string>("");              // グループ
   const [savingMembers, setSavingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -204,6 +208,9 @@ export default function ProjectDetailPage() {
     if (project) {
       setSelectedMemberIds(project.members?.map((m) => m.id) ?? []);
       setSelectedLeadId(project.lead_id ?? null);
+      setSelectedGeoId(project.geo_manager_id ?? null);
+      setSelectedDoscoId(project.dosco_manager_id ?? null);
+      setGroupNameInput(project.group_name ?? "");
     }
   }, [project]);
 
@@ -223,7 +230,13 @@ export default function ProjectDetailPage() {
         selectedLeadId != null && !selectedMemberIds.includes(selectedLeadId)
           ? [...selectedMemberIds, selectedLeadId]
           : selectedMemberIds;
-      await api.updateProject(project.id, { member_ids: memberIds, lead_id: selectedLeadId });
+      await api.updateProject(project.id, {
+        member_ids: memberIds,
+        lead_id: selectedLeadId,
+        geo_manager_id: selectedGeoId,
+        dosco_manager_id: selectedDoscoId,
+        group_name: groupNameInput.trim() || null,
+      });
       setMembersModal(false);
       loadData();
     } catch (err) {
@@ -445,6 +458,24 @@ export default function ProjectDetailPage() {
             <p className="flex items-center gap-1.5">
               <StarIcon className="h-4 w-4 text-amber" />
               Chủ trì: <span className="font-medium text-ink">{project.lead_name}</span>
+            </p>
+          )}
+          {project.group_name && (
+            <p className="flex items-center gap-1.5">
+              <UserGroupIcon className="h-4 w-4 text-muted/80" />
+              Nhóm: <span className="font-medium text-ink">{project.group_name}</span>
+            </p>
+          )}
+          {project.geo_manager_name && (
+            <p className="flex items-center gap-1.5">
+              <UserIcon className="h-4 w-4 text-muted/80" />
+              GEO担当: <span className="font-medium text-ink">{project.geo_manager_name}</span>
+            </p>
+          )}
+          {project.dosco_manager_name && (
+            <p className="flex items-center gap-1.5">
+              <UserIcon className="h-4 w-4 text-muted/80" />
+              DOSCO担当: <span className="font-medium text-ink">{project.dosco_manager_name}</span>
             </p>
           )}
           {project.start_date && (
@@ -1157,6 +1188,43 @@ export default function ProjectDetailPage() {
                 >
                   <XMarkIcon className="h-5 w-5" />
                 </button>
+              </div>
+
+              {/* Nhóm (グループ) + GEO担当 + DOSCO担当 */}
+              <div className="mt-3 space-y-2.5">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</label>
+                  <input
+                    value={groupNameInput}
+                    onChange={(e) => setGroupNameInput(e.target.value)}
+                    placeholder="VD: Nhóm A"
+                    className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</label>
+                    <select
+                      value={selectedGeoId ?? ""}
+                      onChange={(e) => setSelectedGeoId(e.target.value === "" ? null : Number(e.target.value))}
+                      className="w-full rounded-lg border border-line bg-white px-2 py-2 text-xs outline-none focus:border-steel"
+                    >
+                      <option value="">— Chưa chọn —</option>
+                      {allUsers.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当</label>
+                    <select
+                      value={selectedDoscoId ?? ""}
+                      onChange={(e) => setSelectedDoscoId(e.target.value === "" ? null : Number(e.target.value))}
+                      className="w-full rounded-lg border border-line bg-white px-2 py-2 text-xs outline-none focus:border-steel"
+                    >
+                      <option value="">— Chưa chọn —</option>
+                      {allUsers.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               <p className="mt-3 text-[11px] text-muted">

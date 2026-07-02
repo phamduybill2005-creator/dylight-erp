@@ -134,8 +134,11 @@ class BidOut(BidBase):
 
 # --------------------------- PROJECT ----------------------------
 class ProjectBase(BaseModel):
-    code: str
-    name: str
+    code: str                              # 管理番号 (mã quản lý)
+    name: str                              # プロジェクト名 (tên dự án)
+    group_name: str | None = None          # グループ (nhóm)
+    geo_manager_id: int | None = None      # GEO担当 (người phụ trách phía GEO)
+    dosco_manager_id: int | None = None    # DOSCO担当 (người phụ trách phía DOSCO)
     location: str | None = None
     manager_name: str | None = None
     lead_id: int | None = None            # người chủ trì (chỉ huy trưởng)
@@ -151,6 +154,10 @@ class ProjectCreate(ProjectBase):
 
 class ProjectUpdate(BaseModel):
     name: str | None = None
+    code: str | None = None               # 管理番号
+    group_name: str | None = None         # グループ
+    geo_manager_id: int | None = None     # GEO担当
+    dosco_manager_id: int | None = None   # DOSCO担当
     location: str | None = None
     manager_name: str | None = None
     lead_id: int | None = None            # đặt/gỡ người chủ trì
@@ -177,6 +184,8 @@ class ProjectOut(ProjectBase):
     created_at: datetime
     members: list[UserOut] = []
     lead_name: str | None = None          # tên người chủ trì (tiện hiển thị)
+    geo_manager_name: str | None = None   # tên GEO担当 (tiện hiển thị)
+    dosco_manager_name: str | None = None # tên DOSCO担当 (tiện hiển thị)
     # % tiến độ THỰC = trung bình % của các mốc Progress (bơm ở router, mặc định 0).
     progress_percent: Decimal = Decimal(0)
 

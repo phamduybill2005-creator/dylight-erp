@@ -53,12 +53,20 @@ def _ensure_schema() -> None:
                 for sql in missing:
                     conn.execute(text(sql))
 
-        # Projects: cột lead_id (người chủ trì dự án) cho DB cũ.
+        # Projects: cột lead_id + group_name/geo_manager_id/dosco_manager_id cho DB cũ.
         if "projects" in insp.get_table_names():
             pcols = {c["name"] for c in insp.get_columns("projects")}
-            if "lead_id" not in pcols:
+            padds = {
+                "lead_id": "ALTER TABLE projects ADD COLUMN lead_id INTEGER",
+                "group_name": "ALTER TABLE projects ADD COLUMN group_name VARCHAR(255)",
+                "geo_manager_id": "ALTER TABLE projects ADD COLUMN geo_manager_id INTEGER",
+                "dosco_manager_id": "ALTER TABLE projects ADD COLUMN dosco_manager_id INTEGER",
+            }
+            pmissing = [sql for col, sql in padds.items() if col not in pcols]
+            if pmissing:
                 with engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE projects ADD COLUMN lead_id INTEGER"))
+                    for sql in pmissing:
+                        conn.execute(text(sql))
 
         # Conversations: cột project_id (nhóm chat gắn dự án) cho DB cũ.
         if "conversations" in insp.get_table_names():

@@ -91,12 +91,14 @@ def create_project(
     current: User = Depends(get_current_user),
 ):
     data = payload.model_dump()
-    # Validate lead_id (nếu có) thuộc cùng công ty.
-    lead_id = data.get("lead_id")
-    if lead_id is not None:
-        lead = db.get(User, lead_id)
-        if not lead or lead.company_id != current.company_id:
-            raise HTTPException(400, "Người chủ trì không hợp lệ.")
+    # Validate mọi người liên quan (chủ trì / GEO担当 / DOSCO担当) đều thuộc cùng công ty.
+    for fld, label in (("lead_id", "Người chủ trì"), ("geo_manager_id", "GEO担当"),
+                       ("dosco_manager_id", "DOSCO担当")):
+        uid = data.get(fld)
+        if uid is not None:
+            u = db.get(User, uid)
+            if not u or u.company_id != current.company_id:
+                raise HTTPException(400, f"{label} không hợp lệ.")
     project = Project(**data, company_id=current.company_id)
     db.add(project)
     db.commit()
@@ -125,10 +127,17 @@ def update_project(
 
     data = payload.model_dump(exclude_unset=True)
 
-    # member_ids & lead_id là thao tác QUẢN TRỊ -> đòi quyền _can_manage.
-    touches_admin = ("member_ids" in data) or ("lead_id" in data)
+    # member_ids / lead_id / GEO担当 / DOSCO担当 là thao tác QUẢN TRỊ -> đòi quyền _can_manage.
+    touches_admin = any(k in data for k in ("member_ids", "lead_id", "geo_manager_id", "dosco_manager_id"))
     if touches_admin and not _can_manage(db, p, current):
-        raise HTTPException(403, "Bạn không có quyền quản lý thành viên/chủ trì dự án này.")
+        raise HTTPException(403, "Bạn không có quyền quản lý thành viên/người phụ trách dự án này.")
+
+    # Validate GEO担当 / DOSCO担当 (nếu có) thuộc cùng công ty; None = gỡ.
+    for fld, label in (("geo_manager_id", "GEO担当"), ("dosco_manager_id", "DOSCO担当")):
+        if fld in data and data[fld] is not None:
+            u = db.get(User, data[fld])
+            if not u or u.company_id != current.company_id:
+                raise HTTPException(400, f"{label} không hợp lệ.")
 
     if "member_ids" in data:
         member_ids = data.pop("member_ids")

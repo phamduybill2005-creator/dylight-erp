@@ -56,8 +56,13 @@ export interface Project {
   id: number;
   company_id: number;
   bid_id?: number | null;
-  code: string;
-  name: string;
+  code: string;                       // 管理番号 (mã quản lý)
+  name: string;                       // プロジェクト名
+  group_name?: string | null;         // グループ (nhóm)
+  geo_manager_id?: number | null;     // GEO担当
+  dosco_manager_id?: number | null;   // DOSCO担当
+  geo_manager_name?: string | null;
+  dosco_manager_name?: string | null;
   location?: string | null;
   manager_name?: string | null;
   lead_id?: number | null;
