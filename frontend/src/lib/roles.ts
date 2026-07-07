@@ -20,8 +20,8 @@ export const isManagerUp = (role: Role | undefined | null) => roleTier(role) !==
 
 /** Được xem TIỀN của dự án (giá trị HĐ, chi phí, thanh toán/công nợ, lãi/lỗ,
  *  khối lượng – đơn giá – thành tiền hạng mục).
- *  Theo yêu cầu chủ doanh nghiệp: CHỈ GIÁM ĐỐC thấy tiền — quản lý cấp cao/cấp
- *  trung + nhân viên đều KHÔNG. Khớp đúng can_see_money ở backend.
+ *  Theo yêu cầu chủ doanh nghiệp: CHỈ GIÁM ĐỐC thấy tiền — quản lý cấp trung
+ *  + nhân viên đều KHÔNG. Khớp đúng can_see_money ở backend.
  *  (Ngoại lệ: hóa đơn chi phí đầu vào "Hóa đơn AI" quản lý vẫn duyệt — gate riêng.) */
 export const canSeeMoney = (role: Role | undefined | null) => roleTier(role) === "DIRECTOR";
 
@@ -43,11 +43,13 @@ export const TIER_LABEL: Record<Tier, string> = {
 };
 
 /**
- * CHỨC VỤ hiển thị theo 3 tầng (khác ROLE_LABEL — vai trò hệ thống dùng cho dropdown):
- *   MANAGER                         -> "Quản lý cấp cao"
+ * CHỨC VỤ hiển thị (khác ROLE_LABEL — vai trò hệ thống dùng cho dropdown):
+ *   MANAGER                           -> "Quản lý cấp trung"
  *   FIELD_STAFF CÓ cấp dưới trực tiếp -> "Quản lý cấp trung"
  *   FIELD_STAFF KHÔNG cấp dưới        -> "Nhân viên"
  * ADMIN/DIRECTOR/ACCOUNTANT giữ nhãn vai trò gốc.
+ * Theo sơ đồ tổ chức DOSCO: dưới Giám đốc là các trưởng phòng = QUẢN LÝ CẤP TRUNG
+ * (không có tầng "quản lý cấp cao" — chỉ Ban Giám đốc mới trên cấp trung).
  * `hasSubordinates` do backend tính (User.has_subordinates).
  */
 export function roleTitle(
@@ -55,7 +57,7 @@ export function roleTitle(
   hasSubordinates?: boolean | null,
 ): string {
   if (!role) return "";
-  if (role === "MANAGER") return "Quản lý cấp cao";
+  if (role === "MANAGER") return "Quản lý cấp trung";
   if (role === "FIELD_STAFF") return hasSubordinates ? "Quản lý cấp trung" : "Nhân viên";
   return ROLE_LABEL[role] || role;
 }
