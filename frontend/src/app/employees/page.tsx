@@ -34,6 +34,20 @@ const PRESET_DEPARTMENTS = [
   "Phòng AI",
 ];
 
+// Một người có thể thuộc NHIỀU phòng cùng lúc — lưu trong cột `department`,
+// các phòng ngăn cách bởi dấu phẩy (VD: "Phòng BIM, Phòng AI").
+const splitDepts = (s?: string | null): string[] =>
+  (s || "").split(",").map((x) => x.trim()).filter(Boolean);
+const joinDepts = (arr: string[]): string =>
+  Array.from(new Set(arr.map((x) => x.trim()).filter(Boolean))).join(", ");
+const toggleDept = (current: string | null | undefined, dept: string): string => {
+  const set = splitDepts(current);
+  const i = set.indexOf(dept);
+  if (i >= 0) set.splice(i, 1);
+  else set.push(dept);
+  return joinDepts(set);
+};
+
 export default function EmployeesPage() {
   const router = useRouter();
   const nick = useNicknames();
@@ -202,7 +216,7 @@ export default function EmployeesPage() {
   // Gợi ý phòng ban: 4 phòng của công ty (cố định) + phòng nào đã có sẵn nhưng
   // chưa nằm trong danh sách cố định (giữ tương thích dữ liệu cũ). Tránh gõ lệch làm vỡ nhóm.
   const extraDepartments = Array.from(
-    new Set(users.map((u) => u.department?.trim()).filter((d): d is string => !!d))
+    new Set(users.flatMap((u) => splitDepts(u.department)))
   )
     .filter((d) => !PRESET_DEPARTMENTS.includes(d))
     .sort((a, b) => a.localeCompare(b, "vi"));
@@ -220,18 +234,21 @@ export default function EmployeesPage() {
   // GOM THEO PHÒNG BAN: mỗi phòng ban 1 nhóm; người phụ trách = quản lý trong phòng
   // (vai trò MANAGER, hoặc có cấp dưới, hoặc đang là quản lý trực tiếp của người khác trong phòng).
   function buildDepartmentGroups(): EmpGroup[] {
-    const map = new Map<string, User[]>();
+    // Một người thuộc nhiều phòng -> xuất hiện ở nhiều nhóm.
+    const map = new Map<string, { label: string; members: User[] }>();
     for (const u of filteredUsers) {
-      const dept = u.department?.trim();
-      const key = dept ? dept.toLowerCase() : "__none__";
-      const arr = map.get(key);
-      if (arr) arr.push(u);
-      else map.set(key, [u]);
+      const depts = splitDepts(u.department);
+      const entries = depts.length ? depts : ["__none__"];
+      for (const d of entries) {
+        const key = d === "__none__" ? "__none__" : d.toLowerCase();
+        const label = d === "__none__" ? "Chưa phân phòng ban" : d;
+        const g = map.get(key);
+        if (g) g.members.push(u);
+        else map.set(key, { label, members: [u] });
+      }
     }
     const groups: EmpGroup[] = [];
-    for (const [key, members] of map) {
-      const label =
-        key === "__none__" ? "Chưa phân phòng ban" : members[0].department?.trim() || "—";
+    for (const [key, { label, members }] of map) {
       const referenced = new Set(
         members.map((m) => m.manager_id).filter((x): x is number => !!x)
       );
@@ -796,17 +813,38 @@ export default function EmployeesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Bộ phận / Phòng ban</label>
+                  <label className="block text-[11px] font-semibold text-muted">
+                    Bộ phận / Phòng ban{" "}
+                    <span className="font-normal text-muted/70">(chọn 1 hoặc nhiều)</span>
+                  </label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {PRESET_DEPARTMENTS.map((d) => {
+                      const on = splitDepts(formData.department).includes(d);
+                      return (
+                        <button
+                          type="button"
+                          key={d}
+                          onClick={() => setFormData({ ...formData, department: toggleDept(formData.department, d) })}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                            on ? "border-steel bg-steel/10 text-steel" : "border-line text-muted hover:bg-paper"
+                          }`}
+                        >
+                          {on ? "✓ " : ""}
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <input
                     type="text"
                     list="dept-options"
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                    placeholder="VD: Phòng Thiết kế cầu / Tổ Khảo sát"
+                    className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    placeholder="VD: Phòng BIM, Phòng AI"
                   />
                   <p className="mt-1 text-[10px] text-muted">
-                    Chọn phòng ban có sẵn hoặc gõ tên mới. Dùng để gom nhân viên theo phòng ban.
+                    Người làm ở nhiều phòng (VD: BIM + AI) sẽ hiện ở cả các nhóm tương ứng.
                   </p>
                 </div>
               </div>
@@ -1071,14 +1109,35 @@ export default function EmployeesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Bộ phận / Phòng ban</label>
+                  <label className="block text-[11px] font-semibold text-muted">
+                    Bộ phận / Phòng ban{" "}
+                    <span className="font-normal text-muted/70">(chọn 1 hoặc nhiều)</span>
+                  </label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {PRESET_DEPARTMENTS.map((d) => {
+                      const on = splitDepts(createData.department).includes(d);
+                      return (
+                        <button
+                          type="button"
+                          key={d}
+                          onClick={() => setCreateData({ ...createData, department: toggleDept(createData.department, d) })}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                            on ? "border-steel bg-steel/10 text-steel" : "border-line text-muted hover:bg-paper"
+                          }`}
+                        >
+                          {on ? "✓ " : ""}
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <input
                     type="text"
                     list="dept-options"
                     value={createData.department}
                     onChange={(e) => setCreateData({ ...createData, department: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                    placeholder="VD: Phòng Thiết kế cầu"
+                    className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    placeholder="VD: Phòng BIM, Phòng AI"
                   />
                 </div>
               </div>
