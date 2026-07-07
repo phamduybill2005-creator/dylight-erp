@@ -25,6 +25,15 @@ import { ROLE_LABEL, roleTitle } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment } from "@/lib/types";
 
+// Các phòng ban của công ty — luôn hiện sẵn trong ô chọn phòng ban để phân loại
+// nhanh, kể cả khi chưa ai được xếp vào. Sửa danh sách này nếu công ty đổi cơ cấu.
+const PRESET_DEPARTMENTS = [
+  "Phòng Khảo sát",
+  "Phòng BIM",
+  "Phòng Thiết kế đường 2D",
+  "Phòng AI",
+];
+
 export default function EmployeesPage() {
   const router = useRouter();
   const nick = useNicknames();
@@ -190,12 +199,14 @@ export default function EmployeesPage() {
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Danh sách phòng ban đã có (để gợi ý khi nhập — tránh gõ lệch làm vỡ nhóm).
-  const departmentOptions = Array.from(
-    new Set(
-      users.map((u) => u.department?.trim()).filter((d): d is string => !!d)
-    )
-  ).sort((a, b) => a.localeCompare(b, "vi"));
+  // Gợi ý phòng ban: 4 phòng của công ty (cố định) + phòng nào đã có sẵn nhưng
+  // chưa nằm trong danh sách cố định (giữ tương thích dữ liệu cũ). Tránh gõ lệch làm vỡ nhóm.
+  const extraDepartments = Array.from(
+    new Set(users.map((u) => u.department?.trim()).filter((d): d is string => !!d))
+  )
+    .filter((d) => !PRESET_DEPARTMENTS.includes(d))
+    .sort((a, b) => a.localeCompare(b, "vi"));
+  const departmentOptions = [...PRESET_DEPARTMENTS, ...extraDepartments];
 
   // Một nhóm nhân sự (theo phòng ban hoặc theo quản lý) khi hiển thị dạng gom.
   type EmpGroup = {
