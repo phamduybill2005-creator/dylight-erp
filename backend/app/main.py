@@ -213,14 +213,15 @@ def _backfill_departments() -> None:
     }
 
     def name_key(full_name: str | None) -> str:
-        """'D.H.SON' / 'Nguyễn Văn Đức' / 'LINH37' -> 'SON' / 'DUC' / 'LINH'."""
+        """'D.H.SON' / 'Nguyễn Văn Đức' / 'D.T.LINH (LINH37)' -> 'SON' / 'DUC' / 'LINH'.
+        Bỏ dấu + bỏ MỌI ký tự không phải chữ (số, ngoặc...) để tên kèm hậu tố vẫn khớp."""
         tokens = (full_name or "").replace(".", " ").split()
         if not tokens:
             return ""
         t = unicodedata.normalize("NFD", tokens[-1])
         t = "".join(ch for ch in t if unicodedata.category(ch) != "Mn")
         t = t.replace("Đ", "D").replace("đ", "d")
-        return re.sub(r"\d+", "", t).upper()
+        return re.sub(r"[^A-Za-z]", "", t).upper()
 
     db = SessionLocal()
     try:
