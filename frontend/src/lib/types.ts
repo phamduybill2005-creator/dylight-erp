@@ -343,6 +343,7 @@ export interface ProjectItem {
   unit_price: number;
   amount: number;          // thành tiền = khối lượng × đơn giá (đầu việc con)
   progress: number;        // % hoàn thành đầu việc (0..100) — dùng tính tiến độ dự án
+  department?: string | null;  // phòng ban phụ trách (gán ở cấp nhóm cha)
   note?: string | null;
   created_at: string;
 }

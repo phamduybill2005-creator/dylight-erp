@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { formatVND, dateLocal } from "@/lib/format";
+import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import type { ProjectItem } from "@/lib/types";
 
 const num = (v: unknown) => {
@@ -97,6 +98,8 @@ export default function ProjectItemsTab({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Lọc bảng theo phòng ban phụ trách: "" = tất cả, "__none__" = chưa gán phòng.
+  const [deptFilter, setDeptFilter] = useState<string>("");
 
   // ----- Form "Thêm hạng mục" (nhập từng ô riêng, dễ dùng trên điện thoại) -----
   const [showForm, setShowForm] = useState(false);
@@ -131,6 +134,42 @@ export default function ProjectItemsTab({
   const grandTotal = items.filter((i) => i.parent_id != null).reduce((s, c) => s + lineAmount(c), 0);
   // Tiến độ TỔNG của dự án = tính TỰ ĐỘNG từ các đầu việc con (khớp % ở đầu trang & danh sách).
   const grandProgress = rollupProgress(items.filter((i) => i.parent_id != null));
+
+  // ----- Phân loại theo PHÒNG BAN phụ trách (gán ở cấp nhóm cha) -----
+  const chipCls = (on: boolean) =>
+    `rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+      on ? "border-steel bg-steel/10 text-steel" : "border-line text-muted hover:bg-paper"
+    }`;
+  const deptOf = (g: ProjectItem) => (g.department || "").trim();
+  // Tổng hợp 1 phòng: số nhóm + tổng dự toán + tiến độ bình quân (theo các đầu việc con).
+  const statOf = (gs: ProjectItem[]) => {
+    const kids = gs.flatMap((g) => childrenOf(g.id));
+    return {
+      groups: gs.length,
+      total: kids.reduce((s, c) => s + lineAmount(c), 0),
+      progress: rollupProgress(kids),
+    };
+  };
+  // Các phòng đang được dùng: phòng cố định trước, rồi phòng "lạ" (dữ liệu cũ).
+  const deptsInUse = (() => {
+    const set = new Set(groups.map(deptOf).filter(Boolean));
+    return [
+      ...PRESET_DEPARTMENTS.filter((d) => set.has(d)),
+      ...Array.from(set).filter((d) => !PRESET_DEPARTMENTS.includes(d)),
+    ];
+  })();
+  const hasUnassigned = groups.some((g) => !deptOf(g));
+  const visibleGroups =
+    deptFilter === ""
+      ? groups
+      : deptFilter === "__none__"
+      ? groups.filter((g) => !deptOf(g))
+      : groups.filter((g) => deptOf(g) === deptFilter);
+  // Khi lọc theo phòng, dòng "Tổng cộng" phản ánh đúng phần đang hiện.
+  const visibleChildren = visibleGroups.flatMap((g) => childrenOf(g.id));
+  const shownTotal = visibleChildren.reduce((s, c) => s + lineAmount(c), 0);
+  const shownProgress = rollupProgress(visibleChildren);
+  const filterLabel = deptFilter === "__none__" ? "Chưa gán phòng" : deptFilter;
 
   // ----- Mutations -----
   async function persist(id: number, patch: Partial<ProjectItem>) {
@@ -382,6 +421,40 @@ export default function ProjectItemsTab({
 
       {error && <p className="rounded-lg bg-bad/10 px-3 py-2 text-xs text-bad">{error}</p>}
 
+      {/* Tổng hợp & lọc theo PHÒNG BAN phụ trách (bấm để lọc bảng theo phòng) */}
+      {items.length > 0 && (deptsInUse.length > 0 || hasUnassigned) && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl2 border border-line bg-white p-2.5 shadow-card">
+          <span className="text-[11px] font-semibold text-muted">Theo phòng ban:</span>
+          <button type="button" onClick={() => setDeptFilter("")} className={chipCls(deptFilter === "")}>
+            Tất cả · {groups.length} nhóm
+          </button>
+          {deptsInUse.map((d) => {
+            const s = statOf(groups.filter((g) => deptOf(g) === d));
+            return (
+              <button
+                type="button"
+                key={d}
+                onClick={() => setDeptFilter(deptFilter === d ? "" : d)}
+                className={chipCls(deptFilter === d)}
+                title={`${s.groups} nhóm · tiến độ ${Math.round(s.progress)}%`}
+              >
+                {d} · {s.groups} nhóm · {Math.round(s.progress)}%
+                {canSeeMoney ? ` · ${formatVND(s.total)}` : ""}
+              </button>
+            );
+          })}
+          {hasUnassigned && (
+            <button
+              type="button"
+              onClick={() => setDeptFilter(deptFilter === "__none__" ? "" : "__none__")}
+              className={chipCls(deptFilter === "__none__")}
+            >
+              Chưa gán phòng · {groups.filter((g) => !deptOf(g)).length} nhóm
+            </button>
+          )}
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="rounded-xl2 bg-white p-8 text-center shadow-card">
           <TableCellsIcon className="mx-auto h-10 w-10 text-line" />
@@ -413,7 +486,7 @@ export default function ProjectItemsTab({
                 </tr>
               </thead>
               <tbody>
-                {groups.map((g, gi) => {
+                {visibleGroups.map((g, gi) => {
                   const kids = childrenOf(g.id);
                   return (
                     <GroupRows
@@ -437,21 +510,21 @@ export default function ProjectItemsTab({
                   {canSeeMoney ? (
                     <>
                       <td colSpan={5} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
-                        Tổng cộng dự toán
+                        {deptFilter ? `Tổng — ${filterLabel}` : "Tổng cộng dự toán"}
                       </td>
-                      <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(grandTotal)}</td>
+                      <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(shownTotal)}</td>
                     </>
                   ) : (
                     <td colSpan={3} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
-                      Tiến độ dự án
+                      {deptFilter ? `Tiến độ — ${filterLabel}` : "Tiến độ dự án"}
                     </td>
                   )}
                   <td className="px-2 py-2.5">
                     <div className="flex items-center gap-1.5">
                       <div className="h-2 min-w-[40px] flex-1 overflow-hidden rounded-full bg-white/25">
-                        <div className="h-full bg-amber" style={{ width: `${clampPct(grandProgress)}%` }} />
+                        <div className="h-full bg-amber" style={{ width: `${clampPct(shownProgress)}%` }} />
                       </div>
-                      <span className="w-9 shrink-0 text-right text-xs font-bold tnum">{Math.round(grandProgress)}%</span>
+                      <span className="w-9 shrink-0 text-right text-xs font-bold tnum">{Math.round(shownProgress)}%</span>
                     </div>
                   </td>
                   <td />
@@ -512,6 +585,29 @@ function GroupRows({
             placeholder="Tên nhóm hạng mục"
             className="font-bold text-ink"
           />
+          {/* Phòng ban phụ trách nhóm này — đầu việc con hiểu ngầm theo nhóm. */}
+          <div className="mt-0.5 pl-2">
+            <select
+              value={group.department || ""}
+              onChange={(e) => onPersist(group.id, { department: e.target.value || null })}
+              className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel ${
+                group.department
+                  ? "border-steel/40 bg-steel/5 text-steel"
+                  : "border-line bg-white text-muted"
+              }`}
+              aria-label="Phòng ban phụ trách"
+            >
+              <option value="">— Chưa gán phòng —</option>
+              {PRESET_DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              {group.department && !PRESET_DEPARTMENTS.includes(group.department) && (
+                <option value={group.department}>{group.department}</option>
+              )}
+            </select>
+          </div>
         </td>
         {/* STAFF không có 3 cột tiền: vẫn phải chừa 1 ô cho cột ĐVT để thẳng hàng với header. */}
         {canSeeMoney ? (

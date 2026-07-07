@@ -24,15 +24,7 @@ import { api } from "@/lib/api";
 import { ROLE_LABEL, roleTitle } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment } from "@/lib/types";
-
-// Các phòng ban của công ty — luôn hiện sẵn trong ô chọn phòng ban để phân loại
-// nhanh, kể cả khi chưa ai được xếp vào. Sửa danh sách này nếu công ty đổi cơ cấu.
-const PRESET_DEPARTMENTS = [
-  "Phòng Khảo sát",
-  "Phòng BIM",
-  "Phòng Thiết kế đường 2D",
-  "Phòng AI",
-];
+import { PRESET_DEPARTMENTS } from "@/lib/departments";
 
 // Một người có thể thuộc NHIỀU phòng cùng lúc — lưu trong cột `department`,
 // các phòng ngăn cách bởi dấu phẩy (VD: "Phòng BIM, Phòng AI").

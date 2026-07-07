@@ -331,6 +331,7 @@ class ProjectItemBase(BaseModel):
     quantity: Decimal = Decimal(0)
     unit_price: Decimal = Decimal(0)
     progress: Decimal = Decimal(0)   # % hoàn thành đầu việc (0..100) — dùng tính tiến độ dự án
+    department: str | None = None    # phòng ban phụ trách (gán ở cấp nhóm cha)
     note: str | None = None
 
 
@@ -348,6 +349,7 @@ class ProjectItemUpdate(BaseModel):
     quantity: Decimal | None = None
     unit_price: Decimal | None = None
     progress: Decimal | None = None
+    department: str | None = None
     note: str | None = None
 
 

@@ -70,12 +70,18 @@ def _ensure_schema() -> None:
                     for sql in pmissing:
                         conn.execute(text(sql))
 
-        # Project_items: cột progress (% hoàn thành đầu việc) cho DB cũ — dùng tính tiến độ.
+        # Project_items: cột progress (% hoàn thành) + department (phòng ban phụ trách) cho DB cũ.
         if "project_items" in insp.get_table_names():
             picols = {c["name"] for c in insp.get_columns("project_items")}
-            if "progress" not in picols:
+            pi_adds = {
+                "progress": "ALTER TABLE project_items ADD COLUMN progress NUMERIC DEFAULT 0",
+                "department": "ALTER TABLE project_items ADD COLUMN department VARCHAR(120)",
+            }
+            pi_missing = [sql for col, sql in pi_adds.items() if col not in picols]
+            if pi_missing:
                 with engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE project_items ADD COLUMN progress NUMERIC DEFAULT 0"))
+                    for sql in pi_missing:
+                        conn.execute(text(sql))
 
         # Conversations: cột project_id (nhóm chat gắn dự án) cho DB cũ.
         if "conversations" in insp.get_table_names():
