@@ -79,7 +79,8 @@ export default function ProjectProgressPage() {
 
       <p className="mt-2 text-[11px] text-muted">
         Dòng <span className="font-semibold text-bad">đỏ</span> = đã quá hạn ·
-        <span className="font-semibold text-amber-deep"> vàng</span> = còn ≤ 5 ngày.
+        <span className="font-semibold text-amber-deep"> vàng</span> = còn ≤ 5 ngày ·
+        <span className="font-semibold text-ink"> bấm vào dòng</span> để mở dự án (bảng tiến độ ngày).
       </p>
 
       <div className="mt-3 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
@@ -117,7 +118,12 @@ export default function ProjectProgressPage() {
               const rowCls = overdue ? "bg-bad/5" : soon ? "bg-amber/10" : i % 2 ? "bg-paper/40" : "bg-white";
               const members = (p.members || []).map((m) => m.full_name).join(", ");
               return (
-                <tr key={p.id} className={rowCls}>
+                <tr
+                  key={p.id}
+                  onClick={() => router.push(`/projects/${p.id}?tab=progress`)}
+                  title="Bấm để mở dự án — bảng tiến độ ngày"
+                  className={`${rowCls} cursor-pointer transition-colors hover:bg-steel/10`}
+                >
                   <td className={`${TD} text-center text-muted tnum`}>{i + 1}</td>
                   <td className={`${TD} font-mono text-[12px] text-steel whitespace-nowrap`}>{p.code}</td>
                   <td className={`${TD} font-semibold text-ink`}>{p.name}</td>

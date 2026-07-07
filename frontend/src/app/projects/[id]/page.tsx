@@ -184,6 +184,14 @@ export default function ProjectDetailPage() {
         setCurrentUser(me);
         // Nhân viên không có tab tiền -> mặc định vào "Hạng mục" (không phải "Hợp đồng").
         if (!canSeeMoney(me.role)) setActiveTab("items");
+        // Trang khác mở thẳng 1 tab qua ?tab=... (VD: bảng Tiến độ dự án -> tab Tiến độ).
+        // Tab tiền chỉ nhận khi có quyền xem tiền.
+        const want = new URLSearchParams(window.location.search).get("tab");
+        const allowed: string[] = ["items", "progress", "team"];
+        if (canSeeMoney(me.role)) allowed.push("contracts", "invoices", "payments");
+        if (want && allowed.includes(want)) {
+          setActiveTab(want as "contracts" | "items" | "progress" | "team" | "invoices" | "payments");
+        }
       })
       .catch(() => {});
   }, []);
