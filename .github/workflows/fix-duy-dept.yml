@@ -1,0 +1,37 @@
+name: DUY vao Phong BIM + AI (1 lan)
+
+# Chan doan & sua: tim tai khoan DUY, gop phong ban "Phong BIM, Phong AI",
+# giao viec mau trong du an 00-0000. Idempotent — chay lai khong tao trung.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - backend/scripts/fix_duy_dept_once.py
+
+concurrency:
+  group: fix-duy-dept
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+      - name: Fix DUY departments + demo task
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/fix_duy_dept_once.py
