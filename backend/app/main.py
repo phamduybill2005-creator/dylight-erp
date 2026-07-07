@@ -177,6 +177,78 @@ if settings.AUTO_SEED:
     except Exception as _e:  # noqa: BLE001
         print(f"[auto-seed] bo qua (loi khi seed): {_e}")
 
+
+def _backfill_departments() -> None:
+    """
+    Gán PHÒNG BAN cho nhân sự theo sơ đồ tổ chức DOSCO (07/2026) — chạy mỗi lần
+    khởi động nhưng CHỈ điền cho người đang TRỐNG department, nên không bao giờ
+    ghi đè phân công đã chỉnh tay trên giao diện.
+
+    Khớp theo TÊN (từ cuối của full_name, bỏ dấu + bỏ số): tài khoản thật đăng ký
+    qua Google nên không đoán trước được email. Bỏ qua ADMIN/DIRECTOR (Giám đốc
+    không thuộc phòng nào) và các tài khoản demo.
+    """
+    import re
+    import unicodedata
+
+    from app.database import SessionLocal
+    from app.models import User, UserRole
+
+    # Tên phòng PHẢI khớp PRESET_DEPARTMENTS (frontend/src/lib/departments.ts).
+    KS, BIM, TKD, AI = "Phòng Khảo sát", "Phòng BIM", "Phòng Thiết kế đường 2D", "Phòng AI"
+    NAME_TO_DEPTS = {
+        # Phòng Khảo sát — trưởng SƠN (kiêm Phòng AI)
+        "SON": f"{KS}, {AI}",
+        "GIANG": KS, "NHUNG": KS, "DAT": KS, "DUNG": KS, "CUONG": KS, "PHU": KS,
+        # Phòng BIM — trưởng LÂM; DUY kiêm trưởng Phòng AI
+        "LAM": BIM, "QUANG": BIM, "HOAN": BIM,
+        "DUY": f"{BIM}, {AI}",
+        # Phòng Thiết kế đường 2D — trưởng BÍNH (2 bạn LINH đều cùng phòng)
+        "BINH": TKD, "CAO": TKD, "DUC": TKD, "HUNG": TKD, "LINH": TKD,
+        "QUAN": TKD, "DUONG": TKD, "KHAI": TKD,
+    }
+    DEMO_EMAILS = {
+        "giamdoc@dosco.vn", "quanly@dosco.vn", "ketoan@dosco.vn",
+        "hientruong@dosco.vn", "admin@dosco.vn",
+    }
+
+    def name_key(full_name: str | None) -> str:
+        """'D.H.SON' / 'Nguyễn Văn Đức' / 'LINH37' -> 'SON' / 'DUC' / 'LINH'."""
+        tokens = (full_name or "").replace(".", " ").split()
+        if not tokens:
+            return ""
+        t = unicodedata.normalize("NFD", tokens[-1])
+        t = "".join(ch for ch in t if unicodedata.category(ch) != "Mn")
+        t = t.replace("Đ", "D").replace("đ", "d")
+        return re.sub(r"\d+", "", t).upper()
+
+    db = SessionLocal()
+    try:
+        blanks = db.query(User).filter(
+            (User.department.is_(None)) | (User.department == "")
+        ).all()
+        changed = 0
+        for u in blanks:
+            if u.role in (UserRole.ADMIN, UserRole.DIRECTOR):
+                continue
+            if (u.email or "").lower() in DEMO_EMAILS:
+                continue
+            depts = NAME_TO_DEPTS.get(name_key(u.full_name))
+            if depts:
+                u.department = depts
+                changed += 1
+        if changed:
+            db.commit()
+            print(f"[backfill-dept] da gan phong ban cho {changed} nguoi theo so do to chuc")
+    except Exception as _e:  # noqa: BLE001
+        db.rollback()
+        print(f"[backfill-dept] bo qua: {_e}")
+    finally:
+        db.close()
+
+
+_backfill_departments()
+
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
