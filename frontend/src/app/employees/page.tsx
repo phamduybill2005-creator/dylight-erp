@@ -15,6 +15,9 @@ import {
   KeyIcon,
   BriefcaseIcon,
   BuildingOffice2Icon,
+  ListBulletIcon,
+  Squares2X2Icon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
@@ -30,6 +33,8 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  // Cách xem danh sách nhân sự: phẳng, gom theo phòng ban, hay gom theo quản lý.
+  const [viewMode, setViewMode] = useState<"list" | "department" | "manager">("list");
   
   // States for the edit form
   const [formData, setFormData] = useState({
@@ -185,6 +190,106 @@ export default function EmployeesPage() {
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Danh sách phòng ban đã có (để gợi ý khi nhập — tránh gõ lệch làm vỡ nhóm).
+  const departmentOptions = Array.from(
+    new Set(
+      users.map((u) => u.department?.trim()).filter((d): d is string => !!d)
+    )
+  ).sort((a, b) => a.localeCompare(b, "vi"));
+
+  // Một nhóm nhân sự (theo phòng ban hoặc theo quản lý) khi hiển thị dạng gom.
+  type EmpGroup = {
+    key: string;
+    label: string;
+    subtitle?: string;
+    members: User[];
+    headIds: Set<number>;   // id những người "phụ trách" nhóm (in đậm + huy hiệu)
+  };
+
+  // GOM THEO PHÒNG BAN: mỗi phòng ban 1 nhóm; người phụ trách = quản lý trong phòng
+  // (vai trò MANAGER, hoặc có cấp dưới, hoặc đang là quản lý trực tiếp của người khác trong phòng).
+  function buildDepartmentGroups(): EmpGroup[] {
+    const map = new Map<string, User[]>();
+    for (const u of filteredUsers) {
+      const dept = u.department?.trim();
+      const key = dept ? dept.toLowerCase() : "__none__";
+      const arr = map.get(key);
+      if (arr) arr.push(u);
+      else map.set(key, [u]);
+    }
+    const groups: EmpGroup[] = [];
+    for (const [key, members] of map) {
+      const label =
+        key === "__none__" ? "Chưa phân phòng ban" : members[0].department?.trim() || "—";
+      const referenced = new Set(
+        members.map((m) => m.manager_id).filter((x): x is number => !!x)
+      );
+      const headIds = new Set(
+        members
+          .filter((m) => m.role === "MANAGER" || m.has_subordinates || referenced.has(m.id))
+          .map((m) => m.id)
+      );
+      members.sort((a, b) => {
+        const ah = headIds.has(a.id) ? 0 : 1;
+        const bh = headIds.has(b.id) ? 0 : 1;
+        return ah - bh || a.full_name.localeCompare(b.full_name, "vi");
+      });
+      const headNames = members.filter((m) => headIds.has(m.id)).map((m) => nick(m.id, m.full_name));
+      const subtitle =
+        key === "__none__"
+          ? undefined
+          : headNames.length
+          ? `Phụ trách: ${headNames.join(", ")}`
+          : "Chưa có người phụ trách";
+      groups.push({ key, label, subtitle, members, headIds });
+    }
+    groups.sort((a, b) =>
+      a.key === "__none__" ? 1 : b.key === "__none__" ? -1 : a.label.localeCompare(b.label, "vi")
+    );
+    return groups;
+  }
+
+  // GOM THEO QUẢN LÝ: mỗi quản lý trực tiếp 1 nhóm gồm các cấp dưới; tiêu đề nhóm là
+  // tên quản lý + chức vụ + phòng ban của họ. Người chưa có quản lý gom vào cuối.
+  function buildManagerGroups(): EmpGroup[] {
+    const byId = new Map(users.map((u) => [u.id, u]));
+    const map = new Map<string, User[]>();
+    for (const u of filteredUsers) {
+      const key = u.manager_id ? String(u.manager_id) : "__none__";
+      const arr = map.get(key);
+      if (arr) arr.push(u);
+      else map.set(key, [u]);
+    }
+    const groups: EmpGroup[] = [];
+    for (const [key, members] of map) {
+      members.sort((a, b) => a.full_name.localeCompare(b.full_name, "vi"));
+      let label: string;
+      let subtitle: string | undefined;
+      if (key === "__none__") {
+        label = "Chưa có quản lý trực tiếp";
+      } else {
+        const mgr = byId.get(Number(key));
+        label = mgr ? nick(mgr.id, mgr.full_name) : `Quản lý #${key}`;
+        const parts: string[] = [];
+        if (mgr) parts.push(roleTitle(mgr.role, mgr.has_subordinates));
+        if (mgr?.department) parts.push(mgr.department);
+        subtitle = parts.join(" · ") || undefined;
+      }
+      groups.push({ key, label, subtitle, members, headIds: new Set() });
+    }
+    groups.sort((a, b) =>
+      a.key === "__none__" ? 1 : b.key === "__none__" ? -1 : a.label.localeCompare(b.label, "vi")
+    );
+    return groups;
+  }
+
+  const groups =
+    viewMode === "department"
+      ? buildDepartmentGroups()
+      : viewMode === "manager"
+      ? buildManagerGroups()
+      : [];
+
   // Duyệt: cấp quyền + phân vị trí. Từ chối: khóa tài khoản (rời khỏi danh sách chờ).
   async function handleApprove(u: User) {
     setBusyId(u.id);
@@ -326,6 +431,12 @@ export default function EmployeesPage() {
 
   return (
     <AppShell>
+      {/* Gợi ý phòng ban dùng chung cho ô nhập ở form thêm & sửa nhân viên */}
+      <datalist id="dept-options">
+        {departmentOptions.map((d) => (
+          <option key={d} value={d} />
+        ))}
+      </datalist>
       <div className="space-y-4 lg:space-y-6">
         {/* Header */}
         <section className="flex items-center justify-between rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
@@ -429,60 +540,97 @@ export default function EmployeesPage() {
           )}
         </section>
 
+        {/* Chế độ xem: phẳng / gom theo phòng ban / gom theo quản lý */}
+        <section className="flex w-fit items-center gap-1 rounded-xl2 border border-line bg-white p-1 text-xs shadow-card">
+          {([
+            ["list", "Danh sách", ListBulletIcon],
+            ["department", "Theo phòng ban", Squares2X2Icon],
+            ["manager", "Theo quản lý", UserGroupIcon],
+          ] as const).map(([mode, label, Icon]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition-colors ${
+                viewMode === mode ? "bg-ink text-white shadow-card" : "text-muted hover:bg-paper"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </section>
+
         {/* Danh sách nhân viên */}
-        <section className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
-          {filteredUsers.length === 0 ? (
-            <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-full">
-              Không tìm thấy nhân viên nào phù hợp.
-            </p>
-          ) : (
-            filteredUsers.map((u) => {
-              const isSelected = selectedUser?.id === u.id;
-              return (
-                <div
+        {viewMode === "list" ? (
+          <section className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
+            {filteredUsers.length === 0 ? (
+              <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-full">
+                Không tìm thấy nhân viên nào phù hợp.
+              </p>
+            ) : (
+              filteredUsers.map((u) => (
+                <EmployeeCard
                   key={u.id}
+                  u={u}
+                  selected={selectedUser?.id === u.id}
+                  clickable={canAssign}
                   onClick={() => canAssign && setSelectedUser(u)}
-                  className={`rounded-xl2 bg-white p-4 shadow-card transition-all border-l-4 ${canAssign ? "cursor-pointer" : ""} ${
-                    isSelected ? "border-amber bg-amber/5" : "border-transparent hover:border-slate-300"
-                  } ${u.is_active ? "" : "opacity-60"}`}
+                  nick={nick}
+                />
+              ))
+            )}
+          </section>
+        ) : (
+          <section className="space-y-4">
+            {groups.length === 0 ? (
+              <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">
+                Không tìm thấy nhân viên nào phù hợp.
+              </p>
+            ) : (
+              groups.map((g) => (
+                <div
+                  key={g.key}
+                  className="overflow-hidden rounded-xl2 border border-line bg-white/60 shadow-card"
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-ink">{nick(u.id, u.full_name)}</h3>
-                      <p className="text-[11px] text-muted font-mono mt-0.5">{u.email}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] font-medium text-steel">
-                          {roleTitle(u.role, u.has_subordinates)}
-                        </span>
-                        <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${u.is_active ? "bg-ok/10 text-ok" : "bg-bad/10 text-bad"}`}>
-                          {u.is_active ? "Đang truy cập" : "Đã khóa"}
-                        </span>
+                  <header className="flex items-center justify-between gap-2 border-b border-line bg-ink/[0.03] px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {viewMode === "manager" ? (
+                        <UserGroupIcon className="h-5 w-5 shrink-0 text-steel" />
+                      ) : (
+                        <BuildingOffice2Icon className="h-5 w-5 shrink-0 text-steel" />
+                      )}
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-bold text-ink">{g.label}</h2>
+                        {g.subtitle && (
+                          <p className="truncate text-[10px] text-muted">{g.subtitle}</p>
+                        )}
                       </div>
                     </div>
-                    {canAssign && (
-                      <span className="rounded-md bg-paper p-1.5 text-muted hover:text-ink">
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </span>
-                    )}
+                    <span className="shrink-0 rounded-full bg-paper px-2.5 py-0.5 text-[11px] font-semibold text-muted">
+                      {g.members.length} người
+                    </span>
+                  </header>
+                  <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {g.members.map((u) => (
+                      <EmployeeCard
+                        key={u.id}
+                        u={u}
+                        selected={selectedUser?.id === u.id}
+                        clickable={canAssign}
+                        onClick={() => canAssign && setSelectedUser(u)}
+                        nick={nick}
+                        head={g.headIds.has(u.id)}
+                        showDept={viewMode !== "department"}
+                        showManager={viewMode !== "manager"}
+                      />
+                    ))}
                   </div>
-                  {(u.department || u.manager_name) && (
-                    <div className="mt-2 flex flex-col gap-0.5 border-t border-line/50 pt-2 text-[10px] text-muted">
-                      {u.department && (
-                        <span className="flex items-center gap-1">
-                          <BuildingOffice2Icon className="h-3 w-3" /> Phòng ban:{" "}
-                          <span className="font-semibold text-ink">{u.department}</span>
-                        </span>
-                      )}
-                      {u.manager_name && (
-                        <span>Quản lý trực tiếp: <span className="font-semibold text-ink">{u.manager_name}</span></span>
-                      )}
-                    </div>
-                  )}
                 </div>
-              );
-            })
-          )}
-        </section>
+              ))
+            )}
+          </section>
+        )}
       </div>
 
       {/* Slide-over/Modal Form Chỉnh sửa chi tiết */}
@@ -640,11 +788,15 @@ export default function EmployeesPage() {
                   <label className="block text-[11px] font-semibold text-muted">Bộ phận / Phòng ban</label>
                   <input
                     type="text"
+                    list="dept-options"
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     placeholder="VD: Phòng Thiết kế cầu / Tổ Khảo sát"
                   />
+                  <p className="mt-1 text-[10px] text-muted">
+                    Chọn phòng ban có sẵn hoặc gõ tên mới. Dùng để gom nhân viên theo phòng ban.
+                  </p>
                 </div>
               </div>
 
@@ -911,6 +1063,7 @@ export default function EmployeesPage() {
                   <label className="block text-[11px] font-semibold text-muted">Bộ phận / Phòng ban</label>
                   <input
                     type="text"
+                    list="dept-options"
                     value={createData.department}
                     onChange={(e) => setCreateData({ ...createData, department: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
@@ -988,5 +1141,86 @@ export default function EmployeesPage() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+// Thẻ 1 nhân viên — dùng chung cho cả xem phẳng lẫn xem gom (phòng ban / quản lý).
+//   head        : người phụ trách nhóm (viền + huy hiệu "Phụ trách").
+//   showDept    : hiện dòng "Phòng ban" (ẩn khi đang gom theo phòng ban cho đỡ lặp).
+//   showManager : hiện dòng "Quản lý trực tiếp" (ẩn khi đang gom theo quản lý).
+function EmployeeCard({
+  u,
+  selected,
+  clickable,
+  onClick,
+  nick,
+  head = false,
+  showDept = true,
+  showManager = true,
+}: {
+  u: User;
+  selected: boolean;
+  clickable: boolean;
+  onClick: () => void;
+  nick: (id: number, name: string) => string;
+  head?: boolean;
+  showDept?: boolean;
+  showManager?: boolean;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-xl2 bg-white p-4 shadow-card transition-all border-l-4 ${clickable ? "cursor-pointer" : ""} ${
+        selected
+          ? "border-amber bg-amber/5"
+          : head
+          ? "border-steel/60"
+          : "border-transparent hover:border-slate-300"
+      } ${u.is_active ? "" : "opacity-60"}`}
+    >
+      <div className="flex items-start justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h3 className="truncate text-sm font-semibold text-ink">{nick(u.id, u.full_name)}</h3>
+            {head && (
+              <span className="shrink-0 rounded-full bg-steel/10 px-1.5 py-0.5 text-[9px] font-semibold text-steel">
+                Phụ trách
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 truncate font-mono text-[11px] text-muted">{u.email}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium text-steel">
+              {roleTitle(u.role, u.has_subordinates)}
+            </span>
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${u.is_active ? "bg-ok/10 text-ok" : "bg-bad/10 text-bad"}`}
+            >
+              {u.is_active ? "Đang truy cập" : "Đã khóa"}
+            </span>
+          </div>
+        </div>
+        {clickable && (
+          <span className="shrink-0 rounded-md bg-paper p-1.5 text-muted hover:text-ink">
+            <PencilSquareIcon className="h-4 w-4" />
+          </span>
+        )}
+      </div>
+      {((showDept && u.department) || (showManager && u.manager_name)) && (
+        <div className="mt-2 flex flex-col gap-0.5 border-t border-line/50 pt-2 text-[10px] text-muted">
+          {showDept && u.department && (
+            <span className="flex items-center gap-1">
+              <BuildingOffice2Icon className="h-3 w-3" /> Phòng ban:{" "}
+              <span className="font-semibold text-ink">{u.department}</span>
+            </span>
+          )}
+          {showManager && u.manager_name && (
+            <span>
+              Quản lý trực tiếp: <span className="font-semibold text-ink">{u.manager_name}</span>
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
