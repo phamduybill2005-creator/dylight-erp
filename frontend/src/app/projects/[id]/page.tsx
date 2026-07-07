@@ -26,6 +26,7 @@ import {
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import ProgressTimeline from "@/components/progress-timeline";
+import ProjectTeamTab from "@/components/project-team-tab";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate, formatCompactVND } from "@/lib/format";
@@ -56,7 +57,7 @@ export default function ProjectDetailPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "invoices" | "payments">("contracts");
+  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team" | "invoices" | "payments">("contracts");
 
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
@@ -647,6 +648,7 @@ export default function ProjectDetailPage() {
         )}
         <TabButton active={activeTab === "items"} onClick={() => setActiveTab("items")} label="Hạng mục" icon={TableCellsIcon} />
         <TabButton active={activeTab === "progress"} onClick={() => setActiveTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
+        <TabButton active={activeTab === "team"} onClick={() => setActiveTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
         {showMoney && (
           <TabButton active={activeTab === "invoices"} onClick={() => setActiveTab("invoices")} label="Chi phí AI" icon={CurrencyDollarIcon} count={invoices.length} />
         )}
@@ -708,6 +710,16 @@ export default function ProjectDetailPage() {
 
         {/* Tab Hạng mục (bảng dự toán Excel) */}
         {activeTab === "items" && <ProjectItemsTab projectId={projectId} canSeeMoney={showMoney} />}
+
+        {/* Tab Phân công — ai làm gì, bao lâu (từ giao việc lọc theo dự án) */}
+        {activeTab === "team" && (
+          <ProjectTeamTab
+            projectId={projectId}
+            members={project.members ?? []}
+            leadId={project.lead_id ?? null}
+            canManage={canManage}
+          />
+        )}
 
         {/* Tab Tiến độ */}
         {activeTab === "progress" && (

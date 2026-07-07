@@ -383,6 +383,8 @@ export interface Assignment {
   title: string;
   description?: string | null;
   status: string;
+  started_at?: string | null;   // BE tự đóng dấu khi bắt đầu làm
+  done_at?: string | null;      // BE tự đóng dấu khi hoàn thành
   created_at: string;
 }
 

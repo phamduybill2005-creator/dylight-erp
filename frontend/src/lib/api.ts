@@ -362,8 +362,14 @@ export const api = {
   markAllNotificationsRead: () => request<void>("/notifications/me/read-all", { method: "POST" }),
 
   // --- Giao việc / phân công ---
-  assignments: (assigneeId?: number) =>
-    request<Assignment[]>(`/assignments${assigneeId ? `?assignee_id=${assigneeId}` : ""}`),
+  // Lọc theo người nhận (assigneeId) HOẶC theo dự án (projectId — xem việc của mọi người trong dự án).
+  assignments: (opts?: { assigneeId?: number; projectId?: number }) => {
+    const p = new URLSearchParams();
+    if (opts?.assigneeId) p.set("assignee_id", String(opts.assigneeId));
+    if (opts?.projectId) p.set("project_id", String(opts.projectId));
+    const qs = p.toString();
+    return request<Assignment[]>(`/assignments${qs ? `?${qs}` : ""}`);
+  },
   createAssignment: (payload: { assignee_id: number; title: string; description?: string | null; project_id?: number | null }) =>
     request<Assignment>("/assignments", { method: "POST", body: JSON.stringify(payload) }),
   updateAssignment: (id: number, payload: { status?: string; title?: string; description?: string | null }) =>

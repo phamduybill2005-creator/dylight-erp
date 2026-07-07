@@ -729,6 +729,10 @@ class Assignment(Base):
     title: Mapped[str] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="ASSIGNED")  # ASSIGNED/IN_PROGRESS/DONE
+    # Mốc thời gian để đo "làm trong bao lâu" — hệ thống TỰ đóng dấu khi đổi trạng thái
+    # (bắt đầu làm / hoàn thành). Cột mới -> ALTER ở _ensure_schema.
+    started_at: Mapped[datetime | None] = mapped_column(DateTime)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assigner: Mapped["User"] = relationship("User", foreign_keys=[assigner_id])

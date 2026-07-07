@@ -655,6 +655,8 @@ class AssignmentOut(BaseModel):
     title: str
     description: str | None = None
     status: str
+    started_at: datetime | None = None   # do server đóng dấu khi bắt đầu làm
+    done_at: datetime | None = None       # do server đóng dấu khi hoàn thành
     created_at: datetime
 
 

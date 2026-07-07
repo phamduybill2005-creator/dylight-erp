@@ -52,3 +52,34 @@ export function monthLocal(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
+
+/** Chuỗi thời gian từ backend là GIỜ VN "trần" (vn_now, không có múi giờ).
+ *  Gắn "+07:00" để new Date() hiểu đúng là giờ VN trên MỌI máy (tránh lệch 7h ở
+ *  trình duyệt không phải UTC+7). Nếu chuỗi đã có múi giờ thì giữ nguyên. */
+function parseVN(s: string): Date {
+  return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : `${s}+07:00`);
+}
+
+/**
+ * Số NGÀY của 1 phân công (giao việc) — dùng đo "làm trong bao lâu".
+ *   - Đã xong (DONE): done_at − (started_at ?? created_at)
+ *   - Đang làm: hôm nay − (started_at ?? created_at)
+ * Trả 0 nếu ra số âm; null nếu thiếu mốc bắt đầu. Mốc lưu là giờ VN -> quy về đúng
+ * múi giờ trước khi trừ nên không lệch dù xem ở máy múi giờ khác; làm tròn về ngày.
+ */
+export function assignmentDays(
+  status: string,
+  created_at?: string | null,
+  started_at?: string | null,
+  done_at?: string | null,
+): number | null {
+  const start = started_at || created_at;
+  if (!start) return null;
+  const a = parseVN(start);
+  if (isNaN(a.getTime())) return null;
+  const endStr = status === "DONE" ? done_at || created_at : null;
+  const b = status === "DONE" ? (endStr ? parseVN(endStr) : null) : new Date();
+  if (!b || isNaN(b.getTime())) return null;
+  const days = Math.round((b.getTime() - a.getTime()) / 86_400_000);
+  return days < 0 ? 0 : days;
+}

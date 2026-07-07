@@ -83,6 +83,20 @@ def _ensure_schema() -> None:
                     for sql in pi_missing:
                         conn.execute(text(sql))
 
+        # Assignments: cột started_at (bắt đầu) + done_at (hoàn thành) cho DB cũ
+        # -> đo "làm trong bao lâu". TIMESTAMP hợp lệ cả SQLite & Postgres, nullable.
+        if "assignments" in insp.get_table_names():
+            acols = {c["name"] for c in insp.get_columns("assignments")}
+            a_adds = {
+                "started_at": "ALTER TABLE assignments ADD COLUMN started_at TIMESTAMP",
+                "done_at": "ALTER TABLE assignments ADD COLUMN done_at TIMESTAMP",
+            }
+            a_missing = [sql for col, sql in a_adds.items() if col not in acols]
+            if a_missing:
+                with engine.begin() as conn:
+                    for sql in a_missing:
+                        conn.execute(text(sql))
+
         # Conversations: cột project_id (nhóm chat gắn dự án) cho DB cũ.
         if "conversations" in insp.get_table_names():
             cvcols = {c["name"] for c in insp.get_columns("conversations")}

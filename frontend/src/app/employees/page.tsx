@@ -161,7 +161,7 @@ export default function EmployeesPage() {
       setAssignDesc("");
       setAssignProjectId("");
       setAssignMsg("");
-      api.assignments(selectedUser.id).then(setAssignmentsList).catch(() => setAssignmentsList([]));
+      api.assignments({ assigneeId: selectedUser.id }).then(setAssignmentsList).catch(() => setAssignmentsList([]));
     }
   }, [selectedUser]);
 
