@@ -5,7 +5,7 @@
 // Thời gian "bao lâu" do backend tự đóng dấu khi đổi trạng thái (bắt đầu / hoàn thành).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PlusIcon, UserGroupIcon, StarIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, UserGroupIcon, StarIcon, ClockIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { assignmentDays } from "@/lib/format";
 import { roleTitle } from "@/lib/roles";
@@ -127,6 +127,18 @@ export default function ProjectTeamTab({
     }
   }
 
+  async function removeAssignment(a: Assignment) {
+    if (!confirm(`Xóa phần việc "${a.title}"?`)) return;
+    setRows((prev) => prev.filter((x) => x.id !== a.id));
+    try {
+      await api.deleteAssignment(a.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Xóa phần việc thất bại.");
+    } finally {
+      load();
+    }
+  }
+
   if (loading) {
     return <p className="py-10 text-center text-xs text-muted">Đang tải phân công…</p>;
   }
@@ -243,7 +255,7 @@ export default function ProjectTeamTab({
                             {durationText(a)}
                           </span>
                           {canManage && (
-                            <div className="flex gap-1">
+                            <div className="flex items-center gap-1">
                               {["ASSIGNED", "IN_PROGRESS", "DONE"].map((s) => (
                                 <button
                                   key={s}
@@ -256,6 +268,14 @@ export default function ProjectTeamTab({
                                   {s === "ASSIGNED" ? "Mới" : s === "IN_PROGRESS" ? "Đang làm" : "Xong"}
                                 </button>
                               ))}
+                              <button
+                                type="button"
+                                onClick={() => removeAssignment(a)}
+                                title="Xóa phần việc"
+                                className="rounded p-0.5 text-muted hover:bg-bad/10 hover:text-bad"
+                              >
+                                <TrashIcon className="h-3 w-3" />
+                              </button>
                             </div>
                           )}
                         </div>

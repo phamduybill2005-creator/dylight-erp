@@ -374,6 +374,8 @@ export const api = {
     request<Assignment>("/assignments", { method: "POST", body: JSON.stringify(payload) }),
   updateAssignment: (id: number, payload: { status?: string; title?: string; description?: string | null }) =>
     request<Assignment>(`/assignments/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteAssignment: (id: number) =>
+    request<void>(`/assignments/${id}`, { method: "DELETE" }),
 
   // --- Đồng nghiệp: biệt danh riêng + gom team ---
   colleagues: () => request<Colleague[]>("/colleagues"),

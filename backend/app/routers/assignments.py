@@ -127,3 +127,25 @@ def update_assignment(
     db.commit()
     db.refresh(a)
     return a
+
+
+@router.delete("/{assignment_id}", status_code=204)
+def delete_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Xóa phần việc giao nhầm/không còn cần. Người GIAO việc, Giám đốc/Quản trị,
+    hoặc chủ trì dự án mới được xóa — người NHẬN không tự xóa việc của mình."""
+    a = db.get(Assignment, assignment_id)
+    if not a or a.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy phân công.")
+    allowed = current.role in _DIRECTORS or current.id == a.assigner_id
+    if not allowed and a.project_id is not None:
+        proj = db.get(Project, a.project_id)
+        if proj and proj.company_id == current.company_id and proj.lead_id == current.id:
+            allowed = True
+    if not allowed:
+        raise HTTPException(403, "Bạn không có quyền xóa phân công này.")
+    db.delete(a)
+    db.commit()

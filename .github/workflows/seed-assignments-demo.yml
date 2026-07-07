@@ -1,0 +1,38 @@
+name: Giao viec mau cho du an dao tao (1 lan)
+
+# Giao viec mau vao du an noi bo 00-0000 (モデリング研修) de xem thu BANG TIEN DO NGAY.
+# Tu chay khi script duoc push len main (idempotent: du an da co phan cong -> bo qua),
+# hoac chay tay tu tab Actions -> Run workflow.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - backend/scripts/seed_assignments_demo.py
+
+concurrency:
+  group: seed-assignments-demo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+      - name: Seed demo assignments
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/seed_assignments_demo.py
