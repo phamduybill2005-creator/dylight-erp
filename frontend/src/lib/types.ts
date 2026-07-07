@@ -348,6 +348,17 @@ export interface ProjectItem {
   created_at: string;
 }
 
+// Tiến độ theo ngày — 1 điểm = (ngày, phòng ban, %). department "" = toàn dự án.
+export interface ProgressPoint {
+  date: string;        // "YYYY-MM-DD"
+  department: string;  // "" = toàn dự án
+  percent: number;
+}
+export interface ProgressHistory {
+  project_id: number;
+  snapshots: ProgressPoint[];
+}
+
 // Thông báo nội bộ
 export interface Notification {
   id: number;

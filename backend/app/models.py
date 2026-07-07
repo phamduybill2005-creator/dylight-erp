@@ -379,6 +379,29 @@ class ProjectItem(Base):
 
 
 # --------------------------------------------------------------------------
+# 8c. PROGRESS_SNAPSHOTS — ẢNH CHỤP % tiến độ theo NGÀY (để dựng đường tiến độ).
+#     1 dòng / (dự án, ngày, phòng ban). department = "" nghĩa là TOÀN DỰ ÁN.
+#     Ghi khi có người đổi % (upsert theo ngày) + khi mở biểu đồ (chốt điểm hôm nay)
+#     -> theo dõi được từng ngày nhân sự/phòng làm tới đâu, mất bao lâu để xong.
+# --------------------------------------------------------------------------
+class ProgressSnapshot(Base):
+    __tablename__ = "progress_snapshots"
+    __table_args__ = (
+        UniqueConstraint("project_id", "snap_date", "department", name="uq_progress_snap"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    snap_date: Mapped[date] = mapped_column(Date, index=True)     # ngày chụp (giờ VN)
+    department: Mapped[str] = mapped_column(String(120), default="", server_default="")  # "" = toàn dự án
+    percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0)  # % hoàn thành tại ngày đó
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# --------------------------------------------------------------------------
 # 9. ACTIVITY_LOGS — vết kiểm toán (ai làm gì, lúc nào)
 # --------------------------------------------------------------------------
 class ActivityLog(Base):

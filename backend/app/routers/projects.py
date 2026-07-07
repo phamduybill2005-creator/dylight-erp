@@ -18,8 +18,8 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import (
     Assignment, ChatMessage, Contract, Conversation, ConversationMember, DesignDocument,
-    Invoice, MessageReaction, Payment, Progress, Project, ProjectItem, User, UserRole,
-    project_members,
+    Invoice, MessageReaction, Payment, Progress, Project, ProjectItem, ProgressSnapshot,
+    User, UserRole, project_members,
 )
 from app.schemas import (
     ProjectCreate, ProjectLeadSet, ProjectMemberChange, ProjectOut, ProjectUpdate,
@@ -149,6 +149,42 @@ def get_project(project_id: int, db: Session = Depends(get_db), current: User = 
     if not p or p.company_id != current.company_id or not _can_view(db, p, current):
         raise HTTPException(404, "Không tìm thấy dự án.")
     return _to_out(db, p)
+
+
+@router.get("/{project_id}/progress-history")
+def progress_history(project_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    """Lịch sử % tiến độ theo NGÀY (toàn dự án + từng phòng) để vẽ đường tiến độ.
+
+    Mở biểu đồ sẽ CHỐT điểm hôm nay (lazy upsert) rồi trả toàn bộ chuỗi ngày.
+    """
+    p = db.get(Project, project_id)
+    if not p or p.company_id != current.company_id or not _can_view(db, p, current):
+        raise HTTPException(404, "Không tìm thấy dự án.")
+
+    # Chốt điểm hôm nay theo % hiện tại (không để lỗi phụ làm hỏng việc đọc).
+    try:
+        from app.services.progress_snapshot import snapshot_project
+        snapshot_project(db, project_id, current.company_id)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+
+    rows = (
+        db.query(ProgressSnapshot)
+        .filter(ProgressSnapshot.project_id == project_id)
+        .order_by(ProgressSnapshot.snap_date.asc(), ProgressSnapshot.id.asc())
+        .all()
+    )
+    return {
+        "project_id": project_id,
+        "snapshots": [
+            {
+                "date": r.snap_date.isoformat(),
+                "department": r.department or "",
+                "percent": float(r.percent or 0),
+            }
+            for r in rows
+        ],
+    }
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)

@@ -25,6 +25,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
+import ProgressTimeline from "@/components/progress-timeline";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate, formatCompactVND } from "@/lib/format";
@@ -710,7 +711,10 @@ export default function ProjectDetailPage() {
 
         {/* Tab Tiến độ */}
         {activeTab === "progress" && (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Đường tiến độ theo ngày (toàn dự án + từng phòng) */}
+            <ProgressTimeline projectId={projectId} />
+
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-muted uppercase">Nhật ký tiến độ ({progressLogs.length})</h3>
               <button

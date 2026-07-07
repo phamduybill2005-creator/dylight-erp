@@ -130,6 +130,16 @@ def update_item(
 
     db.commit()
     db.refresh(item)
+
+    # Đổi % -> chụp điểm tiến độ HÔM NAY (dựng đường tiến độ theo ngày).
+    # Lỗi phụ không được làm hỏng thao tác lưu chính.
+    if "progress" in data:
+        try:
+            from app.services.progress_snapshot import snapshot_project
+            snapshot_project(db, item.project_id, current.company_id)
+        except Exception:  # noqa: BLE001
+            db.rollback()
+
     return _out(item, current)
 
 
