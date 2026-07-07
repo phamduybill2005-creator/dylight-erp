@@ -26,6 +26,7 @@ import {
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import ProgressTimeline from "@/components/progress-timeline";
+import ProjectScheduleGrid from "@/components/project-schedule-grid";
 import ProjectTeamTab from "@/components/project-team-tab";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
@@ -724,6 +725,15 @@ export default function ProjectDetailPage() {
         {/* Tab Tiến độ */}
         {activeTab === "progress" && (
           <div className="space-y-4">
+            {/* Bảng Excel từng ngày: ai làm gì, bao lâu, còn mấy ngày đến hạn dự án */}
+            <ProjectScheduleGrid
+              projectId={projectId}
+              startDate={project.start_date ?? null}
+              endDate={project.end_date ?? null}
+              members={project.members ?? []}
+              leadId={project.lead_id ?? null}
+            />
+
             {/* Đường tiến độ theo ngày (toàn dự án + từng phòng) */}
             <ProgressTimeline projectId={projectId} />
 
