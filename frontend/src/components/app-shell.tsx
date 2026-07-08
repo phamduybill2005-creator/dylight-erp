@@ -22,12 +22,8 @@ import {
   UsersIcon,
   UserGroupIcon,
   StarIcon,
-  ScaleIcon,
-  BanknotesIcon,
   ClipboardDocumentListIcon,
-  CurrencyDollarIcon,
   CalendarDaysIcon,
-  ShieldCheckIcon,
   RectangleStackIcon,
   PresentationChartLineIcon,
 } from "@heroicons/react/24/outline";
@@ -74,11 +70,7 @@ function deskNav(tier: Tier): NavLink[] {
     items.push(
       { href: "/project-progress", label: "Tiến độ dự án", icon: PresentationChartLineIcon },
       { href: "/partners", label: "Đối tác", icon: BuildingOffice2Icon },
-      { href: "/payroll", label: "Bảng lương", icon: UsersIcon },
-      { href: "/finance", label: "Tài chính & Công nợ", icon: CurrencyDollarIcon },
-      { href: "/reconciliation", label: "Đối soát quyết toán", icon: ScaleIcon },
-      { href: "/reports", label: "Báo cáo lãi / lỗ", icon: BanknotesIcon },
-      { href: "/audit", label: "Nhật ký hoạt động", icon: ShieldCheckIcon }
+      { href: "/payroll", label: "Bảng lương", icon: UsersIcon }
     );
   }
   return items;
