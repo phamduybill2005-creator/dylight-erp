@@ -1,7 +1,7 @@
 "use client";
 
 // Khung giao diện RESPONSIVE — dùng được cả trên điện thoại và máy tính (PC/web).
-//  - Mobile (< lg): thanh tiêu đề trên + thanh điều hướng dưới + nút FAB "Chụp hóa đơn".
+//  - Mobile (< lg): thanh tiêu đề trên + thanh điều hướng dưới.
 //  - Desktop (lg+): thanh điều hướng dọc (sidebar) bên trái với menu đầy đủ; nội dung giãn rộng.
 // Menu thay đổi theo 3 tầng vai trò (Giám đốc / Quản lý / Nhân viên).
 

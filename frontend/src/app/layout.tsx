@@ -19,7 +19,7 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "CÔNG TY DOSCO — Quản lý dự án xây dựng",
-  description: "Đấu thầu, hợp đồng, hóa đơn AI, tiến độ và báo cáo lãi/lỗ.",
+  description: "Đấu thầu, hợp đồng, dự án, tiến độ và báo cáo lãi/lỗ.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "CÔNG TY DOSCO" },
 };

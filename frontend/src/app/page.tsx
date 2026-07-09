@@ -31,7 +31,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, roleTitle, type Tier } from "@/lib/roles";
 import { formatCompactVND, formatVND, todayLocal } from "@/lib/format";
-import type { Invoice, KpiSummary, ProjectProfit, User, Project, Attendance } from "@/lib/types";
+import type { KpiSummary, ProjectProfit, User, Project, Attendance } from "@/lib/types";
 
 type ModuleDef = {
   href: string;
@@ -69,7 +69,6 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [kpi, setKpi] = useState<KpiSummary | null>(null);
   const [profit, setProfit] = useState<ProjectProfit[]>([]);
-  const [pending, setPending] = useState<Invoice[]>([]);
   const [todayAtt, setTodayAtt] = useState<Attendance | null>(null);
   const [attBusy, setAttBusy] = useState(false);
 
@@ -85,11 +84,9 @@ export default function DashboardPage() {
       } else if (tier === "MANAGER") {
         // Quản lý: KHÔNG gọi /dashboard/summary|profit (đã chặn ở backend) — chỉ dữ liệu vận hành.
         api.projects().then((d) => alive && setProjects(d)).catch(() => {});
-        api.invoices("EXTRACTED").then((d) => alive && setPending(d)).catch(() => {});
       } else {
         api.kpiSummary().then((d) => alive && setKpi(d)).catch(() => {});
         api.profitByProject().then((d) => alive && setProfit(d)).catch(() => {});
-        api.invoices("EXTRACTED").then((d) => alive && setPending(d)).catch(() => {});
         api.projects().then((d) => alive && setProjects(d)).catch(() => {});
       }
     }
@@ -337,9 +334,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="text-right text-[11px] text-muted">
-                <p>Chi phí HĐ đã duyệt</p>
-                <p className="font-semibold text-ink">{kpi ? formatCompactVND(kpi.total_invoice_cost) : "—"}</p>
-                <p className="mt-1">Đã thu</p>
+                <p>Đã thu</p>
                 <p className="font-semibold text-ink">{kpi ? formatCompactVND(kpi.total_collected) : "—"}</p>
               </div>
             </div>
@@ -351,16 +346,12 @@ export default function DashboardPage() {
           <p className="text-xs text-amber font-semibold uppercase tracking-wider">Trang quản lý</p>
           <h1 className="mt-1 text-xl lg:text-2xl font-bold">Xin chào, {user.full_name}!</h1>
           <p className="mt-2 text-xs text-white/70">
-            Điều hành dự án, hóa đơn, nhân sự và chấm công. (Số liệu doanh thu/lãi-lỗ do Ban Giám đốc quản lý.)
+            Điều hành dự án, nhân sự và chấm công. (Số liệu doanh thu/lãi-lỗ do Ban Giám đốc quản lý.)
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 lg:max-w-md">
             <div className="rounded-xl2 bg-white/10 p-3">
               <p className="text-[11px] text-white/60">Dự án</p>
               <p className="mt-1 text-2xl font-bold tnum">{projects.length}</p>
-            </div>
-            <div className="rounded-xl2 bg-white/10 p-3">
-              <p className="text-[11px] text-white/60">Hóa đơn chờ duyệt</p>
-              <p className="mt-1 text-2xl font-bold tnum">{pending.length}</p>
             </div>
           </div>
         </section>
@@ -380,42 +371,6 @@ export default function DashboardPage() {
                 <m.icon className="h-6 w-6" />
               </span>
               <span className="text-[11px] font-medium leading-tight text-ink">{m.label}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ---- Hóa đơn chờ duyệt ---- */}
-      <section className="mt-5">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-ink">Hóa đơn chờ duyệt</h2>
-          {pending.length > 0 && (
-            <span className="rounded-full bg-amber/20 px-2 py-0.5 text-[11px] font-semibold text-amber-deep">
-              {pending.length} chờ
-            </span>
-          )}
-        </div>
-        <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">
-          {pending.length === 0 && (
-            <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2">
-              Không có hóa đơn nào chờ duyệt.
-            </p>
-          )}
-          {pending.slice(0, 4).map((inv) => (
-            <Link
-              key={inv.id}
-              href="/invoices"
-              className="flex items-center justify-between rounded-xl2 bg-white p-3 shadow-card"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">
-                  {inv.supplier_name || "Nhà cung cấp chưa rõ"}
-                </p>
-                <p className="font-mono text-[11px] text-muted">MST {inv.supplier_tax_code || "—"}</p>
-              </div>
-              <p className="ml-3 shrink-0 text-sm font-semibold text-ink tnum">
-                {formatVND(inv.total_amount)}
-              </p>
             </Link>
           ))}
         </div>

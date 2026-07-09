@@ -14,7 +14,6 @@ import {
   BanknotesIcon,
   ClockIcon,
   DocumentTextIcon,
-  CurrencyDollarIcon,
   XMarkIcon,
   UsersIcon,
   TableCellsIcon,
@@ -59,7 +58,7 @@ export default function ProjectDetailPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team" | "eval" | "invoices" | "payments">("contracts");
+  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team" | "eval" | "payments">("contracts");
 
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
@@ -189,9 +188,9 @@ export default function ProjectDetailPage() {
         // Tab tiền chỉ nhận khi có quyền xem tiền.
         const want = new URLSearchParams(window.location.search).get("tab");
         const allowed: string[] = ["items", "progress", "team", "eval"];
-        if (canSeeMoney(me.role)) allowed.push("contracts", "invoices", "payments");
+        if (canSeeMoney(me.role)) allowed.push("contracts", "payments");
         if (want && allowed.includes(want)) {
-          setActiveTab(want as "contracts" | "items" | "progress" | "team" | "eval" | "invoices" | "payments");
+          setActiveTab(want as "contracts" | "items" | "progress" | "team" | "eval" | "payments");
         }
       })
       .catch(() => {});
@@ -661,9 +660,6 @@ export default function ProjectDetailPage() {
         <TabButton active={activeTab === "team"} onClick={() => setActiveTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
         <TabButton active={activeTab === "eval"} onClick={() => setActiveTab("eval")} label="Đánh giá" icon={StarIcon} />
         {showMoney && (
-          <TabButton active={activeTab === "invoices"} onClick={() => setActiveTab("invoices")} label="Chi phí AI" icon={CurrencyDollarIcon} count={invoices.length} />
-        )}
-        {showMoney && (
           <TabButton active={activeTab === "payments"} onClick={() => setActiveTab("payments")} label="Thanh toán" icon={BanknotesIcon} count={payments.length} />
         )}
       </div>
@@ -815,50 +811,6 @@ export default function ProjectDetailPage() {
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab Hóa đơn */}
-        {showMoney && activeTab === "invoices" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-muted uppercase">Hóa đơn chi phí liên kết ({invoices.length})</h3>
-              <button
-                onClick={() => router.push("/invoices")}
-                className="flex items-center gap-1 text-xs font-semibold text-amber hover:text-amber-deep"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Chụp hóa đơn mới
-              </button>
-            </div>
-
-            {invoices.length === 0 ? (
-              <p className="rounded-xl2 bg-white p-6 text-center text-xs text-muted shadow-card">
-                Chưa có hóa đơn chi phí nào được gán cho dự án này.
-              </p>
-            ) : (
-              <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3">
-              {invoices.map((inv) => (
-                <div key={inv.id} className="rounded-xl2 bg-white p-3 shadow-card border border-line/40">
-                  <div className="flex items-start justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-ink">{inv.supplier_name || "Nhà cung cấp chưa rõ"}</p>
-                      <p className="font-mono text-[10px] text-muted">
-                        Số HĐ: {inv.invoice_number || "—"} · {inv.invoice_date ? formatDate(inv.invoice_date) : "—"}
-                      </p>
-                    </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ${inv.status === "VERIFIED" ? "bg-ok/10 text-ok" : "bg-amber/10 text-amber-deep"}`}>
-                      {inv.status === "VERIFIED" ? "Đã duyệt" : "Chờ duyệt"}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs border-t border-line/60 pt-2">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-paper text-muted uppercase font-semibold">{inv.category || "khác"}</span>
-                    <span className="font-bold text-ink tnum">{formatVND(inv.total_amount)}</span>
-                  </div>
-                </div>
-              ))}
               </div>
             )}
           </div>
