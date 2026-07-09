@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -252,6 +252,15 @@ export const api = {
     request<EvaluationSummary[]>(`/evaluations/summary?period=${period}`),
   allEvaluations: (period: string) =>
     request<Evaluation[]>(`/evaluations/all?period=${period}`),
+
+  // --- Đánh giá theo DỰ ÁN (chấm chéo 360°) ---
+  projectEvaluations: (projectId: number) =>
+    request<ProjectEvaluationView>(`/project-evaluations?project_id=${projectId}`),
+  createProjectEvaluation: (payload: { project_id: number; evaluatee_id: number; rating: number; comment?: string | null }) =>
+    request<ProjectEvaluation>("/project-evaluations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // --- Partners (Đối tác) — chỉ Giám đốc ---
   partners: (type?: string) =>

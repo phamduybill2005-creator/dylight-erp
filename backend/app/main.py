@@ -17,7 +17,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
-    project_items, attendance, evaluations, partners, payroll,
+    project_items, attendance, evaluations, project_evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
     chat, iclock,
 )
@@ -307,7 +307,7 @@ def health():
 # --- Đăng ký router theo tiền tố /api/v1 ---
 P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
-          project_items, attendance, evaluations, partners, payroll,
+          project_items, attendance, evaluations, project_evaluations, partners, payroll,
           leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
           chat):
     app.include_router(r.router, prefix=P)

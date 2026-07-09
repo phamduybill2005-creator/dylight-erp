@@ -18,8 +18,8 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import (
     Assignment, ChatMessage, Contract, Conversation, ConversationMember, DesignDocument,
-    Invoice, MessageReaction, Payment, Progress, Project, ProjectItem, ProgressSnapshot,
-    User, UserRole, project_members,
+    Invoice, MessageReaction, Payment, Progress, Project, ProjectEvaluation, ProjectItem,
+    ProgressSnapshot, User, UserRole, project_members,
 )
 from app.schemas import (
     ProjectCreate, ProjectLeadSet, ProjectMemberChange, ProjectOut, ProjectUpdate,
@@ -273,6 +273,7 @@ def delete_project(
     d(db.query(ProjectItem).filter(ProjectItem.project_id == project_id))
     d(db.query(Progress).filter(Progress.project_id == project_id))
     d(db.query(Assignment).filter(Assignment.project_id == project_id))
+    d(db.query(ProjectEvaluation).filter(ProjectEvaluation.project_id == project_id))
     d(db.query(DesignDocument).filter(DesignDocument.project_id == project_id))
 
     # 4) Bảng thành viên (M2M) + chính dự án.

@@ -233,6 +233,46 @@ export interface Evaluation {
   evaluatee_name?: string | null;
 }
 
+// Đánh giá CHÉO 360° theo DỰ ÁN — các thành viên chấm lẫn nhau (1 phiếu/người/dự án).
+export interface ProjectEvaluation {
+  id: number;
+  project_id: number;
+  evaluator_id: number;         // = 0 khi phiếu "về mình" đã ẩn danh người chấm
+  evaluatee_id: number;
+  rating: number;               // 1-5
+  comment?: string | null;
+  created_at: string;
+  evaluator_name?: string | null;
+  evaluatee_name?: string | null;
+}
+
+export interface ProjectEvalParticipant {
+  user_id: number;
+  full_name: string;
+  role: Role;
+  department?: string | null;
+  is_lead: boolean;
+}
+
+export interface ProjectEvalSummaryRow {
+  user_id: number;
+  full_name: string;
+  avg_rating: number;
+  num_ratings: number;
+}
+
+export interface ProjectEvaluationView {
+  project_id: number;
+  can_manage: boolean;                     // chủ trì/Giám đốc -> thấy tổng hợp cả nhóm
+  participants: ProjectEvalParticipant[];
+  given: ProjectEvaluation[];              // phiếu MÌNH đã chấm (prefill form)
+  received: ProjectEvaluation[];           // phiếu VỀ MÌNH (đã ẩn danh người chấm)
+  my_avg?: number | null;
+  my_count: number;
+  summary: ProjectEvalSummaryRow[];        // chỉ khi can_manage
+  all_evaluations: ProjectEvaluation[];    // chỉ khi can_manage — từng phiếu, có tên
+}
+
 // Đối tác (Partner) — Chủ đầu tư / Nhà cung cấp / Nhà thầu phụ.
 export type PartnerType = "INVESTOR" | "SUPPLIER" | "SUBCONTRACTOR";
 

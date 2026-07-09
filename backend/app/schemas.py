@@ -514,6 +514,64 @@ class EvaluationSummary(BaseModel):
     num_ratings: int
 
 
+# --------- Đánh giá theo DỰ ÁN (chấm chéo 360° giữa các thành viên) ---------
+class ProjectEvaluationCreate(BaseModel):
+    project_id: int
+    evaluatee_id: int
+    rating: int = Field(ge=1, le=5)
+    comment: str | None = None
+
+
+class ProjectEvaluationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    project_id: int
+    evaluator_id: int
+    evaluatee_id: int
+    rating: int
+    comment: str | None = None
+    created_at: datetime
+    evaluator_name: str | None = None
+    evaluatee_name: str | None = None
+
+
+class ProjectEvalParticipant(BaseModel):
+    """Một người tham gia dự án — đối tượng có thể chấm / được chấm."""
+    user_id: int
+    full_name: str
+    role: UserRole
+    department: str | None = None
+    is_lead: bool = False
+
+
+class ProjectEvalSummaryRow(BaseModel):
+    """Tổng hợp điểm 1 người NHẬN trong dự án — cho chủ trì/Giám đốc."""
+    user_id: int
+    full_name: str
+    avg_rating: float
+    num_ratings: int
+
+
+class ProjectEvaluationView(BaseModel):
+    """Toàn bộ dữ liệu tab 'Đánh giá' của 1 dự án, đã cắt theo quyền người xem.
+
+    - participants: danh sách người tham gia (để dựng form chấm).
+    - given: phiếu MÌNH đã chấm (prefill + sửa).
+    - received: phiếu VỀ MÌNH — ĐÃ ẩn danh người chấm (chấm chéo cần tế nhị).
+    - my_avg/my_count: điểm trung bình mình nhận.
+    - summary/all_evaluations: CHỈ chủ trì/Giám đốc — xem tổng hợp & từng phiếu.
+    """
+    project_id: int
+    can_manage: bool
+    participants: list[ProjectEvalParticipant]
+    given: list[ProjectEvaluationOut]
+    received: list[ProjectEvaluationOut]
+    my_avg: float | None = None
+    my_count: int = 0
+    summary: list[ProjectEvalSummaryRow] = []
+    all_evaluations: list[ProjectEvaluationOut] = []
+
+
 # ------------------------- PARTNER (ĐỐI TÁC) -------------------------
 class PartnerBase(BaseModel):
     type: PartnerType = PartnerType.SUPPLIER

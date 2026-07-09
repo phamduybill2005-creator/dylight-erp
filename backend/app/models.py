@@ -522,6 +522,46 @@ class Evaluation(Base):
 
 
 # --------------------------------------------------------------------------
+# 11b. PROJECT_EVALUATIONS — đánh giá CHÉO 360° trong MỘT DỰ ÁN.
+#     Mọi thành viên (gồm chủ trì) chấm lẫn nhau: 1 phiếu/người/dự án (ghi đè
+#     khi chấm lại), điểm 1–5 sao + nhận xét. Khác Evaluation (đánh giá TUẦN
+#     theo quan hệ quản lý): bảng này gắn project_id, KHÔNG có chiều & kỳ.
+# --------------------------------------------------------------------------
+class ProjectEvaluation(Base):
+    __tablename__ = "project_evaluations"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id", "evaluator_id", "evaluatee_id", name="uq_proj_eval"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    evaluator_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)  # người chấm
+    evaluatee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)  # người được chấm
+    rating: Mapped[int] = mapped_column(Integer, default=0)   # 1–5 sao
+    comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    evaluator: Mapped["User"] = relationship("User", foreign_keys=[evaluator_id])
+    evaluatee: Mapped["User"] = relationship("User", foreign_keys=[evaluatee_id])
+
+    @property
+    def evaluator_name(self) -> str | None:
+        return self.evaluator.full_name if self.evaluator else None
+
+    @property
+    def evaluatee_name(self) -> str | None:
+        return self.evaluatee.full_name if self.evaluatee else None
+
+
+# --------------------------------------------------------------------------
 # 12. PARTNERS — danh mục đối tác: Chủ đầu tư / Nhà cung cấp / Nhà thầu phụ
 #     (NHẠY CẢM: chỉ Giám đốc/Quản trị quản lý — gắn công nợ về sau)
 # --------------------------------------------------------------------------
