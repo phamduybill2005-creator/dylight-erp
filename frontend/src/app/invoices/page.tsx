@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CameraIcon,
   CheckBadgeIcon,
-  SparklesIcon,
   ArrowUpTrayIcon,
   XMarkIcon,
-  EyeIcon,
-  BuildingOfficeIcon,
-  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api, ASSET_BASE } from "@/lib/api";
@@ -37,16 +31,12 @@ export default function InvoicesPage() {
 }
 
 function InvoicesInner() {
-  const params = useSearchParams();
-  const inputRef = useRef<HTMLInputElement>(null);
-  
   // Lists
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
 
   // States
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Detail Modal State
@@ -71,29 +61,6 @@ function InvoicesInner() {
   }
   
   useEffect(loadData, []);
-
-  // Open camera/uploader when coming from FAB (?capture=1)
-  useEffect(() => {
-    if (params.get("capture") === "1") inputRef.current?.click();
-  }, [params]);
-
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError(null);
-    setUploading(true);
-    try {
-      const inv = await api.uploadInvoice(file);
-      // Auto open detail modal for the uploaded invoice
-      openDetailModal(inv);
-      loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Tải hóa đơn thất bại.");
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  }
 
   function openDetailModal(inv: Invoice) {
     setSelectedInvoice(inv);
@@ -162,35 +129,8 @@ function InvoicesInner() {
     <AppShell>
       <h1 className="text-lg font-semibold text-ink lg:text-2xl">Quản lý hóa đơn</h1>
       <p className="mt-0.5 text-xs text-muted">
-        Chụp ảnh hóa đơn, AI tự động bóc tách dữ liệu chi phí công trường.
+        Danh sách hóa đơn chi phí công trường.
       </p>
-
-      {/* Vùng chụp / tải ảnh */}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={onFile}
-        className="hidden"
-      />
-      <button
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl2 bg-amber py-4 font-semibold text-ink shadow-fab disabled:opacity-70 lg:max-w-sm"
-      >
-        {uploading ? (
-          <>
-            <SparklesIcon className="h-5 w-5 animate-pulse" />
-            AI đang đọc hóa đơn…
-          </>
-        ) : (
-          <>
-            <CameraIcon className="h-5 w-5" />
-            Chụp / tải ảnh hóa đơn
-          </>
-        )}
-      </button>
 
       {error && <p className="mt-3 text-xs text-bad">{error}</p>}
 
@@ -200,7 +140,7 @@ function InvoicesInner() {
         {invoices.length === 0 && (
           <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2 xl:col-span-3">
             <ArrowUpTrayIcon className="mx-auto mb-1 h-5 w-5" />
-            Chưa có hóa đơn. Hãy chụp hóa đơn đầu tiên.
+            Chưa có hóa đơn.
           </p>
         )}
         {invoices.map((inv) => {
