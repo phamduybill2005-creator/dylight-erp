@@ -12,9 +12,7 @@ import { motion } from "framer-motion";
 import {
   HomeIcon,
   FolderIcon,
-  DocumentTextIcon,
   UserCircleIcon,
-  CameraIcon,
   ChevronDownIcon,
   BuildingOffice2Icon,
   ClockIcon,
@@ -38,8 +36,6 @@ import DeadlineAlert from "./deadline-alert";
 type IconType = React.ComponentType<{ className?: string }>;
 type NavLink = { href: string; label: string; icon: IconType };
 
-const CAPTURE_HREF = "/invoices?capture=1";
-
 // Menu đầy đủ cho sidebar desktop (mobile dùng bản rút gọn 4 mục bên dưới).
 function deskNav(tier: Tier): NavLink[] {
   if (tier === "STAFF") {
@@ -58,7 +54,6 @@ function deskNav(tier: Tier): NavLink[] {
     { href: "/bids", label: "Đấu thầu", icon: ClipboardDocumentListIcon },
     { href: "/projects", label: "Dự án & Hợp đồng", icon: FolderIcon },
     { href: "/design-docs", label: "Hồ sơ thiết kế", icon: RectangleStackIcon },
-    { href: "/invoices", label: "Hóa đơn", icon: DocumentTextIcon },
     { href: "/attendance", label: "Chấm công", icon: ClockIcon },
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
@@ -139,16 +134,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               ))}
             </div>
           )}
-        </div>
-
-        {/* Nút Chụp hóa đơn nổi bật */}
-        <div className="px-3 pt-4">
-          <Link
-            href={CAPTURE_HREF}
-            className="flex items-center justify-center gap-2 rounded-xl2 bg-amber py-2.5 text-sm font-semibold text-ink shadow-fab"
-          >
-            <CameraIcon className="h-5 w-5" /> Chụp hóa đơn
-          </Link>
         </div>
 
         {/* Menu dọc */}
@@ -236,12 +221,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* ---- Thanh điều hướng dưới + FAB (chỉ MOBILE) ---- */}
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md lg:hidden">
-          <div className="relative mx-3 mb-3 flex items-center justify-between rounded-xl2 bg-white px-6 py-2 shadow-card">
+          <div className="relative mx-3 mb-3 flex items-center justify-around rounded-xl2 bg-white px-6 py-2 shadow-card">
             {tier === "STAFF" ? (
               <>
                 <NavItem href="/" label="Trang chủ" icon={HomeIcon} active={pathname === "/"} />
                 <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
-                <div className="w-14" aria-hidden />
                 <NavItem href="/attendance" label="Chấm công" icon={ClockIcon} active={pathname.startsWith("/attendance")} />
                 <NavItem href="/profile" label="Cá nhân" icon={UserCircleIcon} active={pathname === "/profile"} />
               </>
@@ -249,22 +233,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <>
                 <NavItem href="/" label="Tổng quan" icon={HomeIcon} active={pathname === "/"} />
                 <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
-                <div className="w-14" aria-hidden />
-                <NavItem href="/invoices" label="Hóa đơn" icon={DocumentTextIcon} active={pathname.startsWith("/invoices")} />
                 <NavItem href="/employees" label="Nhân sự" icon={UsersIcon} active={pathname.startsWith("/employees")} />
               </>
             )}
-
-            {/* FAB Chụp hóa đơn */}
-            <Link href={CAPTURE_HREF} className="absolute -top-7 left-1/2 -translate-x-1/2">
-              <motion.div
-                whileTap={{ scale: 0.92 }}
-                className="flex h-16 w-16 flex-col items-center justify-center rounded-full bg-amber text-ink shadow-fab ring-4 ring-paper"
-              >
-                <CameraIcon className="h-6 w-6" />
-                <span className="text-[9px] font-semibold leading-none">Chụp</span>
-              </motion.div>
-            </Link>
           </div>
         </nav>
       </div>
