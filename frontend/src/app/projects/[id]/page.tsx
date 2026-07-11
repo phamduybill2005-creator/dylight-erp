@@ -30,8 +30,8 @@ import ProjectTeamTab from "@/components/project-team-tab";
 import ProjectEvaluationTab from "@/components/project-evaluation-tab";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
-import { formatVND, formatDate, formatCompactVND } from "@/lib/format";
-import type { Project, Contract, Payment, Progress, Invoice, PaymentType, PaymentDirection, User } from "@/lib/types";
+import { formatVND, formatDate } from "@/lib/format";
+import type { Project, Contract, Payment, Progress, PaymentType, PaymentDirection, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -55,7 +55,6 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [progressLogs, setProgressLogs] = useState<Progress[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team" | "eval" | "payments">("contracts");
@@ -134,7 +133,6 @@ export default function ProjectDetailPage() {
           setProject(proj);
           setProgressLogs(prog);
           setContracts([]);
-          setInvoices([]);
           setPayments([]);
         })
         .catch(() => {})
@@ -146,14 +144,11 @@ export default function ProjectDetailPage() {
       api.getProject(projectId),
       api.contracts(projectId),
       api.progress(projectId),
-      api.invoices(),
     ])
-      .then(async ([proj, contrs, prog, invs]) => {
+      .then(async ([proj, contrs, prog]) => {
         setProject(proj);
         setContracts(contrs);
         setProgressLogs(prog);
-        // Filter invoices for this project
-        setInvoices(invs.filter((i) => i.project_id === projectId));
 
         // Fetch payments for all contracts of this project
         if (contrs.length > 0) {
@@ -335,15 +330,6 @@ export default function ProjectDetailPage() {
     setError(null);
     setProgressModal(true);
   }
-
-  // Financial Summaries — dùng GIÁ CHƯA VAT cho cả doanh thu lẫn chi phí để cùng đơn vị
-  // (trước đây cộng total_amount đã gồm VAT khiến chi phí bị thổi ~10%, dự án trông lỗ hơn thực).
-  const totalContractValue = contracts.reduce((acc, c) => acc + Number(c.value_no_vat), 0);
-  const totalCost = invoices
-    .filter((i) => i.status === "VERIFIED")
-    .reduce((acc, i) => acc + Number(i.amount_no_vat), 0);
-  const totalProfit = totalContractValue - totalCost;
-  const marginPercent = totalContractValue > 0 ? (totalProfit / totalContractValue) * 100 : 0;
 
   async function handleAddContract(e: React.FormEvent) {
     e.preventDefault();
@@ -610,45 +596,6 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Tổng quan tài chính — ẩn với nhân viên (STAFF không xem tiền) */}
-      {showMoney && (
-      <div className="mt-4 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
-        <h2 className="text-xs font-semibold text-white/60 uppercase tracking-wider">Tình hình tài chính dự án</h2>
-
-        <div className="mt-3 grid grid-cols-3 gap-2 lg:gap-4 text-center">
-          <div>
-            <p className="text-[10px] text-white/50">Doanh thu (HĐ)</p>
-            <p className="text-sm font-bold tnum">{formatCompactVND(totalContractValue)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-white/50">Chi phí thực (Đã duyệt)</p>
-            <p className="text-sm font-bold text-amber tnum">{formatCompactVND(totalCost)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-white/50">Lợi nhuận dự tính</p>
-            <p className={`text-sm font-bold tnum ${(totalProfit >= 0) ? "text-ok" : "text-bad"}`}>
-              {formatCompactVND(totalProfit)}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-center justify-between text-[11px] text-white/60">
-          <span>Biên lợi nhuận gộp:</span>
-          <span className={`font-bold ${(totalProfit >= 0) ? "text-ok" : "text-bad"}`}>
-            {marginPercent.toFixed(1)}%
-          </span>
-        </div>
-
-        {/* Thanh tỷ lệ chi phí / doanh thu */}
-        <div className="mt-2 h-2 w-full bg-white/20 rounded-full overflow-hidden">
-          <div
-            className={`h-full ${(totalProfit >= 0) ? "bg-ok" : "bg-bad"}`}
-            style={{ width: `${Math.min(100, totalContractValue > 0 ? (totalCost / totalContractValue) * 100 : 0)}%` }}
-          />
-        </div>
-      </div>
-      )}
 
       {/* Tabs điều hướng — nhân viên chỉ thấy Hạng mục + Tiến độ (không có tab tiền) */}
       <div className="mt-6 flex border-b border-line">
