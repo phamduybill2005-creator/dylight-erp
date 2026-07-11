@@ -1,0 +1,38 @@
+name: Nang SON len Quan tri vien (1 lan)
+
+# Nang tai khoan cua SON len role ADMIN tren PROD (Neon).
+# Khop theo email dhson@dosco.vn (uu tien) hoac ten "SON"; chi doi khi duy nhat.
+# Idempotent — chay lai khong doi neu da la ADMIN.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - backend/scripts/promote_son_admin_once.py
+
+concurrency:
+  group: promote-son-admin
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+      - name: Promote SON to ADMIN
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/promote_son_admin_once.py
