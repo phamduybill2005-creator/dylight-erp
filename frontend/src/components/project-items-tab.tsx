@@ -10,7 +10,7 @@ import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon } from "@heroico
 import { api } from "@/lib/api";
 import { formatVND, dateLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import type { ProjectItem } from "@/lib/types";
+import type { ProjectItem, Department } from "@/lib/types";
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -100,6 +100,8 @@ export default function ProjectItemsTab({
   const [error, setError] = useState<string | null>(null);
   // Lọc bảng theo phòng ban phụ trách: "" = tất cả, "__none__" = chưa gán phòng.
   const [deptFilter, setDeptFilter] = useState<string>("");
+  // Danh mục phòng ban của công ty (nguồn chân lý từ backend). Lùi về PRESET nếu chưa nạp.
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   // ----- Form "Thêm hạng mục" (nhập từng ô riêng, dễ dùng trên điện thoại) -----
   const [showForm, setShowForm] = useState(false);
@@ -124,6 +126,14 @@ export default function ProjectItemsTab({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Nạp danh mục phòng ban 1 lần để đổ vào ô chọn "Phòng ban phụ trách".
+  useEffect(() => {
+    api.departments().then(setDepartments).catch(() => {});
+  }, []);
+
+  // Tên các phòng để chọn: danh mục từ backend, lùi về PRESET cố định nếu chưa nạp được.
+  const deptNames = departments.length ? departments.map((d) => d.name) : PRESET_DEPARTMENTS;
 
   const groups = items
     .filter((i) => i.parent_id == null)
@@ -150,12 +160,12 @@ export default function ProjectItemsTab({
       progress: rollupProgress(kids),
     };
   };
-  // Các phòng đang được dùng: phòng cố định trước, rồi phòng "lạ" (dữ liệu cũ).
+  // Các phòng đang được dùng: theo thứ tự danh mục trước, rồi phòng "lạ" (dữ liệu cũ).
   const deptsInUse = (() => {
     const set = new Set(groups.map(deptOf).filter(Boolean));
     return [
-      ...PRESET_DEPARTMENTS.filter((d) => set.has(d)),
-      ...Array.from(set).filter((d) => !PRESET_DEPARTMENTS.includes(d)),
+      ...deptNames.filter((d) => set.has(d)),
+      ...Array.from(set).filter((d) => !deptNames.includes(d)),
     ];
   })();
   const hasUnassigned = groups.some((g) => !deptOf(g));
@@ -497,6 +507,7 @@ export default function ProjectItemsTab({
                       subtotal={groupSubtotal(g.id)}
                       groupProgress={rollupProgress(kids)}
                       canSeeMoney={canSeeMoney}
+                      deptOptions={deptNames}
                       onPersist={persist}
                       onAddChild={addChild}
                       onRemove={remove}
@@ -554,6 +565,7 @@ function GroupRows({
   subtotal,
   groupProgress,
   canSeeMoney,
+  deptOptions,
   onPersist,
   onAddChild,
   onRemove,
@@ -565,6 +577,7 @@ function GroupRows({
   subtotal: number;
   groupProgress: number;
   canSeeMoney: boolean;
+  deptOptions: string[];
   onPersist: (id: number, patch: Partial<ProjectItem>) => void;
   onAddChild: (g: ProjectItem) => void;
   onRemove: (i: ProjectItem) => void;
@@ -598,12 +611,12 @@ function GroupRows({
               aria-label="Phòng ban phụ trách"
             >
               <option value="">— Chưa gán phòng —</option>
-              {PRESET_DEPARTMENTS.map((d) => (
+              {deptOptions.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
               ))}
-              {group.department && !PRESET_DEPARTMENTS.includes(group.department) && (
+              {group.department && !deptOptions.includes(group.department) && (
                 <option value={group.department}>{group.department}</option>
               )}
             </select>

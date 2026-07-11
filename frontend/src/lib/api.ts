@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -343,6 +343,13 @@ export const api = {
     request<DesignDocument>(`/design-docs/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deleteDesignDoc: (id: number) =>
     request<void>(`/design-docs/${id}`, { method: "DELETE" }),
+
+  // --- Phòng ban (danh mục) — xem: mọi người; thêm/đổi tên: Admin & Giám đốc ---
+  departments: () => request<Department[]>("/departments"),
+  createDepartment: (name: string) =>
+    request<Department>("/departments", { method: "POST", body: JSON.stringify({ name }) }),
+  renameDepartment: (id: number, name: string) =>
+    request<Department>(`/departments/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
 
   // --- Users ---
   users: () => request<User[]>("/auth/users"),

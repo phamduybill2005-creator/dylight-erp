@@ -943,3 +943,19 @@ class ConversationRename(BaseModel):
 
 class ConversationAddMembers(BaseModel):
     member_ids: list[int] = Field(default_factory=list)
+
+
+# --------------------------- DEPARTMENT -------------------------
+class DepartmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    order_index: int
+
+
+class DepartmentCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class DepartmentUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)

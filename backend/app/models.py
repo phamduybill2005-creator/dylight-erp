@@ -901,3 +901,23 @@ class MessageReaction(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     emoji: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# --------------------------------------------------------------------------
+# 26. DEPARTMENTS — danh mục PHÒNG BAN của công ty (nguồn chân lý cho danh sách).
+#     Trước đây phòng ban là hằng số cứng ở frontend; bảng này cho Admin/Giám đốc
+#     TỰ thêm phòng mới (kể cả phòng chưa có ai) và ĐỔI TÊN phòng. Việc gán người
+#     vào phòng vẫn lưu dạng chuỗi ở users.department (nhiều phòng ngăn bởi dấu phẩy);
+#     khi đổi tên, router cascade cập nhật các chuỗi tham chiếu để không "mồ côi".
+# --------------------------------------------------------------------------
+class Department(Base):
+    __tablename__ = "departments"
+    __table_args__ = (
+        UniqueConstraint("company_id", "name", name="uq_department_company_name"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    order_index: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # thứ tự hiển thị
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

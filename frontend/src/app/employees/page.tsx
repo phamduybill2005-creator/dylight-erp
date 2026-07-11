@@ -18,12 +18,13 @@ import {
   ListBulletIcon,
   Squares2X2Icon,
   UserGroupIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { ROLE_LABEL, roleTitle } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
-import type { User, Role, Project, Assignment } from "@/lib/types";
+import type { User, Role, Project, Assignment, Department } from "@/lib/types";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 
 // Một người có thể thuộc NHIỀU phòng cùng lúc — lưu trong cột `department`,
@@ -50,6 +51,9 @@ export default function EmployeesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   // Cách xem danh sách nhân sự: phẳng, gom theo phòng ban, hay gom theo quản lý.
   const [viewMode, setViewMode] = useState<"list" | "department" | "manager">("list");
+  // Danh mục phòng ban lấy từ backend (nguồn chân lý); Admin/Giám đốc thêm/đổi tên.
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [showDeptManager, setShowDeptManager] = useState(false);
   
   // States for the edit form
   const [formData, setFormData] = useState({
@@ -117,6 +121,8 @@ export default function EmployeesPage() {
         }
         // Danh sách dự án (cho ô chọn khi giao việc).
         api.projects().then((d) => alive && setProjectsList(d)).catch(() => {});
+        // Danh mục phòng ban của công ty (đổ vào ô chọn phòng + modal quản lý).
+        api.departments().then((d) => alive && setDepartments(d)).catch(() => {});
         // 2. Fetch all company users (lần đầu bật spinner, poll thì không).
         api.users()
           .then((data) => {
@@ -205,14 +211,18 @@ export default function EmployeesPage() {
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Gợi ý phòng ban: 4 phòng của công ty (cố định) + phòng nào đã có sẵn nhưng
-  // chưa nằm trong danh sách cố định (giữ tương thích dữ liệu cũ). Tránh gõ lệch làm vỡ nhóm.
+  // Gợi ý phòng ban: danh mục từ backend (Admin/Giám đốc quản lý) + phòng nào đã có
+  // sẵn trong dữ liệu nhưng chưa nằm trong danh mục (giữ tương thích dữ liệu cũ).
+  // Nếu chưa nạp được danh mục thì lùi về danh sách cố định PRESET_DEPARTMENTS.
+  const knownDepartments = departments.length
+    ? departments.map((d) => d.name)
+    : PRESET_DEPARTMENTS;
   const extraDepartments = Array.from(
     new Set(users.flatMap((u) => splitDepts(u.department)))
   )
-    .filter((d) => !PRESET_DEPARTMENTS.includes(d))
+    .filter((d) => !knownDepartments.includes(d))
     .sort((a, b) => a.localeCompare(b, "vi"));
-  const departmentOptions = [...PRESET_DEPARTMENTS, ...extraDepartments];
+  const departmentOptions = [...knownDepartments, ...extraDepartments];
 
   // Một nhóm nhân sự (theo phòng ban hoặc theo quản lý) khi hiển thị dạng gom.
   type EmpGroup = {
@@ -581,6 +591,20 @@ export default function EmployeesPage() {
           ))}
         </section>
 
+        {/* Quản lý danh mục phòng ban (chỉ Admin & Giám đốc) — chỉ hiện ở chế độ Theo phòng ban */}
+        {viewMode === "department" && canManage && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowDeptManager(true)}
+              className="flex items-center gap-1.5 rounded-xl2 border border-line bg-white px-3 py-2 text-xs font-semibold text-steel shadow-card hover:bg-paper transition-colors"
+            >
+              <BuildingOffice2Icon className="h-4 w-4" />
+              Quản lý phòng ban
+            </button>
+          </div>
+        )}
+
         {/* Danh sách nhân viên */}
         {viewMode === "list" ? (
           <section className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
@@ -810,7 +834,7 @@ export default function EmployeesPage() {
                     <span className="font-normal text-muted/70">(chọn 1 hoặc nhiều)</span>
                   </label>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {PRESET_DEPARTMENTS.map((d) => {
+                    {departmentOptions.map((d) => {
                       const on = splitDepts(formData.department).includes(d);
                       return (
                         <button
@@ -1106,7 +1130,7 @@ export default function EmployeesPage() {
                     <span className="font-normal text-muted/70">(chọn 1 hoặc nhiều)</span>
                   </label>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {PRESET_DEPARTMENTS.map((d) => {
+                    {departmentOptions.map((d) => {
                       const on = splitDepts(createData.department).includes(d);
                       return (
                         <button
@@ -1202,6 +1226,18 @@ export default function EmployeesPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Quản lý phòng ban (Admin & Giám đốc): thêm phòng mới + đổi tên phòng */}
+      {showDeptManager && (
+        <DepartmentManagerModal
+          departments={departments}
+          onClose={() => setShowDeptManager(false)}
+          onChanged={() => {
+            api.departments().then(setDepartments).catch(() => {});
+            api.users().then(setUsers).catch(() => {});
+          }}
+        />
+      )}
     </AppShell>
   );
 }
@@ -1283,6 +1319,143 @@ function EmployeeCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Modal quản lý DANH MỤC phòng ban: thêm phòng mới (kể cả phòng chưa có ai) và
+// đổi tên phòng. Đổi tên sẽ cascade ở backend (cập nhật users/hạng mục/biểu đồ),
+// nên sau mỗi thao tác gọi onChanged() để nạp lại danh mục + danh sách nhân sự.
+function DepartmentManagerModal({
+  departments,
+  onClose,
+  onChanged,
+}: {
+  departments: Department[];
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [edits, setEdits] = useState<Record<number, string>>({});
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState<number | "new" | null>(null);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  const nameOf = (d: Department) => (edits[d.id] ?? d.name);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setErr("");
+    setMsg("");
+    const name = newName.trim();
+    if (!name) { setErr("Nhập tên phòng ban."); return; }
+    setBusy("new");
+    try {
+      await api.createDepartment(name);
+      setNewName("");
+      setMsg(`Đã thêm phòng "${name}".`);
+      onChanged();
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : "Thêm phòng ban thất bại.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRename(d: Department) {
+    setErr("");
+    setMsg("");
+    const name = nameOf(d).trim();
+    if (!name) { setErr("Tên phòng ban không được để trống."); return; }
+    if (name === d.name) return;
+    setBusy(d.id);
+    try {
+      await api.renameDepartment(d.id, name);
+      setMsg(`Đã đổi tên thành "${name}".`);
+      setEdits((prev) => { const n = { ...prev }; delete n[d.id]; return n; });
+      onChanged();
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : "Đổi tên phòng ban thất bại.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl2 bg-white p-5 shadow-2xl">
+        <header className="flex items-center justify-between border-b border-line pb-3">
+          <h3 className="flex items-center gap-1.5 text-sm font-bold text-ink">
+            <BuildingOffice2Icon className="h-5 w-5 text-steel" />
+            Quản lý phòng ban
+          </h3>
+          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-paper hover:text-ink">
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </header>
+
+        {/* Thêm phòng mới */}
+        <form onSubmit={handleAdd} className="mt-4 flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <label className="mb-1 block text-[11px] font-semibold text-muted">Thêm phòng ban mới</label>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="VD: Phòng Kinh doanh"
+              className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={busy === "new"}
+            className="flex shrink-0 items-center gap-1 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-white hover:bg-steel transition-colors disabled:opacity-50"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Thêm
+          </button>
+        </form>
+
+        {(err || msg) && (
+          <p className={`mt-2 text-[11px] ${err ? "text-bad" : "text-ok"}`}>{err || msg}</p>
+        )}
+
+        {/* Danh sách phòng ban — đổi tên tại chỗ */}
+        <div className="mt-4 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+            Danh sách phòng ban ({departments.length})
+          </p>
+          {departments.length === 0 ? (
+            <p className="rounded-lg bg-paper p-3 text-center text-xs text-muted">Chưa có phòng ban nào.</p>
+          ) : (
+            departments.map((d) => {
+              const changed = nameOf(d).trim() !== d.name && nameOf(d).trim() !== "";
+              return (
+                <div key={d.id} className="flex items-center gap-2 rounded-lg border border-line/60 p-2">
+                  <PencilSquareIcon className="h-4 w-4 shrink-0 text-muted" />
+                  <input
+                    value={nameOf(d)}
+                    onChange={(e) => setEdits((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                    className="min-w-0 flex-1 rounded-md border border-transparent bg-paper px-2 py-1.5 text-xs text-ink outline-none focus:border-steel focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRename(d)}
+                    disabled={!changed || busy === d.id}
+                    className="flex shrink-0 items-center gap-1 rounded-md bg-steel px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-ink transition-colors disabled:opacity-40"
+                  >
+                    <CheckIcon className="h-3.5 w-3.5" />
+                    Lưu
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <p className="mt-3 text-[10px] text-muted">
+          Đổi tên phòng sẽ tự cập nhật cho tất cả nhân sự và hạng mục đang thuộc phòng đó.
+        </p>
+      </div>
     </div>
   );
 }

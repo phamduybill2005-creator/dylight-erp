@@ -291,6 +291,13 @@ export interface Partner {
   created_at: string;
 }
 
+// Phòng ban (danh mục do Admin/Giám đốc quản lý).
+export interface Department {
+  id: number;
+  name: string;
+  order_index: number;
+}
+
 // Bảng lương (Payroll).
 export type SalaryType = "MONTHLY" | "DAILY";
 

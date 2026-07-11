@@ -19,7 +19,7 @@ from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, project_evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-    chat, iclock,
+    chat, iclock, departments,
 )
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
@@ -250,6 +250,63 @@ def _backfill_departments() -> None:
 
 _backfill_departments()
 
+
+def _seed_departments() -> None:
+    """
+    Nạp DANH MỤC phòng ban (bảng departments) cho công ty nào CHƯA có dòng nào —
+    chạy mỗi lần khởi động nhưng chỉ điền khi bảng của công ty đó rỗng, nên không
+    ghi đè các phòng Admin đã tạo/đổi tên. Danh mục khởi tạo = 4 phòng mặc định +
+    mọi tên phòng đã dùng sẵn trong dữ liệu (users/hạng mục) để Admin thấy đủ và
+    đổi tên được. Trùng khớp PRESET_DEPARTMENTS ở frontend.
+    """
+    from app.database import SessionLocal
+    from app.models import Company, Department, ProjectItem, User
+
+    PRESETS = ["Phòng Khảo sát", "Phòng BIM", "Phòng Thiết kế đường 2D", "Phòng AI"]
+
+    db = SessionLocal()
+    try:
+        for (cid,) in db.query(Company.id).all():
+            has_any = (
+                db.query(Department.id)
+                .filter(Department.company_id == cid)
+                .first()
+            )
+            if has_any:
+                continue
+
+            names: list[str] = []
+            seen: set[str] = set()
+
+            def _add(raw: str | None) -> None:
+                t = " ".join((raw or "").split())
+                if t and t not in seen:
+                    seen.add(t)
+                    names.append(t)
+
+            for n in PRESETS:
+                _add(n)
+            # Tên phòng đã dùng trong dữ liệu cũ (users lưu nhiều phòng/dấu phẩy).
+            for (dep,) in db.query(User.department).filter(User.company_id == cid).all():
+                for tok in (dep or "").split(","):
+                    _add(tok)
+            for (dep,) in (
+                db.query(ProjectItem.department).filter(ProjectItem.company_id == cid).all()
+            ):
+                _add(dep)
+
+            for i, n in enumerate(names):
+                db.add(Department(company_id=cid, name=n, order_index=i))
+        db.commit()
+    except Exception as _e:  # noqa: BLE001
+        db.rollback()
+        print(f"[seed-dept] bo qua: {_e}")
+    finally:
+        db.close()
+
+
+_seed_departments()
+
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
@@ -309,7 +366,7 @@ P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
           project_items, attendance, evaluations, project_evaluations, partners, payroll,
           leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-          chat):
+          chat, departments):
     app.include_router(r.router, prefix=P)
 
 # Máy chấm công đẩy trực tiếp (ZKTeco PUSH/ADMS) gọi đúng /iclock/... -> KHÔNG thêm tiền tố /api/v1.
