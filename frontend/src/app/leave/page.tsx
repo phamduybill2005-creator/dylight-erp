@@ -16,6 +16,12 @@ import { isManagerUp } from "@/lib/roles";
 import { formatDate } from "@/lib/format";
 import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
 
+// Danh sách LÝ DO nghỉ phép cố định — người xin nghỉ chỉ được chọn 1 trong các mục này.
+const LEAVE_REASONS = [
+  "GIỖ TẾT", "HIẾU SỰ", "HỶ SỰ", "ỐM ĐAU", "NGỦ QUÊN", "TẮC ĐƯỜNG",
+  "HỎNG XE", "SINH NHẬT", "THIÊN TAI", "BIA RƯỢU", "HỌC HÀNH", "YÊU ĐƯƠNG",
+];
+
 const STATUS_LABEL: Record<LeaveStatus, string> = {
   PENDING: "Chờ duyệt",
   APPROVED: "Đã duyệt",
@@ -69,7 +75,7 @@ export default function LeavePage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fromDate || !toDate) return;
+    if (!fromDate || !toDate || !reason) return;   // bắt buộc chọn 1 lý do
     setSaving(true);
     try {
       await api.createLeave({ from_date: fromDate, to_date: toDate, reason: reason || null });
@@ -126,13 +132,17 @@ export default function LeavePage() {
           </div>
         </div>
         <div className="mt-3">
-          <label className="block text-[11px] font-semibold text-muted">Lý do</label>
-          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
-            className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
-            placeholder="Nêu lý do xin nghỉ…" />
+          <label className="block text-[11px] font-semibold text-muted">Lý do * <span className="font-normal text-muted/70">(chọn 1)</span></label>
+          <select required value={reason} onChange={(e) => setReason(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
+            <option value="">— Chọn lý do —</option>
+            {LEAVE_REASONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
         </div>
         <div className="mt-3 flex justify-end">
-          <button type="submit" disabled={saving || !fromDate || !toDate}
+          <button type="submit" disabled={saving || !fromDate || !toDate || !reason}
             className="flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
             <PaperAirplaneIcon className="h-4 w-4" /> {saving ? "Đang gửi…" : "Gửi đơn"}
           </button>
