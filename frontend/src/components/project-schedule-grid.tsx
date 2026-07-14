@@ -288,7 +288,7 @@ export default function ProjectScheduleGrid({
 
       {visibleDays.length > 0 && (
       <div className="mt-3 overflow-x-auto">
-        <table className="w-max border-collapse text-[10px]">
+        <table className="min-w-full border-collapse text-[10px]">
           <thead>
             {/* Hàng 1: tháng */}
             <tr>
@@ -313,7 +313,7 @@ export default function ProjectScheduleGrid({
                   <th
                     key={d}
                     title={formatDate(d)}
-                    className={`min-w-[24px] border border-line/60 px-0.5 py-0.5 text-center font-medium tnum ${
+                    className={`min-w-[34px] border border-line/60 px-1 py-0.5 text-center font-medium tnum ${
                       isToday ? "bg-amber text-white" : wd === 0 || wd === 6 ? "bg-paper text-muted/70" : "bg-white text-muted"
                     }`}
                   >
