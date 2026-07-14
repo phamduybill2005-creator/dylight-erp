@@ -20,6 +20,32 @@ const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
 };
 
+function calculateDuration(start?: string | null, end?: string | null, deadline?: string | null): string {
+  if (!start) return "—";
+  const startDate = new Date(start);
+  if (isNaN(startDate.getTime())) return "—";
+
+  if (end) {
+    const endDate = new Date(end);
+    if (!isNaN(endDate.getTime())) {
+      const diffTime = endDate.getTime() - startDate.getTime();
+      const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      return `${diffDays} ngày`;
+    }
+  }
+
+  if (deadline) {
+    const deadlineDate = new Date(deadline);
+    if (!isNaN(deadlineDate.getTime())) {
+      const diffTime = deadlineDate.getTime() - startDate.getTime();
+      const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      return `${diffDays} ngày (dự kiến)`;
+    }
+  }
+
+  return "—";
+}
+
 export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -180,8 +206,8 @@ export default function ProjectsPage() {
 
   const TH = "border border-line px-3 py-2 font-semibold whitespace-nowrap";
   const TD = "border border-line px-3 py-2 align-middle";
-  // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Đánh giá, Ngày nhận, Ngày hoàn thành, Hạn nội, Trạng thái, Tiến độ = 12 cột.
-  const infoCols = 12;
+  // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Đánh giá, Ngày nhận, Ngày hoàn thành, Hạn nội, Tổng thời gian, Trạng thái, Tiến độ = 13 cột.
+  const infoCols = 13;
 
   return (
     <AppShell>
@@ -214,6 +240,7 @@ export default function ProjectsPage() {
               <th className={TH}>Ngày nhận</th>
               <th className={TH}>Ngày hoàn thành</th>
               <th className={TH}>Hạn nội</th>
+              <th className={TH}>Tổng thời gian</th>
               <th className={TH}>Trạng thái</th>
               <th className={TH}>Tiến độ</th>
             </tr>
@@ -245,6 +272,7 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.start_date || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.end_date || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.internal_deadline || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap tnum`}>{calculateDuration(p.start_date, p.end_date, p.internal_deadline)}</td>
                   <td className={TD}>
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
                       {st.label}
@@ -355,6 +383,11 @@ export default function ProjectsPage() {
                         className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
                     </label>
                   </div>
+                  {nfStartDate && (nfEndDate || nfInternalDeadline) && (
+                    <p className="text-xs text-muted">
+                      Tổng thời gian: <b className="text-ink font-semibold">{calculateDuration(nfStartDate, nfEndDate, nfInternalDeadline)}</b>
+                    </p>
+                  )}
                   {canManage && (
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted">Người chủ trì (chỉ huy trưởng)</span>
