@@ -88,6 +88,20 @@ def _ensure_schema() -> None:
                     for sql in pi_missing:
                         conn.execute(text(sql))
 
+        # Progress: cột người thực hiện / khối lượng / trạng thái cho bảng tiến độ có cấu trúc.
+        if "progress" in insp.get_table_names():
+            prcols = {c["name"] for c in insp.get_columns("progress")}
+            pr_adds = {
+                "assignee_id": "ALTER TABLE progress ADD COLUMN assignee_id INTEGER",
+                "quantity": "ALTER TABLE progress ADD COLUMN quantity NUMERIC DEFAULT 0",
+                "status": "ALTER TABLE progress ADD COLUMN status VARCHAR(20) DEFAULT 'TODO'",
+            }
+            pr_missing = [sql for col, sql in pr_adds.items() if col not in prcols]
+            if pr_missing:
+                with engine.begin() as conn:
+                    for sql in pr_missing:
+                        conn.execute(text(sql))
+
         # Assignments: cột started_at (bắt đầu) + done_at (hoàn thành) cho DB cũ
         # -> đo "làm trong bao lâu". TIMESTAMP hợp lệ cả SQLite & Postgres, nullable.
         if "assignments" in insp.get_table_names():

@@ -308,6 +308,9 @@ class ProgressBase(BaseModel):
     planned_date: date | None = None
     actual_date: date | None = None
     note: str | None = None
+    assignee_id: int | None = None                 # người thực hiện
+    quantity: Decimal = Decimal(0)                  # khối lượng
+    status: str = "TODO"                            # TODO / DOING / DONE
 
 
 class ProgressCreate(ProgressBase):
@@ -320,6 +323,9 @@ class ProgressUpdate(BaseModel):
     planned_date: date | None = None
     actual_date: date | None = None
     note: str | None = None
+    assignee_id: int | None = None
+    quantity: Decimal | None = None
+    status: str | None = None
 
 
 class ProgressOut(ProgressBase):
@@ -327,6 +333,7 @@ class ProgressOut(ProgressBase):
     id: int
     company_id: int
     created_at: datetime
+    assignee_name: str | None = None
 
 
 # ------------------------- PROJECT ITEM -------------------------

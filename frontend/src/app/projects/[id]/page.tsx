@@ -39,6 +39,13 @@ const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
 };
 
+// Trạng thái mốc tiến độ (bảng tiến độ có cấu trúc).
+const PROGRESS_STATUS: Record<string, { label: string; cls: string }> = {
+  TODO: { label: "Chưa làm", cls: "bg-line text-muted" },
+  DOING: { label: "Đang làm", cls: "bg-amber/15 text-amber-deep" },
+  DONE: { label: "Hoàn thành", cls: "bg-ok/15 text-ok" },
+};
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -96,6 +103,9 @@ export default function ProjectDetailPage() {
     planned_date: "",
     actual_date: "",
     note: "",
+    assignee_id: "" as number | "",   // người thực hiện
+    quantity: "",                      // khối lượng (chuỗi để gõ mượt)
+    status: "TODO",                    // TODO / DOING / DONE
   });
 
   function loadData(silent = false) {
@@ -289,6 +299,9 @@ export default function ProjectDetailPage() {
       planned_date: p.planned_date ?? "",
       actual_date: p.actual_date ?? "",
       note: p.note ?? "",
+      assignee_id: p.assignee_id ?? "",
+      quantity: p.quantity != null ? String(p.quantity) : "",
+      status: p.status ?? "TODO",
     });
     setError(null);
     setProgressModal(true);
@@ -296,7 +309,7 @@ export default function ProjectDetailPage() {
 
   function openCreateProgress() {
     setEditingProgressId(null);
-    setNewProgress({ title: "", percent_complete: 0, planned_date: "", actual_date: "", note: "" });
+    setNewProgress({ title: "", percent_complete: 0, planned_date: "", actual_date: "", note: "", assignee_id: "", quantity: "", status: "TODO" });
     setError(null);
     setProgressModal(true);
   }
@@ -347,6 +360,9 @@ export default function ProjectDetailPage() {
         note: newProgress.note,
         planned_date: newProgress.planned_date || null,
         actual_date: newProgress.actual_date || null,
+        assignee_id: newProgress.assignee_id === "" ? null : Number(newProgress.assignee_id),
+        quantity: newProgress.quantity === "" ? 0 : Number(newProgress.quantity),
+        status: newProgress.status,
       };
       if (editingProgressId != null) {
         await api.updateProgress(editingProgressId, payload);
@@ -361,6 +377,9 @@ export default function ProjectDetailPage() {
         planned_date: "",
         actual_date: "",
         note: "",
+        assignee_id: "",
+        quantity: "",
+        status: "TODO",
       });
       loadData();
     } catch (err) {
@@ -643,50 +662,57 @@ export default function ProjectDetailPage() {
                 Chưa ghi nhận nhật ký tiến độ nào.
               </p>
             ) : (
-              <div className="relative pl-4 border-l-2 border-line space-y-5 ml-2 pt-2">
-                {progressLogs.map((p) => {
-                  const completed = Number(p.percent_complete) === 100;
-                  return (
-                    <div key={p.id} className="relative">
-                      {/* Tròn đánh dấu mốc */}
-                      <span className={`absolute -left-[23px] top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full ring-4 ring-paper ${completed ? "bg-ok" : "bg-amber"}`} />
-                      
-                      <div className="rounded-xl2 bg-white p-3 shadow-card border border-line/40">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-sm font-semibold text-ink leading-tight">{p.title}</h4>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            {canManage && (
-                              <>
-                                <button
-                                  onClick={() => openEditProgress(p)}
-                                  className="rounded-full p-1 text-muted hover:bg-paper hover:text-steel"
-                                  title="Sửa mốc"
-                                >
+              <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+                <table className="w-full min-w-[720px] border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
+                      <th className="w-10 border border-line px-3 py-2 text-center">STT</th>
+                      <th className="border border-line px-3 py-2">Công việc</th>
+                      <th className="border border-line px-3 py-2">Người thực hiện</th>
+                      <th className="border border-line px-3 py-2 text-right">Khối lượng</th>
+                      <th className="border border-line px-3 py-2">Thời gian</th>
+                      <th className="border border-line px-3 py-2">Trạng thái</th>
+                      {canManage && <th className="w-16 border border-line px-3 py-2 text-center"></th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {progressLogs.map((p, i) => {
+                      const st = PROGRESS_STATUS[p.status ?? "TODO"] ?? PROGRESS_STATUS.TODO;
+                      return (
+                        <tr key={p.id} className="align-top odd:bg-white even:bg-paper/40">
+                          <td className="border border-line px-3 py-2 text-center text-muted tnum">{i + 1}</td>
+                          <td className="border border-line px-3 py-2">
+                            <p className="font-semibold text-ink">{p.title}</p>
+                            {p.note && <p className="mt-0.5 text-[11px] text-muted">{p.note}</p>}
+                          </td>
+                          <td className="whitespace-nowrap border border-line px-3 py-2 text-ink">{p.assignee_name || "—"}</td>
+                          <td className="border border-line px-3 py-2 text-right text-ink tnum">
+                            {p.quantity ? Number(p.quantity).toLocaleString("vi-VN") : "—"}
+                          </td>
+                          <td className="whitespace-nowrap border border-line px-3 py-2 text-muted">
+                            {p.planned_date ? formatDate(p.planned_date) : "—"}
+                            {p.actual_date && <span className="block text-[10px] font-semibold text-ok">TT: {formatDate(p.actual_date)}</span>}
+                          </td>
+                          <td className="border border-line px-3 py-2">
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>{st.label}</span>
+                          </td>
+                          {canManage && (
+                            <td className="border border-line px-2 py-2">
+                              <div className="flex items-center justify-center gap-1">
+                                <button onClick={() => openEditProgress(p)} title="Sửa" className="rounded p-1 text-muted hover:bg-paper hover:text-steel">
                                   <PencilSquareIcon className="h-3.5 w-3.5" />
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteProgress(p.id)}
-                                  className="rounded-full p-1 text-muted hover:bg-paper hover:text-bad"
-                                  title="Xóa mốc"
-                                >
+                                <button onClick={() => handleDeleteProgress(p.id)} title="Xóa" className="rounded p-1 text-muted hover:bg-paper hover:text-bad">
                                   <TrashIcon className="h-3.5 w-3.5" />
                                 </button>
-                              </>
-                            )}
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${completed ? "bg-ok/10 text-ok" : "bg-amber/10 text-amber-deep"}`}>
-                              {p.percent_complete}%
-                            </span>
-                          </div>
-                        </div>
-                        {p.note && <p className="mt-1 text-xs text-muted">{p.note}</p>}
-                        <div className="mt-2.5 pt-2 border-t border-line flex justify-between text-[10px] text-muted">
-                          <span>Kế hoạch: {p.planned_date ? formatDate(p.planned_date) : "—"}</span>
-                          {p.actual_date && <span className="font-semibold text-ok">Thực tế: {formatDate(p.actual_date)}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -854,16 +880,43 @@ export default function ProjectDetailPage() {
                   />
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted block mb-1">Người thực hiện</label>
+                    <select
+                      value={newProgress.assignee_id}
+                      onChange={(e) => setNewProgress({ ...newProgress, assignee_id: e.target.value ? Number(e.target.value) : "" })}
+                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
+                    >
+                      <option value="">— Chọn người —</option>
+                      {(project.members ?? []).map((m) => (
+                        <option key={m.id} value={m.id}>{m.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted block mb-1">Khối lượng</label>
+                    <input
+                      type="number"
+                      placeholder="VD: 120"
+                      value={newProgress.quantity}
+                      onChange={(e) => setNewProgress({ ...newProgress, quantity: e.target.value })}
+                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="text-[11px] font-semibold text-muted block mb-1">% Hoàn thành ({newProgress.percent_complete}%)</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={newProgress.percent_complete}
-                    onChange={(e) => setNewProgress({ ...newProgress, percent_complete: Number(e.target.value) })}
-                    className="w-full h-1.5 bg-line rounded-lg appearance-none cursor-pointer"
-                  />
+                  <label className="text-[11px] font-semibold text-muted block mb-1">Trạng thái</label>
+                  <select
+                    value={newProgress.status}
+                    onChange={(e) => setNewProgress({ ...newProgress, status: e.target.value })}
+                    className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
+                  >
+                    <option value="TODO">Chưa làm</option>
+                    <option value="DOING">Đang làm</option>
+                    <option value="DONE">Hoàn thành</option>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

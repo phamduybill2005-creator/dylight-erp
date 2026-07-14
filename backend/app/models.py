@@ -340,14 +340,23 @@ class Progress(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
-    title: Mapped[str] = mapped_column(String(255))               # Tên hạng mục/mốc
+    title: Mapped[str] = mapped_column(String(255))               # Tên hạng mục/mốc/việc
     percent_complete: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0)
     planned_date: Mapped[date | None] = mapped_column(Date)
     actual_date: Mapped[date | None] = mapped_column(Date)
     note: Mapped[str | None] = mapped_column(Text)
+    # Cột mới cho bảng tiến độ có cấu trúc (ALTER ở _ensure_schema):
+    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)  # người thực hiện
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 3), default=0, server_default="0")  # khối lượng
+    status: Mapped[str] = mapped_column(String(20), default="TODO", server_default="TODO")   # TODO/DOING/DONE
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     project: Mapped["Project"] = relationship(back_populates="progress_logs")
+    assignee: Mapped["User | None"] = relationship("User", foreign_keys=[assignee_id])
+
+    @property
+    def assignee_name(self) -> str | None:
+        return self.assignee.full_name if self.assignee else None
 
 
 # --------------------------------------------------------------------------

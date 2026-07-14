@@ -157,6 +157,10 @@ export interface Progress {
   planned_date?: string | null;
   actual_date?: string | null;
   note?: string | null;
+  assignee_id?: number | null;      // người thực hiện
+  assignee_name?: string | null;
+  quantity?: number;                // khối lượng
+  status?: string;                  // TODO / DOING / DONE
   created_at: string;
 }
 
