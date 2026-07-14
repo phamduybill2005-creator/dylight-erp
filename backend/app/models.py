@@ -164,6 +164,10 @@ class User(Base):
     # Mã nhân viên trên máy chấm công Yunatt (staffNumber, vd "01"). Dùng để ghép
     # dữ liệu quẹt từ Yunatt về đúng người trong ERP khi đồng bộ tự động.
     yunatt_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Giờ làm việc CƠ SỞ riêng của nhân viên (dạng "HH:MM", giờ VN) — dùng ĐÁNH GIÁ ĐI MUỘN.
+    # NULL = dùng mốc chung của công ty (config WORK_START_HOUR). Cột mới -> ALTER ở _ensure_schema.
+    work_start: Mapped[str | None] = mapped_column(String(5))   # giờ vào cơ sở, vd "08:00"
+    work_end: Mapped[str | None] = mapped_column(String(5))     # giờ ra cơ sở, vd "17:30"
 
     # --- Cấu hình lương (NHẠY CẢM: chỉ Giám đốc xem/sửa; KHÔNG trả ra UserOut chung) ---
     # salary_type lưu dạng String ("MONTHLY"/"DAILY") để dễ tự thêm cột (ALTER) trên DB cũ.
@@ -461,13 +465,21 @@ class Attendance(Base):
 
     @property
     def is_late(self) -> bool:
-        """Đi trễ nếu giờ vào muộn hơn mốc bắt đầu làm việc (config WORK_START_HOUR)."""
-        from app.config import settings
+        """Đi trễ nếu giờ VÀO muộn hơn giờ làm CƠ SỞ của nhân viên (work_start "HH:MM").
+        Nhân viên chưa đặt riêng thì dùng mốc chung của công ty (config WORK_START_HOUR).
+        Đúng giờ (bằng mốc) KHÔNG tính muộn."""
         if not self.check_in:
             return False
-        return self.check_in.hour >= settings.WORK_START_HOUR and not (
-            self.check_in.hour == settings.WORK_START_HOUR and self.check_in.minute == 0
-        )
+        from app.config import settings
+        start_min = settings.WORK_START_HOUR * 60
+        ws = getattr(self.user, "work_start", None) if self.user else None
+        if ws:
+            try:
+                hh, mm = ws.split(":")
+                start_min = int(hh) * 60 + int(mm)
+            except (ValueError, TypeError):
+                pass
+        return self.check_in.hour * 60 + self.check_in.minute > start_min
 
 
 class YunattSyncLog(Base):

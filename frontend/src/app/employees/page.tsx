@@ -70,6 +70,8 @@ export default function EmployeesPage() {
     manager_id: "",
     role: "" as Role | "",
     is_active: true,
+    work_start: "",
+    work_end: "",
   });
   
   const [saving, setSaving] = useState(false);
@@ -161,6 +163,8 @@ export default function EmployeesPage() {
         role: selectedUser.role || "",
         is_active: selectedUser.is_active,
         department: selectedUser.department || "",
+        work_start: selectedUser.work_start || "",
+        work_end: selectedUser.work_end || "",
       });
       setSuccessMsg("");
       setErrorMsg("");
@@ -389,6 +393,8 @@ export default function EmployeesPage() {
         role: formData.role ? (formData.role as Role) : undefined,
         is_active: formData.is_active,
         department: formData.department || null,
+        work_start: formData.work_start || null,
+        work_end: formData.work_end || null,
       };
 
       const updated = await api.updateUser(selectedUser.id, payload);
@@ -986,6 +992,38 @@ export default function EmployeesPage() {
 
               {canManage && (
               <>
+              {/* Giờ làm việc cơ sở — dùng đánh giá đi muộn (giờ vào) */}
+              <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
+                <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
+                  <ClockIcon className="h-4 w-4" />
+                  Giờ làm việc cơ sở
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-muted mb-1">Giờ vào</label>
+                    <input
+                      type="time"
+                      value={formData.work_start}
+                      onChange={(e) => setFormData({ ...formData, work_start: e.target.value })}
+                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-muted mb-1">Giờ ra</label>
+                    <input
+                      type="time"
+                      value={formData.work_end}
+                      onChange={(e) => setFormData({ ...formData, work_end: e.target.value })}
+                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted">
+                  Nhân viên vào <b className="text-ink">muộn hơn giờ vào</b> sẽ bị tính đi muộn (trang Chấm công).
+                  Để trống = dùng mốc chung của công ty.
+                </p>
+              </div>
+
               {/* Lịch làm việc */}
               <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
                 <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">

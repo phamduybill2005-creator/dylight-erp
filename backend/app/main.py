@@ -46,6 +46,8 @@ def _ensure_schema() -> None:
             "department": "ALTER TABLE users ADD COLUMN department VARCHAR(120)",
             "yunatt_code": "ALTER TABLE users ADD COLUMN yunatt_code VARCHAR(50)",
             "token_version": "ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0",
+            "work_start": "ALTER TABLE users ADD COLUMN work_start VARCHAR(5)",
+            "work_end": "ALTER TABLE users ADD COLUMN work_end VARCHAR(5)",
         }
         missing = [sql for col, sql in adds.items() if col not in cols]
         if missing:

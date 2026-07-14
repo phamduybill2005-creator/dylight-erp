@@ -20,6 +20,8 @@ export interface User {
   manager_id?: number | null;
   manager_name?: string | null;
   yunatt_code?: string | null;   // mã nhân viên trên máy chấm công Yunatt
+  work_start?: string | null;    // giờ làm cơ sở "HH:MM" (đánh giá đi muộn)
+  work_end?: string | null;      // giờ ra cơ sở "HH:MM"
   has_subordinates?: boolean;    // BE tính: người này có ≥1 cấp dưới trực tiếp
 }
 

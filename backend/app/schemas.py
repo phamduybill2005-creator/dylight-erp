@@ -52,6 +52,8 @@ class UserOut(BaseModel):
     manager_id: int | None = None
     manager_name: str | None = None
     yunatt_code: str | None = None   # mã trên máy chấm công Yunatt (để map đồng bộ)
+    work_start: str | None = None    # giờ làm cơ sở "HH:MM" (đánh giá đi muộn)
+    work_end: str | None = None      # giờ ra cơ sở "HH:MM"
     has_subordinates: bool = False   # người này đang là quản lý trực tiếp của ≥1 người
 
 class UserUpdate(BaseModel):
@@ -68,6 +70,8 @@ class UserUpdate(BaseModel):
     department: str | None = None
     manager_id: int | None = None
     yunatt_code: str | None = None   # mã nhân viên trên máy chấm công Yunatt
+    work_start: str | None = None    # giờ làm cơ sở "HH:MM" (đánh giá đi muộn)
+    work_end: str | None = None      # giờ ra cơ sở "HH:MM"
 
 
 class UserCreate(BaseModel):
