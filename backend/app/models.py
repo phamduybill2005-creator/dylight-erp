@@ -372,6 +372,8 @@ class ProjectItem(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)  # đơn giá
     # % hoàn thành đầu việc (0..100) — dùng tính tiến độ dự án. Cột mới -> ALTER ở _ensure_schema.
     progress: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0, server_default="0")
+    # ĐÁNH GIÁ hạng mục: 0 = chưa chấm, 1..5 sao (chủ trì/quản lý chấm). Cột mới -> ALTER ở _ensure_schema.
+    rating: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Phòng ban phụ trách hạng mục (gán ở cấp NHÓM cha; đầu việc con hiểu ngầm theo nhóm).
     # Cột mới -> ALTER ở _ensure_schema.
     department: Mapped[str | None] = mapped_column(String(120))

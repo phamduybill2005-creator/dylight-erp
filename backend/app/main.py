@@ -80,6 +80,7 @@ def _ensure_schema() -> None:
             pi_adds = {
                 "progress": "ALTER TABLE project_items ADD COLUMN progress NUMERIC DEFAULT 0",
                 "department": "ALTER TABLE project_items ADD COLUMN department VARCHAR(120)",
+                "rating": "ALTER TABLE project_items ADD COLUMN rating INTEGER DEFAULT 0",
             }
             pi_missing = [sql for col, sql in pi_adds.items() if col not in picols]
             if pi_missing:

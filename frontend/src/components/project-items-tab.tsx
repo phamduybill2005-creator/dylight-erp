@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon } from "@heroicons/react/24/outline";
+import { StarIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { formatVND, dateLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
@@ -16,6 +17,25 @@ const num = (v: unknown) => {
   const n = Number(v);
   return isNaN(n) ? 0 : n;
 };
+
+/** Chấm sao 1–5 đánh giá hạng mục (0 = chưa chấm). Bấm lại sao đang chọn để bỏ về 0. */
+function ItemRating({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  return (
+    <span className="inline-flex items-center gap-0.5" aria-label="Đánh giá hạng mục">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n === value ? 0 : n)}
+          title={`${n} sao`}
+          className={n <= value ? "text-amber" : "text-line hover:text-amber"}
+        >
+          <StarIcon className="h-3.5 w-3.5" />
+        </button>
+      ))}
+    </span>
+  );
+}
 const lineAmount = (i: ProjectItem) => num(i.quantity) * num(i.unit_price);
 const clampPct = (v: unknown) => Math.max(0, Math.min(100, num(v)));
 
@@ -620,6 +640,11 @@ function GroupRows({
                 <option value={group.department}>{group.department}</option>
               )}
             </select>
+          </div>
+          {/* Đánh giá hạng mục (sao) — chủ trì/quản lý chấm chất lượng hạng mục này. */}
+          <div className="mt-1 flex items-center gap-1.5 pl-2">
+            <span className="text-[10px] font-semibold text-muted">Đánh giá:</span>
+            <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} />
           </div>
         </td>
         {/* STAFF không có 3 cột tiền: vẫn phải chừa 1 ô cho cột ĐVT để thẳng hàng với header. */}
