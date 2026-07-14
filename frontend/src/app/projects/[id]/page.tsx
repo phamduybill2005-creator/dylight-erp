@@ -39,27 +39,6 @@ const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
 };
 
-// --- Lọc Nhật ký tiến độ theo tháng / tuần / trạng thái ---
-/** Ngày đại diện của 1 mốc (ưu tiên thực tế → kế hoạch → ngày tạo), dạng YYYY-MM-DD. */
-function progDate(p: Progress): string {
-  return String(p.actual_date || p.planned_date || p.created_at || "").slice(0, 10);
-}
-/** Ngày Thứ 7 của tuần chứa d (YYYY-MM-DD) — tính theo giờ địa phương, tránh lệch UTC. */
-function weekSatOf(d: string): string {
-  if (!d) return "";
-  const x = new Date(d + "T00:00:00");
-  x.setDate(x.getDate() + (6 - x.getDay()));
-  const y = x.getFullYear(), m = String(x.getMonth() + 1).padStart(2, "0"), day = String(x.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-/** Trạng thái mốc theo % hoàn thành: chưa làm (0) / đang làm (1–99) / hoàn thành (100). */
-function progStatusKey(p: Progress): "todo" | "doing" | "done" {
-  const pct = Number(p.percent_complete);
-  if (pct >= 100) return "done";
-  if (pct > 0) return "doing";
-  return "todo";
-}
-
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -99,12 +78,6 @@ export default function ProjectDetailPage() {
 
   // Sửa mốc tiến độ (null = đang tạo mới, khác null = đang sửa mốc này).
   const [editingProgressId, setEditingProgressId] = useState<number | null>(null);
-
-  // Lọc Nhật ký tiến độ: theo tháng "YYYY-MM", theo tuần (1 ngày bất kỳ trong tuần),
-  // và trạng thái ("" = tất cả / "todo" / "doing" / "done").
-  const [progMonth, setProgMonth] = useState("");
-  const [progWeek, setProgWeek] = useState("");
-  const [progStatus, setProgStatus] = useState("");
 
   // New item form states
   const [newContract, setNewContract] = useState({
@@ -416,17 +389,6 @@ export default function ProjectDetailPage() {
     );
   }
 
-  // Nhật ký tiến độ sau khi áp 3 bộ lọc (tháng / tuần / trạng thái).
-  const progWeekSat = weekSatOf(progWeek);
-  const visibleProgress = progressLogs.filter((p) => {
-    const dt = progDate(p);
-    if (progMonth && !dt.startsWith(progMonth)) return false;
-    if (progWeekSat && weekSatOf(dt) !== progWeekSat) return false;
-    if (progStatus && progStatusKey(p) !== progStatus) return false;
-    return true;
-  });
-  const progFilterOn = !!(progMonth || progWeek || progStatus);
-
   return (
     <AppShell>
       {/* Nút quay lại */}
@@ -666,9 +628,7 @@ export default function ProjectDetailPage() {
             />
 
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-muted uppercase">
-                Nhật ký tiến độ ({visibleProgress.length}{progFilterOn ? `/${progressLogs.length}` : ""})
-              </h3>
+              <h3 className="text-xs font-semibold text-muted uppercase">Nhật ký tiến độ ({progressLogs.length})</h3>
               <button
                 onClick={openCreateProgress}
                 className="flex items-center gap-1 text-xs font-semibold text-amber hover:text-amber-deep"
@@ -678,56 +638,13 @@ export default function ProjectDetailPage() {
               </button>
             </div>
 
-            {/* Lọc nhật ký: tìm theo tháng / theo tuần / theo trạng thái */}
-            <div className="flex flex-wrap items-center gap-2 rounded-xl2 border border-line bg-white p-2 shadow-card">
-              <span className="pl-1 text-[11px] font-semibold text-muted">Lọc:</span>
-              <input
-                type="month"
-                value={progMonth}
-                onChange={(e) => setProgMonth(e.target.value)}
-                title="Tìm theo tháng"
-                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs text-ink outline-none focus:border-steel"
-              />
-              <input
-                type="date"
-                value={progWeek}
-                onChange={(e) => setProgWeek(e.target.value)}
-                title="Tìm theo tuần (chọn 1 ngày bất kỳ trong tuần)"
-                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs text-ink outline-none focus:border-steel"
-              />
-              <select
-                value={progStatus}
-                onChange={(e) => setProgStatus(e.target.value)}
-                title="Tìm theo trạng thái"
-                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs text-ink outline-none focus:border-steel"
-              >
-                <option value="">Mọi trạng thái</option>
-                <option value="todo">Chưa làm</option>
-                <option value="doing">Đang làm</option>
-                <option value="done">Hoàn thành</option>
-              </select>
-              {progFilterOn && (
-                <button
-                  type="button"
-                  onClick={() => { setProgMonth(""); setProgWeek(""); setProgStatus(""); }}
-                  className="ml-auto rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted hover:bg-paper"
-                >
-                  Xóa lọc
-                </button>
-              )}
-            </div>
-
             {progressLogs.length === 0 ? (
               <p className="rounded-xl2 bg-white p-6 text-center text-xs text-muted shadow-card">
                 Chưa ghi nhận nhật ký tiến độ nào.
               </p>
-            ) : visibleProgress.length === 0 ? (
-              <p className="rounded-xl2 bg-white p-6 text-center text-xs text-muted shadow-card">
-                Không có mốc tiến độ khớp bộ lọc.
-              </p>
             ) : (
               <div className="relative pl-4 border-l-2 border-line space-y-5 ml-2 pt-2">
-                {visibleProgress.map((p) => {
+                {progressLogs.map((p) => {
                   const completed = Number(p.percent_complete) === 100;
                   return (
                     <div key={p.id} className="relative">

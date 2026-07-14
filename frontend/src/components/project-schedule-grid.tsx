@@ -31,6 +31,16 @@ const addDays = (iso: string, n: number): string => {
 const diffDays = (a: string, b: string): number =>
   Math.round((toDate(b).getTime() - toDate(a).getTime()) / 86_400_000);
 
+/** Ngày Thứ 7 của tuần chứa iso (YYYY-MM-DD) — theo giờ địa phương. Dùng lọc "theo tuần". */
+const weekSat = (iso: string): string => {
+  if (!iso) return "";
+  const t = toDate(iso);
+  return dateLocal(new Date(t.getFullYear(), t.getMonth(), t.getDate() + (6 - t.getDay())));
+};
+/** Trạng thái phần việc: chưa làm (ASSIGNED) / đang làm (IN_PROGRESS) / hoàn thành (DONE). */
+const statusKey = (a: Assignment): "todo" | "doing" | "done" =>
+  a.status === "DONE" ? "done" : a.status === "IN_PROGRESS" ? "doing" : "todo";
+
 type Fill = "done" | "doing" | null;
 
 /** Ô của phần việc `a` tại ngày `d` được tô màu gì (dải Excel). */
@@ -80,6 +90,13 @@ export default function ProjectScheduleGrid({
   const [loading, setLoading] = useState(true);
   const today = todayLocal();
 
+  // Bộ lọc: theo tháng "YYYY-MM", theo tuần (chọn 1 ngày -> cả tuần), theo trạng thái.
+  const [fMonth, setFMonth] = useState("");
+  const [fWeek, setFWeek] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const fWeekSat = fWeek ? weekSat(fWeek) : "";
+  const fOn = !!(fMonth || fWeek || fStatus);
+
   useEffect(() => {
     setLoading(true);
     api
@@ -111,6 +128,12 @@ export default function ProjectScheduleGrid({
     return out;
   }, [rows, projStart, projEnd, today]);
 
+  // Cột HIỂN THỊ sau khi lọc theo THÁNG / TUẦN (rỗng lọc = giữ nguyên toàn bộ).
+  const visibleDays = useMemo(
+    () => days.filter((d) => (!fMonth || d.startsWith(fMonth)) && (!fWeekSat || weekSat(d) === fWeekSat)),
+    [days, fMonth, fWeekSat],
+  );
+
   const truncated = useMemo(() => {
     const first = days[0];
     if (!first) return false;
@@ -122,14 +145,14 @@ export default function ProjectScheduleGrid({
   // Nhóm cột theo THÁNG cho hàng tiêu đề trên cùng.
   const months = useMemo(() => {
     const out: { key: string; label: string; span: number }[] = [];
-    for (const d of days) {
+    for (const d of visibleDays) {
       const key = d.slice(0, 7);
       const last = out[out.length - 1];
       if (last && last.key === key) last.span += 1;
       else out.push({ key, label: `Tháng ${Number(d.slice(5, 7))}/${d.slice(0, 4)}`, span: 1 });
     }
     return out;
-  }, [days]);
+  }, [visibleDays]);
 
   // Người tham gia = thành viên dự án ∪ ai được giao việc; chủ trì lên đầu.
   const people = useMemo(() => {
@@ -148,13 +171,14 @@ export default function ProjectScheduleGrid({
   const byAssignee = useMemo(() => {
     const m = new Map<number, Assignment[]>();
     for (const a of rows) {
+      if (fStatus && statusKey(a) !== fStatus) continue;   // lọc theo trạng thái
       const list = m.get(a.assignee_id) ?? [];
       list.push(a);
       m.set(a.assignee_id, list);
     }
     for (const list of m.values()) list.sort((a, b) => a.created_at.localeCompare(b.created_at));
     return m;
-  }, [rows]);
+  }, [rows, fStatus]);
 
   // ---- Đếm ngày của TOÀN DỰ ÁN: tổng / đã qua / còn lại (hoặc quá hạn) ----
   const totalDays = projStart && projEnd ? diffDays(projStart, projEnd) + 1 : null;
@@ -203,12 +227,58 @@ export default function ProjectScheduleGrid({
         )}
       </p>
 
+      {/* Lọc: tìm theo tháng / theo tuần / theo trạng thái */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-semibold text-muted">Lọc:</span>
+        <input
+          type="month"
+          value={fMonth}
+          onChange={(e) => setFMonth(e.target.value)}
+          title="Tìm theo tháng"
+          className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel"
+        />
+        <input
+          type="date"
+          value={fWeek}
+          onChange={(e) => setFWeek(e.target.value)}
+          title="Tìm theo tuần (chọn 1 ngày bất kỳ trong tuần)"
+          className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel"
+        />
+        <select
+          value={fStatus}
+          onChange={(e) => setFStatus(e.target.value)}
+          title="Tìm theo trạng thái"
+          className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel"
+        >
+          <option value="">Mọi trạng thái</option>
+          <option value="todo">Chưa làm</option>
+          <option value="doing">Đang làm</option>
+          <option value="done">Hoàn thành</option>
+        </select>
+        {fOn && (
+          <button
+            type="button"
+            onClick={() => { setFMonth(""); setFWeek(""); setFStatus(""); }}
+            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-muted hover:bg-paper"
+          >
+            Xóa lọc
+          </button>
+        )}
+      </div>
+
       {rows.length === 0 && (
         <p className="mt-3 rounded-lg bg-paper p-4 text-center text-[11px] text-muted">
           Chưa có phần việc nào — sang tab <b>Phân công</b> để giao việc, bảng sẽ tự vẽ dải ngày cho từng người.
         </p>
       )}
 
+      {rows.length > 0 && (fMonth || fWeek) && visibleDays.length === 0 && (
+        <p className="mt-3 rounded-lg bg-paper p-4 text-center text-[11px] text-muted">
+          Không có ngày nào khớp bộ lọc tháng/tuần.
+        </p>
+      )}
+
+      {visibleDays.length > 0 && (
       <div className="mt-3 overflow-x-auto">
         <table className="w-max border-collapse text-[10px]">
           <thead>
@@ -228,7 +298,7 @@ export default function ProjectScheduleGrid({
             </tr>
             {/* Hàng 2: từng ngày */}
             <tr>
-              {days.map((d) => {
+              {visibleDays.map((d) => {
                 const wd = toDate(d).getDay();
                 const isToday = d === today;
                 return (
@@ -250,7 +320,7 @@ export default function ProjectScheduleGrid({
             {(projStart || projEnd) && (
               <tr>
                 <td className={`${stickyLeft} bg-white px-2 py-1 font-bold text-ink`}>⏳ Toàn dự án</td>
-                {days.map((d) => {
+                {visibleDays.map((d) => {
                   const inSpan = (!projStart || d >= projStart) && (!projEnd || d <= projEnd);
                   return (
                     <td
@@ -276,7 +346,7 @@ export default function ProjectScheduleGrid({
                   isLead={isLead}
                   list={list}
                   doneN={doneN}
-                  days={days}
+                  days={visibleDays}
                   today={today}
                   stickyLeft={stickyLeft}
                   stickyRight={stickyRight}
@@ -286,6 +356,7 @@ export default function ProjectScheduleGrid({
           </tbody>
         </table>
       </div>
+      )}
 
       {truncated && (
         <p className="mt-1.5 text-[10px] italic text-muted">
