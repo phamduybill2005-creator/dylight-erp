@@ -232,30 +232,30 @@ export default function ProjectScheduleGrid({
         <span className="flex items-center gap-1 self-center text-[11px] font-semibold text-muted">
           <FunnelIcon className="h-3.5 w-3.5" /> Lọc
         </span>
-        <label className="flex flex-col gap-0.5">
+        <label className="flex flex-1 flex-col gap-0.5 min-w-[130px]">
           <span className="text-[9px] font-semibold uppercase tracking-wide text-muted/70">Tháng</span>
           <input
             type="month"
             value={fMonth}
             onChange={(e) => setFMonth(e.target.value)}
-            className="h-7 rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
+            className="h-8 w-full rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
           />
         </label>
-        <label className="flex flex-col gap-0.5">
+        <label className="flex flex-1 flex-col gap-0.5 min-w-[130px]">
           <span className="text-[9px] font-semibold uppercase tracking-wide text-muted/70">Tuần (chọn 1 ngày)</span>
           <input
             type="date"
             value={fWeek}
             onChange={(e) => setFWeek(e.target.value)}
-            className="h-7 rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
+            className="h-8 w-full rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
           />
         </label>
-        <label className="flex flex-col gap-0.5">
+        <label className="flex flex-1 flex-col gap-0.5 min-w-[130px]">
           <span className="text-[9px] font-semibold uppercase tracking-wide text-muted/70">Trạng thái</span>
           <select
             value={fStatus}
             onChange={(e) => setFStatus(e.target.value)}
-            className="h-7 rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
+            className="h-8 w-full rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
           >
             <option value="">Tất cả</option>
             <option value="todo">Chưa làm</option>
