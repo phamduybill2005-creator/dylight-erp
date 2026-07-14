@@ -491,9 +491,11 @@ class AttendanceSummary(BaseModel):
 
 # ------------------------- EVALUATION (ĐÁNH GIÁ) -------------------------
 class EvaluationCreate(BaseModel):
-    # Kỳ đánh giá theo TUẦN = ngày Thứ 7 của tuần đó 'YYYY-MM-DD'.
-    period: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Kỳ đánh giá tuần = ngày Thứ 7 'YYYY-MM-DD'")
+    # Chấm theo TỪNG NGÀY (eval_date) & TỪNG DỰ ÁN (project_id, tùy chọn).
+    # Kỳ tuần (period) do backend tự suy từ eval_date để tổng hợp theo tuần.
     evaluatee_id: int
+    eval_date: date = Field(description="Ngày đánh giá 'YYYY-MM-DD'")
+    project_id: int | None = Field(default=None, description="Dự án (tùy chọn); bỏ trống = đánh giá chung")
     rating: int = Field(ge=1, le=5)
     comment: str | None = None
 
@@ -503,6 +505,9 @@ class EvaluationOut(BaseModel):
     id: int
     company_id: int
     period: str
+    eval_date: date | None = None
+    project_id: int | None = None
+    project_name: str | None = None
     evaluator_id: int
     evaluatee_id: int
     direction: EvaluationDirection

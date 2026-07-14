@@ -115,6 +115,20 @@ def _ensure_schema() -> None:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE companies ADD COLUMN payroll_shared BOOLEAN DEFAULT FALSE"))
 
+        # Evaluations: cột eval_date (ngày chấm) + project_id (dự án) cho DB cũ —
+        # chấm theo TỪNG NGÀY & TỪNG DỰ ÁN, gộp theo tuần. Nullable, hợp lệ cả SQLite & Postgres.
+        if "evaluations" in insp.get_table_names():
+            ecols = {c["name"] for c in insp.get_columns("evaluations")}
+            e_adds = {
+                "eval_date": "ALTER TABLE evaluations ADD COLUMN eval_date DATE",
+                "project_id": "ALTER TABLE evaluations ADD COLUMN project_id INTEGER",
+            }
+            e_missing = [sql for col, sql in e_adds.items() if col not in ecols]
+            if e_missing:
+                with engine.begin() as conn:
+                    for sql in e_missing:
+                        conn.execute(text(sql))
+
         # Nới rộng evaluations.period (đánh giá đổi sang kỳ TUẦN 'YYYY-MM-DD' = 10 ký tự).
         # Postgres ép độ dài VARCHAR; SQLite bỏ qua nên không cần. Chỉ ALTER khi đang < 20.
         if engine.dialect.name == "postgresql" and "evaluations" in insp.get_table_names():

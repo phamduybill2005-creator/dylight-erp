@@ -1,19 +1,20 @@
 "use client";
 
-// Trang Đánh giá 2 chiều (Nhân viên <-> Quản lý trực tiếp).
-//  - STAFF   : chấm điểm quản lý trực tiếp + xem điểm mình nhận được.
-//  - MANAGER : chấm điểm cấp dưới trực tiếp + xem điểm nhân viên chấm mình.
-//  - DIRECTOR: chỉ xem (chọn 1 nhân sự để xem các phiếu đánh giá của họ).
+// Trang Đánh giá 2 chiều (Nhân viên <-> Quản lý trực tiếp) — chấm THEO TỪNG NGÀY
+// & TỪNG DỰ ÁN (dự án tùy chọn), TỔNG HỢP THEO TUẦN.
+//  - STAFF   : chấm quản lý trực tiếp theo ngày + xem điểm mình nhận.
+//  - MANAGER : chấm cấp dưới trực tiếp theo ngày/dự án + xem điểm nhân viên chấm mình.
+//  - DIRECTOR: chỉ xem — tổng hợp trung bình theo tuần + tất cả phiếu (kèm ngày/dự án).
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
-import { ChatBubbleLeftRightIcon, UserCircleIcon } from "@heroicons/react/24/outline";
+import { ChatBubbleLeftRightIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
-import { dateLocal } from "@/lib/format";
-import type { Evaluation, EvaluationSummary, User } from "@/lib/types";
+import { dateLocal, todayLocal } from "@/lib/format";
+import type { Evaluation, EvaluationSummary, User, Project } from "@/lib/types";
 
 // Kỳ đánh giá theo TUẦN = ngày Thứ 7 của tuần đó (YYYY-MM-DD).
 function weekSaturday(d: Date = new Date()): string {
@@ -23,6 +24,9 @@ function weekSaturday(d: Date = new Date()): string {
 }
 const fmtSat = (s: string) =>
   new Date(s + "T00:00:00").toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+const fmtDay = (s?: string | null) =>
+  s ? new Date(s + "T00:00:00").toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" }) : "—";
+const avgOf = (rs: number[]) => (rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0);
 
 function Stars({ value, onChange }: { value: number; onChange?: (n: number) => void }) {
   return (
@@ -42,21 +46,30 @@ function Stars({ value, onChange }: { value: number; onChange?: (n: number) => v
   );
 }
 
+// Thẻ 1 phiếu — hiện NGÀY chấm + DỰ ÁN (nếu có) + sao + nhận xét.
 function EvalCard({ e, who }: { e: Evaluation; who: "evaluator" | "evaluatee" }) {
   const name = who === "evaluator" ? e.evaluator_name : e.evaluatee_name;
   return (
     <div className="rounded-xl2 bg-white p-3 shadow-card">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <UserCircleIcon className="h-5 w-5 text-muted" />
-          <p className="text-sm font-semibold text-ink">{name || "—"}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <UserCircleIcon className="h-5 w-5 shrink-0 text-muted" />
+          <p className="truncate text-sm font-semibold text-ink">{name || "—"}</p>
         </div>
-        <span className="text-[11px] text-muted">{e.period}</span>
+        <span className="shrink-0 text-[11px] text-muted">{fmtDay(e.eval_date) }</span>
       </div>
-      <div className="mt-2">
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <Stars value={e.rating} />
+        {e.project_name ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-steel/10 px-2 py-0.5 text-[10px] font-semibold text-steel">
+            <FolderIcon className="h-3 w-3" />
+            {e.project_name}
+          </span>
+        ) : (
+          <span className="rounded-full bg-line px-2 py-0.5 text-[10px] font-semibold text-muted">Chung</span>
+        )}
       </div>
-      {e.comment && <p className="mt-2 text-xs text-ink/80 leading-relaxed">{e.comment}</p>}
+      {e.comment && <p className="mt-2 text-xs leading-relaxed text-ink/80">{e.comment}</p>}
     </div>
   );
 }
@@ -69,11 +82,14 @@ export default function EvaluationsPage() {
   const [received, setReceived] = useState<Evaluation[]>([]);
   const [given, setGiven] = useState<Evaluation[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
-  // form state (chấm điểm 1 đối tượng đang chọn)
+  // form state (chấm 1 đối tượng đang chọn) — theo NGÀY + DỰ ÁN.
   const [target, setTarget] = useState<User | null>(null);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [evalDate, setEvalDate] = useState(todayLocal());
+  const [evalProjectId, setEvalProjectId] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -85,7 +101,6 @@ export default function EvaluationsPage() {
   const period = weekSaturday();
   const tier = user ? roleTier(user.role) : "STAFF";
 
-  // Giám đốc: nạp số liệu tổng hợp + tất cả phiếu khi đổi tuần.
   useEffect(() => {
     if (!user || roleTier(user.role) !== "DIRECTOR") return;
     api.evaluationsSummary(selPeriod).then(setSummary).catch(() => {});
@@ -98,12 +113,9 @@ export default function EvaluationsPage() {
         setUser(u);
         const t = roleTier(u.role);
         api.evaluationsReceived().then(setReceived).catch(() => {});
-        if (t !== "STAFF") {
-          api.evaluationsGiven().then(setGiven).catch(() => {});
-          api.users().then(setUsers).catch(() => {});
-        } else {
-          api.evaluationsGiven().then(setGiven).catch(() => {});
-        }
+        api.evaluationsGiven().then(setGiven).catch(() => {});
+        api.projects().then(setProjects).catch(() => {});
+        if (t !== "STAFF") api.users().then(setUsers).catch(() => {});
         setLoading(false);
       })
       .catch(() => router.push("/login"));
@@ -115,30 +127,79 @@ export default function EvaluationsPage() {
     [users, user]
   );
 
-  // Mở form chấm điểm 1 người: nạp sẵn phiếu kỳ này nếu đã chấm.
-  function openTarget(t: User) {
-    setTarget(t);
-    setMsg("");
-    const prev = given.find((g) => g.evaluatee_id === t.id && g.period === period);
-    setRating(prev?.rating ?? 0);
-    setComment(prev?.comment ?? "");
+  // Các phiếu TUẦN NÀY mình đã chấm cho 1 người (mới nhất trước).
+  const weekGivenTo = (uid: number) =>
+    given.filter((g) => g.evaluatee_id === uid && g.period === period);
+
+  const projectLabel = (p: Project) => `${p.code ? p.code + " · " : ""}${p.name}`;
+
+  function resetForm(keepDateProject = true) {
+    setRating(0);
+    setComment("");
+    if (!keepDateProject) {
+      setEvalDate(todayLocal());
+      setEvalProjectId("");
+    }
   }
 
-  async function submit() {
-    if (!target || rating < 1) return;
+  function openTarget(t: User) {
+    setTarget((prev) => (prev?.id === t.id ? null : t));
+    setMsg("");
+    resetForm(false);
+  }
+
+  // Gửi 1 phiếu cho evaluatee (dùng chung cho cả 2 chiều).
+  async function submitFor(evaluateeId: number) {
+    if (rating < 1) { setMsg("Vui lòng chọn số sao."); return; }
     setSaving(true);
     setMsg("");
     try {
-      await api.createEvaluation({ period, evaluatee_id: target.id, rating, comment: comment || null });
-      const g = await api.evaluationsGiven();
-      setGiven(g);
+      await api.createEvaluation({
+        evaluatee_id: evaluateeId,
+        eval_date: evalDate,
+        project_id: evalProjectId === "" ? null : Number(evalProjectId),
+        rating,
+        comment: comment || null,
+      });
+      setGiven(await api.evaluationsGiven());
       setMsg("Đã lưu đánh giá.");
-      setTarget(null);
-    } catch (err: any) {
-      setMsg(err.message || "Không lưu được đánh giá.");
+      resetForm(true);   // giữ ngày+dự án để chấm tiếp người/việc khác nhanh
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Không lưu được đánh giá.");
     } finally {
       setSaving(false);
     }
+  }
+
+  // Khối chọn NGÀY + DỰ ÁN dùng chung cho mọi form chấm.
+  function DateProjectPicker() {
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold text-muted">Ngày</label>
+          <input
+            type="date"
+            value={evalDate}
+            max={todayLocal()}
+            onChange={(e) => setEvalDate(e.target.value || todayLocal())}
+            className="w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold text-muted">Dự án (tùy chọn)</label>
+          <select
+            value={evalProjectId}
+            onChange={(e) => setEvalProjectId(e.target.value ? Number(e.target.value) : "")}
+            className="w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel"
+          >
+            <option value="">Chung (không theo dự án)</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{projectLabel(p)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
   }
 
   if (loading || !user) {
@@ -151,9 +212,7 @@ export default function EvaluationsPage() {
 
   // ==================== NHÂN VIÊN ====================
   if (tier === "STAFF") {
-    const givenToManager = given.find(
-      (g) => g.evaluatee_id === user.manager_id && g.period === period
-    );
+    const myWeek = user.manager_id ? weekGivenTo(user.manager_id) : [];
     return (
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
@@ -164,58 +223,48 @@ export default function EvaluationsPage() {
         <section className="mt-4 rounded-xl2 bg-white p-4 shadow-card lg:p-6">
           {user.manager_id ? (
             <>
-              <p className="text-xs text-muted">Đánh giá tuần · hạn <b className="text-ink">Thứ 7 {fmtSat(period)}</b> · Quản lý trực tiếp</p>
+              <p className="text-xs text-muted">
+                Chấm quản lý trực tiếp theo ngày — tổng hợp tuần đến <b className="text-ink">Thứ 7 {fmtSat(period)}</b>
+              </p>
               <p className="mt-1 text-base font-bold text-ink">{user.manager_name || "Quản lý"}</p>
 
-              <p className="mt-4 text-[11px] font-semibold text-muted">Mức độ hài lòng</p>
-              <div className="mt-1">
-                <Stars value={rating || givenToManager?.rating || 0} onChange={setRating} />
-              </div>
+              <div className="mt-3">{DateProjectPicker()}</div>
 
-              <p className="mt-4 text-[11px] font-semibold text-muted">Nhận xét</p>
+              <p className="mt-3 text-[11px] font-semibold text-muted">Mức độ hài lòng</p>
+              <div className="mt-1"><Stars value={rating} onChange={setRating} /></div>
+
               <textarea
-                rows={4}
-                value={comment || (rating === 0 ? givenToManager?.comment || "" : comment)}
+                rows={3}
+                value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Nhận xét về sự hỗ trợ, phân công, giao tiếp của quản lý…"
-                className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel resize-none"
+                className="mt-2 w-full resize-none rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
               />
-
-              {givenToManager && (
-                <p className="mt-2 text-[11px] text-ok">
-                  Bạn đã chấm {givenToManager.rating}★ kỳ này — gửi lại sẽ ghi đè.
-                </p>
-              )}
               {msg && <p className="mt-2 text-[11px] font-semibold text-steel">{msg}</p>}
 
               <button
-                onClick={async () => {
-                  if (rating < 1) {
-                    setMsg("Vui lòng chọn số sao.");
-                    return;
-                  }
-                  setSaving(true);
-                  setMsg("");
-                  try {
-                    await api.createEvaluation({
-                      period,
-                      evaluatee_id: user.manager_id!,
-                      rating,
-                      comment: comment || null,
-                    });
-                    setGiven(await api.evaluationsGiven());
-                    setMsg("Đã gửi đánh giá quản lý.");
-                  } catch (err: any) {
-                    setMsg(err.message || "Không gửi được đánh giá.");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                disabled={saving}
-                className="mt-4 w-full rounded-xl2 bg-ink py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                onClick={() => submitFor(user.manager_id!)}
+                disabled={saving || rating < 1}
+                className="mt-3 w-full rounded-xl2 bg-ink py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {saving ? "Đang lưu…" : "Gửi đánh giá"}
+                {saving ? "Đang lưu…" : "Gửi đánh giá ngày"}
               </button>
+
+              {myWeek.length > 0 && (
+                <div className="mt-4 border-t border-line pt-3">
+                  <p className="mb-2 text-[11px] font-semibold text-muted">
+                    Tuần này bạn đã chấm ({myWeek.length}) · TB {avgOf(myWeek.map((g) => g.rating)).toFixed(1)}★
+                  </p>
+                  <div className="space-y-1.5">
+                    {myWeek.map((g) => (
+                      <div key={g.id} className="flex items-center justify-between rounded-lg bg-paper px-2.5 py-1.5 text-[11px]">
+                        <span className="text-muted">{fmtDay(g.eval_date)} · {g.project_name || "Chung"}</span>
+                        <span className="flex items-center gap-0.5 font-semibold text-amber">{g.rating}<StarIcon className="h-3 w-3" /></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <p className="py-4 text-center text-xs text-muted">
@@ -243,7 +292,7 @@ export default function EvaluationsPage() {
     );
   }
 
-  // ============ GIÁM ĐỐC (xem số liệu đánh giá được đẩy lên) ============
+  // ============ GIÁM ĐỐC (xem số liệu tổng hợp theo tuần) ============
   if (tier === "DIRECTOR") {
     const avgAll = summary.length
       ? (summary.reduce((a, s) => a + s.avg_rating, 0) / summary.length).toFixed(2)
@@ -252,13 +301,12 @@ export default function EvaluationsPage() {
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
-          <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự — số liệu</h1>
+          <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự — tổng hợp tuần</h1>
         </header>
 
-        {/* Chọn tuần */}
         <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-3 shadow-card">
           <div className="text-xs text-muted">
-            Tuần đánh giá đến hết <b className="text-ink">Thứ 7 {fmtSat(selPeriod)}</b>
+            Tuần đến hết <b className="text-ink">Thứ 7 {fmtSat(selPeriod)}</b>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -276,13 +324,10 @@ export default function EvaluationsPage() {
           </div>
         </section>
 
-        {/* Điểm trung bình mỗi người (điểm thấp lên đầu) */}
         <section className="mt-4">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink">Điểm trung bình mỗi người ({summary.length})</h2>
-            <span className="text-[11px] text-muted">
-              TB chung: <b className="text-amber-deep">{avgAll}★</b>
-            </span>
+            <span className="text-[11px] text-muted">TB chung: <b className="text-amber-deep">{avgAll}★</b></span>
           </div>
           <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
             {summary.length === 0 ? (
@@ -294,7 +339,7 @@ export default function EvaluationsPage() {
                 <div key={s.user_id} className="flex items-center justify-between rounded-xl2 bg-white p-3 shadow-card">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{s.full_name}</p>
-                    <p className="text-[10px] text-muted">{s.num_ratings} phiếu</p>
+                    <p className="text-[10px] text-muted">{s.num_ratings} phiếu trong tuần</p>
                   </div>
                   <span
                     className={`flex shrink-0 items-center gap-1 text-sm font-bold ${
@@ -309,7 +354,6 @@ export default function EvaluationsPage() {
           </div>
         </section>
 
-        {/* Tất cả phiếu trong tuần */}
         <section className="mt-5">
           <div className="mb-2 flex items-center gap-2">
             <ChatBubbleLeftRightIcon className="h-5 w-5 text-steel" />
@@ -325,12 +369,15 @@ export default function EvaluationsPage() {
                 <div key={e.id} className="rounded-xl2 bg-white p-3 shadow-card">
                   <div className="flex items-center justify-between gap-2">
                     <p className="min-w-0 truncate text-xs text-ink">
-                      <b>{e.evaluator_name}</b> <span className="text-muted">đánh giá</span> <b>{e.evaluatee_name}</b>
+                      <b>{e.evaluator_name}</b> <span className="text-muted">→</span> <b>{e.evaluatee_name}</b>
                     </p>
                     <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-amber">
                       {e.rating} <StarIcon className="h-3.5 w-3.5" />
                     </span>
                   </div>
+                  <p className="mt-1 text-[10px] text-muted">
+                    {fmtDay(e.eval_date)} · {e.project_name || "Chung"}
+                  </p>
                   {e.comment && <p className="mt-1 text-[11px] text-muted">{e.comment}</p>}
                 </div>
               ))
@@ -350,7 +397,9 @@ export default function EvaluationsPage() {
       </header>
 
       <section className="mt-4">
-        <h2 className="mb-2 text-sm font-semibold text-ink">Nhân viên cấp dưới ({subordinates.length})</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink">
+          Nhân viên cấp dưới ({subordinates.length}) · chấm theo ngày/dự án, gộp tuần
+        </h2>
         <div className="space-y-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
           {subordinates.length === 0 ? (
             <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2">
@@ -358,32 +407,44 @@ export default function EvaluationsPage() {
             </p>
           ) : (
             subordinates.map((u) => {
-              const g = given.find((x) => x.evaluatee_id === u.id && x.period === period);
+              const wk = weekGivenTo(u.id);
+              const wkAvg = avgOf(wk.map((g) => g.rating));
               return (
                 <div key={u.id} className="rounded-xl2 bg-white p-3 shadow-card">
                   <button onClick={() => openTarget(u)} className="flex w-full items-center justify-between text-left">
                     <span className="text-sm font-semibold text-ink">{u.full_name}</span>
-                    {g ? (
+                    {wk.length > 0 ? (
                       <span className="flex items-center gap-1 text-xs font-semibold text-amber">
-                        {g.rating} <StarIcon className="h-4 w-4" />
+                        {wkAvg.toFixed(1)} <StarIcon className="h-4 w-4" /> <span className="text-[10px] text-muted">({wk.length})</span>
                       </span>
                     ) : (
                       <span className="text-[11px] font-semibold text-steel">Chấm điểm →</span>
                     )}
                   </button>
 
+                  {/* Danh sách phiếu tuần này cho nhân viên */}
+                  {wk.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {wk.map((g) => (
+                        <div key={g.id} className="flex items-center justify-between rounded-lg bg-paper px-2.5 py-1.5 text-[11px]">
+                          <span className="min-w-0 truncate text-muted">{fmtDay(g.eval_date)} · {g.project_name || "Chung"}</span>
+                          <span className="flex shrink-0 items-center gap-0.5 font-semibold text-amber">{g.rating}<StarIcon className="h-3 w-3" /></span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {target?.id === u.id && (
                     <div className="mt-3 border-t border-line pt-3">
-                      <p className="text-[11px] font-semibold text-muted">Tuần (hạn T7 {fmtSat(period)}) · Mức điểm</p>
-                      <div className="mt-1">
-                        <Stars value={rating} onChange={setRating} />
-                      </div>
+                      {DateProjectPicker()}
+                      <p className="mt-2 text-[11px] font-semibold text-muted">Mức điểm</p>
+                      <div className="mt-1"><Stars value={rating} onChange={setRating} /></div>
                       <textarea
                         rows={3}
                         value={comment}
                         onChange={(e) => setComment(e.target.value)}
                         placeholder="Nhận xét về hiệu quả công việc, thái độ, giờ giấc…"
-                        className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel resize-none"
+                        className="mt-2 w-full resize-none rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                       />
                       {msg && target?.id === u.id && (
                         <p className="mt-1 text-[11px] font-semibold text-steel">{msg}</p>
@@ -393,14 +454,14 @@ export default function EvaluationsPage() {
                           onClick={() => setTarget(null)}
                           className="flex-1 rounded-xl2 border border-line py-2 text-xs font-semibold text-muted"
                         >
-                          Hủy
+                          Đóng
                         </button>
                         <button
-                          onClick={submit}
+                          onClick={() => submitFor(u.id)}
                           disabled={saving || rating < 1}
                           className="flex-1 rounded-xl2 bg-ink py-2 text-xs font-semibold text-white disabled:opacity-50"
                         >
-                          {saving ? "Đang lưu…" : "Lưu đánh giá"}
+                          {saving ? "Đang lưu…" : "Lưu phiếu ngày"}
                         </button>
                       </div>
                     </div>

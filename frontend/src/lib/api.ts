@@ -243,7 +243,7 @@ export const api = {
   evaluationsGiven: () => request<Evaluation[]>("/evaluations/given"),
   evaluationsForUser: (evaluateeId: number) =>
     request<Evaluation[]>(`/evaluations?evaluatee_id=${evaluateeId}`),
-  createEvaluation: (payload: { period: string; evaluatee_id: number; rating: number; comment?: string | null }) =>
+  createEvaluation: (payload: { evaluatee_id: number; eval_date: string; project_id?: number | null; rating: number; comment?: string | null }) =>
     request<Evaluation>("/evaluations", {
       method: "POST",
       body: JSON.stringify(payload),

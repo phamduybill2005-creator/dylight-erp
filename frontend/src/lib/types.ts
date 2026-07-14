@@ -226,7 +226,10 @@ export type EvaluationDirection = "STAFF_TO_MANAGER" | "MANAGER_TO_STAFF";
 export interface Evaluation {
   id: number;
   company_id: number;
-  period: string;             // "YYYY-MM"
+  period: string;             // tuần = ngày Thứ 7 "YYYY-MM-DD" (tự suy từ eval_date)
+  eval_date?: string | null;  // ngày chấm "YYYY-MM-DD"
+  project_id?: number | null; // dự án (tùy chọn)
+  project_name?: string | null;
   evaluator_id: number;
   evaluatee_id: number;
   direction: EvaluationDirection;

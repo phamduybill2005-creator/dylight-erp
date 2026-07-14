@@ -5,14 +5,17 @@ Quy tắc chiều đánh giá (chốt với người dùng):
   - Nhân viên (FIELD_STAFF) chấm điểm QUẢN LÝ TRỰC TIẾP của mình (manager_id).
   - Quản lý (MANAGER / ACCOUNTANT) chấm điểm CẤP DƯỚI trực tiếp của mình.
   - Giám đốc chỉ XEM, không chấm điểm.
-Mỗi kỳ (period 'YYYY-MM') một người chỉ có một phiếu cho một đối tượng (ghi đè khi gửi lại).
+Chấm THEO TỪNG NGÀY (eval_date) & TỪNG DỰ ÁN (project_id, tùy chọn) — mỗi (ngày, dự án)
+một phiếu (gửi lại thì ghi đè); kỳ tuần (period = Thứ 7) tự suy từ ngày để TỔNG HỢP THEO TUẦN.
 """
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, require_roles
-from app.models import Evaluation, EvaluationDirection, User, UserRole
+from app.models import Evaluation, EvaluationDirection, Project, User, UserRole
 from app.schemas import EvaluationCreate, EvaluationOut, EvaluationSummary
 
 router = APIRouter(prefix="/evaluations", tags=["Đánh giá"])
@@ -21,13 +24,20 @@ _MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT)
 _VIEW_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
 
 
+def _week_saturday(d: date) -> str:
+    """Ngày Thứ 7 của tuần chứa d (tuần CN..T7), dạng 'YYYY-MM-DD' — khớp weekSaturday ở frontend."""
+    js_day = (d.weekday() + 1) % 7   # CN=0 … T7=6 (giống Date.getDay của JS)
+    return (d + timedelta(days=6 - js_day)).isoformat()
+
+
 @router.post("", response_model=EvaluationOut, status_code=201)
 def create_or_update_evaluation(
     payload: EvaluationCreate,
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    """Nhân viên/Quản lý gửi phiếu đánh giá. Tự suy ra chiều theo vai trò người chấm."""
+    """Nhân viên/Quản lý gửi phiếu đánh giá THEO NGÀY (+ dự án tùy chọn).
+    Tự suy chiều theo vai trò; kỳ tuần (period) tự tính từ eval_date để tổng hợp tuần."""
     evaluatee = db.get(User, payload.evaluatee_id)
     if not evaluatee or evaluatee.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy người được đánh giá trong công ty.")
@@ -46,22 +56,32 @@ def create_or_update_evaluation(
     else:
         raise HTTPException(403, "Vai trò này không tham gia chấm điểm đánh giá.")
 
-    # Ghi đè phiếu cùng kỳ nếu đã tồn tại.
-    rec = (
-        db.query(Evaluation)
-        .filter(
-            Evaluation.evaluator_id == current.id,
-            Evaluation.evaluatee_id == evaluatee.id,
-            Evaluation.period == payload.period,
-        )
-        .first()
+    # Dự án (tùy chọn) phải thuộc cùng công ty.
+    if payload.project_id is not None:
+        proj = db.get(Project, payload.project_id)
+        if not proj or proj.company_id != current.company_id:
+            raise HTTPException(404, "Không tìm thấy dự án.")
+
+    period = _week_saturday(payload.eval_date)
+
+    # Ghi đè phiếu CÙNG (người chấm, người nhận, NGÀY, DỰ ÁN) nếu đã có.
+    q = db.query(Evaluation).filter(
+        Evaluation.evaluator_id == current.id,
+        Evaluation.evaluatee_id == evaluatee.id,
+        Evaluation.eval_date == payload.eval_date,
     )
+    q = q.filter(Evaluation.project_id.is_(None)) if payload.project_id is None \
+        else q.filter(Evaluation.project_id == payload.project_id)
+    rec = q.first()
     if rec is None:
         rec = Evaluation(
             company_id=current.company_id, evaluator_id=current.id,
-            evaluatee_id=evaluatee.id, period=payload.period, direction=direction,
+            evaluatee_id=evaluatee.id, direction=direction,
         )
         db.add(rec)
+    rec.eval_date = payload.eval_date
+    rec.project_id = payload.project_id
+    rec.period = period
     rec.rating = payload.rating
     rec.comment = payload.comment
     rec.direction = direction
@@ -78,7 +98,7 @@ def evaluations_received(
     return (
         db.query(Evaluation)
         .filter(Evaluation.evaluatee_id == current.id)
-        .order_by(Evaluation.period.desc())
+        .order_by(Evaluation.period.desc(), Evaluation.id.desc())
         .all()
     )
 
@@ -91,7 +111,7 @@ def evaluations_given(
     return (
         db.query(Evaluation)
         .filter(Evaluation.evaluator_id == current.id)
-        .order_by(Evaluation.period.desc())
+        .order_by(Evaluation.period.desc(), Evaluation.id.desc())
         .all()
     )
 
@@ -150,6 +170,6 @@ def evaluations_for_user(
     return (
         db.query(Evaluation)
         .filter(Evaluation.evaluatee_id == evaluatee_id)
-        .order_by(Evaluation.period.desc())
+        .order_by(Evaluation.period.desc(), Evaluation.id.desc())
         .all()
     )

@@ -515,7 +515,11 @@ class Evaluation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    period: Mapped[str] = mapped_column(String(20), index=True)   # tuần = ngày Thứ 7 "YYYY-MM-DD"
+    period: Mapped[str] = mapped_column(String(20), index=True)   # tuần = ngày Thứ 7 "YYYY-MM-DD" (tự suy từ eval_date)
+    # Ngày đánh giá cụ thể + dự án (tùy chọn) — chấm THEO TỪNG NGÀY & TỪNG DỰ ÁN,
+    # rồi TỔNG HỢP THEO TUẦN qua cột period. Cột mới -> ALTER ở _ensure_schema.
+    eval_date: Mapped[date | None] = mapped_column(Date, index=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
     evaluator_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)  # người chấm
     evaluatee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)  # người được chấm
     direction: Mapped[EvaluationDirection] = mapped_column(SAEnum(EvaluationDirection))
@@ -525,6 +529,11 @@ class Evaluation(Base):
 
     evaluator: Mapped["User"] = relationship("User", foreign_keys=[evaluator_id])
     evaluatee: Mapped["User"] = relationship("User", foreign_keys=[evaluatee_id])
+    project: Mapped["Project | None"] = relationship("Project", foreign_keys=[project_id])
+
+    @property
+    def project_name(self) -> str | None:
+        return self.project.name if self.project else None
 
     @property
     def evaluator_name(self) -> str | None:
