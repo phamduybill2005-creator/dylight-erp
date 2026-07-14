@@ -192,6 +192,7 @@ class ProjectOut(ProjectBase):
     created_at: datetime
     members: list[UserOut] = []
     lead_name: str | None = None          # tên người chủ trì (tiện hiển thị)
+    lead_department: str | None = None    # phòng ban của người chủ trì
     # % tiến độ THỰC = trung bình % của các mốc Progress (bơm ở router, mặc định 0).
     progress_percent: Decimal = Decimal(0)
 

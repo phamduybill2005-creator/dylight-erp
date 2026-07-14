@@ -247,6 +247,10 @@ class Project(Base):
     def lead_name(self) -> str | None:
         return self.lead.full_name if self.lead else None
 
+    @property
+    def lead_department(self) -> str | None:
+        return self.lead.department if self.lead else None
+
 
 # --------------------------------------------------------------------------
 # 5. CONTRACTS — hợp đồng thuộc dự án (đây là "Tổng giá trị HD" trên dashboard)

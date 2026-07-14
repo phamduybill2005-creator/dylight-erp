@@ -67,6 +67,7 @@ export interface Project {
   manager_name?: string | null;
   lead_id?: number | null;
   lead_name?: string | null;
+  lead_department?: string | null;
   status: ProjectStatus;
   start_date?: string | null;
   end_date?: string | null;

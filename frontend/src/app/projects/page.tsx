@@ -78,6 +78,38 @@ export default function ProjectsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [canManage, setCanManage] = useState(false);
 
+  // Bộ lọc tìm kiếm
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterLead, setFilterLead] = useState("");
+  const [filterDept, setFilterDept] = useState("");
+
+  const uniqueLeads = Array.from(
+    new Set(projects.map((p) => p.lead_name).filter(Boolean) as string[])
+  ).sort();
+
+  const uniqueDepts = Array.from(
+    new Set([
+      ...(projects.map((p) => p.lead_department).filter(Boolean) as string[]),
+      ...(projects.flatMap((p) => p.members?.map((m) => m.department).filter(Boolean) as string[]) || [])
+    ])
+  ).sort();
+
+  const filteredProjects = projects.filter((p) => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !p.code.toLowerCase().includes(q)) return false;
+    }
+    if (filterLead) {
+      if (p.lead_name !== filterLead) return false;
+    }
+    if (filterDept) {
+      const matchLeadDept = p.lead_department === filterDept;
+      const matchMemberDept = p.members?.some((m) => m.department === filterDept) || false;
+      if (!matchLeadDept && !matchMemberDept) return false;
+    }
+    return true;
+  });
+
   useEffect(() => {
     let alive = true;
     // Nạp danh sách dự án — dùng cho lần đầu và polling.
@@ -236,12 +268,64 @@ export default function ProjectsPage() {
         </button>
       </div>
 
-      <div className="mt-4">
-        <FilterBar
-          show={{ dept: true, lead: true, project: true }}
-          value={filters}
-          onChange={setFilters}
-        />
+      {/* Bộ lọc dự án */}
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[240px]">
+          <input
+            type="text"
+            placeholder="Tìm theo tên hoặc mã quản lý..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel placeholder:text-muted"
+          />
+        </div>
+
+        <div className="w-full sm:w-[200px]">
+          <select
+            value={filterDept}
+            onChange={(e) => setFilterDept(e.target.value)}
+            className="w-full rounded-xl2 border border-line bg-white px-3 py-2.5 text-xs outline-none focus:border-steel text-ink"
+          >
+            <option value="">— Tất cả phòng ban —</option>
+            {uniqueDepts.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="w-full sm:w-[200px]">
+          <select
+            value={filterLead}
+            onChange={(e) => setFilterLead(e.target.value)}
+            className="w-full rounded-xl2 border border-line bg-white px-3 py-2.5 text-xs outline-none focus:border-steel text-ink"
+          >
+            <option value="">— Tất cả chủ trì —</option>
+            {uniqueLeads.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between text-xs text-muted">
+        <span>Tìm thấy: <b>{filteredProjects.length}</b> dự án</span>
+        {(searchQuery || filterDept || filterLead) && (
+          <button
+            onClick={() => {
+              setSearchQuery("");
+              setFilterDept("");
+              setFilterLead("");
+            }}
+            className="text-steel hover:text-ink font-semibold"
+          >
+            Xóa bộ lọc
+          </button>
+        )}
+      </div>
       </div>
 
       <div className="mt-3 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
@@ -264,15 +348,15 @@ export default function ProjectsPage() {
             </tr>
           </thead>
           <tbody>
-            {visibleProjects.length === 0 && (
+            {filteredProjects.length === 0 && (
               <tr>
                 <td className={`${TD} text-center text-muted`} colSpan={infoCols}>
-                  {projects.length === 0 ? "Chưa có dự án nào." : "Không có dự án khớp bộ lọc."}
+                  Không tìm thấy dự án nào khớp với bộ lọc.
                 </td>
               </tr>
             )}
 
-            {visibleProjects.map((p, i) => {
+            {filteredProjects.map((p, i) => {
               const st = PROJECT_STATUS[p.status] ?? PROJECT_STATUS.PLANNING;
               return (
                 <tr
