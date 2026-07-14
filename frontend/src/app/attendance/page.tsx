@@ -17,6 +17,7 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
@@ -120,6 +121,8 @@ export default function AttendancePage() {
   const [dayList, setDayList] = useState<Attendance[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary[]>([]);
   const [summaryPeriod, setSummaryPeriod] = useState(monthStr());  // tháng đang xem tổng hợp
+  const [allUsers, setAllUsers] = useState<User[]>([]);            // để map người -> phòng ban khi lọc
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);     // lọc tổng hợp theo phòng ban
   // Chi tiết từng ngày của 1 người (mở khi bấm vào người trong bảng tổng hợp).
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
   const [detailRecs, setDetailRecs] = useState<Attendance[]>([]);
@@ -183,6 +186,7 @@ export default function AttendancePage() {
             .catch(() => {})
             .finally(() => setLoading(false));
         } else {
+          api.users().then(setAllUsers).catch(() => {});   // cho bộ lọc phòng ban
           setLoading(false);
         }
       })
@@ -386,12 +390,12 @@ export default function AttendancePage() {
   const droppedCount = empCol >= 0 && dateCol >= 0 ? dataRows.length - punches.length : 0;
   const noTimeWarn = punches.length > 0 && punches.every((p) => p.timestamp.endsWith("T00:00:00"));
 
-  // KPI tổng hợp tháng — để Ban Giám đốc nắm nhanh toàn đội.
-  const sumDays = summary.reduce((a, s) => a + s.present_days, 0);
-  const sumLate = summary.reduce((a, s) => a + s.late_days, 0);
-  const sumHours = summary.reduce((a, s) => a + s.total_hours, 0);
-  const avgHours = summary.length ? sumHours / summary.length : 0;
-  const maxDays = summary.reduce((m, s) => Math.max(m, s.present_days), 0) || 1;
+  // Lọc bảng tổng hợp theo PHÒNG BAN (map user_id -> department qua danh sách nhân sự).
+  const deptOfUser = (uid: number) => allUsers.find((u) => u.id === uid)?.department;
+  const shownSummary = summary.filter(
+    (s) => !filters.dept || splitDepts(deptOfUser(s.user_id)).includes(filters.dept)
+  );
+  const maxDays = shownSummary.reduce((m, s) => Math.max(m, s.present_days), 0) || 1;
 
   async function doImport() {
     if (!punches.length) return;
@@ -485,34 +489,17 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* 4 chỉ số nhanh */}
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3">
-          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
-            <p className="text-[10px] text-muted">Nhân viên có công</p>
-            <p className="mt-1 text-xl font-bold text-ink tnum">{summary.length}</p>
-          </div>
-          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
-            <p className="text-[10px] text-muted">Tổng ngày công</p>
-            <p className="mt-1 text-xl font-bold text-steel tnum">{sumDays}</p>
-          </div>
-          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
-            <p className="text-[10px] text-muted">TB giờ/người</p>
-            <p className="mt-1 text-xl font-bold text-ink tnum">{avgHours.toFixed(1)}h</p>
-          </div>
-          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
-            <p className="text-[10px] text-muted">Lượt đi trễ</p>
-            <p className={`mt-1 text-xl font-bold tnum ${sumLate ? "text-bad" : "text-ink"}`}>{sumLate}</p>
-          </div>
-        </div>
+        {/* Lọc theo phòng ban */}
+        <FilterBar show={{ dept: true }} value={filters} onChange={setFilters} />
 
         {/* Chi tiết từng người */}
         <div className="mt-3 space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
-          {summary.length === 0 ? (
+          {shownSummary.length === 0 ? (
             <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2 xl:col-span-3">
-              Chưa có dữ liệu tổng hợp cho tháng này.
+              {summary.length === 0 ? "Chưa có dữ liệu tổng hợp cho tháng này." : "Không có nhân sự khớp phòng ban."}
             </p>
           ) : (
-            summary.map((s) => {
+            shownSummary.map((s) => {
               const isOpen = expandedUser === s.user_id;
               return (
               <div key={s.user_id} className={`rounded-xl2 bg-white shadow-card ${isOpen ? "lg:col-span-2 xl:col-span-3" : ""}`}>
