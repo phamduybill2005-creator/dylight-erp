@@ -41,6 +41,13 @@ const weekSat = (iso: string): string => {
 const statusKey = (a: Assignment): "todo" | "doing" | "done" =>
   a.status === "DONE" ? "done" : a.status === "IN_PROGRESS" ? "doing" : "todo";
 
+/** Nhãn "đã làm hay chưa" cho từng phần việc. */
+const ASSIGN_STATUS: Record<"todo" | "doing" | "done", { label: string; cls: string }> = {
+  done: { label: "Hoàn thành", cls: "bg-ok/15 text-ok" },
+  doing: { label: "Đang làm", cls: "bg-amber/15 text-amber-deep" },
+  todo: { label: "Chưa làm", cls: "bg-line text-muted" },
+};
+
 type Fill = "done" | "doing" | null;
 
 /** Ô của phần việc `a` tại ngày `d` được tô màu gì (dải Excel). */
@@ -418,6 +425,9 @@ function FragmentRows({
             <td className={`${stickyLeft} bg-white px-2 py-1`}>
               <span className="block max-w-36 truncate pl-3 text-ink" title={a.title}>
                 {a.title}
+              </span>
+              <span className={`ml-3 mt-0.5 inline-block rounded-full px-1.5 py-0 text-[9px] font-semibold ${ASSIGN_STATUS[statusKey(a)].cls}`}>
+                {ASSIGN_STATUS[statusKey(a)].label}
               </span>
             </td>
             {days.map((d) => {
