@@ -522,7 +522,7 @@ export default function AttendancePage() {
                       style={{ width: `${Math.round((s.present_days / maxDays) * 100)}%` }}
                     />
                   </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs">
                     <div>
                       <p className="text-[9px] text-muted">Ngày công</p>
                       <p className="font-bold text-ink tnum">{s.present_days}</p>
@@ -530,10 +530,6 @@ export default function AttendancePage() {
                     <div>
                       <p className="text-[9px] text-muted">Tổng giờ</p>
                       <p className="font-bold text-steel tnum">{s.total_hours.toFixed(1)}h</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-muted">Đi trễ</p>
-                      <p className={`font-bold tnum ${s.late_days ? "text-bad" : "text-ink"}`}>{s.late_days}</p>
                     </div>
                   </div>
                 </button>
