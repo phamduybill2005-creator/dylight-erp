@@ -657,12 +657,7 @@ export default function ProjectDetailPage() {
               </button>
             </div>
 
-            {progressLogs.length === 0 ? (
-              <p className="rounded-xl2 bg-white p-6 text-center text-xs text-muted shadow-card">
-                Chưa ghi nhận nhật ký tiến độ nào.
-              </p>
-            ) : (
-              <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+            <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
                 <table className="w-full min-w-[720px] border-collapse text-xs">
                   <thead>
                     <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
@@ -676,7 +671,13 @@ export default function ProjectDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {progressLogs.map((p, i) => {
+                    {progressLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={canManage ? 7 : 6} className="border border-line px-3 py-6 text-center text-muted">
+                          Chưa ghi nhận nhật ký tiến độ nào. Bấm <b className="text-amber-deep">Cập nhật tiến độ</b> để thêm.
+                        </td>
+                      </tr>
+                    ) : progressLogs.map((p, i) => {
                       const st = PROGRESS_STATUS[p.status ?? "TODO"] ?? PROGRESS_STATUS.TODO;
                       return (
                         <tr key={p.id} className="align-top odd:bg-white even:bg-paper/40">
@@ -714,7 +715,6 @@ export default function ProjectDetailPage() {
                   </tbody>
                 </table>
               </div>
-            )}
           </div>
         )}
 
