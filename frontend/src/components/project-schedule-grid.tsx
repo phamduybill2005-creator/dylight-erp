@@ -6,7 +6,7 @@
 // Dữ liệu lấy từ hệ thống Giao việc (Assignment) — mốc ngày do backend tự đóng dấu.
 
 import { useEffect, useMemo, useState } from "react";
-import { StarIcon, TableCellsIcon } from "@heroicons/react/24/outline";
+import { StarIcon, TableCellsIcon, FunnelIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { Assignment, User } from "@/lib/types";
@@ -228,38 +228,46 @@ export default function ProjectScheduleGrid({
       </p>
 
       {/* Lọc: tìm theo tháng / theo tuần / theo trạng thái */}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-semibold text-muted">Lọc:</span>
-        <input
-          type="month"
-          value={fMonth}
-          onChange={(e) => setFMonth(e.target.value)}
-          title="Tìm theo tháng"
-          className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel"
-        />
-        <input
-          type="date"
-          value={fWeek}
-          onChange={(e) => setFWeek(e.target.value)}
-          title="Tìm theo tuần (chọn 1 ngày bất kỳ trong tuần)"
-          className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel"
-        />
-        <select
-          value={fStatus}
-          onChange={(e) => setFStatus(e.target.value)}
-          title="Tìm theo trạng thái"
-          className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel"
-        >
-          <option value="">Mọi trạng thái</option>
-          <option value="todo">Chưa làm</option>
-          <option value="doing">Đang làm</option>
-          <option value="done">Hoàn thành</option>
-        </select>
+      <div className="mt-2.5 flex flex-wrap items-end gap-x-3 gap-y-2 rounded-lg border border-line/70 bg-paper/50 px-3 py-2">
+        <span className="flex items-center gap-1 self-center text-[11px] font-semibold text-muted">
+          <FunnelIcon className="h-3.5 w-3.5" /> Lọc
+        </span>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-semibold uppercase tracking-wide text-muted/70">Tháng</span>
+          <input
+            type="month"
+            value={fMonth}
+            onChange={(e) => setFMonth(e.target.value)}
+            className="h-7 rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
+          />
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-semibold uppercase tracking-wide text-muted/70">Tuần (chọn 1 ngày)</span>
+          <input
+            type="date"
+            value={fWeek}
+            onChange={(e) => setFWeek(e.target.value)}
+            className="h-7 rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
+          />
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-semibold uppercase tracking-wide text-muted/70">Trạng thái</span>
+          <select
+            value={fStatus}
+            onChange={(e) => setFStatus(e.target.value)}
+            className="h-7 rounded-md border border-line bg-white px-2 text-[11px] text-ink outline-none focus:border-steel"
+          >
+            <option value="">Tất cả</option>
+            <option value="todo">Chưa làm</option>
+            <option value="doing">Đang làm</option>
+            <option value="done">Hoàn thành</option>
+          </select>
+        </label>
         {fOn && (
           <button
             type="button"
             onClick={() => { setFMonth(""); setFWeek(""); setFStatus(""); }}
-            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-muted hover:bg-paper"
+            className="self-center rounded-md px-2 py-1 text-[11px] font-semibold text-steel hover:bg-white"
           >
             Xóa lọc
           </button>
