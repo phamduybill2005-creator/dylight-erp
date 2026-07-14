@@ -26,6 +26,7 @@ import { ROLE_LABEL, roleTitle } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment, Department } from "@/lib/types";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
+import FilterBar, { NO_FILTERS, type Filters } from "@/components/filter-bar";
 
 // Một người có thể thuộc NHIỀU phòng cùng lúc — lưu trong cột `department`,
 // các phòng ngăn cách bởi dấu phẩy (VD: "Phòng BIM, Phòng AI").
@@ -54,6 +55,8 @@ export default function EmployeesPage() {
   // Danh mục phòng ban lấy từ backend (nguồn chân lý); Admin/Giám đốc thêm/đổi tên.
   const [departments, setDepartments] = useState<Department[]>([]);
   const [showDeptManager, setShowDeptManager] = useState(false);
+  // Bộ lọc dùng chung: theo phòng ban + theo người chủ trì (= quản lý trực tiếp).
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   
   // States for the edit form
   const [formData, setFormData] = useState({
@@ -206,9 +209,12 @@ export default function EmployeesPage() {
   const pendingUsers = users.filter((u) => !u.is_approved && u.is_active);
   const approvedUsers = users.filter((u) => u.is_approved);
 
-  const filteredUsers = approvedUsers.filter((u) =>
-    u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredUsers = approvedUsers.filter(
+    (u) =>
+      (u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchQuery.toLowerCase())) &&
+      (!filters.dept || splitDepts(u.department).includes(filters.dept)) &&
+      (filters.leadId === "" || u.manager_id === filters.leadId)
   );
 
   // Gợi ý phòng ban: danh mục từ backend (Admin/Giám đốc quản lý) + phòng nào đã có
@@ -569,6 +575,14 @@ export default function EmployeesPage() {
             </button>
           )}
         </section>
+
+        {/* Lọc theo phòng ban + người chủ trì (áp cho cả 3 chế độ xem) */}
+        <FilterBar
+          show={{ dept: true, lead: true }}
+          value={filters}
+          onChange={setFilters}
+          leadLabel="người chủ trì"
+        />
 
         {/* Chế độ xem: phẳng / gom theo phòng ban / gom theo quản lý */}
         <section className="flex w-fit items-center gap-1 rounded-xl2 border border-line bg-white p-1 text-xs shadow-card">

@@ -22,7 +22,6 @@ import {
   StarIcon,
   ClipboardDocumentListIcon,
   CalendarDaysIcon,
-  PresentationChartLineIcon,
 } from "@heroicons/react/24/outline";
 import { api, tokenStore } from "@/lib/api";
 import { roleTitle, roleTier, type Tier } from "@/lib/roles";
@@ -59,13 +58,6 @@ function deskNav(tier: Tier): NavLink[] {
     { href: "/employees", label: "Nhân sự", icon: UsersIcon },
     { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
   ];
-  if (tier === "DIRECTOR") {
-    items.push(
-      { href: "/project-progress", label: "Tiến độ dự án", icon: PresentationChartLineIcon },
-      { href: "/partners", label: "Đối tác", icon: BuildingOffice2Icon },
-      { href: "/payroll", label: "Bảng lương", icon: UsersIcon }
-    );
-  }
   return items;
 }
 

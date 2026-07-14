@@ -10,6 +10,7 @@ import {
   CalendarDaysIcon, PaperAirplaneIcon, CheckIcon, XMarkIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { formatDate } from "@/lib/format";
@@ -41,6 +42,8 @@ export default function LeavePage() {
 
   const [mine, setMine] = useState<LeaveRequest[]>([]);
   const [pending, setPending] = useState<LeaveRequest[]>([]);
+  const [users, setUsers] = useState<User[]>([]);   // để ánh xạ nhân viên -> phòng ban khi lọc
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -57,6 +60,7 @@ export default function LeavePage() {
         ];
         if (isManagerUp(u.role)) {
           tasks.push(api.leaveList("PENDING").then(setPending).catch(() => {}));
+          api.users().then(setUsers).catch(() => {});   // cho bộ lọc phòng ban
         }
         Promise.all(tasks).finally(() => setLoading(false));
       })
@@ -92,6 +96,12 @@ export default function LeavePage() {
   }
 
   const canApprove = isManagerUp(me.role);
+
+  // Lọc đơn chờ duyệt theo PHÒNG BAN của người xin nghỉ (ánh xạ qua danh sách nhân sự).
+  const deptOfUser = (uid: number) => users.find((u) => u.id === uid)?.department;
+  const shownPending = pending.filter(
+    (l) => !filters.dept || splitDepts(deptOfUser(l.user_id)).includes(filters.dept)
+  );
 
   return (
     <AppShell>
@@ -163,6 +173,9 @@ export default function LeavePage() {
       {canApprove && (
         <>
           <h2 className="mt-6 mb-2 text-sm font-bold text-ink">Đơn chờ duyệt toàn công ty</h2>
+          <div className="mb-3">
+            <FilterBar show={{ dept: true }} value={filters} onChange={setFilters} />
+          </div>
           <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
@@ -176,10 +189,12 @@ export default function LeavePage() {
                 </tr>
               </thead>
               <tbody>
-                {pending.length === 0 && (
-                  <tr><td colSpan={6} className="border border-line px-3 py-6 text-center text-muted">Không có đơn nào chờ duyệt.</td></tr>
+                {shownPending.length === 0 && (
+                  <tr><td colSpan={6} className="border border-line px-3 py-6 text-center text-muted">
+                    {pending.length === 0 ? "Không có đơn nào chờ duyệt." : "Không có đơn khớp bộ lọc."}
+                  </td></tr>
                 )}
-                {pending.map((l) => (
+                {shownPending.map((l) => (
                   <tr key={l.id} className="odd:bg-white even:bg-paper/40 hover:bg-amber/10">
                     <td className="border border-line px-3 py-2 font-semibold text-ink">{l.user_name || "—"}</td>
                     <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.from_date)}</td>

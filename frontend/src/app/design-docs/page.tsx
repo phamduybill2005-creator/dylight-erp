@@ -11,6 +11,7 @@ import {
   XMarkIcon, CheckIcon, ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import FilterBar, { NO_FILTERS, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import type { DesignDocument, DesignPhase, DesignDocStatus, Project, User } from "@/lib/types";
@@ -40,6 +41,7 @@ export default function DesignDocsPage() {
   const [docs, setDocs] = useState<DesignDocument[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [filter, setFilter] = useState<DesignPhase | "ALL">("ALL");
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);   // lọc theo dự án
 
   const [form, setForm] = useState<typeof empty & { id?: number }>(empty);
   const [showForm, setShowForm] = useState(false);
@@ -102,7 +104,11 @@ export default function DesignDocsPage() {
     return <AppShell><div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div></AppShell>;
   }
 
-  const shown = docs.filter((d) => filter === "ALL" || d.phase === filter);
+  const shown = docs.filter(
+    (d) =>
+      (filter === "ALL" || d.phase === filter) &&
+      (filters.projectId === "" || d.project_id === filters.projectId)
+  );
 
   return (
     <AppShell>
@@ -126,6 +132,11 @@ export default function DesignDocsPage() {
             {t === "ALL" ? "Tất cả giai đoạn" : PHASE_LABEL[t]}
           </button>
         ))}
+      </div>
+
+      {/* Lọc theo dự án */}
+      <div className="mt-3">
+        <FilterBar show={{ project: true }} value={filters} onChange={setFilters} />
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">

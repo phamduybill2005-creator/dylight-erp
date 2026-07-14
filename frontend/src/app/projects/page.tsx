@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import type { Project, User } from "@/lib/types";
@@ -49,6 +50,8 @@ function calculateDuration(start?: string | null, end?: string | null, deadline?
 export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
+  // Bộ lọc: theo phòng ban (thành viên) / người chủ trì / dự án cụ thể.
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
 
   // Thêm dự án — mặc định FORM từng ô; "bulk" = dán nhiều dòng từ Excel (tùy chọn).
   const [showAdd, setShowAdd] = useState(false);
@@ -103,7 +106,14 @@ export default function ProjectsPage() {
     return () => { alive = false; if (timer) clearInterval(timer); };
   }, []);
 
-
+  // Áp bộ lọc: phòng ban = có thành viên thuộc phòng đó; chủ trì = lead_id; dự án = đúng id.
+  const visibleProjects = projects.filter((p) => {
+    if (filters.dept && !(p.members ?? []).some((m) => splitDepts(m.department).includes(filters.dept)))
+      return false;
+    if (filters.leadId !== "" && p.lead_id !== filters.leadId) return false;
+    if (filters.projectId !== "" && p.id !== filters.projectId) return false;
+    return true;
+  });
 
   // Mỗi dòng 1 dự án; cột ngăn cách bằng phẩy / Tab / ; / | :
   // Mã QL, Tên dự án, Nhóm, GEO担当, DOSCO担当 (dán thẳng từ Excel).
@@ -226,7 +236,15 @@ export default function ProjectsPage() {
         </button>
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+      <div className="mt-4">
+        <FilterBar
+          show={{ dept: true, lead: true, project: true }}
+          value={filters}
+          onChange={setFilters}
+        />
+      </div>
+
+      <div className="mt-3 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
         <table className="w-full min-w-[680px] border-collapse text-sm">
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
@@ -246,15 +264,15 @@ export default function ProjectsPage() {
             </tr>
           </thead>
           <tbody>
-            {projects.length === 0 && (
+            {visibleProjects.length === 0 && (
               <tr>
                 <td className={`${TD} text-center text-muted`} colSpan={infoCols}>
-                  Chưa có dự án nào.
+                  {projects.length === 0 ? "Chưa có dự án nào." : "Không có dự án khớp bộ lọc."}
                 </td>
               </tr>
             )}
 
-            {projects.map((p, i) => {
+            {visibleProjects.map((p, i) => {
               const st = PROJECT_STATUS[p.status] ?? PROJECT_STATUS.PLANNING;
               return (
                 <tr
@@ -289,8 +307,6 @@ export default function ProjectsPage() {
                 </tr>
               );
             })}
-
-
           </tbody>
         </table>
       </div>

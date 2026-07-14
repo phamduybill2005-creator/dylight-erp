@@ -83,11 +83,11 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
 
         <div className="flex gap-2 border-t border-line p-4">
           <Link
-            href="/project-progress"
+            href="/projects"
             onClick={dismiss}
             className="flex-1 rounded-xl2 bg-ink py-2.5 text-center text-xs font-semibold text-white hover:bg-steel"
           >
-            Xem tiến độ dự án
+            Xem dự án
           </Link>
           <button onClick={dismiss} className="flex-1 rounded-xl2 border border-line py-2.5 text-xs font-semibold text-muted hover:bg-paper">
             Đã hiểu

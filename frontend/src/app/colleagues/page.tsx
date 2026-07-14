@@ -15,6 +15,7 @@ import {
   UserMinusIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { roleTitle } from "@/lib/roles";
 import { refreshNicknames } from "@/lib/nicknames";
@@ -30,6 +31,7 @@ export default function ColleaguesPage() {
   const [draft, setDraft] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
 
   useEffect(() => {
     api.me().then(setMe).catch(() => router.push("/login"));
@@ -72,8 +74,9 @@ export default function ColleaguesPage() {
 
   const filtered = list.filter(
     (c) =>
-      c.full_name.toLowerCase().includes(q.toLowerCase()) ||
-      (c.my_nickname || "").toLowerCase().includes(q.toLowerCase())
+      (c.full_name.toLowerCase().includes(q.toLowerCase()) ||
+        (c.my_nickname || "").toLowerCase().includes(q.toLowerCase())) &&
+      (!filters.dept || splitDepts(c.department).includes(filters.dept))
   );
 
   if (loading) {
@@ -104,6 +107,8 @@ export default function ColleaguesPage() {
           placeholder="Tìm theo tên hoặc biệt danh…"
           className="w-full rounded-xl2 border border-line bg-white px-4 py-3 text-sm outline-none focus:border-steel"
         />
+
+        <FilterBar show={{ dept: true }} value={filters} onChange={setFilters} />
 
         <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
           {filtered.length === 0 ? (
