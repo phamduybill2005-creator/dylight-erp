@@ -493,16 +493,16 @@ export default function AttendancePage() {
         <FilterBar show={{ dept: true }} value={filters} onChange={setFilters} />
 
         {/* Chi tiết từng người */}
-        <div className="mt-3 space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
+        <div className="mt-3 space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-4">
           {shownSummary.length === 0 ? (
-            <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2 xl:col-span-3">
+            <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2 xl:col-span-4">
               {summary.length === 0 ? "Chưa có dữ liệu tổng hợp cho tháng này." : "Không có nhân sự khớp phòng ban."}
             </p>
           ) : (
             shownSummary.map((s) => {
               const isOpen = expandedUser === s.user_id;
               return (
-              <div key={s.user_id} className={`rounded-xl2 bg-white shadow-card ${isOpen ? "lg:col-span-2 xl:col-span-3" : ""}`}>
+              <div key={s.user_id} className={`rounded-xl2 bg-white shadow-card ${isOpen ? "lg:col-span-2 xl:col-span-4" : ""}`}>
                 <button onClick={() => toggleDetail(s.user_id)} className="block w-full p-3 text-left">
                   <div className="flex items-center justify-between gap-2">
                     <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-ink">
