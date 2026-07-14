@@ -52,7 +52,7 @@ function deskNav(tier: Tier): NavLink[] {
   const items: NavLink[] = [
     { href: "/", label: "Tổng quan", icon: HomeIcon },
     { href: "/bids", label: "Đấu thầu", icon: ClipboardDocumentListIcon },
-    { href: "/projects", label: "Dự án & Hợp đồng", icon: FolderIcon },
+    { href: "/projects", label: "Dự án", icon: FolderIcon },
     { href: "/design-docs", label: "Hồ sơ thiết kế", icon: RectangleStackIcon },
     { href: "/attendance", label: "Chấm công", icon: ClockIcon },
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },
