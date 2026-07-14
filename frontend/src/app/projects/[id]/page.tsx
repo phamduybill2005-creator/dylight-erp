@@ -23,7 +23,6 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
-import ProgressTimeline from "@/components/progress-timeline";
 import ProjectScheduleGrid from "@/components/project-schedule-grid";
 import ProjectTeamTab from "@/components/project-team-tab";
 import ProjectEvaluationTab from "@/components/project-evaluation-tab";
@@ -627,9 +626,6 @@ export default function ProjectDetailPage() {
               members={project.members ?? []}
               leadId={project.lead_id ?? null}
             />
-
-            {/* Đường tiến độ theo ngày (toàn dự án + từng phòng) */}
-            <ProgressTimeline projectId={projectId} />
 
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-muted uppercase">Nhật ký tiến độ ({progressLogs.length})</h3>
