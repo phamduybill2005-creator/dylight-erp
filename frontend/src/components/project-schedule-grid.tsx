@@ -173,7 +173,7 @@ export default function ProjectScheduleGrid({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase text-muted">
           <TableCellsIcon className="h-4 w-4 text-steel" />
-          Bảng tiến độ ngày — ai làm gì, bao lâu
+          Bảng tiến độ ngày
         </h3>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted">
           <span className="flex items-center gap-1"><i className="h-2.5 w-4 rounded-sm bg-steel/25" /> thời gian dự án</span>

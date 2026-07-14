@@ -11,7 +11,6 @@ import {
   PlusIcon,
   CheckBadgeIcon,
   ArrowLeftIcon,
-  BanknotesIcon,
   ClockIcon,
   DocumentTextIcon,
   XMarkIcon,
@@ -31,7 +30,7 @@ import ProjectEvaluationTab from "@/components/project-evaluation-tab";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate } from "@/lib/format";
-import type { Project, Contract, Payment, Progress, PaymentType, PaymentDirection, User } from "@/lib/types";
+import type { Project, Contract, Progress, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -39,12 +38,6 @@ const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   ON_HOLD: { label: "Tạm dừng", cls: "bg-amber/20 text-amber-deep" },
   COMPLETED: { label: "Hoàn thành", cls: "bg-ok/15 text-ok" },
   CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
-};
-
-const PAYMENT_TYPE_LABEL = {
-  ADVANCE: "Tạm ứng",
-  PROGRESS: "Theo tiến độ",
-  FINAL: "Quyết toán",
 };
 
 export default function ProjectDetailPage() {
@@ -55,9 +48,8 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [progressLogs, setProgressLogs] = useState<Progress[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team" | "eval" | "payments">("contracts");
+  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team" | "eval">("contracts");
 
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
@@ -72,7 +64,6 @@ export default function ProjectDetailPage() {
   // Modals & Member management states
   const [contractModal, setContractModal] = useState(false);
   const [progressModal, setProgressModal] = useState(false);
-  const [paymentModal, setPaymentModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
@@ -108,16 +99,6 @@ export default function ProjectDetailPage() {
     note: "",
   });
 
-  const [newPayment, setNewPayment] = useState({
-    contract_id: 0,
-    code: "",
-    payment_type: "PROGRESS",
-    direction: "IN",
-    amount: 0,
-    payment_date: "",
-    note: "",
-  });
-
   function loadData(silent = false) {
     if (isNaN(projectId)) return;
     // Chưa biết vai trò (chưa nạp xong /me) thì chờ — tránh gọi nhầm endpoint tiền
@@ -133,7 +114,6 @@ export default function ProjectDetailPage() {
           setProject(proj);
           setProgressLogs(prog);
           setContracts([]);
-          setPayments([]);
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -145,19 +125,10 @@ export default function ProjectDetailPage() {
       api.contracts(projectId),
       api.progress(projectId),
     ])
-      .then(async ([proj, contrs, prog]) => {
+      .then(([proj, contrs, prog]) => {
         setProject(proj);
         setContracts(contrs);
         setProgressLogs(prog);
-
-        // Fetch payments for all contracts of this project
-        if (contrs.length > 0) {
-          const paymentsPromises = contrs.map((c) => api.payments(c.id));
-          const paymentsResults = await Promise.all(paymentsPromises);
-          setPayments(paymentsResults.flat());
-        } else {
-          setPayments([]);
-        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -183,9 +154,9 @@ export default function ProjectDetailPage() {
         // Tab tiền chỉ nhận khi có quyền xem tiền.
         const want = new URLSearchParams(window.location.search).get("tab");
         const allowed: string[] = ["items", "progress", "team", "eval"];
-        if (canSeeMoney(me.role)) allowed.push("contracts", "payments");
+        if (canSeeMoney(me.role)) allowed.push("contracts");
         if (want && allowed.includes(want)) {
-          setActiveTab(want as "contracts" | "items" | "progress" | "team" | "eval" | "payments");
+          setActiveTab(want as "contracts" | "items" | "progress" | "team" | "eval");
         }
       })
       .catch(() => {});
@@ -206,14 +177,14 @@ export default function ProjectDetailPage() {
   // Tạm dừng khi có modal đang mở (tránh ghi đè state khi người dùng đang thao tác).
   useEffect(() => {
     if (currentUser == null || isNaN(projectId)) return;
-    const anyModalOpen = contractModal || progressModal || paymentModal || membersModal;
+    const anyModalOpen = contractModal || progressModal || membersModal;
     if (anyModalOpen) return;
     const id = setInterval(() => {
       if (document.visibilityState === "visible") loadData(true);
     }, 20_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, currentUser, showMoney, contractModal, progressModal, paymentModal, membersModal]);
+  }, [projectId, currentUser, showMoney, contractModal, progressModal, membersModal]);
 
   // Sync selectedMemberIds / lead when project changes
   useEffect(() => {
@@ -398,37 +369,6 @@ export default function ProjectDetailPage() {
     }
   }
 
-  async function handleAddPayment(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!newPayment.contract_id || !newPayment.amount) {
-      setError("Vui lòng chọn Hợp đồng và điền Số tiền.");
-      return;
-    }
-    try {
-      await api.createPayment({
-        ...newPayment,
-        payment_type: newPayment.payment_type as PaymentType,
-        direction: newPayment.direction as PaymentDirection,
-        amount: Number(newPayment.amount),
-        payment_date: newPayment.payment_date || null,
-      });
-      setPaymentModal(false);
-      setNewPayment({
-        contract_id: 0,
-        code: "",
-        payment_type: "PROGRESS",
-        direction: "IN",
-        amount: 0,
-        payment_date: "",
-        note: "",
-      });
-      loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ghi nhận thanh toán thất bại.");
-    }
-  }
-
   if (loading) {
     return (
       <AppShell>
@@ -600,9 +540,6 @@ export default function ProjectDetailPage() {
         <TabButton active={activeTab === "progress"} onClick={() => setActiveTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
         <TabButton active={activeTab === "team"} onClick={() => setActiveTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
         <TabButton active={activeTab === "eval"} onClick={() => setActiveTab("eval")} label="Đánh giá" icon={StarIcon} />
-        {showMoney && (
-          <TabButton active={activeTab === "payments"} onClick={() => setActiveTab("payments")} label="Thanh toán" icon={BanknotesIcon} count={payments.length} />
-        )}
       </div>
 
       {/* Nội dung Tab */}
@@ -657,7 +594,9 @@ export default function ProjectDetailPage() {
         )}
 
         {/* Tab Hạng mục (bảng dự toán Excel) */}
-        {activeTab === "items" && <ProjectItemsTab projectId={projectId} canSeeMoney={showMoney} />}
+        {/* Bảng dự toán: ẩn Khối lượng + Đơn giá + Thành tiền + tiểu tổng + tổng cho MỌI
+            vai trò (theo yêu cầu bỏ phần dự toán) — chỉ giữ tên hạng mục, ĐVT, % hoàn thành. */}
+        {activeTab === "items" && <ProjectItemsTab projectId={projectId} canSeeMoney={false} />}
 
         {/* Tab Phân công — ai làm gì, bao lâu (từ giao việc lọc theo dự án) */}
         {activeTab === "team" && (
@@ -757,63 +696,6 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* Tab Thanh toán */}
-        {showMoney && activeTab === "payments" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-muted uppercase">Nhật ký thu chi ({payments.length})</h3>
-              {contracts.length > 0 && (
-                <button
-                  onClick={() => setPaymentModal(true)}
-                  className="flex items-center gap-1 text-xs font-semibold text-amber hover:text-amber-deep"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                  Ghi nhận thu/chi
-                </button>
-              )}
-            </div>
-
-            {contracts.length === 0 && (
-              <p className="rounded-xl2 bg-white p-6 text-center text-xs text-bad shadow-card">
-                Bạn cần tạo Hợp đồng trước khi ghi nhận các đợt thanh toán.
-              </p>
-            )}
-
-            {contracts.length > 0 && payments.length === 0 ? (
-              <p className="rounded-xl2 bg-white p-6 text-center text-xs text-muted shadow-card">
-                Chưa ghi nhận đợt thanh toán nào cho các hợp đồng của dự án.
-              </p>
-            ) : (
-              <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">
-              {payments.map((p) => {
-                const isCollect = p.direction === "IN";
-                const matchedContract = contracts.find((c) => c.id === p.contract_id);
-
-                return (
-                  <div key={p.id} className="rounded-xl2 bg-white p-3.5 shadow-card border border-line/40">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`h-2.5 w-2.5 rounded-full ${isCollect ? "bg-ok" : "bg-bad"}`} />
-                          <span className="text-xs font-bold text-ink">{isCollect ? "Thu tiền (CĐT trả)" : "Chi ra"}</span>
-                          <span className="text-[10px] text-muted">({PAYMENT_TYPE_LABEL[p.payment_type]})</span>
-                        </div>
-                        {p.code && <p className="font-mono text-[9px] text-muted mt-0.5">{p.code}</p>}
-                        {matchedContract && <p className="text-[11px] text-muted mt-0.5">HĐ: {matchedContract.code}</p>}
-                      </div>
-                      <span className={`text-sm font-bold tnum ${isCollect ? "text-ok" : "text-bad"}`}>
-                        {isCollect ? "+" : "-"}{formatVND(p.amount)}
-                      </span>
-                    </div>
-                    {p.note && <p className="mt-2 text-xs text-muted bg-paper p-2 rounded-xl">{p.note}</p>}
-                    <p className="mt-2 text-[10px] text-right text-muted">{p.payment_date ? formatDate(p.payment_date) : "—"}</p>
-                  </div>
-                );
-              })}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Modal Thêm Hợp Đồng */}
@@ -1030,136 +912,6 @@ export default function ProjectDetailPage() {
                   <button
                     type="button"
                     onClick={() => { setProgressModal(false); setEditingProgressId(null); }}
-                    className="rounded-xl2 bg-paper px-4 py-2.5 text-xs text-muted font-medium"
-                  >
-                    Hủy
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal Ghi Nhận Thanh Toán */}
-      <AnimatePresence>
-        {paymentModal && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25 }}
-              className="w-full max-w-md lg:max-w-lg rounded-t-xl2 bg-white p-5 lg:p-6 shadow-card"
-            >
-              <div className="flex items-center justify-between border-b border-line pb-3">
-                <h2 className="text-sm font-bold text-ink">Ghi nhận thanh toán / tạm ứng</h2>
-                <button onClick={() => setPaymentModal(false)} className="rounded-full p-1 hover:bg-paper">
-                  <XMarkIcon className="h-5 w-5 text-muted" />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddPayment} className="mt-4 space-y-3">
-                {error && <p className="text-xs text-bad">{error}</p>}
-                
-                <div>
-                  <label className="text-[11px] font-semibold text-muted block mb-1">Chọn Hợp đồng liên kết *</label>
-                  <select
-                    required
-                    value={newPayment.contract_id}
-                    onChange={(e) => setNewPayment({ ...newPayment, contract_id: Number(e.target.value) })}
-                    className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                  >
-                    <option value={0}>-- Chọn hợp đồng --</option>
-                    {contracts.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.code} - {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Mã đợt thanh toán</label>
-                    <input
-                      type="text"
-                      placeholder="VD: TT-D1"
-                      value={newPayment.code}
-                      onChange={(e) => setNewPayment({ ...newPayment, code: e.target.value })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Loại dòng tiền *</label>
-                    <select
-                      value={newPayment.direction}
-                      onChange={(e) => setNewPayment({ ...newPayment, direction: e.target.value })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    >
-                      <option value="IN">Thu tiền từ Chủ đầu tư (Doanh thu)</option>
-                      <option value="OUT">Chi trả Nhà cung cấp / Thầu phụ (Chi phí)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Đợt thanh toán</label>
-                    <select
-                      value={newPayment.payment_type}
-                      onChange={(e) => setNewPayment({ ...newPayment, payment_type: e.target.value })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    >
-                      <option value="ADVANCE">Tạm ứng</option>
-                      <option value="PROGRESS">Thanh toán theo tiến độ</option>
-                      <option value="FINAL">Quyết toán hợp đồng</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Ngày thực hiện</label>
-                    <input
-                      type="date"
-                      value={newPayment.payment_date}
-                      onChange={(e) => setNewPayment({ ...newPayment, payment_date: e.target.value })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-muted block mb-1">Số tiền thanh toán *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="VD: 100000000"
-                    value={newPayment.amount || ""}
-                    onChange={(e) => setNewPayment({ ...newPayment, amount: Number(e.target.value) })}
-                    className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-muted block mb-1">Ghi chú chuyển khoản</label>
-                  <textarea
-                    rows={2}
-                    placeholder="Nội dung chuyển khoản hoặc ghi chú khác..."
-                    value={newPayment.note}
-                    onChange={(e) => setNewPayment({ ...newPayment, note: e.target.value })}
-                    className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                  />
-                </div>
-
-                <div className="pt-2 flex gap-2">
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-xl2 bg-amber py-2.5 text-xs font-semibold text-ink text-center"
-                  >
-                    Ghi nhận thanh toán
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentModal(false)}
                     className="rounded-xl2 bg-paper px-4 py-2.5 text-xs text-muted font-medium"
                   >
                     Hủy
