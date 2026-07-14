@@ -536,12 +536,6 @@ export default function ProjectDetailPage() {
               GEO担当: <span className="font-medium text-ink">{project.geo_manager}</span>
             </p>
           )}
-          {project.dosco_manager && (
-            <p className="flex items-center gap-1.5">
-              <UserIcon className="h-4 w-4 text-muted/80" />
-              DOSCO担当: <span className="font-medium text-ink">{project.dosco_manager}</span>
-            </p>
-          )}
           {project.start_date && (
             <p className="flex items-center gap-1.5 col-span-2">
               <CalendarDaysIcon className="h-4 w-4 text-muted/80" />
