@@ -1,0 +1,37 @@
+name: Doi ten Phong Khao sat -> Phong Ban do (1 lan)
+
+# Doi ten phong ban tren PROD (Neon) + cascade users/project_items/progress_snapshots.
+# Idempotent — chay lai khong doi neu da doi ten.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - backend/scripts/rename_khaosat_bando_once.py
+
+concurrency:
+  group: rename-khaosat-bando
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+      - name: Rename department
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/rename_khaosat_bando_once.py

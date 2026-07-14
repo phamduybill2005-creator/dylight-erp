@@ -213,9 +213,9 @@ def _backfill_departments() -> None:
     from app.models import User, UserRole
 
     # Tên phòng PHẢI khớp PRESET_DEPARTMENTS (frontend/src/lib/departments.ts).
-    KS, BIM, TKD, AI = "Phòng Khảo sát", "Phòng BIM", "Phòng Thiết kế đường 2D", "Phòng AI"
+    KS, BIM, TKD, AI = "Phòng Bản đồ", "Phòng BIM", "Phòng Thiết kế đường 2D", "Phòng AI"
     NAME_TO_DEPTS = {
-        # Phòng Khảo sát — trưởng SƠN (kiêm Phòng AI)
+        # Phòng Bản đồ (trước là Phòng Khảo sát) — trưởng SƠN (kiêm Phòng AI)
         "SON": f"{KS}, {AI}",
         "GIANG": KS, "NHUNG": KS, "DAT": KS, "DUNG": KS, "CUONG": KS, "PHU": KS,
         # Phòng BIM — trưởng LÂM; DUY kiêm trưởng Phòng AI
@@ -280,7 +280,7 @@ def _seed_departments() -> None:
     from app.database import SessionLocal
     from app.models import Company, Department, ProjectItem, User
 
-    PRESETS = ["Phòng Khảo sát", "Phòng BIM", "Phòng Thiết kế đường 2D", "Phòng AI"]
+    PRESETS = ["Phòng Bản đồ", "Phòng BIM", "Phòng Thiết kế đường 2D", "Phòng AI"]
 
     db = SessionLocal()
     try:
