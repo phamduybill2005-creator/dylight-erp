@@ -206,12 +206,6 @@ export default function ProjectScheduleGrid({
           <TableCellsIcon className="h-4 w-4 text-steel" />
           Bảng tiến độ ngày
         </h3>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted">
-          <span className="flex items-center gap-1"><i className="h-2.5 w-4 rounded-sm bg-steel/25" /> thời gian dự án</span>
-          <span className="flex items-center gap-1"><i className="h-2.5 w-4 rounded-sm bg-amber/70" /> đang làm</span>
-          <span className="flex items-center gap-1"><i className="h-2.5 w-4 rounded-sm bg-ok/60" /> đã xong</span>
-          <span className="flex items-center gap-1"><i className="block h-1.5 w-1.5 rounded-full bg-steel" /> ngày giao (chưa bắt đầu)</span>
-        </div>
       </div>
 
       {/* Đếm ngày hoàn thành dự án */}
