@@ -9,9 +9,8 @@ import { useRouter } from "next/navigation";
 import { PlusIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { isDirector, isManagerUp } from "@/lib/roles";
-import { formatCompactVND } from "@/lib/format";
-import type { Project, ProjectProfit, User } from "@/lib/types";
+import { isManagerUp } from "@/lib/roles";
+import type { Project, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -24,8 +23,6 @@ const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
 export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [profit, setProfit] = useState<Record<number, ProjectProfit>>({});
-  const [showFinance, setShowFinance] = useState(false);
 
   // Thêm dự án — mặc định FORM từng ô; "bulk" = dán nhiều dòng từ Excel (tùy chọn).
   const [showAdd, setShowAdd] = useState(false);
@@ -50,19 +47,12 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     let alive = true;
-    // Nạp danh sách dự án + (Giám đốc) lãi/lỗ — dùng cho lần đầu và polling.
-    function loadProjects(director: boolean) {
+    // Nạp danh sách dự án — dùng cho lần đầu và polling.
+    function loadProjects() {
       api.projects().then((d) => alive && setProjects(d)).catch(() => {});
-      if (director) {
-        api
-          .profitByProject()
-          .then((rows) => alive && setProfit(Object.fromEntries(rows.map((r) => [r.project_id, r]))))
-          .catch(() => {});
-      }
     }
 
     let timer: ReturnType<typeof setInterval> | undefined;
-    // Số liệu lãi/lỗ theo dự án chỉ dành cho Giám đốc — Quản lý không tải (tránh 403).
     api.me()
       .then((me) => {
         if (!alive) return;
@@ -73,32 +63,17 @@ export default function ProjectsPage() {
           // Danh sách GEO担当/DOSCO担当 đã dùng để chọn nhanh.
           api.projectManagers().then((d) => alive && setMgrs(d)).catch(() => {});
         }
-        const director = isDirector(me.role);
-        if (director) setShowFinance(true);
-        loadProjects(director);
+        loadProjects();
         // Cập nhật gần thời gian thực (~20s) — theo dõi trạng thái/tiến độ dự án.
         timer = setInterval(() => {
-          if (document.visibilityState === "visible") loadProjects(director);
+          if (document.visibilityState === "visible") loadProjects();
         }, 20_000);
       })
       .catch(() => {});
     return () => { alive = false; if (timer) clearInterval(timer); };
   }, []);
 
-  // Tổng cộng các cột tài chính (chỉ tính dự án có dữ liệu lãi/lỗ).
-  const totals = projects.reduce(
-    (acc, p) => {
-      const fin = profit[p.id];
-      if (fin) {
-        acc.contract += Number(fin.contract_value);
-        acc.cost += Number(fin.cost);
-        acc.profit += Number(fin.profit);
-      }
-      return acc;
-    },
-    { contract: 0, cost: 0, profit: 0 }
-  );
-  const totalMargin = totals.contract > 0 ? (totals.profit / totals.contract) * 100 : 0;
+
 
   // Mỗi dòng 1 dự án; cột ngăn cách bằng phẩy / Tab / ; / | :
   // Mã QL, Tên dự án, Nhóm, GEO担当, DOSCO担当 (dán thẳng từ Excel).
@@ -229,16 +204,12 @@ export default function ProjectsPage() {
               <th className={TH}>DOSCO担当</th>
               <th className={TH}>Trạng thái</th>
               <th className={TH}>Tiến độ</th>
-              {showFinance && <th className={`${TH} text-right`}>Giá trị HĐ</th>}
-              {showFinance && <th className={`${TH} text-right`}>Chi phí</th>}
-              {showFinance && <th className={`${TH} text-right`}>Lãi / lỗ</th>}
-              {showFinance && <th className={`${TH} text-right`}>Biên %</th>}
             </tr>
           </thead>
           <tbody>
             {projects.length === 0 && (
               <tr>
-                <td className={`${TD} text-center text-muted`} colSpan={showFinance ? infoCols + 4 : infoCols}>
+                <td className={`${TD} text-center text-muted`} colSpan={infoCols}>
                   Chưa có dự án nào.
                 </td>
               </tr>
@@ -246,8 +217,6 @@ export default function ProjectsPage() {
 
             {projects.map((p, i) => {
               const st = PROJECT_STATUS[p.status] ?? PROJECT_STATUS.PLANNING;
-              const fin = profit[p.id];
-              const positive = fin ? Number(fin.profit) >= 0 : true;
               return (
                 <tr
                   key={p.id}
@@ -273,46 +242,11 @@ export default function ProjectsPage() {
                       <span className="text-[11px] tnum text-muted">{Math.round(Number(p.progress_percent ?? 0))}%</span>
                     </div>
                   </td>
-                  {showFinance && (
-                    <td className={`${TD} text-right tnum whitespace-nowrap`}>
-                      {fin ? formatCompactVND(fin.contract_value) : "—"}
-                    </td>
-                  )}
-                  {showFinance && (
-                    <td className={`${TD} text-right tnum whitespace-nowrap`}>
-                      {fin ? formatCompactVND(fin.cost) : "—"}
-                    </td>
-                  )}
-                  {showFinance && (
-                    <td className={`${TD} text-right tnum whitespace-nowrap font-semibold ${positive ? "text-ok" : "text-bad"}`}>
-                      {fin ? formatCompactVND(fin.profit) : "—"}
-                    </td>
-                  )}
-                  {showFinance && (
-                    <td className={`${TD} text-right tnum whitespace-nowrap font-semibold ${positive ? "text-ok" : "text-bad"}`}>
-                      {fin ? `${Number(fin.margin_percent).toFixed(1)}%` : "—"}
-                    </td>
-                  )}
                 </tr>
               );
             })}
 
-            {/* Dòng TỔNG CỘNG (chỉ Giám đốc) */}
-            {showFinance && projects.length > 0 && (
-              <tr className="bg-ink/5 font-bold text-ink">
-                <td className={`${TD} text-right`} colSpan={infoCols}>
-                  TỔNG CỘNG
-                </td>
-                <td className={`${TD} text-right tnum whitespace-nowrap`}>{formatCompactVND(totals.contract)}</td>
-                <td className={`${TD} text-right tnum whitespace-nowrap`}>{formatCompactVND(totals.cost)}</td>
-                <td className={`${TD} text-right tnum whitespace-nowrap ${totals.profit >= 0 ? "text-ok" : "text-bad"}`}>
-                  {formatCompactVND(totals.profit)}
-                </td>
-                <td className={`${TD} text-right tnum whitespace-nowrap ${totalMargin >= 0 ? "text-ok" : "text-bad"}`}>
-                  {totalMargin.toFixed(1)}%
-                </td>
-              </tr>
-            )}
+
           </tbody>
         </table>
       </div>
