@@ -227,6 +227,8 @@ class Project(Base):
     status: Mapped[ProjectStatus] = mapped_column(SAEnum(ProjectStatus), default=ProjectStatus.PLANNING)
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
+    internal_deadline: Mapped[date | None] = mapped_column(Date)
+    evaluation: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     company: Mapped["Company"] = relationship(back_populates="projects")

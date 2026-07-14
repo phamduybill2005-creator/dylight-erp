@@ -145,6 +145,8 @@ class ProjectBase(BaseModel):
     status: ProjectStatus = ProjectStatus.PLANNING
     start_date: date | None = None
     end_date: date | None = None
+    internal_deadline: date | None = None
+    evaluation: str | None = None
     bid_id: int | None = None
 
 
@@ -164,6 +166,8 @@ class ProjectUpdate(BaseModel):
     status: ProjectStatus | None = None
     start_date: date | None = None
     end_date: date | None = None
+    internal_deadline: date | None = None
+    evaluation: str | None = None
     member_ids: list[int] | None = None
 
 

@@ -63,6 +63,8 @@ def _ensure_schema() -> None:
                 # nếu đã có trên DB thì để trống, không dùng nữa.)
                 "geo_manager": "ALTER TABLE projects ADD COLUMN geo_manager VARCHAR(255)",
                 "dosco_manager": "ALTER TABLE projects ADD COLUMN dosco_manager VARCHAR(255)",
+                "internal_deadline": "ALTER TABLE projects ADD COLUMN internal_deadline DATE",
+                "evaluation": "ALTER TABLE projects ADD COLUMN evaluation VARCHAR(500)",
             }
             pmissing = [sql for col, sql in padds.items() if col not in pcols]
             if pmissing:

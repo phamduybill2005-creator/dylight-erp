@@ -37,6 +37,10 @@ export default function ProjectsPage() {
   const [nfGroup, setNfGroup] = useState("");
   const [nfGeo, setNfGeo] = useState("");
   const [nfDosco, setNfDosco] = useState("");
+  const [nfEval, setNfEval] = useState("");
+  const [nfStartDate, setNfStartDate] = useState("");
+  const [nfEndDate, setNfEndDate] = useState("");
+  const [nfInternalDeadline, setNfInternalDeadline] = useState("");
   // Danh sách GEO担当 / DOSCO担当 đã dùng -> để CHỌN (datalist) khỏi gõ tay.
   const [mgrs, setMgrs] = useState<{ geo: string[]; dosco: string[] }>({ geo: [], dosco: [] });
 
@@ -156,11 +160,16 @@ export default function ProjectsPage() {
         geo_manager: nfGeo.trim() || null,
         dosco_manager: nfDosco.trim() || null,
         lead_id: leadId === "" ? null : Number(leadId),
+        evaluation: nfEval.trim() || null,
+        start_date: nfStartDate || null,
+        end_date: nfEndDate || null,
+        internal_deadline: nfInternalDeadline || null,
       });
       const fresh = await api.projects().catch(() => null);
       if (fresh) setProjects(fresh);
       // Reset để nhập dự án kế tiếp nhanh.
       setNfCode(""); setNfName(""); setNfGroup(""); setNfGeo(""); setNfDosco("");
+      setNfEval(""); setNfStartDate(""); setNfEndDate(""); setNfInternalDeadline("");
       setAddResult(`✓ Đã tạo dự án "${created.name}".`);
     } catch (e) {
       setAddResult(e instanceof Error ? e.message : "Tạo dự án thất bại.");
@@ -171,9 +180,8 @@ export default function ProjectsPage() {
 
   const TH = "border border-line px-3 py-2 font-semibold whitespace-nowrap";
   const TD = "border border-line px-3 py-2 align-middle";
-  // Số cột phần "thông tin" (trước các cột tiền) để gộp ô cho dòng TỔNG CỘNG.
-  // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Trạng thái, Tiến độ = 8 cột.
-  const infoCols = 8;
+  // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Đánh giá, Ngày nhận, Ngày hoàn thành, Hạn nội, Trạng thái, Tiến độ = 12 cột.
+  const infoCols = 12;
 
   return (
     <AppShell>
@@ -202,6 +210,10 @@ export default function ProjectsPage() {
               <th className={TH}>Nhóm</th>
               <th className={TH}>GEO担当</th>
               <th className={TH}>DOSCO担当</th>
+              <th className={TH}>Đánh giá</th>
+              <th className={TH}>Ngày nhận</th>
+              <th className={TH}>Ngày hoàn thành</th>
+              <th className={TH}>Hạn nội</th>
               <th className={TH}>Trạng thái</th>
               <th className={TH}>Tiến độ</th>
             </tr>
@@ -229,6 +241,10 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.group_name || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.dosco_manager || "—"}</td>
+                  <td className={`${TD} text-muted`}>{p.evaluation || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.start_date || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.end_date || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.internal_deadline || "—"}</td>
                   <td className={TD}>
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
                       {st.label}
@@ -316,6 +332,28 @@ export default function ProjectsPage() {
                     </label>
                     <datalist id="geo-mgr-list">{mgrs.geo.map((n) => <option key={n} value={n} />)}</datalist>
                     <datalist id="dosco-mgr-list">{mgrs.dosco.map((n) => <option key={n} value={n} />)}</datalist>
+                  </div>
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-semibold text-muted">Đánh giá / Ghi chú</span>
+                    <input value={nfEval} onChange={(e) => setNfEval(e.target.value)} placeholder="Nhập đánh giá hoặc ghi chú dự án…"
+                      className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">Ngày nhận</span>
+                      <input type="date" value={nfStartDate} onChange={(e) => setNfStartDate(e.target.value)}
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">Ngày hoàn thành</span>
+                      <input type="date" value={nfEndDate} onChange={(e) => setNfEndDate(e.target.value)}
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">Hạn nội bộ</span>
+                      <input type="date" value={nfInternalDeadline} onChange={(e) => setNfInternalDeadline(e.target.value)}
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                    </label>
                   </div>
                   {canManage && (
                     <label className="block">

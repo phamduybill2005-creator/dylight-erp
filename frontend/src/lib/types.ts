@@ -68,6 +68,8 @@ export interface Project {
   status: ProjectStatus;
   start_date?: string | null;
   end_date?: string | null;
+  internal_deadline?: string | null;
+  evaluation?: string | null;
   created_at: string;
   members?: User[];
   progress_percent?: number; // % tiến độ THỰC (trung bình các mốc), do BE tính
