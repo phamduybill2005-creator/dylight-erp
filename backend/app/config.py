@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     ATTENDANCE_API_KEY: str = ""
     # Mốc giờ bắt đầu làm việc (giờ địa phương) để tính "đi trễ".
     WORK_START_HOUR: int = 8
+    # CA làm việc để tính CÔNG (0.5 công / ca). Làm cả 2 ca = 1 công, 1 ca = 0.5 công.
+    # Đơn vị: PHÚT trong ngày. Ca sáng 08:00–11:45, ca chiều 13:30–17:00.
+    MORNING_END_MIN: int = 11 * 60 + 45       # 11:45 — hết ca sáng
+    AFTERNOON_START_MIN: int = 13 * 60 + 30    # 13:30 — vào ca chiều
 
     # --- Máy chấm công ĐẨY TRỰC TIẾP qua giao thức ZKTeco PUSH/ADMS (/iclock) ---
     # Trỏ "địa chỉ máy chủ" trên máy về domain ERP; máy tự gọi /iclock/cdata.

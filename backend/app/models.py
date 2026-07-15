@@ -492,6 +492,27 @@ class Attendance(Base):
                 pass
         return self.check_in.hour * 60 + self.check_in.minute > start_min
 
+    @property
+    def work_credit(self) -> Decimal:
+        """CÔNG của ngày theo 2 CA (0.5 công/ca).
+        Ca sáng 08:00–11:45, ca chiều 13:30–17:00. Làm cả 2 ca = 1.0, chỉ 1 ca = 0.5.
+        - Có mặt buổi SÁNG   = giờ VÀO ở/ trước mốc hết ca sáng (MORNING_END_MIN).
+        - Có mặt buổi CHIỀU  = giờ RA ở/ sau mốc vào ca chiều (AFTERNOON_START_MIN);
+          nếu thiếu giờ ra thì suy theo giờ vào (vào buổi chiều -> tính chiều).
+        Có chấm vào nhưng không rơi vào ca nào -> tính tối thiểu 0.5 (không để mất công)."""
+        if not self.check_in:
+            return Decimal(0)
+        from app.config import settings
+        ci = self.check_in.hour * 60 + self.check_in.minute
+        worked_morning = ci <= settings.MORNING_END_MIN
+        if self.check_out:
+            co = self.check_out.hour * 60 + self.check_out.minute
+            worked_afternoon = co >= settings.AFTERNOON_START_MIN
+        else:
+            worked_afternoon = ci >= settings.AFTERNOON_START_MIN
+        credit = Decimal("0.5") * (worked_morning + worked_afternoon)
+        return credit if credit > 0 else Decimal("0.5")
+
 
 class YunattSyncLog(Base):
     """

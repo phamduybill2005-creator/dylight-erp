@@ -170,12 +170,13 @@ def attendance_summary(
             rec.user_id, AttendanceSummary(user_id=rec.user_id, full_name=u.full_name)
         )
         if rec.check_in:
-            s.present_days += 1
+            s.present_days += float(rec.work_credit)   # công theo ca: cả ngày=1, nửa ngày=0.5
         if rec.is_late:
             s.late_days += 1
         s.total_hours += round(rec.worked_minutes / 60, 2)
     for s in by_user.values():
         s.total_hours = round(s.total_hours, 2)
+        s.present_days = round(s.present_days, 1)
     return sorted(by_user.values(), key=lambda s: s.full_name)
 
 

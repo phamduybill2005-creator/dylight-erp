@@ -493,7 +493,7 @@ class AttendanceSummary(BaseModel):
     """Tổng hợp chấm công theo người trong 1 kỳ (cho màn quản lý)."""
     user_id: int
     full_name: str
-    present_days: int = 0
+    present_days: float = 0.0   # NGÀY CÔNG theo ca: cả ngày = 1, nửa ngày = 0.5
     late_days: int = 0
     total_hours: float = 0.0
 
