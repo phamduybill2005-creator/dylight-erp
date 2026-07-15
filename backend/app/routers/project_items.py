@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, can_see_money
 from app.models import ProjectItem, Project, User
-from app.routers.projects import _can_view
+from app.routers.projects import _can_view, _can_manage
 from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut
 
 router = APIRouter(prefix="/project-items", tags=["Hạng mục dự toán"])
@@ -46,6 +46,18 @@ def _out(item: ProjectItem, current: User) -> ProjectItemOut:
     if not can_see_money(current):
         out = out.model_copy(update={"quantity": None, "unit_price": None, "amount": None})
     return out
+
+
+def _validate_assignee(db: Session, project: Project, assignee_id: int | None) -> None:
+    """Người được giao (nếu có) phải cùng công ty VÀ là thành viên/chủ trì dự án
+    (giao cho người ngoài dự án thì họ không vào xem/khai giờ được). None = bỏ giao."""
+    if assignee_id is None:
+        return
+    u = db.get(User, assignee_id)
+    if not u or u.company_id != project.company_id:
+        raise HTTPException(400, "Người được giao không hợp lệ.")
+    if not _can_view(db, project, u):
+        raise HTTPException(400, "Người được giao phải là thành viên của dự án.")
 
 
 def _validate_parent(
@@ -96,8 +108,12 @@ def create_item(
     current: User = Depends(get_current_user),
 ):
     """Thêm một nhóm cha (parent_id=null) hoặc một đầu việc con (parent_id=<nhóm>)."""
-    _assert_member(db, current, payload.project_id)   # chặn IDOR: chỉ thành viên dự án
+    project = _assert_member(db, current, payload.project_id)   # chặn IDOR: chỉ thành viên dự án
     _validate_parent(db, current, payload.project_id, payload.parent_id)
+    # Giao việc (đặt người phụ trách) chỉ dành cho chủ trì/giám đốc.
+    if payload.assignee_id is not None and not _can_manage(db, project, current):
+        raise HTTPException(403, "Chỉ chủ trì/giám đốc được giao việc cho người khác.")
+    _validate_assignee(db, project, payload.assignee_id)
 
     data = _strip_money_if_needed(payload.model_dump(), current)  # non-director không đặt được tiền
     item = ProjectItem(**data, company_id=current.company_id)
@@ -118,12 +134,17 @@ def update_item(
     item = db.get(ProjectItem, item_id)
     if not item or item.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy hạng mục.")
-    _assert_member(db, current, item.project_id)   # chặn IDOR: chỉ thành viên dự án
+    project = _assert_member(db, current, item.project_id)   # chặn IDOR: chỉ thành viên dự án
 
     data = _strip_money_if_needed(payload.model_dump(exclude_unset=True), current)
     # Nếu client đổi parent_id thì phải kiểm tra như khi tạo (cùng công ty/dự án, 2 cấp).
     if "parent_id" in data:
         _validate_parent(db, current, item.project_id, data["parent_id"], self_id=item.id)
+    # GIAO / đổi người phụ trách: chỉ chủ trì/giám đốc (khớp với UI ẩn ô chọn với nhân viên).
+    if "assignee_id" in data:
+        if not _can_manage(db, project, current):
+            raise HTTPException(403, "Chỉ chủ trì/giám đốc được giao việc cho người khác.")
+        _validate_assignee(db, project, data["assignee_id"])
 
     for k, v in data.items():
         setattr(item, k, v)

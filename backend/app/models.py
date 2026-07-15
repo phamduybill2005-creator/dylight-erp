@@ -386,13 +386,22 @@ class ProjectItem(Base):
     # Phòng ban phụ trách hạng mục (gán ở cấp NHÓM cha; đầu việc con hiểu ngầm theo nhóm).
     # Cột mới -> ALTER ở _ensure_schema.
     department: Mapped[str | None] = mapped_column(String(120))
+    # NGƯỜI ĐƯỢC GIAO đầu việc (giao việc cho ai) — để bảng Tiến độ sổ ra đầu việc theo
+    # từng người. Gán ở cấp đầu việc con. Cột mới -> ALTER ở _ensure_schema.
+    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    assignee: Mapped["User | None"] = relationship("User", foreign_keys=[assignee_id])
 
     @property
     def amount(self) -> Decimal:
         """Thành tiền của một đầu việc = khối lượng × đơn giá (nhóm cha tự cộng ở tầng trên)."""
         return (self.quantity or Decimal(0)) * (self.unit_price or Decimal(0))
+
+    @property
+    def assignee_name(self) -> str | None:
+        return self.assignee.full_name if self.assignee else None
 
 
 # --------------------------------------------------------------------------

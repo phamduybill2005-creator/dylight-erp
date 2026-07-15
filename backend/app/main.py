@@ -81,6 +81,7 @@ def _ensure_schema() -> None:
                 "progress": "ALTER TABLE project_items ADD COLUMN progress NUMERIC DEFAULT 0",
                 "department": "ALTER TABLE project_items ADD COLUMN department VARCHAR(120)",
                 "rating": "ALTER TABLE project_items ADD COLUMN rating INTEGER DEFAULT 0",
+                "assignee_id": "ALTER TABLE project_items ADD COLUMN assignee_id INTEGER",
             }
             pi_missing = [sql for col, sql in pi_adds.items() if col not in picols]
             if pi_missing:
@@ -212,6 +213,25 @@ def _ensure_schema() -> None:
                     ))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] bo qua: {_e}")
+
+    # CỘT QUAN TRỌNG cho tính năng "giao đầu việc + giờ theo người" — chạy ĐỘC LẬP với
+    # khối trên: nếu 1 bảng phía trên lỗi, migration này VẪN chạy (khỏi bị bỏ qua dây chuyền).
+    # Idempotent: chỉ ALTER khi thiếu cột; DROP ... IF EXISTS.
+    try:
+        insp2 = inspect(engine)
+        tn2 = insp2.get_table_names()
+        if "project_items" in tn2 and "assignee_id" not in {c["name"] for c in insp2.get_columns("project_items")}:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE project_items ADD COLUMN assignee_id INTEGER"))
+        if "timesheets" in tn2:
+            if "project_item_id" not in {c["name"] for c in insp2.get_columns("timesheets")}:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE timesheets ADD COLUMN project_item_id INTEGER"))
+            if engine.dialect.name == "postgresql":
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE timesheets DROP CONSTRAINT IF EXISTS uq_timesheet_user_proj_day"))
+    except Exception as _e:  # noqa: BLE001
+        print(f"[ensure-schema] cot quan trong bo qua: {_e}")
 
 
 _ensure_schema()

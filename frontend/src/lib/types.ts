@@ -416,6 +416,8 @@ export interface ProjectItem {
   amount: number;          // thành tiền = khối lượng × đơn giá (đầu việc con)
   progress: number;        // % hoàn thành đầu việc (0..100) — dùng tính tiến độ dự án
   department?: string | null;  // phòng ban phụ trách (gán ở cấp nhóm cha)
+  assignee_id?: number | null;   // người được giao đầu việc (giao việc cho ai)
+  assignee_name?: string | null; // tên người được giao (hiển thị)
   rating?: number;         // đánh giá hạng mục: 0 = chưa chấm, 1..5 sao
   note?: string | null;
   created_at: string;

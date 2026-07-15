@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, is_staff_tier
 from app.models import Project, ProjectItem, Timesheet, User
+from app.routers.projects import _can_view
 from app.schemas import TimesheetOut, TimesheetUpsert
 
 router = APIRouter(prefix="/timesheets", tags=["Nhân công theo ngày"])
@@ -64,6 +65,9 @@ def upsert_timesheet(
 
     proj = db.get(Project, payload.project_id)
     if not proj or proj.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy dự án.")
+    # Chỉ thành viên/chủ trì/giám đốc của dự án mới khai được giờ (chặn khai lên dự án lạ).
+    if not _can_view(db, proj, current):
         raise HTTPException(404, "Không tìm thấy dự án.")
 
     # Đầu việc (hạng mục) — nếu có, phải thuộc đúng dự án này.
