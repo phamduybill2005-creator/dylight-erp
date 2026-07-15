@@ -354,7 +354,7 @@ export const api = {
     const s = q.toString();
     return request<Timesheet[]>(`/timesheets${s ? `?${s}` : ""}`);
   },
-  upsertTimesheet: (payload: { project_id: number; work_date: string; hours: number; note?: string | null; user_id?: number }) =>
+  upsertTimesheet: (payload: { project_id: number; project_item_id?: number | null; work_date: string; hours: number; note?: string | null; user_id?: number }) =>
     request<Timesheet | { deleted: boolean }>("/timesheets", { method: "POST", body: JSON.stringify(payload) }),
   deleteTimesheet: (id: number) => request<void>(`/timesheets/${id}`, { method: "DELETE" }),
 

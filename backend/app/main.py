@@ -173,6 +173,21 @@ def _ensure_schema() -> None:
                             "CREATE UNIQUE INDEX uq_attendance_user_day ON attendance (user_id, work_date)"
                         ))
 
+        # Timesheets: cột project_item_id (gắn giờ vào ĐẦU VIỆC của hạng mục) cho DB cũ.
+        # Đồng thời BỎ ràng buộc cũ (user_id, project_id, work_date) — nay 1 người có thể
+        # khai NHIỀU đầu việc trong cùng 1 dự án/ngày nên khóa cũ sẽ chặn nhầm. Dedup do
+        # router (tìm-rồi-ghi-đè) đảm nhiệm. Chỉ chạy DROP trên Postgres (prod); SQLite tạo
+        # bảng mới theo model nên không có khóa cũ.
+        if "timesheets" in insp.get_table_names():
+            tcols = {c["name"] for c in insp.get_columns("timesheets")}
+            with engine.begin() as conn:
+                if "project_item_id" not in tcols:
+                    conn.execute(text("ALTER TABLE timesheets ADD COLUMN project_item_id INTEGER"))
+                if engine.dialect.name == "postgresql":
+                    conn.execute(text(
+                        "ALTER TABLE timesheets DROP CONSTRAINT IF EXISTS uq_timesheet_user_proj_day"
+                    ))
+
         # CHAT: chống tạo trùng phòng 1-1 -> UNIQUE (company_id, direct_key) chỉ với DIRECT
         # (direct_key IS NOT NULL). Partial index chạy được cả Postgres & SQLite.
         if "conversations" in insp.get_table_names():

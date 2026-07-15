@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, is_staff_tier
-from app.models import Project, Timesheet, User
+from app.models import Project, ProjectItem, Timesheet, User
 from app.schemas import TimesheetOut, TimesheetUpsert
 
 router = APIRouter(prefix="/timesheets", tags=["Nhân công theo ngày"])
@@ -66,15 +66,25 @@ def upsert_timesheet(
     if not proj or proj.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy dự án.")
 
-    rec = (
+    # Đầu việc (hạng mục) — nếu có, phải thuộc đúng dự án này.
+    item_id = payload.project_item_id
+    if item_id is not None:
+        item = db.get(ProjectItem, item_id)
+        if not item or item.project_id != payload.project_id:
+            raise HTTPException(404, "Không tìm thấy đầu việc trong dự án.")
+
+    # Khóa 1 ô = (người, dự án, đầu việc, ngày). project_item_id NULL cần lọc riêng.
+    q = (
         db.query(Timesheet)
         .filter(
             Timesheet.user_id == target_uid,
             Timesheet.project_id == payload.project_id,
             Timesheet.work_date == payload.work_date,
         )
-        .first()
     )
+    q = q.filter(Timesheet.project_item_id == item_id) if item_id is not None \
+        else q.filter(Timesheet.project_item_id.is_(None))
+    rec = q.first()
 
     if payload.hours <= 0:
         if rec:
@@ -85,7 +95,8 @@ def upsert_timesheet(
     if rec is None:
         rec = Timesheet(
             company_id=current.company_id, user_id=target_uid,
-            project_id=payload.project_id, work_date=payload.work_date,
+            project_id=payload.project_id, project_item_id=item_id,
+            work_date=payload.work_date,
         )
         db.add(rec)
     rec.hours = payload.hours

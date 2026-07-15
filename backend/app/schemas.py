@@ -973,6 +973,7 @@ class TimesheetOut(BaseModel):
     id: int
     user_id: int
     project_id: int
+    project_item_id: int | None = None      # đầu việc (hạng mục) gắn giờ; None = cấp dự án
     work_date: date
     hours: Decimal
     note: str | None = None
@@ -983,6 +984,7 @@ class TimesheetOut(BaseModel):
 
 class TimesheetUpsert(BaseModel):
     project_id: int
+    project_item_id: int | None = None      # đầu việc gắn giờ; None = giờ cấp dự án
     work_date: date
     hours: Decimal = Field(ge=0, le=24)     # 0 = xóa ô
     note: str | None = None

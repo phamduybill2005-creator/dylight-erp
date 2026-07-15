@@ -965,14 +965,18 @@ class MessageReaction(Base):
 # --------------------------------------------------------------------------
 class Timesheet(Base):
     __tablename__ = "timesheets"
-    __table_args__ = (
-        UniqueConstraint("user_id", "project_id", "work_date", name="uq_timesheet_user_proj_day"),
-    )
+    # 1 dòng = (người, dự án, ĐẦU VIỆC, ngày). project_item_id NULL = giờ ở cấp dự án
+    # (không gắn đầu việc). Dedup do router (find-then-upsert) đảm nhiệm — không dùng
+    # UNIQUE cứng để tránh vướng NULL (nhiều đầu việc / ngày phải cho phép).
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    # Đầu việc (project_items) — kéo hạng mục/đầu việc sang bảng tiến độ để điền giờ.
+    project_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("project_items.id", ondelete="CASCADE"), index=True, nullable=True
+    )
     work_date: Mapped[date] = mapped_column(Date, index=True)
     hours: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0)   # giờ thực tế đã làm
     note: Mapped[str | None] = mapped_column(String(255))

@@ -307,6 +307,7 @@ export interface Timesheet {
   id: number;
   user_id: number;
   project_id: number;
+  project_item_id?: number | null;   // đầu việc (hạng mục) gắn giờ; null = cấp dự án
   work_date: string;         // "YYYY-MM-DD"
   hours: number;
   note?: string | null;
