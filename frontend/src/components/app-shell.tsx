@@ -20,7 +20,6 @@ import {
   UsersIcon,
   UserGroupIcon,
   StarIcon,
-  ClipboardDocumentListIcon,
   CalendarDaysIcon,
   TableCellsIcon,
 } from "@heroicons/react/24/outline";
@@ -51,7 +50,6 @@ function deskNav(tier: Tier): NavLink[] {
   }
   const items: NavLink[] = [
     { href: "/", label: "Tổng quan", icon: HomeIcon },
-    { href: "/bids", label: "Đấu thầu", icon: ClipboardDocumentListIcon },
     { href: "/projects", label: "Dự án", icon: FolderIcon },
     { href: "/timesheet", label: "Nhân công", icon: TableCellsIcon },
     { href: "/attendance", label: "Chấm công", icon: ClockIcon },
