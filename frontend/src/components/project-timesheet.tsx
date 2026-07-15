@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ClockIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, UserCircleIcon,
+  ClockIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, UserCircleIcon, StarIcon,
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal, formatDate } from "@/lib/format";
@@ -197,6 +197,12 @@ export default function ProjectTimesheet({
     try { await api.updateProjectItem(it.id, { progress: val }); loadItems(); } catch { /* noop */ }
   }
 
+  // ---- ĐÁNH GIÁ đầu việc (sao 1..5; bấm lại sao đang chọn = bỏ về 0) ----
+  async function rate(it: ProjectItem, stars: number) {
+    if (stars === (it.rating ?? 0)) return;
+    try { await api.updateProjectItem(it.id, { rating: stars }); loadItems(); } catch { /* noop */ }
+  }
+
   // ---- GIAO / đổi người phụ trách đầu việc ----
   async function assign(it: ProjectItem, pid: number | null) {
     if (pid === (it.assignee_id ?? null)) return;
@@ -218,7 +224,7 @@ export default function ProjectTimesheet({
   const toggle = (k: PersonKey) =>
     setCollapsed((s) => { const n = new Set(s); const key = String(k); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
-  const COLS = 1 + 1 + 7 + 1; // tên · % · 7 ngày · tổng
+  const COLS = 1 + 1 + 1 + 7 + 1; // tên · % · đánh giá · 7 ngày · tổng
 
   return (
     <div className="rounded-xl2 border border-line/40 bg-white p-3.5 shadow-card">
@@ -255,11 +261,12 @@ export default function ProjectTimesheet({
       </p>
 
       <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[680px] border-collapse text-xs">
+        <table className="w-full min-w-[760px] border-collapse text-xs">
           <thead>
             <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
               <th className="sticky left-0 z-10 border border-line bg-paper px-2 py-1.5 text-left font-semibold">Người / Đầu việc</th>
               <th className="border border-line px-1 py-1 text-center font-semibold">% TĐ</th>
+              <th className="border border-line px-1 py-1 text-center font-semibold">Đánh giá</th>
               {days.map((d, i) => (
                 <th key={d} className={`border border-line px-1 py-1 text-center font-semibold ${d === today ? "bg-amber text-white" : ""}`}>
                   <div>{DOW[i]}</div>
@@ -295,6 +302,7 @@ export default function ProjectTimesheet({
                           <span className="ml-1 rounded-full bg-white/70 px-1.5 text-[9px] font-semibold text-muted">{g.tasks.length}</span>
                         </span>
                       </td>
+                      <td className="border border-line" />
                       <td className="border border-line" />
                       {days.map((d) => {
                         const v = personDay(g, d);
@@ -348,6 +356,25 @@ export default function ProjectTimesheet({
                               </span>
                             )}
                           </td>
+                          {/* Đánh giá đầu việc (sao 1..5) — quản lý chấm; người khác chỉ xem */}
+                          <td className="border border-line px-1 py-1.5 text-center">
+                            <span className="inline-flex items-center gap-0.5">
+                              {[1, 2, 3, 4, 5].map((n) => {
+                                const on = n <= (it.rating ?? 0);
+                                return canManage ? (
+                                  <button
+                                    key={n} type="button" title={`${n} sao`}
+                                    onClick={() => rate(it, n === (it.rating ?? 0) ? 0 : n)}
+                                    className={on ? "text-amber" : "text-line hover:text-amber"}
+                                  >
+                                    <StarIcon className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : (
+                                  <StarIcon key={n} className={`h-3.5 w-3.5 ${on ? "text-amber" : "text-line"}`} />
+                                );
+                              })}
+                            </span>
+                          </td>
                           {/* Giờ mỗi ngày */}
                           {days.map((d) => {
                             const v = taskDay(g.key, it.id, d);
@@ -387,6 +414,7 @@ export default function ProjectTimesheet({
               <tr className="bg-ink/10 font-bold text-ink">
                 <td className="sticky left-0 z-10 border border-line bg-ink/10 px-2 py-1.5 text-right">Tổng ngày</td>
                 <td className="border border-line" />
+                <td className="border border-line" />
                 {days.map((d) => {
                   const t = dayGrand(d);
                   return <td key={d} className="border border-line px-1 py-1.5 text-center tnum">{t > 0 ? num1(t) : "–"}</td>;
@@ -398,9 +426,10 @@ export default function ProjectTimesheet({
         </table>
       </div>
       <p className="mt-1.5 text-[11px] text-muted">
-        <b className="text-ink">% TĐ</b> = mức hoàn thành đầu việc. {canManage
-          ? <>Chọn người trong ô dưới tên đầu việc để <b className="text-ink">giao / đổi người</b>.</>
-          : "Bạn điền giờ cho các đầu việc được giao cho mình."}
+        <b className="text-ink">% TĐ</b> = mức hoàn thành · <b className="text-ink">Đánh giá</b> = chấm sao chất lượng từng đầu việc
+        {canManage
+          ? <> (bấm sao để chấm; bấm lại sao đang chọn để bỏ). Chọn người trong ô dưới tên đầu việc để <b className="text-ink">giao / đổi người</b>.</>
+          : <>. Bạn điền giờ cho các đầu việc được giao cho mình.</>}
       </p>
     </div>
   );
