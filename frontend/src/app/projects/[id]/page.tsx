@@ -24,6 +24,7 @@ import {
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import ProjectScheduleGrid from "@/components/project-schedule-grid";
+import ProjectTimesheet from "@/components/project-timesheet";
 import ProjectTeamTab from "@/components/project-team-tab";
 import ProjectEvaluationTab from "@/components/project-evaluation-tab";
 import { api } from "@/lib/api";
@@ -644,6 +645,14 @@ export default function ProjectDetailPage() {
               endDate={project.end_date ?? null}
               members={project.members ?? []}
               leadId={project.lead_id ?? null}
+            />
+
+            {/* Nhân công theo ngày (giờ thực tế) cho dự án này */}
+            <ProjectTimesheet
+              projectId={projectId}
+              members={project.members ?? []}
+              currentUserId={currentUser?.id ?? null}
+              canManage={canManage}
             />
 
             <div className="flex items-center justify-between">
