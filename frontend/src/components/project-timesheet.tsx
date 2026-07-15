@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ClockIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
-import { dateLocal, todayLocal } from "@/lib/format";
+import { dateLocal, todayLocal, formatDate } from "@/lib/format";
 import type { Timesheet, User } from "@/lib/types";
 
 function mondayOf(d: string): string {
@@ -29,11 +29,15 @@ export default function ProjectTimesheet({
   members,
   currentUserId,
   canManage,
+  startDate = null,
+  endDate = null,
 }: {
   projectId: number;
   members: User[];
   currentUserId: number | null;
   canManage: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
 }) {
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayLocal()));
   const [entries, setEntries] = useState<Timesheet[]>([]);
@@ -42,6 +46,14 @@ export default function ProjectTimesheet({
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const weekEnd = days[6];
   const today = todayLocal();
+  const projStart = startDate ? startDate.slice(0, 10) : null;
+  const projEnd = endDate ? endDate.slice(0, 10) : null;
+  const dayDiff = (a: string, b: string) => {
+    const [ay, am, ad] = a.split("-").map(Number);
+    const [by, bm, bd] = b.split("-").map(Number);
+    return Math.round((new Date(by, bm - 1, bd).getTime() - new Date(ay, am - 1, ad).getTime()) / 86_400_000);
+  };
+  const remaining = projEnd ? dayDiff(today, projEnd) : null;
 
   const load = useCallback(() => {
     api.timesheets({ from: weekStart, to: weekEnd, projectId })
@@ -103,7 +115,7 @@ export default function ProjectTimesheet({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase text-muted">
           <ClockIcon className="h-4 w-4 text-steel" />
-          Nhân công theo ngày (giờ)
+          Bảng tiến độ ngày · nhân công (giờ)
         </h3>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="rounded-lg border border-line p-1 text-muted hover:bg-paper" title="Tuần trước">
@@ -119,7 +131,20 @@ export default function ProjectTimesheet({
         </div>
       </div>
 
-      <div className="mt-2.5 overflow-x-auto">
+      <p className="mt-1 text-[11px] text-muted">
+        {projStart ? <>Bắt đầu <b className="text-ink">{formatDate(projStart)}</b></> : "Chưa đặt ngày bắt đầu"}
+        {projEnd ? (
+          <>
+            {" · "}hạn <b className="text-ink">{formatDate(projEnd)}</b>
+            {remaining !== null && (remaining >= 0
+              ? <> — còn <b className="text-amber-deep tnum">{remaining}</b> ngày</>
+              : <> — <b className="text-bad">quá hạn {-remaining} ngày</b></>)}
+          </>
+        ) : " · chưa đặt hạn (vào Sửa dự án)"}
+        <span className="text-muted/70"> · chỉ cần điền số giờ vào ô là tự chạy.</span>
+      </p>
+
+      <div className="mt-2 overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-xs">
           <thead>
             <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
@@ -145,7 +170,7 @@ export default function ProjectTimesheet({
                       {p.name}{p.id === currentUserId && <span className="text-[9px] text-muted"> (tôi)</span>}
                     </td>
                     {days.map((d) => (
-                      <td key={d} className={`border border-line p-0 text-center ${d === today ? "bg-amber/10" : ""}`}>
+                      <td key={d} className={`border border-line p-0 text-center ${(hoursMap.get(key(p.id, d)) ?? 0) > 0 ? "bg-ok/15" : d === today ? "bg-amber/10" : ""}`}>
                         {canEditRow(p.id) ? (
                           <input
                             type="text"
