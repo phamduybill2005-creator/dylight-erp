@@ -302,6 +302,19 @@ export interface Partner {
   created_at: string;
 }
 
+// Timesheet — giờ làm thực tế mỗi người khai cho từng dự án theo ngày.
+export interface Timesheet {
+  id: number;
+  user_id: number;
+  project_id: number;
+  work_date: string;         // "YYYY-MM-DD"
+  hours: number;
+  note?: string | null;
+  user_name?: string | null;
+  project_name?: string | null;
+  project_code?: string | null;
+}
+
 // Phòng ban (danh mục do Admin/Giám đốc quản lý).
 export interface Department {
   id: number;

@@ -959,6 +959,42 @@ class MessageReaction(Base):
 
 
 # --------------------------------------------------------------------------
+# 27. TIMESHEETS — GIỜ LÀM THỰC TẾ mỗi người khai cho từng dự án theo NGÀY.
+#     1 dòng = (người, dự án, ngày) -> số giờ. Dùng dựng bảng Nhân công theo ngày
+#     (Dự án × Ngày = tổng giờ) để kiểm soát dự án từng ngày.
+# --------------------------------------------------------------------------
+class Timesheet(Base):
+    __tablename__ = "timesheets"
+    __table_args__ = (
+        UniqueConstraint("user_id", "project_id", "work_date", name="uq_timesheet_user_proj_day"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    work_date: Mapped[date] = mapped_column(Date, index=True)
+    hours: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0)   # giờ thực tế đã làm
+    note: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship("User")
+    project: Mapped["Project"] = relationship("Project")
+
+    @property
+    def user_name(self) -> str | None:
+        return self.user.full_name if self.user else None
+
+    @property
+    def project_name(self) -> str | None:
+        return self.project.name if self.project else None
+
+    @property
+    def project_code(self) -> str | None:
+        return self.project.code if self.project else None
+
+
+# --------------------------------------------------------------------------
 # 26. DEPARTMENTS — danh mục PHÒNG BAN của công ty (nguồn chân lý cho danh sách).
 #     Trước đây phòng ban là hằng số cứng ở frontend; bảng này cho Admin/Giám đốc
 #     TỰ thêm phòng mới (kể cả phòng chưa có ai) và ĐỔI TÊN phòng. Việc gán người

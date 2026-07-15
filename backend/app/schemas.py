@@ -967,6 +967,28 @@ class ConversationAddMembers(BaseModel):
     member_ids: list[int] = Field(default_factory=list)
 
 
+# --------------------------- TIMESHEET --------------------------
+class TimesheetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    user_id: int
+    project_id: int
+    work_date: date
+    hours: Decimal
+    note: str | None = None
+    user_name: str | None = None
+    project_name: str | None = None
+    project_code: str | None = None
+
+
+class TimesheetUpsert(BaseModel):
+    project_id: int
+    work_date: date
+    hours: Decimal = Field(ge=0, le=24)     # 0 = xóa ô
+    note: str | None = None
+    user_id: int | None = None              # Quản lý+ có thể khai hộ người khác; None = chính mình
+
+
 # --------------------------- DEPARTMENT -------------------------
 class DepartmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
