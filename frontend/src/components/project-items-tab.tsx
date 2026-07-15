@@ -415,11 +415,6 @@ export default function ProjectItemsTab({
               <input value={fName} onChange={(e) => setFName(e.target.value)} placeholder="VD: Đổ bê tông móng M1"
                 className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
             </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold text-muted">Đơn vị tính (ĐVT)</span>
-              <input value={fUnit} onChange={(e) => setFUnit(e.target.value)} placeholder="m³, m², kg, cái…"
-                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
-            </label>
             {canSeeMoney && (
               <label className="block">
                 <span className="mb-1 block text-[11px] font-semibold text-muted">Khối lượng</span>
@@ -507,7 +502,6 @@ export default function ProjectItemsTab({
                 <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
                   <th className="w-10 px-2 py-2 text-left font-semibold">STT</th>
                   <th className="px-2 py-2 text-left font-semibold">Tên hạng mục</th>
-                  <th className="w-16 px-2 py-2 text-left font-semibold">ĐVT</th>
                   {canSeeMoney && <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>}
                   {canSeeMoney && <th className="w-28 px-2 py-2 text-right font-semibold">Đơn giá</th>}
                   {canSeeMoney && <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>}
@@ -540,13 +534,13 @@ export default function ProjectItemsTab({
                 <tr className="border-t-2 border-ink bg-ink text-white">
                   {canSeeMoney ? (
                     <>
-                      <td colSpan={5} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
+                      <td colSpan={4} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
                         {deptFilter ? `Tổng — ${filterLabel}` : "Tổng cộng dự toán"}
                       </td>
                       <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(shownTotal)}</td>
                     </>
                   ) : (
-                    <td colSpan={3} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
+                    <td colSpan={2} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
                       {deptFilter ? `Tiến độ — ${filterLabel}` : "Tiến độ dự án"}
                     </td>
                   )}
@@ -605,7 +599,7 @@ function GroupRows({
 }) {
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
   // +1 cho cột "% Hoàn thành" (hiện với mọi vai trò).
-  const contentCols = canSeeMoney ? 7 : 4;
+  const contentCols = canSeeMoney ? 6 : 3;
   return (
     <>
       {/* Dòng nhóm cha */}
@@ -647,15 +641,12 @@ function GroupRows({
             <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} />
           </div>
         </td>
-        {/* STAFF không có 3 cột tiền: vẫn phải chừa 1 ô cho cột ĐVT để thẳng hàng với header. */}
-        {canSeeMoney ? (
+        {canSeeMoney && (
           <>
-            <td colSpan={2} />
+            <td />
             <td className="px-2 py-1.5 text-right text-[10px] text-muted">Tiểu tổng</td>
             <td className="whitespace-nowrap px-2 py-1.5 text-right text-xs font-bold text-ink tnum">{formatVND(subtotal)}</td>
           </>
-        ) : (
-          <td />
         )}
         {/* Tiến độ nhóm (tự tính từ các đầu việc con) */}
         <td className="px-2 py-1.5">
@@ -690,9 +681,6 @@ function GroupRows({
               onCommit={(v) => onPersist(c.id, { name: String(v) })}
               placeholder="Tên đầu việc / công tác..."
             />
-          </td>
-          <td className="px-1 py-0.5">
-            <EditableCell value={c.unit} onCommit={(v) => onPersist(c.id, { unit: String(v) })} placeholder="m³, m², kg..." />
           </td>
           {canSeeMoney && (
             <td className="px-1 py-0.5">
