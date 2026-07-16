@@ -518,6 +518,8 @@ class Attendance(Base):
         Đúng giờ (bằng mốc) KHÔNG tính muộn."""
         if not self.check_in:
             return False
+        if self.work_date.weekday() == 6:  # 6 = Chủ Nhật
+            return False
         from app.config import settings
         start_min = settings.WORK_START_HOUR * 60
         ws = getattr(self.user, "work_start", None) if self.user else None

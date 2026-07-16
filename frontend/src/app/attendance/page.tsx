@@ -392,9 +392,9 @@ export default function AttendancePage() {
 
   // Lọc bảng tổng hợp theo PHÒNG BAN (map user_id -> department qua danh sách nhân sự).
   const deptOfUser = (uid: number) => allUsers.find((u) => u.id === uid)?.department;
-  const shownSummary = summary.filter(
-    (s) => !filters.dept || splitDepts(deptOfUser(s.user_id)).includes(filters.dept)
-  );
+  const shownSummary = summary
+    .filter((s) => !filters.dept || splitDepts(deptOfUser(s.user_id)).includes(filters.dept))
+    .sort((a, b) => b.total_minutes - a.total_minutes);
   const maxDays = shownSummary.reduce((m, s) => Math.max(m, s.present_days), 0) || 1;
 
   async function doImport() {
