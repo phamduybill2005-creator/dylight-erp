@@ -595,12 +595,31 @@ function GroupRows({
       <tr className="border-t border-line bg-steel/5">
         <td className="px-2 py-1.5 text-[11px] font-bold text-ink">{groupIndex + 1}</td>
         <td className="px-1 py-1">
-          <EditableCell
-            value={group.name}
-            onCommit={(v) => onPersist(group.id, { name: String(v) })}
-            placeholder="Tên nhóm hạng mục"
-            className="font-bold text-ink"
-          />
+          <div className="flex flex-wrap items-center justify-between gap-2 pr-2">
+            <div className="min-w-[150px] flex-1">
+              <EditableCell
+                value={group.name}
+                onCommit={(v) => onPersist(group.id, { name: String(v) })}
+                placeholder="Tên nhóm hạng mục"
+                className="font-bold text-ink"
+              />
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] font-semibold text-muted">Nhóm trưởng:</span>
+              <select
+                value={group.assignee_id || ""}
+                onChange={(e) => onPersist(group.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
+                className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] font-semibold text-muted outline-none focus:border-steel cursor-pointer"
+              >
+                <option value="">— Chưa chọn —</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           {/* Phòng ban phụ trách nhóm này — đầu việc con hiểu ngầm theo nhóm. */}
           <div className="mt-0.5 pl-2">
             <select
