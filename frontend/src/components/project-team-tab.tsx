@@ -5,7 +5,7 @@
 // Thời gian "bao lâu" do backend tự đóng dấu khi đổi trạng thái (bắt đầu / hoàn thành).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PlusIcon, UserGroupIcon, StarIcon, ClockIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { UserGroupIcon, StarIcon, ClockIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { assignmentDays } from "@/lib/format";
 import { roleTitle } from "@/lib/roles";
@@ -47,13 +47,8 @@ export default function ProjectTeamTab({
 }) {
   const [rows, setRows] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Giao việc nhanh cho 1 người ngay trong tab.
-  const [assignTo, setAssignTo] = useState<number | null>(null);
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
+  const [busy, setBusy] = useState(false); // dùng cho đổi trạng thái
 
   const load = useCallback(() => {
     setLoading(true);
@@ -94,27 +89,6 @@ export default function ProjectTeamTab({
     });
   }, [members, rows, leadId]);
 
-  async function submitAssign() {
-    if (assignTo == null || !title.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createAssignment({
-        assignee_id: assignTo,
-        title: title.trim(),
-        description: desc.trim() || null,
-        project_id: projectId,
-      });
-      setTitle("");
-      setDesc("");
-      setAssignTo(null);
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Giao việc thất bại.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function changeStatus(a: Assignment, status: string) {
     // Cập nhật lạc quan rồi đồng bộ lại (để mốc thời gian/độ dài tính đúng từ backend).
@@ -182,57 +156,10 @@ export default function ProjectTeamTab({
                       {list.length > 0 && ` · ${list.length} việc (${doneN} xong)`}
                     </p>
                   </div>
-                  {canManage && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAssignTo(assignTo === p.id ? null : p.id);
-                        setTitle("");
-                        setDesc("");
-                      }}
-                      className="flex shrink-0 items-center gap-1 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-steel hover:bg-paper"
-                    >
-                      <PlusIcon className="h-3.5 w-3.5" />
-                      Giao việc
-                    </button>
-                  )}
+
                 </div>
 
-                {/* Form giao việc nhanh */}
-                {canManage && assignTo === p.id && (
-                  <div className="mt-2 space-y-2 rounded-lg bg-paper p-2.5">
-                    <input
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Tên phần việc *"
-                      className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
-                    />
-                    <textarea
-                      value={desc}
-                      onChange={(e) => setDesc(e.target.value)}
-                      rows={2}
-                      placeholder="Mô tả (tùy chọn)"
-                      className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={submitAssign}
-                        disabled={busy || !title.trim()}
-                        className="rounded-xl2 bg-ink px-3 py-1.5 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50"
-                      >
-                        {busy ? "Đang giao…" : `Giao cho ${p.name}`}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAssignTo(null)}
-                        className="rounded-xl2 border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:bg-white"
-                      >
-                        Hủy
-                      </button>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Danh sách phần việc + thời gian */}
                 {list.length === 0 ? (
