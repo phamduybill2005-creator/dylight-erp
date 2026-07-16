@@ -256,7 +256,7 @@ export default function TimesheetPage() {
       </div>
 
       {/* Lưới Dự án × Ngày */}
-      <div className="mt-3 overflow-auto max-h-[calc(100vh-280px)] rounded-xl2 border border-line bg-white shadow-card">
+      <div className="mt-3 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
         <table className="w-full border-collapse text-[11px]">
           <thead>
             <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
