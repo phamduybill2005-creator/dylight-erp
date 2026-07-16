@@ -246,7 +246,7 @@ export default function ProjectsPage() {
     }
   }
 
-  const TH = "border border-line px-1.5 py-1.5 font-semibold whitespace-nowrap";
+  const TH = "border border-line px-1.5 py-1.5 font-semibold whitespace-nowrap sticky top-0 bg-paper z-10";
   const TD = "border border-line px-1.5 py-1.5 align-middle";
   // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Đánh giá, Ngày nhận, Ngày hoàn thành, Hạn nội, Tổng thời gian, Trạng thái, Tiến độ = 13 cột.
   const infoCols = 13;
@@ -327,7 +327,7 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      <div className="mt-3 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+      <div className="mt-3 overflow-auto rounded-xl2 border border-line bg-white shadow-card max-h-[calc(100vh-280px)]">
         <table className="w-full min-w-[900px] border-collapse text-[11px]">
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
