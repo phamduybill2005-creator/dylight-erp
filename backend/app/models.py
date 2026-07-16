@@ -408,6 +408,30 @@ class ProjectItem(Base):
         return self.assignee.full_name if self.assignee else None
 
 
+class ProjectItemRating(Base):
+    __tablename__ = "project_item_ratings"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_item_id", "user_id", name="uq_proj_item_user_rating"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    project_item_id: Mapped[int] = mapped_column(
+        ForeignKey("project_items.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    rating: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    project_item: Mapped["ProjectItem"] = relationship("ProjectItem")
+    user: Mapped["User"] = relationship("User")
+
+
 # --------------------------------------------------------------------------
 # 8c. PROGRESS_SNAPSHOTS — ẢNH CHỤP % tiến độ theo NGÀY (để dựng đường tiến độ).
 #     1 dòng / (dự án, ngày, phòng ban). department = "" nghĩa là TOÀN DỰ ÁN.

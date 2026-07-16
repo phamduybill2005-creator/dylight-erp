@@ -1009,3 +1009,19 @@ class DepartmentCreate(BaseModel):
 
 class DepartmentUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+
+
+# ---------------------- PROJECT ITEM RATING ---------------------
+class ProjectItemRatingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    project_item_id: int
+    user_id: int
+    rating: int
+
+
+class ProjectItemRatingUpsert(BaseModel):
+    project_item_id: int
+    user_id: int
+    rating: int = Field(ge=0, le=5)
+

@@ -424,6 +424,14 @@ export interface ProjectItem {
   created_at: string;
 }
 
+export interface ProjectItemRating {
+  id: number;
+  project_item_id: number;
+  user_id: number;
+  rating: number;
+}
+
+
 // Tiến độ theo ngày — 1 điểm = (ngày, phòng ban, %). department "" = toàn dự án.
 export interface ProgressPoint {
   date: string;        // "YYYY-MM-DD"

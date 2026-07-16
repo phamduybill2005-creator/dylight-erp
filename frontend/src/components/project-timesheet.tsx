@@ -12,7 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal, formatDate } from "@/lib/format";
-import type { ProjectItem, Timesheet, User } from "@/lib/types";
+import type { ProjectItem, ProjectItemRating, Timesheet, User } from "@/lib/types";
 
 function mondayOf(d: string): string {
   const [y, m, dd] = d.split("-").map(Number);
@@ -47,6 +47,7 @@ export default function ProjectTimesheet({
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayLocal()));
   const [entries, setEntries] = useState<Timesheet[]>([]);
   const [items, setItems] = useState<ProjectItem[]>([]);
+  const [workerRatings, setWorkerRatings] = useState<ProjectItemRating[]>([]);
   const [hourEdits, setHourEdits] = useState<Record<string, string>>({});
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());   // item id -> đang thu gọn
   const [tempWorkers, setTempWorkers] = useState<Record<number, number[]>>({}); // item id -> user ids thêm tạm thời
@@ -74,6 +75,19 @@ export default function ProjectTimesheet({
       .catch(() => setEntries([]));
   }, [weekStart, weekEnd, projectId]);
   useEffect(() => { loadEntries(); }, [loadEntries]);
+
+  const loadWorkerRatings = useCallback(() => {
+    api.projectItemRatings(projectId).then(setWorkerRatings).catch(() => setWorkerRatings([]));
+  }, [projectId]);
+  useEffect(() => { loadWorkerRatings(); }, [loadWorkerRatings]);
+
+  async function rateWorker(itemId: number, userId: number, stars: number) {
+    try {
+      await api.upsertProjectItemRating({ project_item_id: itemId, user_id: userId, rating: stars });
+      loadWorkerRatings();
+    } catch { /* noop */ }
+  }
+
 
   const nameOf = useCallback((uid: number): string => {
     const m = members.find((x) => x.id === uid);
@@ -273,7 +287,27 @@ export default function ProjectTimesheet({
                                   {w.id === currentUserId && <span className="text-[9px] text-muted">(tôi)</span>}
                                 </div>
                               </td>
-                              <td className="border border-line" />
+                              <td className="border border-line px-1 py-1.5 text-center">
+                                <span className="inline-flex items-center gap-0.5">
+                                  {[1, 2, 3, 4, 5].map((n) => {
+                                    const rating = workerRatings.find(r => r.project_item_id === it.id && r.user_id === w.id)?.rating ?? 0;
+                                    const on = n <= rating;
+                                    return canManage ? (
+                                      <button
+                                        key={n}
+                                        type="button"
+                                        title={`${n} sao`}
+                                        onClick={() => rateWorker(it.id, w.id, n === rating ? 0 : n)}
+                                        className={on ? "text-amber" : "text-line hover:text-amber"}
+                                      >
+                                        <StarIcon className="h-3.5 w-3.5" />
+                                      </button>
+                                    ) : (
+                                      <StarIcon key={n} className={`h-3.5 w-3.5 ${on ? "text-amber" : "text-line"}`} />
+                                    );
+                                  })}
+                                </span>
+                              </td>
                               {days.map((d) => {
                                 const v = hoursMap.get(hkey(w.id, it.id, d)) ?? 0;
                                 return (

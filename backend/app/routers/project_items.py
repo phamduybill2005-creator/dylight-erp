@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, can_see_money
-from app.models import ProjectItem, Project, User
+from app.models import ProjectItem, Project, User, ProjectItemRating
 from app.routers.projects import _can_view, _can_manage
-from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut
+from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut, ProjectItemRatingOut, ProjectItemRatingUpsert
 
 router = APIRouter(prefix="/project-items", tags=["Hạng mục dự toán"])
 
@@ -184,3 +184,63 @@ def delete_item(
     db.delete(item)
     db.commit()
     return None
+
+
+@router.get("/ratings/all", response_model=list[ProjectItemRatingOut])
+def list_project_item_ratings(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Liệt kê toàn bộ đánh giá của nhân sự trên từng đầu việc trong dự án."""
+    _assert_member(db, current, project_id)
+    return (
+        db.query(ProjectItemRating)
+        .join(ProjectItem)
+        .filter(
+            ProjectItem.project_id == project_id,
+            ProjectItemRating.company_id == current.company_id,
+        )
+        .all()
+    )
+
+
+@router.post("/ratings", response_model=ProjectItemRatingOut)
+def upsert_project_item_rating(
+    payload: ProjectItemRatingUpsert,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Lưu hoặc cập nhật đánh giá của một nhân sự trên một đầu việc (chỉ quản lý được chấm)."""
+    item = db.get(ProjectItem, payload.project_item_id)
+    if not item or item.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy đầu việc.")
+    
+    project = db.get(Project, item.project_id)
+    if not project or not _can_manage(db, project, current):
+        raise HTTPException(403, "Chỉ quản lý/chủ trì mới được đánh giá nhân sự.")
+
+    rating_rec = (
+        db.query(ProjectItemRating)
+        .filter(
+            ProjectItemRating.project_item_id == payload.project_item_id,
+            ProjectItemRating.user_id == payload.user_id,
+            ProjectItemRating.company_id == current.company_id,
+        )
+        .first()
+    )
+    if not rating_rec:
+        rating_rec = ProjectItemRating(
+            company_id=current.company_id,
+            project_item_id=payload.project_item_id,
+            user_id=payload.user_id,
+            rating=payload.rating,
+        )
+        db.add(rating_rec)
+    else:
+        rating_rec.rating = payload.rating
+
+    db.commit()
+    db.refresh(rating_rec)
+    return rating_rec
+
