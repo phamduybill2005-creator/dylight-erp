@@ -530,31 +530,7 @@ export default function ProjectItemsTab({
                   );
                 })}
               </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-ink bg-ink text-white">
-                  {canSeeMoney ? (
-                    <>
-                      <td colSpan={4} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
-                        {deptFilter ? `Tổng — ${filterLabel}` : "Tổng cộng dự toán"}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-2.5 text-right text-sm font-bold tnum">{formatVND(shownTotal)}</td>
-                    </>
-                  ) : (
-                    <td colSpan={2} className="px-2 py-2.5 text-right text-xs font-bold uppercase">
-                      {deptFilter ? `Tiến độ — ${filterLabel}` : "Tiến độ dự án"}
-                    </td>
-                  )}
-                  <td className="px-2 py-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-2 min-w-[40px] flex-1 overflow-hidden rounded-full bg-white/25">
-                        <div className="h-full bg-amber" style={{ width: `${clampPct(shownProgress)}%` }} />
-                      </div>
-                      <span className="w-9 shrink-0 text-right text-xs font-bold tnum">{Math.round(shownProgress)}%</span>
-                    </div>
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
+
             </table>
           </div>
 

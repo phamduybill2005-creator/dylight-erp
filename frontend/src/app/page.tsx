@@ -43,8 +43,6 @@ const MODULES: ModuleDef[] = [
   { href: "/attendance", label: "Chấm công", icon: ClockIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
-  { href: "/finance", label: "Tài chính & Công nợ", icon: CurrencyDollarIcon, tint: "bg-ok/10 text-ok", tiers: ["DIRECTOR"] },
-  { href: "/reconciliation", label: "Đối soát quyết toán", icon: ScaleIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR"] },
   { href: "/reports", label: "Báo cáo lãi / lỗ", icon: BanknotesIcon, tint: "bg-ok/10 text-ok", tiers: ["DIRECTOR"] },
   { href: "/audit", label: "Nhật ký hoạt động", icon: ShieldCheckIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
 ];
@@ -381,49 +379,6 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* ---- Lãi/lỗ theo dự án (CHỈ Giám đốc) ---- */}
-      {isDir && (
-        <section className="mt-5">
-          <h2 className="mb-2 text-sm font-semibold text-ink">Lãi / lỗ theo dự án</h2>
-          <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">
-            {profit.length === 0 && (
-              <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2">
-                Chưa có dữ liệu dự án.
-              </p>
-            )}
-            {profit.map((p) => {
-              const positive = p.profit >= 0;
-              return (
-                <div key={p.project_id} className="rounded-xl2 bg-white p-3 shadow-card card-hover border-t-2 border-line">
-                  <div className="flex items-center justify-between">
-                    <p className="min-w-0 truncate text-sm font-medium text-ink">{p.project_name}</p>
-                    <span className={`ml-2 flex shrink-0 items-center gap-1 text-sm font-semibold ${positive ? "text-ok" : "text-bad"}`}>
-                      {positive ? (
-                        <ArrowTrendingUpIcon className="h-4 w-4" />
-                      ) : (
-                        <ArrowTrendingDownIcon className="h-4 w-4" />
-                      )}
-                      {Number(p.margin_percent || 0).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="mt-2 flex justify-between text-[11px] text-muted">
-                    <span>GT hợp đồng: {formatCompactVND(p.contract_value)}</span>
-                    <span>Chi phí: {formatCompactVND(p.cost)}</span>
-                  </div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-line">
-                    <div
-                      className={positive ? "h-full bg-ok" : "h-full bg-bad"}
-                      style={{
-                        width: `${Math.min(100, p.contract_value > 0 ? (p.cost / p.contract_value) * 100 : 0)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
     </AppShell>
   );
 }
