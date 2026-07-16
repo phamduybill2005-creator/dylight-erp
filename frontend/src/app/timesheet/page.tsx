@@ -257,31 +257,31 @@ export default function TimesheetPage() {
 
       {/* Lưới Dự án × Ngày */}
       <div className="mt-3 overflow-auto max-h-[calc(100vh-280px)] rounded-xl2 border border-line bg-white shadow-card">
-        <table className="min-w-[720px] w-full border-collapse text-xs">
+        <table className="w-full border-collapse text-[11px]">
           <thead>
-            <tr className="bg-paper text-[11px] uppercase tracking-wide text-muted">
-              <th className={`${stickyLeft} sticky top-0 z-30 bg-paper px-3 py-2 text-left font-semibold`}>Dự án</th>
+            <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
+              <th className={`${stickyLeft} sticky top-0 z-30 bg-paper px-2 py-1.5 text-left font-semibold`}>Dự án</th>
               {days.map((d, i) => (
-                <th key={d} className={`sticky top-0 z-20 border border-line px-1 py-2 text-center font-semibold ${d === today ? "bg-amber text-white" : "bg-paper text-muted"}`}>
+                <th key={d} className={`sticky top-0 z-20 border border-line px-0.5 py-1.5 text-center font-semibold whitespace-nowrap ${d === today ? "bg-amber text-white" : "bg-paper text-muted"}`}>
                   <div>{DOW[i]}</div>
-                  <div className="text-[10px] font-normal">{fmtDay(d)}</div>
+                  <div className="text-[9px] font-normal">{fmtDay(d)}</div>
                 </th>
               ))}
-              <th className={`${stickyRight} sticky top-0 z-30 bg-paper px-2 py-2 text-center font-semibold`} style={{right: 60}}>人工<br />(giờ)</th>
-              <th className={`${stickyRight} sticky top-0 z-30 bg-paper px-2 py-2 text-center font-semibold`}>Ngày<br />công</th>
+              <th className={`${stickyRight} sticky top-0 z-30 bg-paper px-1 py-1.5 text-center font-semibold whitespace-nowrap`} style={{right: 48}}>Giờ</th>
+              <th className={`${stickyRight} sticky top-0 z-30 bg-paper px-1 py-1.5 text-center font-semibold whitespace-nowrap`}>Ngày<br />công</th>
             </tr>
           </thead>
           <tbody>
             {rowProjects.length === 0 ? (
-              <tr><td colSpan={10} className="border border-line px-3 py-6 text-center text-muted">Chưa có dự án nào.</td></tr>
+              <tr><td colSpan={10} className="border border-line px-2 py-5 text-center text-muted">Chưa có dự án nào.</td></tr>
             ) : (
               rowProjects.map((p) => {
                 const total = projTotal(p.id);
                 return (
                   <tr key={p.id} className="odd:bg-white even:bg-slate-50">
-                    <td className={`${stickyLeft} bg-inherit px-3 py-1.5`}>
-                      <span className="font-mono text-[10px] text-muted">{p.code}</span>
-                      <span className="block max-w-[220px] truncate font-medium text-ink" title={p.name}>{p.name}</span>
+                    <td className={`${stickyLeft} bg-inherit px-2 py-1`}>
+                      <span className="font-mono text-[9px] text-muted">{p.code}</span>
+                      <span className="block max-w-[180px] truncate font-medium text-ink text-[11px]" title={p.name}>{p.name}</span>
                     </td>
                     {days.map((d) => (
                       <td key={d} className={`border border-line p-0 text-center ${d === today ? "bg-amber/10" : "bg-inherit"}`}>
@@ -294,19 +294,19 @@ export default function TimesheetPage() {
                             onBlur={() => commitCell(p.id, d)}
                             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                             placeholder="–"
-                            className="h-8 w-full min-w-[40px] bg-transparent text-center text-xs text-ink outline-none placeholder:text-line focus:bg-steel/5"
+                            className="h-7 w-full min-w-[32px] bg-transparent text-center text-[11px] text-ink outline-none placeholder:text-line focus:bg-steel/5"
                           />
                         ) : (
-                          <span className={`block px-1 py-1.5 tnum ${cellHours.get(key(p.id, d)) ? "font-semibold text-ink" : "text-line"}`}>
+                          <span className={`block px-0.5 py-1 tnum ${cellHours.get(key(p.id, d)) ? "font-semibold text-ink" : "text-line"}`}>
                             {cellHours.get(key(p.id, d)) ? num1(cellHours.get(key(p.id, d))!) : "–"}
                           </span>
                         )}
                       </td>
                     ))}
-                    <td className={`${stickyRight} bg-inherit px-2 py-1.5 text-center font-bold tnum ${total > 0 ? "text-steel" : "text-muted"}`} style={{right: 60}}>
+                    <td className={`${stickyRight} bg-inherit px-1 py-1 text-center font-bold tnum ${total > 0 ? "text-steel" : "text-muted"}`} style={{right: 48}}>
                       {total > 0 ? num1(total) : "–"}
                     </td>
-                    <td className={`${stickyRight} bg-inherit px-2 py-1.5 text-center font-bold tnum ${total > 0 ? "text-ink" : "text-muted"}`}>
+                    <td className={`${stickyRight} bg-inherit px-1 py-1 text-center font-bold tnum ${total > 0 ? "text-ink" : "text-muted"}`}>
                       {total > 0 ? num1(total / 8) : "–"}
                     </td>
                   </tr>
@@ -316,19 +316,19 @@ export default function TimesheetPage() {
           </tbody>
           <tfoot>
             <tr className="bg-slate-100 font-bold text-ink">
-              <td className={`${stickyLeft} bg-slate-100 px-3 py-2 text-right sticky bottom-0 z-30 border-t border-line`}>Tổng ngày</td>
+              <td className={`${stickyLeft} bg-slate-100 px-2 py-1.5 text-right sticky bottom-0 z-30 border-t border-line text-[11px]`}>Tổng ngày</td>
               {days.map((d) => {
                 const t = dayTotal(d);
                 return (
-                  <td key={d} className="border border-line bg-slate-100 px-1 py-2 text-center tnum sticky bottom-0 z-20 border-t border-line">
+                  <td key={d} className="border border-line bg-slate-100 px-0.5 py-1.5 text-center tnum sticky bottom-0 z-20 border-t border-line">
                     {t > 0 ? num1(t) : "–"}
                   </td>
                 );
               })}
-              <td className={`${stickyRight} bg-slate-100 px-2 py-2 text-center text-amber-deep tnum sticky bottom-0 z-30 border-t border-line`} style={{right: 60}}>
+              <td className={`${stickyRight} bg-slate-100 px-1 py-1.5 text-center text-amber-deep tnum sticky bottom-0 z-30 border-t border-line`} style={{right: 48}}>
                 {grandTotal > 0 ? num1(grandTotal) : "–"}
               </td>
-              <td className={`${stickyRight} bg-slate-100 px-2 py-2 text-center text-emerald-600 font-extrabold tnum sticky bottom-0 z-30 border-t border-line`}>
+              <td className={`${stickyRight} bg-slate-100 px-1 py-1.5 text-center text-emerald-600 font-extrabold tnum sticky bottom-0 z-30 border-t border-line`}>
                 {grandTotal > 0 ? num1(grandTotal / 8) : "–"}
               </td>
             </tr>
