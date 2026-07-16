@@ -1,17 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 90" width="100%" height="100%">
-  <!-- Icon Group -->
-  <g transform="translate(15, 12)">
-    <!-- Top Black Shape -->
-    <path d="M 5,10 H 48 C 55,10 58,13 58,20 C 58,27 55,30 48,30 H 26 V 21 H 46 C 47,21 48,20 48,19 C 48,18 47,17 46,17 H 5 Z" fill="#1A1D20" />
-    <!-- Bottom Black Shape -->
-    <path d="M 26,30 H 48 C 55,30 58,33 58,40 C 58,47 55,50 48,50 H 5 V 41 H 46 C 47,41 48,40 48,39 C 48,38 47,37 46,37 H 26 Z" fill="#1A1D20" />
-    <!-- Middle Blue Bar -->
-    <rect x="5" y="24" width="22" height="9" rx="1" fill="#0D5CBA" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 110" width="100%" height="100%">
+  <!-- Icon: stylized D bracket -->
+  <g transform="translate(8, 8)">
+    <!-- Top black bar -->
+    <rect x="0" y="0" width="68" height="18" rx="2" fill="#111111"/>
+    <!-- Bottom black bar -->
+    <rect x="0" y="56" width="68" height="18" rx="2" fill="#111111"/>
+    <!-- Blue middle bar (shorter) -->
+    <rect x="0" y="24" width="38" height="26" rx="2" fill="#2255AA"/>
+    <!-- Right vertical connector (black) -->
+    <rect x="54" y="18" width="14" height="38" fill="#111111"/>
   </g>
-  
-  <!-- Text: DOSCO -->
-  <text x="90" y="47" font-family="'Outfit', 'Inter', 'Montserrat', 'Segoe UI', sans-serif" font-weight="900" font-size="38" letter-spacing="1.5" fill="#1A1D20">DOSCO</text>
-  
-  <!-- Text: OUTSOURCE SERVICE -->
-  <text x="90" y="63" font-family="'Outfit', 'Inter', 'Montserrat', 'Segoe UI', sans-serif" font-weight="800" font-size="11" letter-spacing="4" fill="#0D5CBA">OUTSOURCE SERVICE</text>
+
+  <!-- DOSCO text -->
+  <text
+    x="100"
+    y="66"
+    font-family="'Arial Black', 'Impact', 'Franklin Gothic Heavy', 'Oswald', sans-serif"
+    font-weight="900"
+    font-size="68"
+    letter-spacing="-1"
+    fill="#111111"
+  >DOSCO</text>
+
+  <!-- OUTSOURCE SERVICE -->
+  <text
+    x="102"
+    y="92"
+    font-family="'Arial', 'Helvetica', sans-serif"
+    font-weight="600"
+    font-size="14"
+    letter-spacing="5.5"
+    fill="#2255AA"
+  >OUTSOURCE SERVICE</text>
 </svg>
