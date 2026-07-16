@@ -257,7 +257,13 @@ def update_user(
         if payload.role is not None and payload.role not in (UserRole.ADMIN, UserRole.DIRECTOR):
             raise HTTPException(400, "Không thể tự hạ quyền quản trị của chính mình.")
 
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    if payload.email is not None:
+        email = payload.email.lower()
+        if user.email != email and db.query(User).filter(User.email == email).first():
+            raise HTTPException(400, "Email này đã được sử dụng.")
+        user.email = email
+
+    for k, v in payload.model_dump(exclude_unset=True, exclude={"email"}).items():
         setattr(user, k, v)
 
     db.commit()

@@ -60,6 +60,8 @@ export default function EmployeesPage() {
   
   // States for the edit form
   const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
     phone: "",
     address: "",
     dob: "",
@@ -153,6 +155,8 @@ export default function EmployeesPage() {
   useEffect(() => {
     if (selectedUser) {
       setFormData({
+        full_name: selectedUser.full_name || "",
+        email: selectedUser.email || "",
         phone: selectedUser.phone || "",
         address: selectedUser.address || "",
         dob: selectedUser.dob || "",
@@ -383,6 +387,8 @@ export default function EmployeesPage() {
 
     try {
       const payload: Partial<User> = {
+        full_name: formData.full_name.trim() || undefined,
+        email: formData.email.trim().toLowerCase() || undefined,
         phone: formData.phone || null,
         address: formData.address || null,
         dob: formData.dob || null,
@@ -738,12 +744,39 @@ export default function EmployeesPage() {
 
               {canManage && (
               <>
-              {/* Thông tin hồ sơ */}
+              {/* Tài khoản đăng nhập */}
               <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
                 <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
                   <IdentificationIcon className="h-4 w-4" />
-                  Thông tin hồ sơ & liên hệ
+                  Tài khoản đăng nhập
                 </h3>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted">Họ và tên *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    placeholder="VD: Nguyễn Văn A"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted">Email đăng nhập *</label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    placeholder="ten@dosco.vn"
+                  />
+                  <p className="mt-1 text-[10px] text-muted">
+                    Email để nhân viên đăng nhập. (Nếu sau này bật đăng nhập Google thì đây cũng là email Google của họ.)
+                  </p>
+                </div>
 
                 <div>
                   <label className="block text-[11px] font-semibold text-muted">Số điện thoại</label>
@@ -757,39 +790,43 @@ export default function EmployeesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Số CCCD / Hộ chiếu</label>
+                  <label className="block text-[11px] font-semibold text-muted">
+                    Bộ phận / Phòng ban{" "}
+                    <span className="font-normal text-muted/70">(chọn 1 hoặc nhiều)</span>
+                  </label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {departmentOptions.map((d) => {
+                      const on = splitDepts(formData.department).includes(d);
+                      return (
+                        <button
+                          type="button"
+                          key={d}
+                          onClick={() => setFormData({ ...formData, department: toggleDept(formData.department, d) })}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                            on ? "border-steel bg-steel/10 text-steel" : "border-line text-muted hover:bg-paper"
+                          }`}
+                        >
+                          {on ? "✓ " : ""}
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <input
                     type="text"
-                    value={formData.identity_card}
-                    onChange={(e) => setFormData({ ...formData, identity_card: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                    placeholder="Nhập số CCCD"
+                    list="dept-options"
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    placeholder="VD: Phòng BIM, Phòng AI"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-muted">Ngày sinh</label>
-                  <input
-                    type="date"
-                    value={formData.dob}
-                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-muted">Địa chỉ thường trú</label>
-                  <textarea
-                    rows={2}
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel resize-none"
-                    placeholder="Nhập địa chỉ đầy đủ"
-                  />
+                  <p className="mt-1 text-[10px] text-muted">
+                    Người làm ở nhiều phòng (VD: BIM + AI) sẽ hiện ở cả các nhóm tương ứng.
+                  </p>
                 </div>
               </div>
 
-              {/* Phân cấp Quản lý & Vai trò */}
+              {/* Vai trò & Phân cấp quản lý */}
               <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
                 <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
                   <ShieldCheckIcon className="h-4 w-4" />
@@ -847,41 +884,45 @@ export default function EmployeesPage() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Thông tin hồ sơ */}
+              <div className="space-y-3 rounded-xl2 bg-white p-4 shadow-card">
+                <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
+                  <IdentificationIcon className="h-4 w-4" />
+                  Thông tin hồ sơ & liên hệ
+                </h3>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">
-                    Bộ phận / Phòng ban{" "}
-                    <span className="font-normal text-muted/70">(chọn 1 hoặc nhiều)</span>
-                  </label>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {departmentOptions.map((d) => {
-                      const on = splitDepts(formData.department).includes(d);
-                      return (
-                        <button
-                          type="button"
-                          key={d}
-                          onClick={() => setFormData({ ...formData, department: toggleDept(formData.department, d) })}
-                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                            on ? "border-steel bg-steel/10 text-steel" : "border-line text-muted hover:bg-paper"
-                          }`}
-                        >
-                          {on ? "✓ " : ""}
-                          {d}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <label className="block text-[11px] font-semibold text-muted">Số CCCD / Hộ chiếu</label>
                   <input
                     type="text"
-                    list="dept-options"
-                    value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                    placeholder="VD: Phòng BIM, Phòng AI"
+                    value={formData.identity_card}
+                    onChange={(e) => setFormData({ ...formData, identity_card: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    placeholder="Nhập số CCCD"
                   />
-                  <p className="mt-1 text-[10px] text-muted">
-                    Người làm ở nhiều phòng (VD: BIM + AI) sẽ hiện ở cả các nhóm tương ứng.
-                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted">Ngày sinh</label>
+                  <input
+                    type="date"
+                    value={formData.dob}
+                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted">Địa chỉ thường trú</label>
+                  <textarea
+                    rows={2}
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel resize-none"
+                    placeholder="Nhập địa chỉ đầy đủ"
+                  />
                 </div>
               </div>
 
