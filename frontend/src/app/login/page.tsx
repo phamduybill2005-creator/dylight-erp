@@ -100,7 +100,7 @@ export default function LoginPage() {
       {/* ============ PANEL THƯƠNG HIỆU (chỉ desktop) ============ */}
       <div className="hidden lg:flex lg:w-1/2 lg:flex-col lg:justify-between bg-ink p-12 text-white">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="DOSCO" className="h-12 w-auto rounded-xl2 bg-white px-4 py-2 object-contain" />
+          <img src="/logo.svg" alt="DOSCO" className="h-12 w-auto rounded-xl2 bg-white px-4 py-2 object-contain" />
         </div>
         <div className="max-w-md">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber">
@@ -144,7 +144,7 @@ export default function LoginPage() {
           {/* Logo + tiêu đề (mobile hiển thị logo; desktop hiển thị tiêu đề) */}
           <div className="mb-8 text-center lg:mb-6 lg:text-left">
             <img
-              src="/logo.png"
+              src="/logo.svg"
               alt="DOSCO Logo"
               className="mx-auto mb-3 h-14 w-auto rounded-xl2 bg-white px-5 py-2.5 object-contain lg:hidden"
             />
