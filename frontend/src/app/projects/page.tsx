@@ -91,8 +91,8 @@ export default function ProjectsPage() {
   const uniqueDepts = Array.from(
     new Set([
       ...PRESET_DEPARTMENTS,
-      ...(projects.map((p) => p.lead_department).filter(Boolean) as string[]),
-      ...(projects.flatMap((p) => p.members?.map((m) => m.department).filter(Boolean) as string[]) || [])
+      ...(projects.flatMap((p) => p.lead_department ? p.lead_department.split(",").map(s => s.trim()) : []).filter(Boolean)),
+      ...(projects.flatMap((p) => p.members?.flatMap((m) => m.department ? m.department.split(",").map(s => s.trim()) : []) || []).filter(Boolean))
     ])
   ).sort();
 
@@ -105,8 +105,12 @@ export default function ProjectsPage() {
       if (p.lead_name !== filterLead) return false;
     }
     if (filterDept) {
-      const matchLeadDept = p.lead_department === filterDept;
-      const matchMemberDept = p.members?.some((m) => m.department === filterDept) || false;
+      const leadDepts = p.lead_department ? p.lead_department.split(",").map(s => s.trim()) : [];
+      const matchLeadDept = leadDepts.includes(filterDept);
+      const matchMemberDept = p.members?.some((m) => {
+        const memDepts = m.department ? m.department.split(",").map(s => s.trim()) : [];
+        return memDepts.includes(filterDept);
+      }) || false;
       if (!matchLeadDept && !matchMemberDept) return false;
     }
     return true;
