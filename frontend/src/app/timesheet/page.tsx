@@ -256,18 +256,18 @@ export default function TimesheetPage() {
       </div>
 
       {/* Lưới Dự án × Ngày */}
-      <div className="mt-3 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+      <div className="mt-3 overflow-auto max-h-[calc(100vh-280px)] rounded-xl2 border border-line bg-white shadow-card">
         <table className="min-w-[720px] w-full border-collapse text-xs">
           <thead>
             <tr className="bg-paper text-[11px] uppercase tracking-wide text-muted">
-              <th className={`${stickyLeft} bg-paper px-3 py-2 text-left font-semibold`}>Dự án</th>
+              <th className={`${stickyLeft} sticky top-0 z-30 bg-paper px-3 py-2 text-left font-semibold`}>Dự án</th>
               {days.map((d, i) => (
-                <th key={d} className={`border border-line px-1 py-2 text-center font-semibold ${d === today ? "bg-amber text-white" : ""}`}>
+                <th key={d} className={`sticky top-0 z-20 border border-line px-1 py-2 text-center font-semibold ${d === today ? "bg-amber text-white" : "bg-paper text-muted"}`}>
                   <div>{DOW[i]}</div>
                   <div className="text-[10px] font-normal">{fmtDay(d)}</div>
                 </th>
               ))}
-              <th className={`${stickyRight} bg-paper px-2 py-2 text-center font-semibold`}>人工<br />(giờ)</th>
+              <th className={`${stickyRight} sticky top-0 z-30 bg-paper px-2 py-2 text-center font-semibold`}>人工<br />(giờ)</th>
             </tr>
           </thead>
           <tbody>
@@ -277,13 +277,13 @@ export default function TimesheetPage() {
               rowProjects.map((p) => {
                 const total = projTotal(p.id);
                 return (
-                  <tr key={p.id} className="odd:bg-white even:bg-paper/40">
+                  <tr key={p.id} className="odd:bg-white even:bg-slate-50">
                     <td className={`${stickyLeft} bg-inherit px-3 py-1.5`}>
                       <span className="font-mono text-[10px] text-muted">{p.code}</span>
                       <span className="block max-w-[220px] truncate font-medium text-ink" title={p.name}>{p.name}</span>
                     </td>
                     {days.map((d) => (
-                      <td key={d} className={`border border-line p-0 text-center ${d === today ? "bg-amber/10" : ""}`}>
+                      <td key={d} className={`border border-line p-0 text-center ${d === today ? "bg-amber/10" : "bg-inherit"}`}>
                         {editable ? (
                           <input
                             type="text"
@@ -311,17 +311,17 @@ export default function TimesheetPage() {
             )}
           </tbody>
           <tfoot>
-            <tr className="bg-ink/5 font-bold text-ink">
-              <td className={`${stickyLeft} bg-ink/5 px-3 py-2 text-right`}>Tổng ngày</td>
+            <tr className="bg-slate-100 font-bold text-ink">
+              <td className={`${stickyLeft} bg-slate-100 px-3 py-2 text-right sticky bottom-0 z-30 border-t border-line`}>Tổng ngày</td>
               {days.map((d) => {
                 const t = dayTotal(d);
                 return (
-                  <td key={d} className="border border-line px-1 py-2 text-center tnum">
+                  <td key={d} className="border border-line bg-slate-100 px-1 py-2 text-center tnum sticky bottom-0 z-20 border-t border-line">
                     {t > 0 ? num1(t) : "–"}
                   </td>
                 );
               })}
-              <td className={`${stickyRight} bg-ink/5 px-2 py-2 text-center text-amber-deep tnum`}>
+              <td className={`${stickyRight} bg-slate-100 px-2 py-2 text-center text-amber-deep tnum sticky bottom-0 z-30 border-t border-line`}>
                 {grandTotal > 0 ? num1(grandTotal) : "–"}
               </td>
             </tr>
