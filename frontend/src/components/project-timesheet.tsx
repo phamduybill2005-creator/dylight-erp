@@ -48,7 +48,6 @@ export default function ProjectTimesheet({
   const [entries, setEntries] = useState<Timesheet[]>([]);
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [hourEdits, setHourEdits] = useState<Record<string, string>>({});
-  const [progEdits, setProgEdits] = useState<Record<number, string>>({});
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());   // item id -> đang thu gọn
   const [tempWorkers, setTempWorkers] = useState<Record<number, number[]>>({}); // item id -> user ids thêm tạm thời
 
@@ -152,21 +151,6 @@ export default function ProjectTimesheet({
     } catch { /* noop */ }
   }
 
-  const canEditProgress = (it: ProjectItem) =>
-    canManage || (it.assignee_id != null && it.assignee_id === currentUserId);
-  const progValue = (it: ProjectItem) =>
-    progEdits[it.id] !== undefined ? progEdits[it.id] : (it.progress ? num1(it.progress) : "");
-  async function commitProgress(it: ProjectItem) {
-    if (progEdits[it.id] === undefined) return;
-    const raw = progEdits[it.id].trim().replace(",", ".");
-    let val = raw === "" ? 0 : Number(raw);
-    setProgEdits((p) => { const n = { ...p }; delete n[it.id]; return n; });
-    if (isNaN(val)) return;
-    val = Math.max(0, Math.min(100, val));
-    if (val === Number(it.progress)) return;
-    try { await api.updateProjectItem(it.id, { progress: val }); loadItems(); } catch { /* noop */ }
-  }
-
   async function rate(it: ProjectItem, stars: number) {
     if (stars === (it.rating ?? 0)) return;
     try { await api.updateProjectItem(it.id, { rating: stars }); loadItems(); } catch { /* noop */ }
@@ -184,7 +168,7 @@ export default function ProjectTimesheet({
   const toggle = (k: number) =>
     setCollapsed((s) => { const n = new Set(s); const key = String(k); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
-  const COLS = 1 + 1 + 1 + 7 + 1;
+  const COLS = 1 + 1 + 7 + 1;
 
   return (
     <div className="rounded-xl2 border border-line/40 bg-white p-3.5 shadow-card">
@@ -225,7 +209,6 @@ export default function ProjectTimesheet({
           <thead>
             <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
               <th className="sticky left-0 z-10 border border-line bg-paper px-2 py-1.5 text-left font-semibold">Đầu việc / Người làm</th>
-              <th className="border border-line px-1 py-1 text-center font-semibold">% TĐ</th>
               <th className="border border-line px-1 py-1 text-center font-semibold">Đánh giá</th>
               {days.map((d, i) => (
                 <th key={d} className={`border border-line px-1 py-1 text-center font-semibold ${d === today ? "bg-amber text-white" : ""}`}>
@@ -259,13 +242,6 @@ export default function ProjectTimesheet({
                           <span className="ml-1 rounded-full bg-white/70 px-1.5 text-[9px] font-semibold text-muted">{workers.length}</span>
                         </span>
                       </td>
-                      <td className={`border border-line p-0 text-center ${Number(it.progress) >= 100 ? "bg-ok/20" : ""}`} onClick={(e) => e.stopPropagation()}>
-                        {canEditProgress(it) ? (
-                          <input type="text" inputMode="decimal" value={progValue(it)} onChange={(e) => setProgEdits((x) => ({ ...x, [it.id]: e.target.value }))} onBlur={() => commitProgress(it)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="0" className="h-7 w-full min-w-[34px] bg-transparent text-center text-xs font-semibold text-ink outline-none placeholder:text-line focus:bg-steel/5" />
-                        ) : (
-                          <span className={`block px-1 py-1 tnum ${it.progress ? "font-semibold text-ink" : "text-line"}`}>{it.progress ? num1(it.progress) : "–"}</span>
-                        )}
-                      </td>
                       <td className="border border-line px-1 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                         <span className="inline-flex items-center gap-0.5">
                           {[1, 2, 3, 4, 5].map((n) => {
@@ -297,7 +273,7 @@ export default function ProjectTimesheet({
                                   {w.id === currentUserId && <span className="text-[9px] text-muted">(tôi)</span>}
                                 </div>
                               </td>
-                              <td className="border border-line" /><td className="border border-line" />
+                              <td className="border border-line" />
                               {days.map((d) => {
                                 const v = hoursMap.get(hkey(w.id, it.id, d)) ?? 0;
                                 return (
@@ -347,7 +323,7 @@ export default function ProjectTimesheet({
             <tfoot>
               <tr className="bg-ink/10 font-bold text-ink">
                 <td className="sticky left-0 z-10 border border-line bg-ink/10 px-2 py-1.5 text-right">Tổng ngày</td>
-                <td className="border border-line" /><td className="border border-line" />
+                <td className="border border-line" />
                 {days.map((d) => { const t = dayGrand(d); return <td key={d} className="border border-line px-1 py-1.5 text-center tnum">{t > 0 ? num1(t) : "–"}</td>; })}
                 <td className="border border-line px-2 py-1.5 text-center text-amber-deep tnum">{grand > 0 ? num1(grand) : "–"}</td>
               </tr>
@@ -356,7 +332,7 @@ export default function ProjectTimesheet({
         </table>
       </div>
       <p className="mt-1.5 text-[11px] text-muted">
-        <b className="text-ink">% TĐ</b> = mức hoàn thành đầu việc · <b className="text-ink">Đánh giá</b> = chất lượng (chỉ quản lý chấm).
+        <b className="text-ink">Đánh giá</b> = chất lượng (chỉ quản lý chấm).
         Bấm tên đầu việc để mở rộng xem danh sách những người tham gia làm và điền giờ tương ứng của họ.
       </p>
     </div>
