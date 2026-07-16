@@ -46,6 +46,14 @@ const PROGRESS_STATUS: Record<string, { label: string; cls: string }> = {
   DONE: { label: "Hoàn thành", cls: "bg-ok/15 text-ok" },
 };
 
+function getRoleRank(role?: string | null, hasSubordinates?: boolean | null): number {
+  if (!role) return 99;
+  if (role === "ADMIN" || role === "DIRECTOR") return 0;
+  if (role === "MANAGER" || (role === "FIELD_STAFF" && hasSubordinates)) return 1;
+  if (role === "ACCOUNTANT") return 2;
+  return 3; // FIELD_STAFF without subordinates (Nhân viên)
+}
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -523,7 +531,14 @@ export default function ProjectDetailPage() {
           
           <div className="mt-2 flex flex-wrap gap-1.5">
             {(() => {
-              const otherMembers = (project.members ?? []).filter((m) => m.id !== project.lead_id);
+              const otherMembers = (project.members ?? [])
+                .filter((m) => m.id !== project.lead_id)
+                .sort((a, b) => {
+                  const rankA = getRoleRank(a.role, a.has_subordinates);
+                  const rankB = getRoleRank(b.role, b.has_subordinates);
+                  if (rankA !== rankB) return rankA - rankB;
+                  return a.full_name.localeCompare(b.full_name, "vi");
+                });
               if (otherMembers.length === 0) {
                 return <p className="text-[11px] text-muted italic">Chưa phân công thành viên thực hiện.</p>;
               }
