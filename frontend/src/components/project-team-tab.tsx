@@ -162,13 +162,13 @@ export default function ProjectTeamTab({
           Dự án chưa có thành viên. Vào <b>Sửa dự án</b> để thêm người thực hiện.
         </p>
       ) : (
-        <div className="space-y-2.5">
+        <div className="rounded-xl2 border border-line bg-white shadow-card divide-y divide-line">
           {people.map((p) => {
             const list = (byAssignee.get(p.id) ?? []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
             const isLead = leadId === p.id;
             const doneN = list.filter((a) => a.status === "DONE").length;
             return (
-              <div key={p.id} className="rounded-xl2 border border-line bg-white p-3.5 shadow-card">
+              <div key={p.id} className="p-3.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
