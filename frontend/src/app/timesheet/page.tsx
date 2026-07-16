@@ -267,12 +267,13 @@ export default function TimesheetPage() {
                   <div className="text-[10px] font-normal">{fmtDay(d)}</div>
                 </th>
               ))}
-              <th className={`${stickyRight} sticky top-0 z-30 bg-paper px-2 py-2 text-center font-semibold`}>人工<br />(giờ)</th>
+              <th className={`${stickyRight} sticky top-0 z-30 bg-paper px-2 py-2 text-center font-semibold`} style={{right: 60}}>人工<br />(giờ)</th>
+              <th className={`${stickyRight} sticky top-0 z-30 bg-paper px-2 py-2 text-center font-semibold`}>Ngày<br />công</th>
             </tr>
           </thead>
           <tbody>
             {rowProjects.length === 0 ? (
-              <tr><td colSpan={9} className="border border-line px-3 py-6 text-center text-muted">Chưa có dự án nào.</td></tr>
+              <tr><td colSpan={10} className="border border-line px-3 py-6 text-center text-muted">Chưa có dự án nào.</td></tr>
             ) : (
               rowProjects.map((p) => {
                 const total = projTotal(p.id);
@@ -302,8 +303,11 @@ export default function TimesheetPage() {
                         )}
                       </td>
                     ))}
-                    <td className={`${stickyRight} bg-inherit px-2 py-1.5 text-center font-bold tnum ${total > 0 ? "text-steel" : "text-muted"}`}>
+                    <td className={`${stickyRight} bg-inherit px-2 py-1.5 text-center font-bold tnum ${total > 0 ? "text-steel" : "text-muted"}`} style={{right: 60}}>
                       {total > 0 ? num1(total) : "–"}
+                    </td>
+                    <td className={`${stickyRight} bg-inherit px-2 py-1.5 text-center font-bold tnum ${total > 0 ? "text-ink" : "text-muted"}`}>
+                      {total > 0 ? num1(total / 8) : "–"}
                     </td>
                   </tr>
                 );
@@ -321,8 +325,11 @@ export default function TimesheetPage() {
                   </td>
                 );
               })}
-              <td className={`${stickyRight} bg-slate-100 px-2 py-2 text-center text-amber-deep tnum sticky bottom-0 z-30 border-t border-line`}>
+              <td className={`${stickyRight} bg-slate-100 px-2 py-2 text-center text-amber-deep tnum sticky bottom-0 z-30 border-t border-line`} style={{right: 60}}>
                 {grandTotal > 0 ? num1(grandTotal) : "–"}
+              </td>
+              <td className={`${stickyRight} bg-slate-100 px-2 py-2 text-center text-emerald-600 font-extrabold tnum sticky bottom-0 z-30 border-t border-line`}>
+                {grandTotal > 0 ? num1(grandTotal / 8) : "–"}
               </td>
             </tr>
           </tfoot>
