@@ -30,6 +30,7 @@ import NotificationsBell from "./notifications-bell";
 import ChatWidget from "./chat-widget";
 import AccountMenu from "./account-menu";
 import DeadlineAlert from "./deadline-alert";
+import EvaluationAlert from "./evaluation-alert";
 
 type IconType = React.ComponentType<{ className?: string }>;
 type NavLink = { href: string; label: string; icon: IconType };
@@ -62,7 +63,13 @@ function deskNav(tier: Tier): NavLink[] {
   return items;
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({
+  children,
+  maxWidthClass = "max-w-md lg:max-w-6xl",
+}: {
+  children: React.ReactNode;
+  maxWidthClass?: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(api.cachedUser());
@@ -205,7 +212,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           transition={{ duration: 0.25, ease: "easeOut" }}
           className="flex-1 px-4 pb-28 pt-4 lg:px-8 lg:pb-12 lg:pt-8"
         >
-          <div className="mx-auto w-full max-w-md lg:max-w-6xl">{children}</div>
+          <div className={`mx-auto w-full ${maxWidthClass}`}>{children}</div>
         </motion.main>
 
         {/* ---- Thanh điều hướng dưới + FAB (chỉ MOBILE) ---- */}
@@ -232,6 +239,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <NotificationsBell />
       <ChatWidget />
       <DeadlineAlert user={user} />
+      <EvaluationAlert user={user} />
     </div>
   );
 }

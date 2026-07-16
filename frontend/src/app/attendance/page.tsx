@@ -278,6 +278,9 @@ export default function AttendancePage() {
     const totalMins = myRecords.reduce((a, r) => a + r.worked_minutes, 0);
     const lateDays = myRecords.filter((r) => r.is_late).length;
 
+    const userDepts = (user.department || "").toLowerCase();
+    const isHrOrMgmt = userDepts.includes("nhân sự") || userDepts.includes("quản lý");
+
     return (
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
@@ -302,22 +305,28 @@ export default function AttendancePage() {
           {today?.is_late && (
             <p className="mt-2 text-center text-[11px] font-semibold text-bad">Hôm nay bạn đi trễ.</p>
           )}
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <button
-              onClick={() => punch("in")}
-              disabled={busy || !!today?.check_in}
-              className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ok/90 py-3 text-sm font-semibold text-white disabled:opacity-40"
-            >
-              <ArrowRightCircleIcon className="h-5 w-5" /> Chấm vào
-            </button>
-            <button
-              onClick={() => punch("out")}
-              disabled={busy}
-              className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ink py-3 text-sm font-semibold text-white disabled:opacity-40"
-            >
-              <ArrowLeftEndOnRectangleIcon className="h-5 w-5" /> Chấm ra
-            </button>
-          </div>
+          {isHrOrMgmt ? (
+            <div className="mt-4 rounded-xl2 bg-paper p-3 text-center text-xs font-semibold text-steel border border-line/40">
+              📌 Bộ phận của bạn tự động chấm công qua máy nhận diện khuôn mặt (không sử dụng chấm công bằng tay).
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => punch("in")}
+                disabled={busy || !!today?.check_in}
+                className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ok/90 py-3 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                <ArrowRightCircleIcon className="h-5 w-5" /> Chấm vào
+              </button>
+              <button
+                onClick={() => punch("out")}
+                disabled={busy}
+                className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ink py-3 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                <ArrowLeftEndOnRectangleIcon className="h-5 w-5" /> Chấm ra
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Tổng kết tháng */}

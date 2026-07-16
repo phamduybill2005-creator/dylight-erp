@@ -182,7 +182,7 @@ export default function TimesheetPage() {
   const stickyRight = "sticky right-0 z-10 border border-line";
 
   return (
-    <AppShell>
+    <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
       <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
         <ClockIcon className="h-5 w-5 text-amber" />
         <h1 className="text-base lg:text-xl font-bold">Nhân công theo ngày</h1>
