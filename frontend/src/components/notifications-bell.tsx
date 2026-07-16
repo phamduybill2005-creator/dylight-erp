@@ -40,35 +40,68 @@ export default function NotificationsBell() {
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState("");
 
+  const [lastNotificationIds, setLastNotificationIds] = useState<Set<number>>(new Set());
+
   const nick = useNicknames();
   const tier = me ? roleTier(me.role) : "STAFF";
   const canCompose = tier !== "STAFF";
   const targets = tier === "DIRECTOR" ? TARGETS_DIRECTOR : TARGETS_MANAGER;
+
+  const showDesktopNotification = useCallback((titleStr: string, bodyStr: string) => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      new Notification(titleStr, { body: bodyStr });
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification(titleStr, { body: bodyStr });
+        }
+      });
+    }
+  }, []);
 
   const refreshUnread = useCallback(() => {
     api.unreadCount().then((r) => setUnread(r.count)).catch(() => {});
   }, []);
 
   const refreshItems = useCallback(() => {
-    api.notifications().then(setItems).catch(() => {});
-  }, []);
+    api.notifications().then((newItems) => {
+      setItems(newItems);
+      setLastNotificationIds((prevIds) => {
+        const nextIds = new Set(newItems.map((x) => x.id));
+        if (prevIds.size > 0) {
+          const newUnread = newItems.filter((x) => !x.is_read && !prevIds.has(x.id));
+          if (newUnread.length > 0) {
+            newUnread.forEach((n) => {
+              showDesktopNotification(n.title, n.body || "");
+            });
+          }
+        }
+        return nextIds;
+      });
+    }).catch(() => {});
+  }, [showDesktopNotification]);
 
   // Nạp thông tin người đăng nhập 1 lần khi mở app.
   useEffect(() => {
     api.me().then(setMe).catch(() => {});
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+      }
+    }
   }, []);
 
-  // Tự làm mới định kỳ (KHÔNG cần F5): số tin chưa đọc cập nhật mỗi ~20s;
-  // nếu đang mở bảng thông báo thì làm mới cả danh sách để tin mới tự hiện.
+  // Tự làm mới định kỳ (KHÔNG cần F5): số tin chưa đọc + danh sách thông báo cập nhật mỗi ~20s
   useEffect(() => {
     refreshUnread();
-    if (open) refreshItems();
+    refreshItems();
     const t = setInterval(() => {
       refreshUnread();
-      if (open) refreshItems();
+      refreshItems();
     }, 20000);
     return () => clearInterval(t);
-  }, [open, refreshUnread, refreshItems]);
+  }, [refreshUnread, refreshItems]);
 
   async function openPanel() {
     setOpen(true);

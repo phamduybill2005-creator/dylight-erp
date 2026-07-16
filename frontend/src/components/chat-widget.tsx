@@ -138,14 +138,45 @@ export default function ChatWidget() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const draftRef = useRef<HTMLTextAreaElement | null>(null);
   const activeId = active?.id ?? null;
+  const [lastConvStates, setLastConvStates] = useState<Record<number, { unread: number; lastMsgAt: string | null }>>({});
+
+  const showDesktopNotification = useCallback((titleStr: string, bodyStr: string) => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      new Notification(titleStr, { body: bodyStr });
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification(titleStr, { body: bodyStr });
+        }
+      });
+    }
+  }, []);
 
   const refreshUnread = useCallback(() => {
     api.chatUnreadCount().then((r) => setUnread(r.count)).catch(() => {});
   }, []);
 
   const refreshList = useCallback(() => {
-    api.chatConversations().then(setList).catch(() => {});
-  }, []);
+    api.chatConversations().then((newList) => {
+      setList(newList);
+      setLastConvStates((prev) => {
+        const nextStates = { ...prev };
+        newList.forEach((c) => {
+          const prevState = prev[c.id];
+          const hasNewUnread = c.unread > 0 && (!prevState || c.unread > prevState.unread || c.last_message_at !== prevState.lastMsgAt);
+          if (hasNewUnread && c.last_message) {
+            if (activeId !== c.id) {
+              const title = convTitle(c, me?.id, nick);
+              showDesktopNotification(`Tin nhắn mới từ ${title}`, c.last_message);
+            }
+          }
+          nextStates[c.id] = { unread: c.unread, lastMsgAt: c.last_message_at || null };
+        });
+        return nextStates;
+      });
+    }).catch(() => {});
+  }, [activeId, me?.id, nick, showDesktopNotification]);
 
   const refreshMessages = useCallback((id: number) => {
     api.chatMessages(id).then(setMessages).catch(() => {});
@@ -154,6 +185,11 @@ export default function ChatWidget() {
   // Nạp người đăng nhập 1 lần.
   useEffect(() => {
     api.me().then(setMe).catch(() => {});
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+      }
+    }
   }, []);
 
   // Cho phép các trang khác mở nhóm chat của 1 dự án qua sự kiện toàn cục
@@ -177,15 +213,14 @@ export default function ChatWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tự làm mới định kỳ ~8s: badge; nếu mở panel làm mới danh sách; nếu đang trong 1
-  // phòng thì làm mới cả tin nhắn phòng đó (poll-based, không WebSocket).
+  // Tự làm mới định kỳ ~8s: badge, danh sách chat, và tin nhắn (nếu đang xem)
   useEffect(() => {
     refreshUnread();
-    if (open) refreshList();
+    refreshList();
     if (open && activeId) refreshMessages(activeId);
     const t = setInterval(() => {
       refreshUnread();
-      if (open) refreshList();
+      refreshList();
       if (open && activeId) refreshMessages(activeId);
     }, POLL_MS);
     return () => clearInterval(t);
