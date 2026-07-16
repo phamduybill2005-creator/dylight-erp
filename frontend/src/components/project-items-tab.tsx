@@ -714,21 +714,32 @@ function GroupRows({
                 placeholder="Tên đầu việc / công tác..."
                 disabled={!canManage}
               />
-              <div className="mt-0.5 flex items-center gap-1">
-                <span className="text-[9px] font-semibold text-muted">Người làm:</span>
-                <select
-                  value={c.assignee_id || ""}
-                  onChange={(e) => onPersist(c.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
-                  disabled={!canManage}
-                  className="rounded border border-line bg-white px-1 py-0.5 text-[9px] text-muted outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent"
-                >
-                  <option value="">— Chưa phân công —</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.full_name}
-                    </option>
-                  ))}
-                </select>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] font-semibold text-muted">Người làm:</span>
+                  <select
+                    value={c.assignee_id || ""}
+                    onChange={(e) => onPersist(c.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
+                    disabled={!canManage}
+                    className="rounded border border-line bg-white px-1 py-0.5 text-[9px] text-muted outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent"
+                  >
+                    <option value="">— Chưa phân công —</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] font-semibold text-muted">Đánh giá:</span>
+                  <ItemRating value={num(c.rating)} onChange={(n) => onPersist(c.id, { rating: n })} disabled={!canManage} />
+                  {num(c.rating) > 0 && (
+                    <span className="text-[9px] font-bold text-amber-deep bg-amber/10 px-1 py-0.2 rounded">
+                      {RATING_LABELS[num(c.rating)]}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </td>
