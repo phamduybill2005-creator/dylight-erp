@@ -502,34 +502,38 @@ export default function AttendancePage() {
             shownSummary.map((s) => {
               const isOpen = expandedUser === s.user_id;
               return (
-              <div key={s.user_id} className={`rounded-xl2 bg-white shadow-card ${isOpen ? "lg:col-span-2 xl:col-span-4" : ""}`}>
-                <button onClick={() => toggleDetail(s.user_id)} className="block w-full p-3 text-left">
+              <div key={s.user_id} className={`rounded-xl2 bg-white shadow-card border border-line/45 hover:border-teal-500/20 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 ${isOpen ? "lg:col-span-2 xl:col-span-4" : ""}`}>
+                <button onClick={() => toggleDetail(s.user_id)} className="block w-full p-3.5 text-left">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-ink">
+                    <p className="flex min-w-0 items-center gap-1 text-sm font-bold text-ink">
                       <ChevronDownIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${isOpen ? "" : "-rotate-90"}`} />
                       <span className="truncate">{nick(s.user_id, s.full_name)}</span>
                     </p>
                     {s.late_days > 0 && (
-                      <span className="shrink-0 rounded-full bg-bad/10 px-2 py-0.5 text-[10px] font-semibold text-bad">
+                      <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200/50 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                        </span>
                         trễ {s.late_days}
                       </span>
                     )}
                   </div>
                   {/* thanh trực quan số ngày công so với người cao nhất */}
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-paper">
+                  <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-paper">
                     <div
-                      className="h-full rounded-full bg-steel"
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-500"
                       style={{ width: `${Math.round((s.present_days / maxDays) * 100)}%` }}
                     />
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs">
-                    <div>
-                      <p className="text-[9px] text-muted">Ngày công</p>
-                      <p className="font-bold text-ink tnum">{s.present_days}</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
+                    <div className="rounded-lg bg-emerald-50/40 border border-emerald-500/10 p-1.5">
+                      <p className="text-[9px] font-medium text-muted">Ngày công</p>
+                      <p className="font-bold text-emerald-600 tnum text-sm mt-0.5">{s.present_days}</p>
                     </div>
-                    <div>
-                      <p className="text-[9px] text-muted">Tổng giờ</p>
-                      <p className="font-bold text-steel tnum">{s.total_hours.toFixed(1)}h</p>
+                    <div className="rounded-lg bg-indigo-50/40 border border-indigo-500/10 p-1.5">
+                      <p className="text-[9px] font-medium text-muted">Tổng giờ</p>
+                      <p className="font-bold text-indigo-600 tnum text-sm mt-0.5">{s.total_hours.toFixed(1)}h</p>
                     </div>
                   </div>
                 </button>
