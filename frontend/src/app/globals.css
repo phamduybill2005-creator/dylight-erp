@@ -32,7 +32,7 @@ html, body {
     @apply rounded-2xl bg-white shadow-card border border-line/70 transition-all duration-300;
   }
   .card-hover {
-    @apply hover:-translate-y-1 hover:shadow-lg active:scale-98 transition-all duration-300;
+    @apply hover:-translate-y-1 hover:shadow-lg active:scale-95 transition-all duration-300;
   }
   /* Vùng an toàn dưới cùng cho điện thoại có thanh gesture */
   .safe-bottom {

@@ -394,7 +394,7 @@ export default function AttendancePage() {
   const deptOfUser = (uid: number) => allUsers.find((u) => u.id === uid)?.department;
   const shownSummary = summary
     .filter((s) => !filters.dept || splitDepts(deptOfUser(s.user_id)).includes(filters.dept))
-    .sort((a, b) => b.total_minutes - a.total_minutes);
+    .sort((a, b) => b.total_hours - a.total_hours);
   const maxDays = shownSummary.reduce((m, s) => Math.max(m, s.present_days), 0) || 1;
 
   async function doImport() {
