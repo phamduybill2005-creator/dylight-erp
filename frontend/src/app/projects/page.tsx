@@ -364,7 +364,7 @@ export default function ProjectsPage() {
                   className="cursor-pointer transition-colors odd:bg-white even:bg-paper/40 hover:bg-amber/10"
                 >
                   <td className={`${TD} text-center text-muted tnum`}>{i + 1}</td>
-                  <td className={`${TD} font-mono text-[12px] text-steel whitespace-nowrap`}>{p.code}</td>
+                  <td className={`${TD} font-mono text-[12px] font-bold text-bad whitespace-nowrap`}>{p.code}</td>
                   <td className={`${TD} font-semibold text-ink`}>{p.name}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.group_name || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager || "—"}</td>
