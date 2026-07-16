@@ -503,7 +503,7 @@ export default function ProjectDetailPage() {
         {/* Tab Hạng mục (bảng dự toán Excel) */}
         {/* Bảng dự toán: ẩn Khối lượng + Đơn giá + Thành tiền + tiểu tổng + tổng cho MỌI
             vai trò (theo yêu cầu bỏ phần dự toán) — chỉ giữ tên hạng mục, ĐVT, % hoàn thành. */}
-        {activeTab === "items" && <ProjectItemsTab projectId={projectId} canSeeMoney={false} />}
+        {activeTab === "items" && <ProjectItemsTab projectId={projectId} canSeeMoney={false} members={project.members ?? []} />}
 
         {/* Tab Phân công — ai làm gì, bao lâu (từ giao việc lọc theo dự án) */}
         {activeTab === "team" && (

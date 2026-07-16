@@ -11,7 +11,15 @@ import { StarIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { formatVND, dateLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import type { ProjectItem, Department } from "@/lib/types";
+import type { ProjectItem, Department, User } from "@/lib/types";
+
+const RATING_LABELS: Record<number, string> = {
+  1: "Cần xem xét lại",
+  2: "Cần cải thiện",
+  3: "Đạt",
+  4: "Xuất sắc",
+  5: "Rất xuất sắc",
+};
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -109,10 +117,12 @@ function EditableCell({
 export default function ProjectItemsTab({
   projectId,
   canSeeMoney = true,
+  members = [],
 }: {
   projectId: number;
   /** Nhân viên (STAFF) = false: ẩn cột Khối lượng/Đơn giá/Thành tiền, tiểu tổng, tổng, xuất Excel. */
   canSeeMoney?: boolean;
+  members?: User[];
 }) {
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -526,6 +536,7 @@ export default function ProjectItemsTab({
                       onAddChild={addChild}
                       onRemove={remove}
                       busy={busy}
+                      members={members}
                     />
                   );
                 })}
@@ -560,6 +571,7 @@ function GroupRows({
   onAddChild,
   onRemove,
   busy,
+  members = [],
 }: {
   group: ProjectItem;
   groupIndex: number;
@@ -572,6 +584,7 @@ function GroupRows({
   onAddChild: (g: ProjectItem) => void;
   onRemove: (i: ProjectItem) => void;
   busy: boolean;
+  members?: User[];
 }) {
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
   // +1 cho cột "% Hoàn thành" (hiện với mọi vai trò).
@@ -612,9 +625,14 @@ function GroupRows({
             </select>
           </div>
           {/* Đánh giá hạng mục (sao) — chủ trì/quản lý chấm chất lượng hạng mục này. */}
-          <div className="mt-1 flex items-center gap-1.5 pl-2">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-2">
             <span className="text-[10px] font-semibold text-muted">Đánh giá:</span>
             <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} />
+            {num(group.rating) > 0 && (
+              <span className="text-[10px] font-bold text-amber-deep bg-amber/10 px-1 py-0.5 rounded">
+                {RATING_LABELS[num(group.rating)]}
+              </span>
+            )}
           </div>
         </td>
         {canSeeMoney && (
@@ -652,11 +670,28 @@ function GroupRows({
             {groupIndex + 1}.{ci + 1}
           </td>
           <td className="px-1 py-0.5 pl-3">
-            <EditableCell
-              value={c.name}
-              onCommit={(v) => onPersist(c.id, { name: String(v) })}
-              placeholder="Tên đầu việc / công tác..."
-            />
+            <div className="flex flex-col">
+              <EditableCell
+                value={c.name}
+                onCommit={(v) => onPersist(c.id, { name: String(v) })}
+                placeholder="Tên đầu việc / công tác..."
+              />
+              <div className="mt-0.5 flex items-center gap-1">
+                <span className="text-[9px] font-semibold text-muted">Người làm:</span>
+                <select
+                  value={c.assignee_id || ""}
+                  onChange={(e) => onPersist(c.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
+                  className="rounded border border-line bg-white px-1 py-0.5 text-[9px] text-muted outline-none focus:border-steel cursor-pointer"
+                >
+                  <option value="">— Chưa phân công —</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </td>
           {canSeeMoney && (
             <td className="px-1 py-0.5">
