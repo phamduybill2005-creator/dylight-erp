@@ -17,7 +17,6 @@ import {
   UsersIcon,
   TableCellsIcon,
   ChatBubbleLeftRightIcon,
-  StarIcon,
   TrashIcon,
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
@@ -25,7 +24,6 @@ import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import ProjectTimesheet from "@/components/project-timesheet";
 import ProjectTeamTab from "@/components/project-team-tab";
-import ProjectEvaluationTab from "@/components/project-evaluation-tab";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate } from "@/lib/format";
@@ -63,7 +61,7 @@ export default function ProjectDetailPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [progressLogs, setProgressLogs] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team" | "eval">("contracts");
+  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team">("contracts");
 
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
@@ -170,10 +168,10 @@ export default function ProjectDetailPage() {
         // Trang khác mở thẳng 1 tab qua ?tab=... (VD: bảng Tiến độ dự án -> tab Tiến độ).
         // Tab tiền chỉ nhận khi có quyền xem tiền.
         const want = new URLSearchParams(window.location.search).get("tab");
-        const allowed: string[] = ["items", "progress", "team", "eval"];
+        const allowed: string[] = ["items", "progress", "team"];
         if (canSeeMoney(me.role)) allowed.push("contracts");
         if (want && allowed.includes(want)) {
-          setActiveTab(want as "contracts" | "items" | "progress" | "team" | "eval");
+          setActiveTab(want as "contracts" | "items" | "progress" | "team");
         }
       })
       .catch(() => {});
@@ -566,7 +564,6 @@ export default function ProjectDetailPage() {
         <TabButton active={activeTab === "items"} onClick={() => setActiveTab("items")} label="Hạng mục" icon={TableCellsIcon} />
         <TabButton active={activeTab === "progress"} onClick={() => setActiveTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
         <TabButton active={activeTab === "team"} onClick={() => setActiveTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
-        <TabButton active={activeTab === "eval"} onClick={() => setActiveTab("eval")} label="Đánh giá" icon={StarIcon} />
       </div>
 
       {/* Nội dung Tab */}
@@ -632,14 +629,6 @@ export default function ProjectDetailPage() {
             members={project.members ?? []}
             leadId={project.lead_id ?? null}
             canManage={canManage}
-          />
-        )}
-
-        {/* Tab Đánh giá — chấm chéo 360° giữa các thành viên dự án */}
-        {activeTab === "eval" && (
-          <ProjectEvaluationTab
-            projectId={projectId}
-            currentUserId={currentUser?.id ?? null}
           />
         )}
 
