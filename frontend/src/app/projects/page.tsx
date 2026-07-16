@@ -246,8 +246,8 @@ export default function ProjectsPage() {
     }
   }
 
-  const TH = "border border-line px-3 py-2 font-semibold whitespace-nowrap";
-  const TD = "border border-line px-3 py-2 align-middle";
+  const TH = "border border-line px-1.5 py-1.5 font-semibold whitespace-nowrap";
+  const TD = "border border-line px-1.5 py-1.5 align-middle";
   // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Đánh giá, Ngày nhận, Ngày hoàn thành, Hạn nội, Tổng thời gian, Trạng thái, Tiến độ = 13 cột.
   const infoCols = 13;
 
@@ -328,7 +328,7 @@ export default function ProjectsPage() {
       </div>
 
       <div className="mt-3 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
-        <table className="w-full min-w-[680px] border-collapse text-sm">
+        <table className="w-full min-w-[900px] border-collapse text-[11px]">
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
               <th className={`${TH} w-10 text-center`}>STT</th>
@@ -364,7 +364,7 @@ export default function ProjectsPage() {
                   className="cursor-pointer transition-colors odd:bg-white even:bg-paper/40 hover:bg-amber/10"
                 >
                   <td className={`${TD} text-center text-muted tnum`}>{i + 1}</td>
-                  <td className={`${TD} font-mono text-[12px] font-bold text-bad whitespace-nowrap`}>{p.code}</td>
+                  <td className={`${TD} font-mono text-[11px] font-bold text-bad whitespace-nowrap`}>{p.code}</td>
                   <td className={`${TD} font-semibold text-ink`}>{p.name}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.group_name || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager || "—"}</td>
@@ -380,11 +380,11 @@ export default function ProjectsPage() {
                     </span>
                   </td>
                   <td className={`${TD} whitespace-nowrap`}>
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-line">
+                    <div className="flex items-center gap-1">
+                      <div className="h-1.5 w-10 overflow-hidden rounded-full bg-line">
                         <div className="h-full bg-steel" style={{ width: `${Math.max(0, Math.min(100, Math.round(Number(p.progress_percent ?? 0))))}%` }} />
                       </div>
-                      <span className="text-[11px] tnum text-muted">{Math.round(Number(p.progress_percent ?? 0))}%</span>
+                      <span className="text-[10px] tnum text-muted">{Math.round(Number(p.progress_percent ?? 0))}%</span>
                     </div>
                   </td>
                 </tr>
