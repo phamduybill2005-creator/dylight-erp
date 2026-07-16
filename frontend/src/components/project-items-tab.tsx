@@ -27,16 +27,17 @@ const num = (v: unknown) => {
 };
 
 /** Chấm sao 1–5 đánh giá hạng mục (0 = chưa chấm). Bấm lại sao đang chọn để bỏ về 0. */
-function ItemRating({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+function ItemRating({ value, onChange, disabled = false }: { value: number; onChange: (n: number) => void; disabled?: boolean }) {
   return (
     <span className="inline-flex items-center gap-0.5" aria-label="Đánh giá hạng mục">
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n}
           type="button"
+          disabled={disabled}
           onClick={() => onChange(n === value ? 0 : n)}
           title={`${n} sao`}
-          className={n <= value ? "text-amber" : "text-line hover:text-amber"}
+          className={`${disabled ? "cursor-not-allowed opacity-75" : ""} ${n <= value ? "text-amber" : "text-line hover:text-amber"}`}
         >
           <StarIcon className="h-3.5 w-3.5" />
         </button>
@@ -63,12 +64,14 @@ function EditableCell({
   type = "text",
   placeholder,
   className = "",
+  disabled = false,
 }: {
   value: string | number | null | undefined;
   onCommit: (v: string | number) => void;
   type?: "text" | "number";
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
 }) {
   // Giữ CHUỖI đang gõ (không ép về số mỗi phím) -> gõ mượt cả số thập phân "12.5", "0,75".
   const [v, setV] = useState<string>(value == null ? "" : String(value));
@@ -106,10 +109,11 @@ function EditableCell({
       inputMode={type === "number" ? "decimal" : undefined}
       value={editing ? v : shown}
       placeholder={placeholder}
-      onFocus={() => { setEditing(true); if (type === "number" && Number(v) === 0) setV(""); }}
-      onChange={(e) => setV(e.target.value)}
+      onFocus={() => { if (disabled) return; setEditing(true); if (type === "number" && Number(v) === 0) setV(""); }}
+      onChange={(e) => !disabled && setV(e.target.value)}
       onBlur={commit}
-      className={`w-full bg-transparent px-2 py-1.5 text-xs text-ink outline-none focus:bg-amber/5 focus:ring-1 focus:ring-amber rounded ${className}`}
+      disabled={disabled}
+      className={`w-full bg-transparent px-2 py-1.5 text-xs text-ink outline-none ${disabled ? "cursor-not-allowed text-muted/60" : "focus:bg-amber/5 focus:ring-1 focus:ring-amber"} rounded ${className}`}
     />
   );
 }
@@ -118,11 +122,13 @@ export default function ProjectItemsTab({
   projectId,
   canSeeMoney = true,
   members = [],
+  canManage = false,
 }: {
   projectId: number;
   /** Nhân viên (STAFF) = false: ẩn cột Khối lượng/Đơn giá/Thành tiền, tiểu tổng, tổng, xuất Excel. */
   canSeeMoney?: boolean;
   members?: User[];
+  canManage?: boolean;
 }) {
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -378,13 +384,15 @@ export default function ProjectItemsTab({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={() => { setShowForm((s) => !s); setFormMsg(""); if (fGroupId === "" && groups.length > 0) setFGroupId(String(groups[0].id)); }}
-            className="flex items-center gap-1.5 rounded-xl2 bg-amber px-3 py-2 text-xs font-semibold text-ink shadow hover:bg-amber-deep hover:text-white transition-all"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Thêm hạng mục
-          </button>
+          {canManage && (
+            <button
+              onClick={() => { setShowForm((s) => !s); setFormMsg(""); if (fGroupId === "" && groups.length > 0) setFGroupId(String(groups[0].id)); }}
+              className="flex items-center gap-1.5 rounded-xl2 bg-amber px-3 py-2 text-xs font-semibold text-ink shadow hover:bg-amber-deep hover:text-white transition-all"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Thêm hạng mục
+            </button>
+          )}
           {canSeeMoney && (
             <button
               onClick={exportCSV}
@@ -537,6 +545,7 @@ export default function ProjectItemsTab({
                       onRemove={remove}
                       busy={busy}
                       members={members}
+                      canManage={canManage}
                     />
                   );
                 })}
@@ -545,14 +554,16 @@ export default function ProjectItemsTab({
             </table>
           </div>
 
-          <button
-            onClick={addGroup}
-            disabled={busy}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl2 border border-dashed border-line py-2.5 text-xs font-semibold text-steel hover:border-steel hover:bg-paper transition-all disabled:opacity-50"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Thêm nhóm hạng mục
-          </button>
+          {canManage && (
+            <button
+              onClick={addGroup}
+              disabled={busy}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl2 border border-dashed border-line py-2.5 text-xs font-semibold text-steel hover:border-steel hover:bg-paper transition-all disabled:opacity-50"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Thêm nhóm hạng mục
+            </button>
+          )}
         </>
       )}
     </div>
@@ -572,6 +583,7 @@ function GroupRows({
   onRemove,
   busy,
   members = [],
+  canManage = false,
 }: {
   group: ProjectItem;
   groupIndex: number;
@@ -585,6 +597,7 @@ function GroupRows({
   onRemove: (i: ProjectItem) => void;
   busy: boolean;
   members?: User[];
+  canManage?: boolean;
 }) {
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
   // +1 cho cột "% Hoàn thành" (hiện với mọi vai trò).
@@ -602,6 +615,7 @@ function GroupRows({
                 onCommit={(v) => onPersist(group.id, { name: String(v) })}
                 placeholder="Tên nhóm hạng mục"
                 className="font-bold text-ink"
+                disabled={!canManage}
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -609,7 +623,8 @@ function GroupRows({
               <select
                 value={group.assignee_id || ""}
                 onChange={(e) => onPersist(group.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
-                className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] font-semibold text-muted outline-none focus:border-steel cursor-pointer"
+                disabled={!canManage}
+                className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] font-semibold text-muted outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent"
               >
                 <option value="">— Chưa chọn —</option>
                 {members.map((m) => (
@@ -625,7 +640,8 @@ function GroupRows({
             <select
               value={group.department || ""}
               onChange={(e) => onPersist(group.id, { department: e.target.value || null })}
-              className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel ${
+              disabled={!canManage}
+              className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel disabled:cursor-not-allowed disabled:bg-transparent ${
                 group.department
                   ? "border-steel/40 bg-steel/5 text-steel"
                   : "border-line bg-white text-muted"
@@ -646,7 +662,7 @@ function GroupRows({
           {/* Đánh giá hạng mục (sao) — chủ trì/quản lý chấm chất lượng hạng mục này. */}
           <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-2">
             <span className="text-[10px] font-semibold text-muted">Đánh giá:</span>
-            <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} />
+            <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} disabled={!canManage} />
             {num(group.rating) > 0 && (
               <span className="text-[10px] font-bold text-amber-deep bg-amber/10 px-1 py-0.5 rounded">
                 {RATING_LABELS[num(group.rating)]}
@@ -671,14 +687,16 @@ function GroupRows({
           </div>
         </td>
         <td className="px-1 py-1 text-center">
-          <button
-            onClick={() => onRemove(group)}
-            title="Xoá nhóm"
-            aria-label={`Xoá nhóm hạng mục ${group.name || ""}`.trim()}
-            className="rounded p-1 text-muted hover:bg-bad/10 hover:text-bad focus:outline-none focus:ring-2 focus:ring-bad"
-          >
-            <TrashIcon className="h-3.5 w-3.5" />
-          </button>
+          {canManage && (
+            <button
+              onClick={() => onRemove(group)}
+              title="Xoá nhóm"
+              aria-label={`Xoá nhóm hạng mục ${group.name || ""}`.trim()}
+              className="rounded p-1 text-muted hover:bg-bad/10 hover:text-bad focus:outline-none focus:ring-2 focus:ring-bad"
+            >
+              <TrashIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
         </td>
       </tr>
 
@@ -694,13 +712,15 @@ function GroupRows({
                 value={c.name}
                 onCommit={(v) => onPersist(c.id, { name: String(v) })}
                 placeholder="Tên đầu việc / công tác..."
+                disabled={!canManage}
               />
               <div className="mt-0.5 flex items-center gap-1">
                 <span className="text-[9px] font-semibold text-muted">Người làm:</span>
                 <select
                   value={c.assignee_id || ""}
                   onChange={(e) => onPersist(c.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
-                  className="rounded border border-line bg-white px-1 py-0.5 text-[9px] text-muted outline-none focus:border-steel cursor-pointer"
+                  disabled={!canManage}
+                  className="rounded border border-line bg-white px-1 py-0.5 text-[9px] text-muted outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent"
                 >
                   <option value="">— Chưa phân công —</option>
                   {members.map((m) => (
@@ -719,6 +739,7 @@ function GroupRows({
                 value={c.quantity}
                 onCommit={(v) => onPersist(c.id, { quantity: Number(v) })}
                 className="text-right"
+                disabled={!canManage}
               />
             </td>
           )}
@@ -729,6 +750,7 @@ function GroupRows({
                 value={c.unit_price}
                 onCommit={(v) => onPersist(c.id, { unit_price: Number(v) })}
                 className="text-right"
+                disabled={!canManage}
               />
             </td>
           )}
@@ -748,38 +770,43 @@ function GroupRows({
                   onCommit={(v) => onPersist(c.id, { progress: clampPct(v) })}
                   className="text-right"
                   placeholder="0"
+                  disabled={!canManage}
                 />
               </div>
               <span className="text-[10px] text-muted">%</span>
             </div>
           </td>
           <td className="px-1 py-1 text-center">
-            <button
-              onClick={() => onRemove(c)}
-              title="Xoá đầu việc"
-              aria-label={`Xoá đầu việc ${c.name || ""}`.trim()}
-              className="rounded p-1 text-muted hover:bg-bad/10 hover:text-bad focus:outline-none focus:ring-2 focus:ring-bad"
-            >
-              <TrashIcon className="h-3.5 w-3.5" />
-            </button>
+            {canManage && (
+              <button
+                onClick={() => onRemove(c)}
+                title="Xoá đầu việc"
+                aria-label={`Xoá đầu việc ${c.name || ""}`.trim()}
+                className="rounded p-1 text-muted hover:bg-bad/10 hover:text-bad focus:outline-none focus:ring-2 focus:ring-bad"
+              >
+                <TrashIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
           </td>
         </tr>
       ))}
 
       {/* Nút thêm đầu việc vào nhóm */}
-      <tr className="border-t border-line/40">
-        <td />
-        <td colSpan={contentCols} className="px-1 py-1">
-          <button
-            onClick={() => onAddChild(group)}
-            disabled={busy}
-            className="flex items-center gap-1 pl-2 text-[11px] font-semibold text-steel hover:text-ink disabled:opacity-50"
-          >
-            <PlusIcon className="h-3.5 w-3.5" />
-            Thêm đầu việc
-          </button>
-        </td>
-      </tr>
+      {canManage && (
+        <tr className="border-t border-line/40">
+          <td />
+          <td colSpan={contentCols} className="px-1 py-1">
+            <button
+              onClick={() => onAddChild(group)}
+              disabled={busy}
+              className="flex items-center gap-1 pl-2 text-[11px] font-semibold text-steel hover:text-ink disabled:opacity-50"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+              Thêm đầu việc
+            </button>
+          </td>
+        </tr>
+      )}
     </>
   );
 }
