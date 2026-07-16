@@ -522,29 +522,23 @@ export default function ProjectDetailPage() {
           </div>
           
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {!project.members || project.members.length === 0 ? (
-              <p className="text-[11px] text-muted italic">Chưa phân công thành viên thực hiện.</p>
-            ) : (
-              project.members.map((member) => {
-                const isLead = project.lead_id === member.id;
-                return (
-                  <span
-                    key={member.id}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold text-ink ${isLead ? "bg-amber/15 border-amber/50" : "bg-paper border-line/50"}`}
-                    title={`${roleTitle(member.role, member.has_subordinates)} - ${member.phone || "Không có SĐT"}`}
-                  >
-                    {isLead ? (
-                      <StarIcon className="h-3 w-3 text-amber" />
-                    ) : (
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-                    )}
-                    {member.full_name}
-                    {isLead && <span className="text-[9px] font-bold text-amber-deep">(Chủ trì)</span>}
-                    <span className="text-[9px] text-muted">({roleTitle(member.role, member.has_subordinates)})</span>
-                  </span>
-                );
-              })
-            )}
+            {(() => {
+              const otherMembers = (project.members ?? []).filter((m) => m.id !== project.lead_id);
+              if (otherMembers.length === 0) {
+                return <p className="text-[11px] text-muted italic">Chưa phân công thành viên thực hiện.</p>;
+              }
+              return otherMembers.map((member) => (
+                <span
+                  key={member.id}
+                  className="inline-flex items-center gap-1 rounded-md border bg-paper border-line/50 px-2 py-0.5 text-[10px] font-semibold text-ink"
+                  title={`${roleTitle(member.role, member.has_subordinates)} - ${member.phone || "Không có SĐT"}`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber" />
+                  {member.full_name}
+                  <span className="text-[9px] text-muted">({roleTitle(member.role, member.has_subordinates)})</span>
+                </span>
+              ));
+            })()}
           </div>
         </div>
       </div>
