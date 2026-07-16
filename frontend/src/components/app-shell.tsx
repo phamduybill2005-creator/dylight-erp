@@ -94,9 +94,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-paper lg:flex">
       {/* ====================== SIDEBAR (DESKTOP) ====================== */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-ink text-white lg:flex">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <img src="/logo.png" alt="DOSCO" className="h-10 w-auto rounded-lg bg-white/95 px-3 py-1.5 object-contain" />
-          <p className="text-[10px] leading-tight text-white/60">Tư vấn · Thiết kế<br />hạ tầng &amp; khảo sát</p>
+        <div className="flex items-center justify-center px-5 py-5">
+          <img src="/logo.png" alt="DOSCO" className="h-12 w-auto rounded-lg bg-white/95 px-3 py-1.5 object-contain" />
         </div>
 
         {/* Chọn công ty / chi nhánh */}
@@ -158,10 +157,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-30 bg-ink text-white lg:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="DOSCO" className="h-9 w-auto rounded-lg bg-white/95 px-3 py-1.5 object-contain" />
-              <div className="leading-tight">
-                <p className="text-[10px] text-white/60">DOSCO · Tư vấn thiết kế hạ tầng</p>
-              </div>
+              <img src="/logo.png" alt="DOSCO" className="h-10 w-auto rounded-lg bg-white/95 px-3 py-1.5 object-contain" />
             </div>
 
             <div className="flex items-center gap-2">
