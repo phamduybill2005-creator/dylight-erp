@@ -519,13 +519,6 @@ export default function AttendancePage() {
                       </span>
                     )}
                   </div>
-                  {/* thanh trực quan số ngày công so với người cao nhất */}
-                  <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-paper">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-500"
-                      style={{ width: `${Math.round((s.present_days / maxDays) * 100)}%` }}
-                    />
-                  </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
                     <div className="rounded-lg bg-emerald-50/40 border border-emerald-500/10 p-1.5">
                       <p className="text-[9px] font-medium text-muted">Ngày công</p>

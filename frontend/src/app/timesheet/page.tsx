@@ -41,6 +41,7 @@ export default function TimesheetPage() {
   const [mode, setMode] = useState<"me" | "team">("me");        // team = tổng hợp toàn đội (chỉ đọc)
   const [viewUserId, setViewUserId] = useState<number | null>(null); // quản lý: khai/xem hộ 1 người
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [dept, setDept] = useState<string>("");
 
   const isManager = me ? roleTier(me.role) !== "STAFF" : false;
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -48,6 +49,56 @@ export default function TimesheetPage() {
   const targetUid = viewUserId ?? me?.id ?? 0;
   const editable = mode === "me";
   const today = todayLocal();
+
+  // Trích xuất danh sách phòng ban duy nhất từ danh sách nhân viên
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    for (const u of users) {
+      if (u.department) {
+        u.department.split(",").forEach((d) => {
+          const trimmed = d.trim();
+          if (trimmed) set.add(trimmed);
+        });
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [users]);
+
+  // Bộ lọc danh sách nhân viên để chọn khai/xem hộ
+  const filteredUsers = useMemo(() => {
+    if (!dept) return users;
+    return users.filter((u) => {
+      const userDepts = (u.department || "").split(",").map((x) => x.trim());
+      return userDepts.includes(dept);
+    });
+  }, [users, dept]);
+
+  // Tự động reset viewUserId về null (Tôi) nếu đổi phòng ban mà nhân viên đang chọn không thuộc phòng ban đó
+  useEffect(() => {
+    if (!dept) return;
+    if (viewUserId) {
+      const selectedUser = users.find((u) => u.id === viewUserId);
+      if (selectedUser) {
+        const userDepts = (selectedUser.department || "").split(",").map((x) => x.trim());
+        if (!userDepts.includes(dept)) {
+          setViewUserId(null);
+        }
+      }
+    }
+  }, [dept, users, viewUserId]);
+
+  // Danh sách ID người dùng thuộc phòng ban được chọn để tính tổng trong chế độ "team"
+  const deptUserIds = useMemo(() => {
+    if (!dept) return null;
+    const ids = new Set<number>();
+    for (const u of users) {
+      const userDepts = (u.department || "").split(",").map((x) => x.trim());
+      if (userDepts.includes(dept)) {
+        ids.add(u.id);
+      }
+    }
+    return ids;
+  }, [users, dept]);
 
   const loadEntries = useCallback(() => {
     if (!me) return;
@@ -71,16 +122,20 @@ export default function TimesheetPage() {
 
   const key = (pid: number, d: string) => `${pid}:${d}`;
 
-  // Giờ mỗi ô: "me" = giờ của targetUid; "team" = TỔNG giờ mọi người.
+  // Giờ mỗi ô: "me" = giờ của targetUid; "team" = TỔNG giờ mọi người (có lọc phòng ban).
   const cellHours = useMemo(() => {
     const map = new Map<string, number>();
     for (const e of entries) {
-      if (mode === "me" && e.user_id !== targetUid) continue;
+      if (mode === "me") {
+        if (e.user_id !== targetUid) continue;
+      } else { // team mode
+        if (deptUserIds && !deptUserIds.has(e.user_id)) continue;
+      }
       const k = key(e.project_id, e.work_date);
       map.set(k, (map.get(k) ?? 0) + Number(e.hours));
     }
     return map;
-  }, [entries, mode, targetUid]);
+  }, [entries, mode, targetUid, deptUserIds]);
 
   // Hàng = dự án; dự án có giờ trong tuần lên đầu.
   const rowProjects = useMemo(() => {
@@ -161,12 +216,24 @@ export default function TimesheetPage() {
 
         {isManager && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* Bộ lọc phòng ban */}
+            <select
+              value={dept}
+              onChange={(e) => setDept(e.target.value)}
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel cursor-pointer"
+            >
+              <option value="">Tất cả phòng ban</option>
+              {departments.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+
             <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs">
               {(["me", "team"] as const).map((mo) => (
                 <button
                   key={mo}
                   onClick={() => setMode(mo)}
-                  className={`rounded px-2 py-1 font-semibold ${mode === mo ? "bg-ink text-white" : "text-muted hover:bg-paper"}`}
+                  className={`rounded px-2 py-1 font-semibold transition-colors duration-200 ${mode === mo ? "bg-ink text-white" : "text-muted hover:bg-paper"}`}
                 >
                   {mo === "me" ? "1 người" : "Toàn đội (tổng)"}
                 </button>
@@ -176,10 +243,10 @@ export default function TimesheetPage() {
               <select
                 value={viewUserId ?? me.id}
                 onChange={(e) => setViewUserId(Number(e.target.value) === me.id ? null : Number(e.target.value))}
-                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel cursor-pointer"
               >
                 <option value={me.id}>Tôi ({me.full_name})</option>
-                {users.filter((u) => u.id !== me.id).map((u) => (
+                {filteredUsers.filter((u) => u.id !== me.id).map((u) => (
                   <option key={u.id} value={u.id}>{u.full_name}</option>
                 ))}
               </select>
