@@ -11,6 +11,7 @@ import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
+import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import type { Project, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -89,6 +90,7 @@ export default function ProjectsPage() {
 
   const uniqueDepts = Array.from(
     new Set([
+      ...PRESET_DEPARTMENTS,
       ...(projects.map((p) => p.lead_department).filter(Boolean) as string[]),
       ...(projects.flatMap((p) => p.members?.map((m) => m.department).filter(Boolean) as string[]) || [])
     ])
