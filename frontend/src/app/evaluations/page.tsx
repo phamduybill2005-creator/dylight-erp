@@ -12,9 +12,17 @@ import { StarIcon } from "@heroicons/react/24/solid";
 import { ChatBubbleLeftRightIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { roleTier } from "@/lib/roles";
+import { roleTier, ROLE_LABEL } from "@/lib/roles";
 import { dateLocal, todayLocal } from "@/lib/format";
 import type { Evaluation, EvaluationSummary, User, Project } from "@/lib/types";
+
+const RATING_LABELS: Record<number, string> = {
+  1: "Cần xem xét lại",
+  2: "Cần cải thiện",
+  3: "Đạt",
+  4: "Xuất sắc",
+  5: "Rất xuất sắc",
+};
 
 // Kỳ đánh giá theo TUẦN = ngày Thứ 7 của tuần đó (YYYY-MM-DD).
 function weekSaturday(d: Date = new Date()): string {
@@ -49,17 +57,28 @@ function Stars({ value, onChange }: { value: number; onChange?: (n: number) => v
 // Thẻ 1 phiếu — hiện NGÀY chấm + DỰ ÁN (nếu có) + sao + nhận xét.
 function EvalCard({ e, who }: { e: Evaluation; who: "evaluator" | "evaluatee" }) {
   const name = who === "evaluator" ? e.evaluator_name : e.evaluatee_name;
+  const isStaff = who === "evaluator"
+    ? e.direction === "STAFF_TO_MANAGER"
+    : e.direction === "MANAGER_TO_STAFF";
+  const roleLabel = isStaff ? "Nhân viên" : "Quản lý";
+
   return (
     <div className="rounded-xl2 bg-white p-3 shadow-card">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <UserCircleIcon className="h-5 w-5 shrink-0 text-muted" />
-          <p className="truncate text-sm font-semibold text-ink">{name || "—"}</p>
+          <p className="truncate text-sm font-semibold text-ink">
+            {name || "—"}{" "}
+            <span className="text-[10px] font-normal text-muted">({roleLabel})</span>
+          </p>
         </div>
-        <span className="shrink-0 text-[11px] text-muted">{fmtDay(e.eval_date) }</span>
+        <span className="shrink-0 text-[11px] text-muted">{fmtDay(e.eval_date)}</span>
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <Stars value={e.rating} />
+        <span className="text-[10px] font-bold text-amber-deep bg-amber/10 px-1.5 py-0.5 rounded">
+          {RATING_LABELS[e.rating]}
+        </span>
         {e.project_name ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-steel/10 px-2 py-0.5 text-[10px] font-semibold text-steel">
             <FolderIcon className="h-3 w-3" />
@@ -230,7 +249,14 @@ export default function EvaluationsPage() {
 
               <div className="mt-3">{DateProjectPicker()}</div>
 
-              <p className="mt-3 text-[11px] font-semibold text-muted">Mức độ hài lòng</p>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-muted">Mức độ hài lòng</span>
+                {rating > 0 && (
+                  <span className="text-xs font-bold text-amber-deep bg-amber/10 px-2 py-0.5 rounded">
+                    {RATING_LABELS[rating]}
+                  </span>
+                )}
+              </div>
               <div className="mt-1"><Stars value={rating} onChange={setRating} /></div>
 
               <textarea
@@ -259,7 +285,10 @@ export default function EvaluationsPage() {
                     {myWeek.map((g) => (
                       <div key={g.id} className="flex items-center justify-between rounded-lg bg-paper px-2.5 py-1.5 text-[11px]">
                         <span className="text-muted">{fmtDay(g.eval_date)} · {g.project_name || "Chung"}</span>
-                        <span className="flex items-center gap-0.5 font-semibold text-amber">{g.rating}<StarIcon className="h-3 w-3" /></span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-semibold text-amber-deep">{RATING_LABELS[g.rating]}</span>
+                          <span className="flex items-center gap-0.5 font-semibold text-amber">{g.rating}<StarIcon className="h-3 w-3" /></span>
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -338,7 +367,12 @@ export default function EvaluationsPage() {
               summary.map((s) => (
                 <div key={s.user_id} className="flex items-center justify-between rounded-xl2 bg-white p-3 shadow-card">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{s.full_name}</p>
+                    <p className="truncate text-sm font-semibold text-ink">
+                      {s.full_name}{" "}
+                      <span className="text-xs font-normal text-muted">
+                        ({ROLE_LABEL[s.role] || "Nhân viên"})
+                      </span>
+                    </p>
                     <p className="text-[10px] text-muted">{s.num_ratings} phiếu trong tuần</p>
                   </div>
                   <span
@@ -369,10 +403,18 @@ export default function EvaluationsPage() {
                 <div key={e.id} className="rounded-xl2 bg-white p-3 shadow-card">
                   <div className="flex items-center justify-between gap-2">
                     <p className="min-w-0 truncate text-xs text-ink">
-                      <b>{e.evaluator_name}</b> <span className="text-muted">→</span> <b>{e.evaluatee_name}</b>
+                      {e.direction === "STAFF_TO_MANAGER" ? (
+                        <span>
+                          <b>{e.evaluator_name}</b> <span className="text-[10px] text-muted">(NV)</span> <span className="text-muted">→</span> <b>{e.evaluatee_name}</b> <span className="text-[10px] text-muted">(QL)</span>
+                        </span>
+                      ) : (
+                        <span>
+                          <b>{e.evaluator_name}</b> <span className="text-[10px] text-muted">(QL)</span> <span className="text-muted">→</span> <b>{e.evaluatee_name}</b> <span className="text-[10px] text-muted">(NV)</span>
+                        </span>
+                      )}
                     </p>
-                    <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-amber">
-                      {e.rating} <StarIcon className="h-3.5 w-3.5" />
+                    <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-amber-deep bg-amber/10 px-1.5 py-0.5 rounded">
+                      {e.rating}★ {RATING_LABELS[e.rating]}
                     </span>
                   </div>
                   <p className="mt-1 text-[10px] text-muted">
@@ -428,7 +470,10 @@ export default function EvaluationsPage() {
                       {wk.map((g) => (
                         <div key={g.id} className="flex items-center justify-between rounded-lg bg-paper px-2.5 py-1.5 text-[11px]">
                           <span className="min-w-0 truncate text-muted">{fmtDay(g.eval_date)} · {g.project_name || "Chung"}</span>
-                          <span className="flex shrink-0 items-center gap-0.5 font-semibold text-amber">{g.rating}<StarIcon className="h-3 w-3" /></span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <span className="font-semibold text-amber-deep">{RATING_LABELS[g.rating]}</span>
+                            <span className="flex shrink-0 items-center gap-0.5 font-semibold text-amber">{g.rating}<StarIcon className="h-3 w-3" /></span>
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -437,7 +482,14 @@ export default function EvaluationsPage() {
                   {target?.id === u.id && (
                     <div className="mt-3 border-t border-line pt-3">
                       {DateProjectPicker()}
-                      <p className="mt-2 text-[11px] font-semibold text-muted">Mức điểm</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-muted">Mức điểm</span>
+                        {rating > 0 && (
+                          <span className="text-xs font-bold text-amber-deep bg-amber/10 px-2 py-0.5 rounded">
+                            {RATING_LABELS[rating]}
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-1"><Stars value={rating} onChange={setRating} /></div>
                       <textarea
                         rows={3}
