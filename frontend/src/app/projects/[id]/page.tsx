@@ -329,7 +329,7 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <AppShell>
+      <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
         <p className="py-20 text-center text-xs text-muted">Đang tải chi tiết dự án...</p>
       </AppShell>
     );
@@ -337,7 +337,7 @@ export default function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <AppShell>
+      <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
         <div className="text-center py-20">
           <p className="text-sm text-bad font-semibold">Không tìm thấy dự án.</p>
           <button onClick={() => router.push("/projects")} className="mt-4 text-xs text-steel font-medium underline">
@@ -349,7 +349,7 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
       {/* Nút quay lại */}
       <button
         onClick={() => router.push("/projects")}

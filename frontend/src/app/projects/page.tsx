@@ -258,7 +258,7 @@ export default function ProjectsPage() {
   const infoCols = 13;
 
   return (
-    <AppShell>
+    <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-ink lg:text-2xl">Dự án</h1>
