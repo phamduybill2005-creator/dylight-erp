@@ -326,7 +326,6 @@ export default function ProjectsPage() {
           </button>
         )}
       </div>
-      </div>
 
       <div className="mt-3 overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
         <table className="w-full min-w-[680px] border-collapse text-sm">
