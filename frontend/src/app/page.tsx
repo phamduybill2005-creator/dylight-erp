@@ -124,23 +124,25 @@ export default function DashboardPage() {
     return (
       <AppShell>
         {/* Lời chào */}
-        <section className="rounded-xl2 bg-gradient-to-br from-ink to-steel p-5 lg:p-6 text-white shadow-card">
-          <p className="text-xs text-amber font-semibold uppercase tracking-wider">Trang nhân viên</p>
-          <h1 className="mt-1 text-2xl lg:text-3xl font-bold">Xin chào, {user.full_name}!</h1>
-          <div className="mt-4 flex flex-col gap-1.5 text-xs text-white/80">
+        <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-br from-cyan-600 via-blue-700 to-indigo-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
+          <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+          <div className="absolute left-1/4 bottom-0 -mb-10 h-36 w-36 rounded-full bg-cyan-400/25 blur-2xl" />
+          <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">Trang nhân viên</p>
+          <h1 className="mt-1 text-2xl lg:text-3xl font-bold tracking-tight">Xin chào, {user.full_name}! 👋</h1>
+          <div className="relative z-10 mt-4 flex flex-col gap-1.5 text-xs text-white/85">
             <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber" />
+              <span className="h-1.5 w-1.5 rounded-full bg-yellow-300 animate-pulse-glow" />
               <span>Vai trò: <span className="font-semibold text-white">{roleTitle(user.role, user.has_subordinates)}</span></span>
             </div>
             {user.manager_name && (
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber" />
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
                 <span>Người quản lý: <span className="font-semibold text-white">{user.manager_name}</span></span>
               </div>
             )}
             {user.phone && (
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber" />
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
                 <span>SĐT liên hệ: <span className="font-semibold text-white">{user.phone}</span></span>
               </div>
             )}
@@ -153,7 +155,7 @@ export default function DashboardPage() {
             <ClockIcon className="h-5 w-5 text-steel" />
             <h2 className="text-sm font-semibold text-ink">Chấm công hôm nay</h2>
           </div>
-          <div className="rounded-xl2 bg-white p-4 shadow-card">
+          <div className="rounded-xl2 bg-white p-4 shadow-card card-hover">
             <div className="flex items-center justify-between text-center">
               <div className="flex-1">
                 <p className="text-[10px] text-muted">Giờ vào</p>
@@ -169,14 +171,14 @@ export default function DashboardPage() {
               <button
                 onClick={() => quickPunch("in")}
                 disabled={attBusy || !!todayAtt?.check_in}
-                className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ok/90 py-2.5 text-xs font-semibold text-white disabled:opacity-40"
+                className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ok/90 hover:bg-ok py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-200 active:scale-95 disabled:opacity-40"
               >
                 <ArrowRightCircleIcon className="h-4 w-4" /> Chấm vào
               </button>
               <button
                 onClick={() => quickPunch("out")}
                 disabled={attBusy}
-                className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ink py-2.5 text-xs font-semibold text-white disabled:opacity-40"
+                className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ink hover:bg-ink/90 py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-200 active:scale-95 disabled:opacity-40"
               >
                 <ArrowLeftEndOnRectangleIcon className="h-4 w-4" /> Chấm ra
               </button>
@@ -184,7 +186,7 @@ export default function DashboardPage() {
             {todayAtt?.is_late && (
               <p className="mt-2 text-center text-[11px] font-semibold text-bad">Hôm nay bạn đi trễ.</p>
             )}
-            <Link href="/attendance" className="mt-3 block text-center text-[11px] font-semibold text-steel hover:text-ink">
+            <Link href="/attendance" className="mt-3 block text-center text-[11px] font-semibold text-steel hover:text-ink transition-colors">
               Xem lịch sử chấm công →
             </Link>
           </div>
@@ -194,7 +196,7 @@ export default function DashboardPage() {
         <section className="mt-5">
           <Link
             href="/evaluations"
-            className="flex items-center justify-between rounded-xl2 bg-white p-4 shadow-card border-l-4 border-amber"
+            className="flex items-center justify-between rounded-xl2 bg-white p-4 shadow-card border-l-4 border-amber card-hover"
           >
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl2 bg-amber/15 text-amber-deep">
@@ -205,7 +207,7 @@ export default function DashboardPage() {
                 <p className="text-[11px] text-muted">Chấm điểm & nhận xét quản lý trực tiếp</p>
               </div>
             </div>
-            <span className="text-steel">→</span>
+            <span className="text-steel transition-transform duration-200 hover:translate-x-1">→</span>
           </Link>
         </section>
 
@@ -213,7 +215,7 @@ export default function DashboardPage() {
         <section className="mt-3">
           <Link
             href="/leave"
-            className="flex items-center justify-between rounded-xl2 bg-white p-4 shadow-card border-l-4 border-steel"
+            className="flex items-center justify-between rounded-xl2 bg-white p-4 shadow-card border-l-4 border-steel card-hover"
           >
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl2 bg-steel/10 text-steel">
@@ -224,7 +226,7 @@ export default function DashboardPage() {
                 <p className="text-[11px] text-muted">Xin nghỉ & theo dõi trạng thái duyệt</p>
               </div>
             </div>
-            <span className="text-steel">→</span>
+            <span className="text-steel transition-transform duration-200 hover:translate-x-1">→</span>
           </Link>
         </section>
 
@@ -234,7 +236,7 @@ export default function DashboardPage() {
             <ClockIcon className="h-5 w-5 text-steel" />
             <h2 className="text-sm font-semibold text-ink">Lịch làm việc của bạn</h2>
           </div>
-          <div className="rounded-xl2 bg-white p-4 shadow-card">
+          <div className="rounded-xl2 bg-white p-4 shadow-card card-hover">
             {user.schedule ? (
               <div className="whitespace-pre-line text-sm text-ink leading-relaxed font-medium">
                 {user.schedule}
@@ -260,7 +262,7 @@ export default function DashboardPage() {
               </p>
             ) : (
               projects.map((proj) => (
-                <div key={proj.id} className="rounded-xl2 bg-white p-4 shadow-card border-l-4 border-amber">
+                <div key={proj.id} className="rounded-xl2 bg-white p-4 shadow-card border-l-4 border-amber card-hover">
                   <div className="flex items-start justify-between">
                     <div>
                       <span className="inline-block rounded-md bg-steel/10 px-2 py-0.5 text-[10px] font-bold text-steel">
@@ -298,16 +300,27 @@ export default function DashboardPage() {
     <AppShell>
       {isDir ? (
         <>
+          {/* Lời chào Giám đốc */}
+          <section className="relative overflow-hidden mb-4 rounded-xl2 bg-gradient-to-br from-amber-600 via-amber-700 to-slate-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
+            <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+            <div className="absolute left-1/3 bottom-0 -mb-10 h-36 w-36 rounded-full bg-yellow-400/25 blur-2xl" />
+            <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">Ban Giám đốc</p>
+            <h1 className="mt-1 text-xl lg:text-2xl font-bold tracking-tight">Xin chào Giám đốc, {user.full_name}! 👑</h1>
+            <p className="relative z-10 mt-2 text-xs text-white/80">
+              Hệ thống quản trị tài chính & điều hành doanh nghiệp thời gian thực.
+            </p>
+          </section>
+
           {/* ---- Hai thẻ KPI chính (chỉ Giám đốc) ---- */}
           <section className="grid grid-cols-2 gap-3 lg:gap-4">
-            <div className="rounded-xl2 bg-ink p-4 lg:p-6 text-white">
+            <div className="rounded-xl2 bg-gradient-to-br from-slate-900 to-ink p-4 lg:p-6 text-white card-hover border border-white/5">
               <p className="text-xs text-white/60">Hợp đồng đang quản lý</p>
-              <p className="mt-2 text-3xl lg:text-4xl font-bold tnum">{kpi?.active_contracts ?? "—"}</p>
+              <p className="mt-2 text-3xl lg:text-4xl font-bold tnum text-amber">{kpi?.active_contracts ?? "—"}</p>
               <p className="mt-1 text-[11px] text-white/50">gói thầu / dự án</p>
             </div>
-            <div className="rounded-xl2 bg-steel p-4 lg:p-6 text-white">
+            <div className="rounded-xl2 bg-gradient-to-br from-steel to-slate-800 p-4 lg:p-6 text-white card-hover border border-white/5">
               <p className="text-xs text-white/70">Tổng giá trị HĐ</p>
-              <p className="mt-2 text-3xl lg:text-4xl font-bold tnum">
+              <p className="mt-2 text-3xl lg:text-4xl font-bold tnum text-amber">
                 {kpi ? formatCompactVND(kpi.total_contract_value) : "—"}
               </p>
               <p className="mt-1 text-[11px] text-white/60">chưa gồm VAT</p>
@@ -315,7 +328,7 @@ export default function DashboardPage() {
           </section>
 
           {/* ---- Dải lợi nhuận ước tính (chỉ Giám đốc) ---- */}
-          <section className="mt-3 lg:mt-4 rounded-xl2 bg-white p-4 lg:p-6 shadow-card">
+          <section className="mt-3 lg:mt-4 rounded-xl2 bg-white p-4 lg:p-6 shadow-card card-hover border-l-4 border-ok">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted">Lợi nhuận ước tính</p>
@@ -332,14 +345,16 @@ export default function DashboardPage() {
         </>
       ) : (
         /* ---- Header vận hành cho Quản lý (không có tiền) ---- */
-        <section className="rounded-xl2 bg-gradient-to-br from-ink to-steel p-5 lg:p-6 text-white shadow-card">
-          <p className="text-xs text-amber font-semibold uppercase tracking-wider">Trang quản lý</p>
-          <h1 className="mt-1 text-xl lg:text-2xl font-bold">Xin chào, {user.full_name}!</h1>
-          <p className="mt-2 text-xs text-white/70">
+        <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-br from-violet-600 via-purple-700 to-slate-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
+          <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+          <div className="absolute left-1/3 bottom-0 -mb-10 h-36 w-36 rounded-full bg-purple-400/25 blur-2xl" />
+          <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">Trang quản lý</p>
+          <h1 className="mt-1 text-xl lg:text-2xl font-bold tracking-tight">Xin chào, {user.full_name}! 👔</h1>
+          <p className="relative z-10 mt-2 text-xs text-white/80">
             Điều hành dự án, nhân sự và chấm công. (Số liệu doanh thu/lãi-lỗ do Ban Giám đốc quản lý.)
           </p>
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:max-w-md">
-            <div className="rounded-xl2 bg-white/10 p-3">
+          <div className="relative z-10 mt-4 grid grid-cols-2 gap-3 lg:max-w-md">
+            <div className="rounded-xl2 bg-white/10 p-3 card-hover">
               <p className="text-[11px] text-white/60">Dự án</p>
               <p className="mt-1 text-2xl font-bold tnum">{projects.length}</p>
             </div>
@@ -355,9 +370,9 @@ export default function DashboardPage() {
             <Link
               key={i}
               href={m.href}
-              className="flex flex-col items-center gap-2 rounded-xl2 bg-white p-3 lg:p-4 text-center shadow-card"
+              className="flex flex-col items-center gap-2 rounded-xl2 bg-white p-3 lg:p-4 text-center shadow-card card-hover"
             >
-              <span className={`flex h-11 w-11 items-center justify-center rounded-xl2 ${m.tint}`}>
+              <span className={`flex h-11 w-11 items-center justify-center rounded-xl2 transition-transform duration-300 hover:scale-110 ${m.tint}`}>
                 <m.icon className="h-6 w-6" />
               </span>
               <span className="text-[11px] font-medium leading-tight text-ink">{m.label}</span>
@@ -379,7 +394,7 @@ export default function DashboardPage() {
             {profit.map((p) => {
               const positive = p.profit >= 0;
               return (
-                <div key={p.project_id} className="rounded-xl2 bg-white p-3 shadow-card">
+                <div key={p.project_id} className="rounded-xl2 bg-white p-3 shadow-card card-hover border-t-2 border-line">
                   <div className="flex items-center justify-between">
                     <p className="min-w-0 truncate text-sm font-medium text-ink">{p.project_name}</p>
                     <span className={`ml-2 flex shrink-0 items-center gap-1 text-sm font-semibold ${positive ? "text-ok" : "text-bad"}`}>

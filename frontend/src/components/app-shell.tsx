@@ -134,11 +134,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.label}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-xl2 px-3 py-2.5 text-sm transition-colors ${
-                  active ? "bg-white/15 font-semibold text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+                className={`flex items-center gap-3 rounded-xl2 px-3 py-2.5 text-sm transition-all duration-200 hover:translate-x-1.5 ${
+                  active
+                    ? "bg-gradient-to-r from-amber/95 to-amber-deep font-semibold text-white shadow-md shadow-amber/20"
+                    : "text-white/70 hover:bg-white/5 hover:text-white"
                 }`}
               >
-                <item.icon className="h-5 w-5 shrink-0" />
+                <item.icon className={`h-5 w-5 shrink-0 transition-transform duration-200 ${active ? "scale-110" : ""}`} />
                 <span className="truncate">{item.label}</span>
               </Link>
             );
@@ -248,9 +250,11 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex flex-col items-center gap-0.5 ${active ? "text-steel" : "text-muted"}`}
+      className={`flex flex-col items-center gap-0.5 transition-all duration-200 active:scale-95 ${
+        active ? "text-amber scale-105 font-medium" : "text-muted hover:text-ink"
+      }`}
     >
-      <Icon className="h-6 w-6" />
+      <Icon className={`h-6 w-6 transition-transform duration-200 ${active ? "stroke-[2.5]" : ""}`} />
       <span className="text-[10px]">{label}</span>
     </Link>
   );
