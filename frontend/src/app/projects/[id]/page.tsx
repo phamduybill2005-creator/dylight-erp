@@ -12,7 +12,6 @@ import {
   CheckBadgeIcon,
   ArrowLeftIcon,
   ClockIcon,
-  DocumentTextIcon,
   XMarkIcon,
   UsersIcon,
   TableCellsIcon,
@@ -59,10 +58,9 @@ export default function ProjectDetailPage() {
   const projectId = Number(params.id);
 
   const [project, setProject] = useState<Project | null>(null);
-  const [contracts, setContracts] = useState<Contract[]>([]);
   const [progressLogs, setProgressLogs] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"contracts" | "items" | "progress" | "team">("contracts");
+  const [activeTab, setActiveTab] = useState<"items" | "progress" | "team">("items");
 
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
@@ -75,7 +73,6 @@ export default function ProjectDetailPage() {
   const showMoney = canSeeMoney(currentUser?.role);
 
   // Modals & Member management states
-  const [contractModal, setContractModal] = useState(false);
   const [progressModal, setProgressModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
@@ -93,17 +90,6 @@ export default function ProjectDetailPage() {
   // Sửa mốc tiến độ (null = đang tạo mới, khác null = đang sửa mốc này).
   const [editingProgressId, setEditingProgressId] = useState<number | null>(null);
 
-  // New item form states
-  const [newContract, setNewContract] = useState({
-    code: "",
-    name: "",
-    partner: "",
-    value_no_vat: 0,
-    vat_percent: 10,
-    sign_date: "",
-    status: "ACTIVE",
-  });
-
   const [newProgress, setNewProgress] = useState({
     title: "",
     percent_complete: 0,
@@ -117,33 +103,15 @@ export default function ProjectDetailPage() {
 
   function loadData(silent = false) {
     if (isNaN(projectId)) return;
-    // Chưa biết vai trò (chưa nạp xong /me) thì chờ — tránh gọi nhầm endpoint tiền
-    // với STAFF (bị 403) rồi lại phải nạp lại.
     if (currentUser == null) return;
-    // Poll (silent) KHÔNG bật spinner để tránh nháy màn hình.
     if (!silent) setLoading(true);
-
-    // Nhân viên: chỉ nạp thông tin dự án + tiến độ (không có tiền).
-    if (!showMoney) {
-      Promise.all([api.getProject(projectId), api.progress(projectId)])
-        .then(([proj, prog]) => {
-          setProject(proj);
-          setProgressLogs(prog);
-          setContracts([]);
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
-      return;
-    }
 
     Promise.all([
       api.getProject(projectId),
-      api.contracts(projectId),
       api.progress(projectId),
     ])
-      .then(([proj, contrs, prog]) => {
+      .then(([proj, prog]) => {
         setProject(proj);
-        setContracts(contrs);
         setProgressLogs(prog);
       })
       .catch(() => {})
@@ -164,15 +132,10 @@ export default function ProjectDetailPage() {
     api.me()
       .then((me) => {
         setCurrentUser(me);
-        // Nhân viên không có tab tiền -> mặc định vào "Hạng mục" (không phải "Hợp đồng").
-        if (!canSeeMoney(me.role)) setActiveTab("items");
-        // Trang khác mở thẳng 1 tab qua ?tab=... (VD: bảng Tiến độ dự án -> tab Tiến độ).
-        // Tab tiền chỉ nhận khi có quyền xem tiền.
         const want = new URLSearchParams(window.location.search).get("tab");
-        const allowed: string[] = ["items", "progress", "team"];
-        if (canSeeMoney(me.role)) allowed.push("contracts");
+        const allowed = ["items", "progress", "team"];
         if (want && allowed.includes(want)) {
-          setActiveTab(want as "contracts" | "items" | "progress" | "team");
+          setActiveTab(want as "items" | "progress" | "team");
         }
       })
       .catch(() => {});
@@ -193,14 +156,14 @@ export default function ProjectDetailPage() {
   // Tạm dừng khi có modal đang mở (tránh ghi đè state khi người dùng đang thao tác).
   useEffect(() => {
     if (currentUser == null || isNaN(projectId)) return;
-    const anyModalOpen = contractModal || progressModal || membersModal;
+    const anyModalOpen = progressModal || membersModal;
     if (anyModalOpen) return;
     const id = setInterval(() => {
       if (document.visibilityState === "visible") loadData(true);
     }, 20_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, currentUser, showMoney, contractModal, progressModal, membersModal]);
+  }, [projectId, currentUser, showMoney, progressModal, membersModal]);
 
   // Sync selectedMemberIds / lead when project changes
   useEffect(() => {
@@ -321,37 +284,7 @@ export default function ProjectDetailPage() {
     setProgressModal(true);
   }
 
-  async function handleAddContract(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!newContract.code || !newContract.name) {
-      setError("Vui lòng điền đầy đủ Mã và Tên hợp đồng.");
-      return;
-    }
-    try {
-      await api.createContract({
-        ...newContract,
-        project_id: projectId,
-        value_no_vat: Number(newContract.value_no_vat),
-        vat_percent: Number(newContract.vat_percent),
-        sign_date: newContract.sign_date || null,
-        status: newContract.status as any,
-      });
-      setContractModal(false);
-      setNewContract({
-        code: "",
-        name: "",
-        partner: "",
-        value_no_vat: 0,
-        vat_percent: 10,
-        sign_date: "",
-        status: "ACTIVE",
-      });
-      loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Thêm hợp đồng thất bại.");
-    }
-  }
+
 
   async function handleAddProgress(e: React.FormEvent) {
     e.preventDefault();
@@ -557,11 +490,8 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Tabs điều hướng — nhân viên chỉ thấy Hạng mục + Tiến độ (không có tab tiền) */}
+      {/* Tabs điều hướng */}
       <div className="mt-6 flex border-b border-line">
-        {showMoney && (
-          <TabButton active={activeTab === "contracts"} onClick={() => setActiveTab("contracts")} label="Hợp đồng" icon={DocumentTextIcon} count={contracts.length} />
-        )}
         <TabButton active={activeTab === "items"} onClick={() => setActiveTab("items")} label="Hạng mục" icon={TableCellsIcon} />
         <TabButton active={activeTab === "progress"} onClick={() => setActiveTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
         <TabButton active={activeTab === "team"} onClick={() => setActiveTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
@@ -569,54 +499,6 @@ export default function ProjectDetailPage() {
 
       {/* Nội dung Tab */}
       <div className="mt-4">
-        {/* Tab Hợp đồng */}
-        {showMoney && activeTab === "contracts" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-muted uppercase">Danh sách hợp đồng ({contracts.length})</h3>
-              <button
-                onClick={() => setContractModal(true)}
-                className="flex items-center gap-1 text-xs font-semibold text-amber hover:text-amber-deep"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Thêm hợp đồng
-              </button>
-            </div>
-
-            {contracts.length === 0 ? (
-              <p className="rounded-xl2 bg-white p-6 text-center text-xs text-muted shadow-card">
-                Chưa có hợp đồng nào được ký kết cho dự án này.
-              </p>
-            ) : (
-              <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">
-              {contracts.map((c) => (
-                <div key={c.id} className="rounded-xl2 bg-white p-3.5 lg:p-4 shadow-card border border-line/40">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="font-mono text-[9px] text-muted">{c.code}</span>
-                      <h4 className="text-sm font-semibold text-ink leading-snug">{c.name}</h4>
-                      {c.partner && <p className="text-xs text-muted">Bên ký: {c.partner}</p>}
-                    </div>
-                    <span className="rounded-full bg-steel/10 px-2 py-0.5 text-[9px] font-bold text-steel">
-                      {c.status === "ACTIVE" ? "Hiệu lực" : c.status}
-                    </span>
-                  </div>
-                  <div className="mt-2.5 pt-2.5 border-t border-line flex justify-between text-xs">
-                    <div>
-                      <p className="text-muted">Giá trị (chưa VAT)</p>
-                      <p className="font-bold text-ink tnum">{formatVND(c.value_no_vat)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted">Ngày ký</p>
-                      <p className="font-medium text-ink">{c.sign_date ? formatDate(c.sign_date) : "—"}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Tab Hạng mục (bảng dự toán Excel) */}
         {/* Bảng dự toán: ẩn Khối lượng + Đơn giá + Thành tiền + tiểu tổng + tổng cho MỌI
@@ -720,130 +602,7 @@ export default function ProjectDetailPage() {
 
       </div>
 
-      {/* Modal Thêm Hợp Đồng */}
-      <AnimatePresence>
-        {contractModal && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25 }}
-              className="w-full max-w-md lg:max-w-lg rounded-t-xl2 bg-white p-5 lg:p-6 shadow-card"
-            >
-              <div className="flex items-center justify-between border-b border-line pb-3">
-                <h2 className="text-sm font-bold text-ink">Thêm hợp đồng mới</h2>
-                <button onClick={() => setContractModal(false)} className="rounded-full p-1 hover:bg-paper">
-                  <XMarkIcon className="h-5 w-5 text-muted" />
-                </button>
-              </div>
 
-              <form onSubmit={handleAddContract} className="mt-4 space-y-3">
-                {error && <p className="text-xs text-bad">{error}</p>}
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Mã hợp đồng *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="HD-01/2026"
-                      value={newContract.code}
-                      onChange={(e) => setNewContract({ ...newContract, code: e.target.value })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Đối tác/Bên ký</label>
-                    <input
-                      type="text"
-                      placeholder="Tên đối tác..."
-                      value={newContract.partner}
-                      onChange={(e) => setNewContract({ ...newContract, partner: e.target.value })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-muted block mb-1">Tên hợp đồng *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: Thi công san lấp..."
-                    value={newContract.name}
-                    onChange={(e) => setNewContract({ ...newContract, name: e.target.value })}
-                    className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Giá trị chưa VAT (VND)</label>
-                    <input
-                      type="number"
-                      placeholder="VD: 5000000000"
-                      value={newContract.value_no_vat || ""}
-                      onChange={(e) => setNewContract({ ...newContract, value_no_vat: Number(e.target.value) })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">% Thuế VAT</label>
-                    <input
-                      type="number"
-                      value={newContract.vat_percent}
-                      onChange={(e) => setNewContract({ ...newContract, vat_percent: Number(e.target.value) })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Ngày ký hợp đồng</label>
-                    <input
-                      type="date"
-                      value={newContract.sign_date}
-                      onChange={(e) => setNewContract({ ...newContract, sign_date: e.target.value })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted block mb-1">Trạng thái hợp đồng</label>
-                    <select
-                      value={newContract.status}
-                      onChange={(e) => setNewContract({ ...newContract, status: e.target.value })}
-                      className="w-full rounded-xl2 border border-line bg-paper px-3 py-2 text-xs focus:bg-white focus:outline-none"
-                    >
-                      <option value="DRAFT">Nháp</option>
-                      <option value="ACTIVE">Hiệu lực</option>
-                      <option value="COMPLETED">Hoàn thành</option>
-                      <option value="LIQUIDATED">Đã thanh lý</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex gap-2">
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-xl2 bg-amber py-2.5 text-xs font-semibold text-ink text-center"
-                  >
-                    Thêm hợp đồng
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setContractModal(false)}
-                    className="rounded-xl2 bg-paper px-4 py-2.5 text-xs text-muted font-medium"
-                  >
-                    Hủy
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Modal Cập Nhật Tiến Độ */}
       <AnimatePresence>
