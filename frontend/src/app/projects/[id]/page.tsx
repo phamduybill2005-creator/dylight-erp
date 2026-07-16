@@ -431,7 +431,7 @@ export default function ProjectDetailPage() {
       <div className="rounded-xl2 bg-white p-4 lg:p-6 shadow-card border border-line/50">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <span className="font-mono text-[10px] text-muted">{project.code}</span>
+            <span className="font-mono text-[11px] font-bold text-bad">{project.code}</span>
             <h1 className="text-base lg:text-xl font-bold text-ink leading-tight">{project.name}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
