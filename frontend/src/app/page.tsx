@@ -21,6 +21,7 @@ import {
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import CompanyOrgChart from "@/components/company-org-chart";
 import { api } from "@/lib/api";
 import { roleTier, roleTitle, type Tier } from "@/lib/roles";
 import { formatCompactVND, formatVND } from "@/lib/format";
@@ -219,6 +220,11 @@ export default function DashboardPage() {
             )}
           </div>
         </section>
+
+        {/* Sơ đồ tổ chức công ty */}
+        <section className="mt-5">
+          <CompanyOrgChart />
+        </section>
       </AppShell>
     );
   }
@@ -310,6 +316,11 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+      </section>
+
+      {/* Sơ đồ tổ chức công ty */}
+      <section className="mt-6">
+        <CompanyOrgChart />
       </section>
 
     </AppShell>

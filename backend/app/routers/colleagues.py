@@ -58,7 +58,8 @@ def list_colleagues(db: Session = Depends(get_db), current: User = Depends(get_c
         mgr = umap.get(u.manager_id) if u.manager_id else None
         out.append(ColleagueOut(
             id=u.id, full_name=u.full_name, role=u.role, department=u.department,
-            manager_id=u.manager_id, manager_name=mgr.full_name if mgr else None,
+            email=u.email, phone=u.phone,
+            manager_id=u.manager_id, manager_ids=u.manager_ids, manager_name=mgr.full_name if mgr else None,
             my_nickname=my_nn.get(u.id), in_my_team=(u.manager_id == current.id),
             has_subordinates=(u.id in manager_ids),
         ))

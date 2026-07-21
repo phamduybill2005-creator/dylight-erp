@@ -50,6 +50,7 @@ class UserOut(BaseModel):
     schedule: str | None = None
     department: str | None = None
     manager_id: int | None = None
+    manager_ids: str | None = None
     manager_name: str | None = None
     yunatt_code: str | None = None   # mã trên máy chấm công Yunatt (để map đồng bộ)
     work_start: str | None = None    # giờ làm cơ sở "HH:MM" (đánh giá đi muộn)
@@ -70,6 +71,7 @@ class UserUpdate(BaseModel):
     schedule: str | None = None
     department: str | None = None
     manager_id: int | None = None
+    manager_ids: str | None = None
     yunatt_code: str | None = None   # mã nhân viên trên máy chấm công Yunatt
     work_start: str | None = None    # giờ làm cơ sở "HH:MM" (đánh giá đi muộn)
     work_end: str | None = None      # giờ ra cơ sở "HH:MM"
@@ -90,6 +92,7 @@ class UserCreate(BaseModel):
     schedule: str | None = None
     department: str | None = None
     manager_id: int | None = None
+    manager_ids: str | None = None
 
 
 # --------------------------- COMPANY ----------------------------
@@ -753,9 +756,12 @@ class AssignmentOut(BaseModel):
 class ColleagueOut(BaseModel):
     id: int
     full_name: str
+    email: str | None = None
+    phone: str | None = None
     role: UserRole
     department: str | None = None
     manager_id: int | None = None
+    manager_ids: str | None = None
     manager_name: str | None = None
     my_nickname: str | None = None    # biệt danh DO MÌNH đặt cho người này (chỉ mình thấy)
     in_my_team: bool = False          # người này đang thuộc team của mình (mình là quản lý)

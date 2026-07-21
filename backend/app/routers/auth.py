@@ -214,6 +214,14 @@ def create_user(
             raise HTTPException(400, "Người quản lý không hợp lệ.")
 
     data = payload.model_dump(exclude={"password", "email"})
+    m_ids = data.get("manager_ids")
+    if m_ids:
+        parts = [p.strip() for p in m_ids.split(",") if p.strip().isdigit()]
+        if parts:
+            data["manager_id"] = int(parts[0])
+    elif data.get("manager_id"):
+        data["manager_ids"] = str(data["manager_id"])
+
     # Bỏ trống mật khẩu = tài khoản chỉ đăng nhập bằng Google -> sinh mật khẩu ngẫu nhiên.
     raw_pw = payload.password or secrets.token_urlsafe(32)
     user = User(
@@ -263,7 +271,24 @@ def update_user(
             raise HTTPException(400, "Email này đã được sử dụng.")
         user.email = email
 
-    for k, v in payload.model_dump(exclude_unset=True, exclude={"email"}).items():
+    update_data = payload.model_dump(exclude_unset=True, exclude={"email"})
+    if "manager_ids" in update_data:
+        m_ids = update_data["manager_ids"]
+        if m_ids:
+            parts = [p.strip() for p in m_ids.split(",") if p.strip().isdigit()]
+            if parts:
+                update_data["manager_id"] = int(parts[0])
+            else:
+                update_data["manager_id"] = None
+        else:
+            update_data["manager_id"] = None
+    elif "manager_id" in update_data:
+        if update_data["manager_id"] is not None:
+            update_data["manager_ids"] = str(update_data["manager_id"])
+        else:
+            update_data["manager_ids"] = None
+
+    for k, v in update_data.items():
         setattr(user, k, v)
 
     db.commit()

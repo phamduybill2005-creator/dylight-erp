@@ -20,6 +20,7 @@ import {
   TrashIcon,
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
+import { CheckBadgeIcon as CheckBadgeSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import ProjectTimesheet from "@/components/project-timesheet";
@@ -418,7 +419,7 @@ export default function ProjectDetailPage() {
           )}
           {project.lead_name && (
             <p className="flex items-center gap-1.5">
-              <StarIcon className="h-4 w-4 text-amber" />
+              <CheckBadgeSolid className="h-4 w-4 text-indigo-600" />
               Chủ trì: <span className="font-medium text-ink">{project.lead_name}</span>
             </p>
           )}
@@ -830,9 +831,9 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              <p className="mt-3 text-[11px] text-muted">
-                Tick chọn thành viên. Bấm <StarIcon className="inline h-3 w-3 text-amber" /> để đặt
-                <b className="text-ink"> người chủ trì</b> (chỉ 1 người). Bấm lại ngôi sao đang bật để gỡ chủ trì.
+              <p className="mt-3 text-[11px] text-muted flex items-center flex-wrap gap-1">
+                Tick chọn thành viên. Bấm <CheckBadgeSolid className="inline h-3.5 w-3.5 text-indigo-600" /> để đặt
+                <b className="text-ink"> người chủ trì</b> (chỉ 1 người). Bấm lại để gỡ chủ trì.
               </p>
 
               {/* Danh sách checklist thành viên + chọn chủ trì */}
@@ -864,9 +865,13 @@ export default function ProjectDetailPage() {
                           type="button"
                           onClick={() => setSelectedLeadId((prev) => (prev === u.id ? null : u.id))}
                           title={isLead ? "Gỡ chủ trì" : "Đặt làm chủ trì"}
-                          className={`ml-2 shrink-0 rounded-full p-1.5 transition-colors ${isLead ? "text-amber" : "text-muted hover:bg-paper hover:text-amber"}`}
+                          className={`ml-2 shrink-0 rounded-full p-1.5 transition-colors ${isLead ? "text-indigo-600" : "text-muted hover:bg-paper hover:text-indigo-600"}`}
                         >
-                          <StarIcon className={`h-4 w-4 ${isLead ? "fill-amber" : ""}`} />
+                          {isLead ? (
+                            <CheckBadgeSolid className="h-5 w-5 text-indigo-600" />
+                          ) : (
+                            <CheckBadgeIcon className="h-5 w-5 text-slate-300 hover:text-indigo-500" />
+                          )}
                         </button>
                       </div>
                     );

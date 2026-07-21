@@ -70,6 +70,7 @@ export default function EmployeesPage() {
     schedule: "",
     department: "",
     manager_id: "",
+    manager_ids: "",
     role: "" as Role | "",
     is_active: true,
     work_start: "",
@@ -89,6 +90,7 @@ export default function EmployeesPage() {
     phone: "",
     department: "",
     manager_id: "",
+    manager_ids: "",
   };
   const [showCreate, setShowCreate] = useState(false);
   const [createData, setCreateData] = useState(emptyCreate);
@@ -164,6 +166,7 @@ export default function EmployeesPage() {
         cv_details: selectedUser.cv_details || "",
         schedule: selectedUser.schedule || "",
         manager_id: selectedUser.manager_id ? String(selectedUser.manager_id) : "",
+        manager_ids: selectedUser.manager_ids || "",
         role: selectedUser.role || "",
         is_active: selectedUser.is_active,
         department: selectedUser.department || "",
@@ -396,6 +399,7 @@ export default function EmployeesPage() {
         cv_details: formData.cv_details || null,
         schedule: formData.schedule || null,
         manager_id: formData.manager_id ? Number(formData.manager_id) : null,
+        manager_ids: formData.manager_ids || null,
         role: formData.role ? (formData.role as Role) : undefined,
         is_active: formData.is_active,
         department: formData.department || null,
@@ -430,6 +434,7 @@ export default function EmployeesPage() {
         phone: createData.phone || null,
         department: createData.department || null,
         manager_id: createData.manager_id ? Number(createData.manager_id) : null,
+        manager_ids: createData.manager_ids || null,
       });
       setUsers((prev) => [...prev, created]);
       setShowCreate(false);
@@ -870,19 +875,38 @@ export default function EmployeesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Người quản lý trực tiếp</label>
-                  <select
-                    value={formData.manager_id}
-                    onChange={(e) => setFormData({ ...formData, manager_id: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                  >
-                    <option value="">-- Chưa chỉ định người quản lý --</option>
-                    {potentialManagers.map((mgr) => (
-                      <option key={mgr.id} value={mgr.id}>
-                        {mgr.full_name} ({ROLE_LABEL[mgr.role]})
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-[11px] font-semibold text-muted mb-1.5">Người quản lý (có thể chọn nhiều)</label>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-line bg-paper p-2 space-y-1.5">
+                    {potentialManagers.length === 0 ? (
+                      <p className="text-[11px] text-muted text-center py-2">Chưa có người quản lý nào.</p>
+                    ) : (
+                      potentialManagers.map((mgr) => {
+                        const mIds = (formData.manager_ids || "").split(",").map(x => x.trim()).filter(Boolean);
+                        const isChecked = mIds.includes(String(mgr.id));
+                        return (
+                          <label key={mgr.id} className="flex items-center gap-2 text-xs text-ink cursor-pointer hover:bg-slate-100/50 p-1 rounded transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                let newIds = [...mIds];
+                                if (e.target.checked) {
+                                  if (!newIds.includes(String(mgr.id))) {
+                                    newIds.push(String(mgr.id));
+                                  }
+                                } else {
+                                  newIds = newIds.filter(id => id !== String(mgr.id));
+                                }
+                                setFormData({ ...formData, manager_ids: newIds.join(",") });
+                              }}
+                              className="h-3.5 w-3.5 rounded border-line text-steel focus:ring-steel cursor-pointer"
+                            />
+                            <span>{mgr.full_name} ({ROLE_LABEL[mgr.role]})</span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1273,21 +1297,42 @@ export default function EmployeesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Người quản lý trực tiếp</label>
-                  <select
-                    value={createData.manager_id}
-                    onChange={(e) => setCreateData({ ...createData, manager_id: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                  >
-                    <option value="">-- Chưa chỉ định người quản lý --</option>
+                  <label className="block text-[11px] font-semibold text-muted mb-1.5">Người quản lý (có thể chọn nhiều)</label>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-line bg-paper p-2 space-y-1.5">
                     {users
                       .filter((u) => u.role === "ADMIN" || u.role === "DIRECTOR" || u.role === "MANAGER")
-                      .map((mgr) => (
-                        <option key={mgr.id} value={mgr.id}>
-                          {mgr.full_name} ({ROLE_LABEL[mgr.role]})
-                        </option>
-                      ))}
-                  </select>
+                      .length === 0 ? (
+                      <p className="text-[11px] text-muted text-center py-2">Chưa có người quản lý nào.</p>
+                    ) : (
+                      users
+                        .filter((u) => u.role === "ADMIN" || u.role === "DIRECTOR" || u.role === "MANAGER")
+                        .map((mgr) => {
+                          const mIds = (createData.manager_ids || "").split(",").map(x => x.trim()).filter(Boolean);
+                          const isChecked = mIds.includes(String(mgr.id));
+                          return (
+                            <label key={mgr.id} className="flex items-center gap-2 text-xs text-ink cursor-pointer hover:bg-slate-100/50 p-1 rounded transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  let newIds = [...mIds];
+                                  if (e.target.checked) {
+                                    if (!newIds.includes(String(mgr.id))) {
+                                      newIds.push(String(mgr.id));
+                                    }
+                                  } else {
+                                    newIds = newIds.filter(id => id !== String(mgr.id));
+                                  }
+                                  setCreateData({ ...createData, manager_ids: newIds.join(",") });
+                                }}
+                                className="h-3.5 w-3.5 rounded border-line text-steel focus:ring-steel cursor-pointer"
+                              />
+                              <span>{mgr.full_name} ({ROLE_LABEL[mgr.role]})</span>
+                            </label>
+                          );
+                        })
+                    )}
+                  </div>
                 </div>
               </div>
             </form>

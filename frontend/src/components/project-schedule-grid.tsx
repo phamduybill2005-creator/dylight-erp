@@ -6,7 +6,8 @@
 // Dữ liệu lấy từ hệ thống Giao việc (Assignment) — mốc ngày do backend tự đóng dấu.
 
 import { useEffect, useMemo, useState } from "react";
-import { StarIcon, TableCellsIcon, FunnelIcon } from "@heroicons/react/24/outline";
+import { TableCellsIcon, FunnelIcon } from "@heroicons/react/24/outline";
+import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { Assignment, User } from "@/lib/types";
@@ -401,7 +402,7 @@ function FragmentRows({
       <tr>
         <td className={`${stickyLeft} bg-paper px-2 py-1`}>
           <span className="flex items-center gap-1 font-semibold text-ink">
-            {isLead && <StarIcon className="h-3 w-3 shrink-0 text-amber" />}
+            {isLead && <CheckBadgeIcon className="h-3.5 w-3.5 shrink-0 text-indigo-600" />}
             <span className="truncate">{name}</span>
           </span>
         </td>

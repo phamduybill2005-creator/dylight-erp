@@ -21,6 +21,14 @@ const RATING_LABELS: Record<number, string> = {
   5: "Rất xuất sắc",
 };
 
+const RATING_CLASSES: Record<number, string> = {
+  1: "bg-red-50 text-red-700 border border-red-200/60",
+  2: "bg-orange-50 text-orange-700 border border-orange-200/60",
+  3: "bg-sky-50 text-sky-700 border border-sky-200/60",
+  4: "bg-emerald-50 text-emerald-700 border border-emerald-200/60",
+  5: "bg-purple-50 text-purple-700 border border-purple-200/60",
+};
+
 const num = (v: unknown) => {
   const n = Number(v);
   return isNaN(n) ? 0 : n;
@@ -127,8 +135,11 @@ function EditableCell({
       onFocus={() => { if (disabled) return; setEditing(true); if (type === "number" && Number(v) === 0) setV(""); }}
       onChange={(e) => !disabled && setV(e.target.value)}
       onBlur={commit}
-      disabled={disabled}
-      className={`w-full bg-transparent px-2 py-1.5 text-xs text-ink outline-none ${disabled ? "cursor-not-allowed opacity-100" : "focus:bg-amber/5 focus:ring-1 focus:ring-amber"} rounded ${className}`}
+      className={`w-full bg-transparent px-2 py-1 text-xs text-ink outline-none transition-all rounded-md ${
+        disabled
+          ? "cursor-not-allowed opacity-100 text-muted/60"
+          : "hover:bg-white hover:shadow-sm focus:bg-white focus:shadow-sm focus:ring-1 focus:ring-indigo-200 border border-transparent hover:border-slate-200 focus:border-indigo-400"
+      } ${className}`}
     />
   );
 }
@@ -552,7 +563,7 @@ export default function ProjectItemsTab({
           <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
             <table className={`w-full border-collapse text-xs ${canSeeMoney ? "min-w-[1080px]" : "min-w-[700px]"}`}>
               <thead>
-                <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
+                <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-[10px] uppercase tracking-wide text-white">
                   <th className="w-10 px-2 py-2 text-left font-semibold">STT</th>
                   <th className="px-2 py-2 text-left font-semibold">Tên hạng mục</th>
                   {canSeeMoney && <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>}
@@ -642,8 +653,12 @@ function GroupRows({
   return (
     <>
       {/* Dòng nhóm cha */}
-      <tr className="border-t border-line bg-steel/5">
-        <td className="px-2 py-1.5 text-[11px] font-bold text-ink">{groupIndex + 1}</td>
+      <tr className="border-y-2 border-indigo-100 bg-gradient-to-r from-indigo-50/90 to-sky-50/70 hover:from-indigo-100/70 hover:to-sky-100/50 transition-all">
+        <td className="px-2 py-1.5 text-[11px] font-bold text-ink">
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 font-bold text-white shadow-sm">
+            {groupIndex + 1}
+          </span>
+        </td>
         <td className="px-1 py-1">
           <div className="flex flex-wrap items-center justify-between gap-2 pr-2">
             <div className="min-w-[150px] flex-1">
@@ -660,8 +675,11 @@ function GroupRows({
               <select
                 value={group.assignee_id || ""}
                 onChange={(e) => onPersist(group.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
-                disabled={!canManage}
-                className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] font-semibold text-ink outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100"
+                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 transition-all ${
+                  group.assignee_id
+                    ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+                    : "border-line bg-white text-muted"
+                }`}
               >
                 <option value="">— Chưa chọn —</option>
                 {members.map((m) => (
@@ -678,9 +696,9 @@ function GroupRows({
               value={group.department || ""}
               onChange={(e) => onPersist(group.id, { department: e.target.value || null })}
               disabled={!canManage}
-              className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel disabled:cursor-not-allowed disabled:bg-transparent ${
+              className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel disabled:cursor-not-allowed disabled:bg-transparent transition-all ${
                 group.department
-                  ? "border-steel/40 bg-steel/5 text-steel"
+                  ? "border-amber-200 bg-amber-50 text-amber-deep"
                   : "border-line bg-white text-muted"
               }`}
               aria-label="Phòng ban phụ trách"
@@ -701,7 +719,7 @@ function GroupRows({
             <span className="text-[10px] font-semibold text-muted">Đánh giá:</span>
             <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} disabled={!canManage} />
             {num(group.rating) > 0 && (
-              <span className="text-[10px] font-bold text-amber-deep bg-amber/10 px-1 py-0.5 rounded">
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${RATING_CLASSES[num(group.rating)] || "bg-amber/10 text-amber-deep"}`}>
                 {RATING_LABELS[num(group.rating)]}
               </span>
             )}
@@ -710,8 +728,8 @@ function GroupRows({
         {canSeeMoney && (
           <>
             <td />
-            <td className="px-2 py-1.5 text-right text-[10px] text-muted">Tiểu tổng</td>
-            <td className="whitespace-nowrap px-2 py-1.5 text-right text-xs font-bold text-ink tnum">{formatVND(subtotal)}</td>
+            <td className="px-2 py-1.5 text-right text-[10px] text-muted font-semibold">Tiểu tổng</td>
+            <td className="whitespace-nowrap px-2 py-1.5 text-right text-xs font-bold text-indigo-700 tnum bg-indigo-50/30">{formatVND(subtotal)}</td>
           </>
         )}
         {/* Ghi chú + Hạn nộp của nhóm */}
@@ -739,14 +757,14 @@ function GroupRows({
             const doneN = kids.filter((k) => k.done_date).length;
             const anyLate = kids.some((k) => itemStatus(k).late);
             const allDone = total > 0 && doneN === total;
-            const bar = anyLate ? "bg-bad" : allDone ? "bg-ok" : "bg-steel";
-            const txt = anyLate ? "text-bad" : allDone ? "text-ok" : "text-steel";
+            const bar = anyLate ? "bg-bad animate-pulse" : allDone ? "bg-ok" : "bg-gradient-to-r from-indigo-500 to-sky-500";
+            const txt = anyLate ? "text-bad font-bold" : allDone ? "text-ok font-bold" : "text-indigo-700 font-bold";
             return (
               <div className="flex items-center gap-1.5">
-                <div className="h-1.5 min-w-[32px] flex-1 overflow-hidden rounded-full bg-line">
-                  <div className={`h-full ${bar}`} style={{ width: `${total ? (doneN / total) * 100 : 0}%` }} />
+                <div className="h-2 min-w-[32px] flex-1 overflow-hidden rounded-full bg-slate-200">
+                  <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${total ? (doneN / total) * 100 : 0}%` }} />
                 </div>
-                <span className={`shrink-0 text-right text-[10px] font-bold tnum ${txt}`}>{doneN}/{total}</span>
+                <span className={`shrink-0 text-right text-[10px] tnum ${txt}`}>{doneN}/{total}</span>
               </div>
             );
           })()}
@@ -767,8 +785,8 @@ function GroupRows({
 
       {/* Các đầu việc con */}
       {kids.map((c, ci) => (
-        <tr key={c.id} className="border-t border-line/60">
-          <td className="px-2 py-1 text-[10px] text-muted">
+        <tr key={c.id} className={`border-t border-line/50 ${ci % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-sky-50/40 transition-colors`}>
+          <td className="px-2 py-1 text-[10px] font-medium text-slate-500 text-center bg-slate-50/50">
             {groupIndex + 1}.{ci + 1}
           </td>
           <td className="px-1 py-0.5 pl-3">
@@ -786,7 +804,11 @@ function GroupRows({
                     value={c.assignee_id || ""}
                     onChange={(e) => onPersist(c.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
                     disabled={!canManage}
-                    className="rounded border border-line bg-white px-1 py-0.5 text-[9px] text-ink outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100"
+                    className={`rounded border px-1 py-0.5 text-[9px] outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 transition-all ${
+                      c.assignee_id
+                        ? "border-sky-200 bg-sky-50 text-sky-800 font-medium"
+                        : "border-line bg-white text-muted"
+                    }`}
                   >
                     <option value="">— Chưa phân công —</option>
                     {members.map((m) => (
@@ -800,7 +822,7 @@ function GroupRows({
                   <span className="text-[9px] font-semibold text-muted">Đánh giá:</span>
                   <ItemRating value={num(c.rating)} onChange={(n) => onPersist(c.id, { rating: n })} disabled={!canManage} />
                   {num(c.rating) > 0 && (
-                    <span className="text-[9px] font-bold text-amber-deep bg-amber/10 px-1 py-0.2 rounded">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${RATING_CLASSES[num(c.rating)] || "bg-amber/10 text-amber-deep"}`}>
                       {RATING_LABELS[num(c.rating)]}
                     </span>
                   )}
@@ -809,29 +831,29 @@ function GroupRows({
             </div>
           </td>
           {canSeeMoney && (
-            <td className="px-1 py-0.5">
+            <td className="px-1 py-0.5 bg-slate-50/20">
               <EditableCell
                 type="number"
                 value={c.quantity}
                 onCommit={(v) => onPersist(c.id, { quantity: Number(v) })}
-                className="text-right"
+                className="text-right font-medium text-slate-800"
                 disabled={!canManage}
               />
             </td>
           )}
           {canSeeMoney && (
-            <td className="px-1 py-0.5">
+            <td className="px-1 py-0.5 bg-slate-50/20">
               <EditableCell
                 type="number"
                 value={c.unit_price}
                 onCommit={(v) => onPersist(c.id, { unit_price: Number(v) })}
-                className="text-right"
+                className="text-right font-medium text-slate-800"
                 disabled={!canManage}
               />
             </td>
           )}
           {canSeeMoney && (
-            <td className="whitespace-nowrap px-2 py-1 text-right text-xs font-semibold text-ink tnum">{formatVND(lineAmount(c))}</td>
+            <td className="whitespace-nowrap px-2 py-1 text-right text-xs font-bold text-indigo-700 bg-indigo-50/20 tnum">{formatVND(lineAmount(c))}</td>
           )}
           {/* Ghi chú + Hạn nộp của đầu việc */}
           <td className="px-1 py-0.5">
@@ -848,7 +870,7 @@ function GroupRows({
               value={dateOnly(c.due_date)}
               onChange={(e) => onPersist(c.id, { due_date: e.target.value || null })}
               disabled={!canManage}
-              className="w-full rounded border border-line bg-white px-1.5 py-1 text-[11px] text-ink outline-none focus:border-steel disabled:cursor-not-allowed disabled:bg-transparent"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 transition-all"
             />
           </td>
           {/* Đúng hạn: liên kết với tích Trạng thái — xanh nếu nộp đúng hạn, đỏ nếu trễ hạn */}
@@ -858,17 +880,17 @@ function GroupRows({
               if (!st.done) {
                 return (
                   <div className="flex items-center gap-1.5">
-                    <div className="h-1.5 min-w-[28px] flex-1 overflow-hidden rounded-full bg-line" />
-                    <span className="shrink-0 text-[10px] text-muted">Chưa xong</span>
+                    <div className="h-1.5 min-w-[28px] flex-1 overflow-hidden rounded-full bg-slate-100 border border-slate-200/50" />
+                    <span className="shrink-0 text-[10px] font-semibold text-muted bg-slate-50 border border-slate-100 px-1 py-0.2 rounded">Chưa xong</span>
                   </div>
                 );
               }
               return (
                 <div className="flex items-center gap-1.5">
-                  <div className="h-1.5 min-w-[28px] flex-1 overflow-hidden rounded-full bg-line">
-                    <div className={`h-full ${st.late ? "bg-bad" : "bg-ok"}`} style={{ width: "100%" }} />
+                  <div className="h-1.5 min-w-[28px] flex-1 overflow-hidden rounded-full bg-slate-100 border border-slate-200/50">
+                    <div className={`h-full rounded-full transition-all ${st.late ? "bg-bad animate-pulse" : "bg-ok"}`} style={{ width: "100%" }} />
                   </div>
-                  <span className={`shrink-0 text-[10px] font-semibold ${st.late ? "text-bad" : "text-ok"}`}>
+                  <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.2 rounded ${st.late ? "bg-red-50 text-red-700 border border-red-100" : "bg-emerald-50 text-emerald-700 border border-emerald-100"}`}>
                     {st.late ? `Trễ ${st.days} ngày` : "Đúng hạn"}
                   </span>
                 </div>

@@ -48,6 +48,7 @@ def _ensure_schema() -> None:
             "token_version": "ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0",
             "work_start": "ALTER TABLE users ADD COLUMN work_start VARCHAR(5)",
             "work_end": "ALTER TABLE users ADD COLUMN work_end VARCHAR(5)",
+            "manager_ids": "ALTER TABLE users ADD COLUMN manager_ids VARCHAR(255)",
         }
         missing = [sql for col, sql in adds.items() if col not in cols]
         if missing:

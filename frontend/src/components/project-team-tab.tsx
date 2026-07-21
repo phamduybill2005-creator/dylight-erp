@@ -5,7 +5,8 @@
 // Thời gian "bao lâu" do backend tự đóng dấu khi đổi trạng thái (bắt đầu / hoàn thành).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { UserGroupIcon, StarIcon, ClockIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { UserGroupIcon, ClockIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { assignmentDays } from "@/lib/format";
 import { roleTitle } from "@/lib/roles";
@@ -146,7 +147,7 @@ export default function ProjectTeamTab({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      {isLead && <StarIcon className="h-3.5 w-3.5 shrink-0 text-amber" />}
+                      {isLead && <CheckBadgeIcon className="h-4 w-4 shrink-0 text-indigo-600" />}
                       <span className="truncate text-sm font-semibold text-ink">{p.name}</span>
                       {isLead && <span className="text-[9px] font-bold text-amber-deep">(Chủ trì)</span>}
                     </div>

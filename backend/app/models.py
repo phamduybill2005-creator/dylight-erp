@@ -161,6 +161,7 @@ class User(Base):
     schedule: Mapped[str | None] = mapped_column(Text)
     department: Mapped[str | None] = mapped_column(String(120))   # bộ phận / phòng ban
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    manager_ids: Mapped[str | None] = mapped_column(String(255), nullable=True)   # danh sách ID quản lý, vd "2,3,4"
     # Mã nhân viên trên máy chấm công Yunatt (staffNumber, vd "01"). Dùng để ghép
     # dữ liệu quẹt từ Yunatt về đúng người trong ERP khi đồng bộ tự động.
     yunatt_code: Mapped[str | None] = mapped_column(String(50), nullable=True)

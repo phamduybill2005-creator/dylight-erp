@@ -18,6 +18,7 @@ export interface User {
   schedule?: string | null;
   department?: string | null;
   manager_id?: number | null;
+  manager_ids?: string | null;
   manager_name?: string | null;
   yunatt_code?: string | null;   // mã nhân viên trên máy chấm công Yunatt
   work_start?: string | null;    // giờ làm cơ sở "HH:MM" (đánh giá đi muộn)
@@ -478,9 +479,12 @@ export interface Assignment {
 export interface Colleague {
   id: number;
   full_name: string;
+  email?: string | null;
+  phone?: string | null;
   role: Role;
   department?: string | null;
   manager_id?: number | null;
+  manager_ids?: string | null;
   manager_name?: string | null;
   my_nickname?: string | null;
   in_my_team: boolean;
