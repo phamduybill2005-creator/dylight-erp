@@ -96,16 +96,9 @@ def _to_out(db: Session, project: Project) -> ProjectOut:
 
 @router.get("", response_model=list[ProjectOut])
 def list_projects(db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    # XEM: mọi người trong công ty đều thấy TẤT CẢ dự án (chỉ xem; sửa/tích/khai giờ
+    # vẫn theo quyền cũ — chỉ thành viên/chủ trì/giám đốc mới thao tác).
     q = db.query(Project).filter(Project.company_id == current.company_id)
-    if not _is_director(current):
-        # Chỉ dự án mình là thành viên HOẶC là người chủ trì.
-        member_pids = (
-            db.query(project_members.c.project_id)
-            .filter(project_members.c.user_id == current.id)
-        )
-        q = q.filter(
-            (Project.id.in_(member_pids)) | (Project.lead_id == current.id)
-        )
     projects = q.order_by(Project.created_at.desc()).all()
     return [_to_out(db, p) for p in projects]
 
@@ -146,7 +139,8 @@ def create_project(
 @router.get("/{project_id}", response_model=ProjectOut)
 def get_project(project_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     p = db.get(Project, project_id)
-    if not p or p.company_id != current.company_id or not _can_view(db, p, current):
+    # XEM: mọi người cùng công ty đều mở & xem được dự án (sửa vẫn theo quyền cũ).
+    if not p or p.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy dự án.")
     return _to_out(db, p)
 
@@ -158,7 +152,7 @@ def progress_history(project_id: int, db: Session = Depends(get_db), current: Us
     Mở biểu đồ sẽ CHỐT điểm hôm nay (lazy upsert) rồi trả toàn bộ chuỗi ngày.
     """
     p = db.get(Project, project_id)
-    if not p or p.company_id != current.company_id or not _can_view(db, p, current):
+    if not p or p.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy dự án.")
 
     # Chốt điểm hôm nay theo % hiện tại (không để lỗi phụ làm hỏng việc đọc).

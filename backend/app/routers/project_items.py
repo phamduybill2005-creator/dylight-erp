@@ -86,7 +86,7 @@ def list_items(
     current: User = Depends(get_current_user),
 ):
     """Liệt kê toàn bộ hạng mục của một dự án (dạng phẳng, đã sắp thứ tự)."""
-    _assert_member(db, current, project_id)   # chỉ thành viên dự án mới xem được BOQ
+    _assert_project(db, current, project_id)   # XEM: mọi người cùng công ty đều xem được BOQ
     rows = (
         db.query(ProjectItem)
         .filter(
@@ -195,8 +195,8 @@ def list_project_item_ratings(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    """Liệt kê toàn bộ đánh giá của nhân sự trên từng đầu việc trong dự án."""
-    _assert_member(db, current, project_id)
+    """Liệt kê toàn bộ đánh giá/tích của nhân sự trên từng đầu việc trong dự án."""
+    _assert_project(db, current, project_id)   # XEM: mọi người cùng công ty đều xem được
     return (
         db.query(ProjectItemRating)
         .join(ProjectItem)
@@ -220,8 +220,9 @@ def upsert_project_item_rating(
         raise HTTPException(404, "Không tìm thấy đầu việc.")
     
     project = db.get(Project, item.project_id)
-    if not project:
-        raise HTTPException(404, "Không tìm thấy dự án.")
+    # Phải là NGƯỜI TRONG DỰ ÁN mới thao tác (người ngoài chỉ được XEM, không tích).
+    if not project or not _can_view(db, project, current):
+        raise HTTPException(404, "Không tìm thấy đầu việc trong dự án của bạn.")
     # "Đã xong" của TỪNG NGƯỜI: CHÍNH người đó tự tích (hoặc quản lý/chủ trì thao tác hộ).
     if not (_can_manage(db, project, current) or current.id == payload.user_id):
         raise HTTPException(403, "Chỉ người đó (hoặc quản lý) mới đánh dấu được.")
