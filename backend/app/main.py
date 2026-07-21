@@ -82,6 +82,7 @@ def _ensure_schema() -> None:
                 "department": "ALTER TABLE project_items ADD COLUMN department VARCHAR(120)",
                 "rating": "ALTER TABLE project_items ADD COLUMN rating INTEGER DEFAULT 0",
                 "assignee_id": "ALTER TABLE project_items ADD COLUMN assignee_id INTEGER",
+                "due_date": "ALTER TABLE project_items ADD COLUMN due_date DATE",
             }
             pi_missing = [sql for col, sql in pi_adds.items() if col not in picols]
             if pi_missing:
@@ -220,9 +221,13 @@ def _ensure_schema() -> None:
     try:
         insp2 = inspect(engine)
         tn2 = insp2.get_table_names()
-        if "project_items" in tn2 and "assignee_id" not in {c["name"] for c in insp2.get_columns("project_items")}:
+        if "project_items" in tn2:
+            picols2 = {c["name"] for c in insp2.get_columns("project_items")}
             with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE project_items ADD COLUMN assignee_id INTEGER"))
+                if "assignee_id" not in picols2:
+                    conn.execute(text("ALTER TABLE project_items ADD COLUMN assignee_id INTEGER"))
+                if "due_date" not in picols2:
+                    conn.execute(text("ALTER TABLE project_items ADD COLUMN due_date DATE"))
         if "timesheets" in tn2:
             if "project_item_id" not in {c["name"] for c in insp2.get_columns("timesheets")}:
                 with engine.begin() as conn:

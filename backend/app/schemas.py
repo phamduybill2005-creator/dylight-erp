@@ -352,6 +352,7 @@ class ProjectItemBase(BaseModel):
     assignee_id: int | None = None   # người được giao đầu việc (giao việc cho ai)
     rating: int = 0                  # đánh giá hạng mục: 0 = chưa chấm, 1..5 sao
     note: str | None = None
+    due_date: date | None = None     # hạn nộp từng hạng mục/đầu việc
 
 
 class ProjectItemCreate(ProjectItemBase):
@@ -372,6 +373,7 @@ class ProjectItemUpdate(BaseModel):
     assignee_id: int | None = None
     rating: int | None = None
     note: str | None = None
+    due_date: date | None = None
 
 
 class ProjectItemOut(ProjectItemBase):

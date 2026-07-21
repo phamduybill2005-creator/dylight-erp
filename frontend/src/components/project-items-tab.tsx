@@ -25,6 +25,8 @@ const num = (v: unknown) => {
   const n = Number(v);
   return isNaN(n) ? 0 : n;
 };
+// Chuẩn hoá ngày về "YYYY-MM-DD" cho ô <input type="date">.
+const dateOnly = (d?: string | null) => (d ? d.slice(0, 10) : "");
 
 /** Chấm sao 1–5 đánh giá hạng mục (0 = chưa chấm). Bấm lại sao đang chọn để bỏ về 0. */
 function ItemRating({ value, onChange, disabled = false }: { value: number; onChange: (n: number) => void; disabled?: boolean }) {
@@ -329,13 +331,13 @@ export default function ProjectItemsTab({
 
   // ----- Xuất Excel (CSV, BOM UTF-8) -----
   function exportCSV() {
-    const headers = ["STT", "Mã", "Tên hạng mục", "ĐVT", "Khối lượng", "Đơn giá", "Thành tiền", "% HT", "Ghi chú"];
+    const headers = ["STT", "Mã", "Tên hạng mục", "ĐVT", "Khối lượng", "Đơn giá", "Thành tiền", "% HT", "Hạn nộp", "Ghi chú"];
     const esc = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
     const rows: string[] = [];
     groups.forEach((g, gi) => {
       rows.push(
         [gi + 1, esc(g.code), esc(g.name), "", "", "", groupSubtotal(g.id).toFixed(0),
-         Math.round(rollupProgress(childrenOf(g.id))), esc(g.note)].join(",")
+         Math.round(rollupProgress(childrenOf(g.id))), esc(dateOnly(g.due_date)), esc(g.note)].join(",")
       );
       childrenOf(g.id).forEach((c, ci) => {
         rows.push(
@@ -348,12 +350,13 @@ export default function ProjectItemsTab({
             num(c.unit_price).toFixed(0),
             lineAmount(c).toFixed(0),
             Math.round(clampPct(c.progress)),
+            esc(dateOnly(c.due_date)),
             esc(c.note),
           ].join(",")
         );
       });
     });
-    rows.push(["", "", esc("TỔNG CỘNG"), "", "", "", grandTotal.toFixed(0), Math.round(grandProgress), ""].join(","));
+    rows.push(["", "", esc("TỔNG CỘNG"), "", "", "", grandTotal.toFixed(0), Math.round(grandProgress), "", ""].join(","));
 
     const csv = "﻿" + [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -515,7 +518,7 @@ export default function ProjectItemsTab({
         <>
           {/* Bảng cuộn ngang trên mobile */}
           <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
-            <table className={`w-full border-collapse text-xs ${canSeeMoney ? "min-w-[820px]" : "min-w-[440px]"}`}>
+            <table className={`w-full border-collapse text-xs ${canSeeMoney ? "min-w-[1080px]" : "min-w-[700px]"}`}>
               <thead>
                 <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
                   <th className="w-10 px-2 py-2 text-left font-semibold">STT</th>
@@ -523,6 +526,8 @@ export default function ProjectItemsTab({
                   {canSeeMoney && <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>}
                   {canSeeMoney && <th className="w-28 px-2 py-2 text-right font-semibold">Đơn giá</th>}
                   {canSeeMoney && <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>}
+                  <th className="w-40 px-2 py-2 text-left font-semibold">Ghi chú</th>
+                  <th className="w-28 px-2 py-2 text-left font-semibold">Hạn nộp</th>
                   <th className="w-32 px-2 py-2 text-left font-semibold">% Hoàn thành</th>
                   <th className="w-8 px-1 py-2" />
                 </tr>
@@ -600,8 +605,8 @@ function GroupRows({
   canManage?: boolean;
 }) {
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
-  // +1 cho cột "% Hoàn thành" (hiện với mọi vai trò).
-  const contentCols = canSeeMoney ? 6 : 3;
+  // +2 cho "Ghi chú" + "Hạn nộp", +1 cho "% Hoàn thành" (hiện với mọi vai trò).
+  const contentCols = canSeeMoney ? 8 : 5;
   return (
     <>
       {/* Dòng nhóm cha */}
@@ -677,6 +682,24 @@ function GroupRows({
             <td className="whitespace-nowrap px-2 py-1.5 text-right text-xs font-bold text-ink tnum">{formatVND(subtotal)}</td>
           </>
         )}
+        {/* Ghi chú + Hạn nộp của nhóm */}
+        <td className="px-1 py-1">
+          <EditableCell
+            value={group.note}
+            onCommit={(v) => onPersist(group.id, { note: String(v) })}
+            placeholder="Ghi chú…"
+            disabled={!canManage}
+          />
+        </td>
+        <td className="px-1 py-1">
+          <input
+            type="date"
+            value={dateOnly(group.due_date)}
+            onChange={(e) => onPersist(group.id, { due_date: e.target.value || null })}
+            disabled={!canManage}
+            className="w-full rounded border border-line bg-white px-1.5 py-1 text-[11px] text-ink outline-none focus:border-steel disabled:cursor-not-allowed disabled:bg-transparent"
+          />
+        </td>
         {/* Tiến độ nhóm (tự tính từ các đầu việc con) */}
         <td className="px-2 py-1.5">
           <div className="flex items-center gap-1.5">
@@ -768,6 +791,24 @@ function GroupRows({
           {canSeeMoney && (
             <td className="whitespace-nowrap px-2 py-1 text-right text-xs font-semibold text-ink tnum">{formatVND(lineAmount(c))}</td>
           )}
+          {/* Ghi chú + Hạn nộp của đầu việc */}
+          <td className="px-1 py-0.5">
+            <EditableCell
+              value={c.note}
+              onCommit={(v) => onPersist(c.id, { note: String(v) })}
+              placeholder="Ghi chú…"
+              disabled={!canManage}
+            />
+          </td>
+          <td className="px-1 py-0.5">
+            <input
+              type="date"
+              value={dateOnly(c.due_date)}
+              onChange={(e) => onPersist(c.id, { due_date: e.target.value || null })}
+              disabled={!canManage}
+              className="w-full rounded border border-line bg-white px-1.5 py-1 text-[11px] text-ink outline-none focus:border-steel disabled:cursor-not-allowed disabled:bg-transparent"
+            />
+          </td>
           {/* % Hoàn thành đầu việc — gõ trực tiếp (0..100). Ai cũng sửa được (không phải tiền). */}
           <td className="px-1 py-0.5">
             <div className="flex items-center gap-1.5">

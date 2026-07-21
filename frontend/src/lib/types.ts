@@ -421,6 +421,7 @@ export interface ProjectItem {
   assignee_name?: string | null; // tên người được giao (hiển thị)
   rating?: number;         // đánh giá hạng mục: 0 = chưa chấm, 1..5 sao
   note?: string | null;
+  due_date?: string | null;    // hạn nộp (YYYY-MM-DD) từng hạng mục/đầu việc
   created_at: string;
 }
 

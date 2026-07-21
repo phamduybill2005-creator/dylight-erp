@@ -394,6 +394,8 @@ class ProjectItem(Base):
     # từng người. Gán ở cấp đầu việc con. Cột mới -> ALTER ở _ensure_schema.
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     note: Mapped[str | None] = mapped_column(Text)
+    # HẠN NỘP (deadline) của hạng mục/đầu việc. Cột mới -> ALTER ở _ensure_schema.
+    due_date: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assignee: Mapped["User | None"] = relationship("User", foreign_keys=[assignee_id])
