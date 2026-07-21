@@ -51,14 +51,14 @@ def run_seed():
             {"email": "dung@dosco.vn", "name": "Dũng", "role": UserRole.MANAGER, "dept": "Địa hình"},
             
             # Level 2
-            {"email": "cuong@dosco.vn", "name": "Cường", "role": UserRole.MANAGER, "dept": "Địa hình"},
+            {"email": "cuong@dosco.vn", "name": "Cường", "role": UserRole.MANAGER, "dept": "Địa hình", "work_start": "08:30", "work_end": "18:30"},
             {"email": "phu@dosco.vn", "name": "Phú", "role": UserRole.MANAGER, "dept": "Địa hình"},
             
             # Level 3
             {"email": "son@dosco.vn", "name": "Sơn", "role": UserRole.MANAGER, "dept": "Địa hình"},
             
             # Level 4
-            {"email": "lam@dosco.vn", "name": "Lâm", "role": UserRole.MANAGER, "dept": "Thiết kế"},
+            {"email": "lam@dosco.vn", "name": "Lâm", "role": UserRole.MANAGER, "dept": "Thiết kế", "work_start": "08:30", "work_end": "18:30"},
             {"email": "binh@dosco.vn", "name": "Bính", "role": UserRole.MANAGER, "dept": "Thiết kế"},
             
             # Level 5
@@ -90,7 +90,9 @@ def run_seed():
                     role=udef["role"],
                     department=udef["dept"],
                     is_approved=True,
-                    is_active=True
+                    is_active=True,
+                    work_start=udef.get("work_start"),
+                    work_end=udef.get("work_end")
                 )
                 db.add(u)
                 db.flush()
@@ -98,6 +100,10 @@ def run_seed():
                 print(f"Created user ID {u.id}")
             else:
                 u = db.query(User).filter(User.email == email).first()
+                if "work_start" in udef:
+                    u.work_start = udef["work_start"]
+                if "work_end" in udef:
+                    u.work_end = udef["work_end"]
                 users_map[udef["name"]] = u
                 print(f"Found existing user ID {u.id}")
                 
