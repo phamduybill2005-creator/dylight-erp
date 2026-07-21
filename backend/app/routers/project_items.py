@@ -220,8 +220,11 @@ def upsert_project_item_rating(
         raise HTTPException(404, "Không tìm thấy đầu việc.")
     
     project = db.get(Project, item.project_id)
-    if not project or not _can_manage(db, project, current):
-        raise HTTPException(403, "Chỉ quản lý/chủ trì mới được đánh giá nhân sự.")
+    if not project:
+        raise HTTPException(404, "Không tìm thấy dự án.")
+    # "Đã xong" của TỪNG NGƯỜI: CHÍNH người đó tự tích (hoặc quản lý/chủ trì thao tác hộ).
+    if not (_can_manage(db, project, current) or current.id == payload.user_id):
+        raise HTTPException(403, "Chỉ người đó (hoặc quản lý) mới đánh dấu được.")
 
     rating_rec = (
         db.query(ProjectItemRating)

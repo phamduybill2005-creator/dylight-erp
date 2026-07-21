@@ -303,25 +303,21 @@ export default function ProjectTimesheet({
                                 </div>
                               </td>
                               <td className="border border-line px-1 py-1.5 text-center">
-                                <span className="inline-flex items-center gap-0.5">
-                                  {[1, 2, 3, 4, 5].map((n) => {
-                                    const rating = workerRatings.find(r => r.project_item_id === it.id && r.user_id === w.id)?.rating ?? 0;
-                                    const on = n <= rating;
-                                    return canManage ? (
-                                      <button
-                                        key={n}
-                                        type="button"
-                                        title={`${n} sao`}
-                                        onClick={() => rateWorker(it.id, w.id, n === rating ? 0 : n)}
-                                        className={on ? "text-amber" : "text-line hover:text-amber"}
-                                      >
-                                        <StarIcon className="h-3.5 w-3.5" />
-                                      </button>
-                                    ) : (
-                                      <StarIcon key={n} className={`h-3.5 w-3.5 ${on ? "text-amber" : "text-line"}`} />
-                                    );
-                                  })}
-                                </span>
+                                {(() => {
+                                  const wDone = (workerRatings.find(r => r.project_item_id === it.id && r.user_id === w.id)?.rating ?? 0) > 0;
+                                  const canTick = w.id === currentUserId;   // mỗi người tự tích phần của mình
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={!canTick}
+                                      onClick={() => rateWorker(it.id, w.id, wDone ? 0 : 1)}
+                                      title={wDone ? "Đã xong — bấm để bỏ" : canTick ? "Đánh dấu phần của bạn đã xong" : "Chưa xong"}
+                                      className={`inline-flex items-center justify-center transition-colors ${wDone ? "text-ok" : "text-line"} ${canTick ? "cursor-pointer hover:text-ok" : "cursor-default"}`}
+                                    >
+                                      {wDone ? <CheckCircleIcon className="h-5 w-5" /> : <span className="h-4 w-4 rounded-full border-2 border-current" />}
+                                    </button>
+                                  );
+                                })()}
                               </td>
                               {days.map((d) => {
                                 const v = hoursMap.get(hkey(w.id, it.id, d)) ?? 0;
@@ -381,8 +377,8 @@ export default function ProjectTimesheet({
         </table>
       </div>
       <p className="mt-1.5 text-[11px] text-muted">
-        <b className="text-ink">Đã xong</b> = người phụ trách chính đánh dấu hoàn thành (liên kết cột &quot;Đúng hạn&quot; ở tab Hạng mục).
-        {" "}<b className="text-ink">Đánh giá</b> (sao) = chất lượng từng người (quản lý chấm).
+        <b className="text-ink">Đã xong</b> (dòng đầu việc) = người phụ trách chính đánh dấu hoàn thành → liên kết cột &quot;Đúng hạn&quot; ở tab Hạng mục.
+        {" "}Mỗi người tự tích <b className="text-ok">✓</b> phần việc của mình ở dòng bên dưới.
         Bấm tên đầu việc để mở rộng danh sách người làm.
       </p>
     </div>
