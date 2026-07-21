@@ -47,6 +47,7 @@ export default function ProjectTimesheet({
 }) {
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayLocal()));
   const [entries, setEntries] = useState<Timesheet[]>([]);
+  const [allEntries, setAllEntries] = useState<Timesheet[]>([]);
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [workerRatings, setWorkerRatings] = useState<ProjectItemRating[]>([]);
   const [hourEdits, setHourEdits] = useState<Record<string, string>>({});
@@ -54,7 +55,6 @@ export default function ProjectTimesheet({
   const [tempWorkers, setTempWorkers] = useState<Record<number, number[]>>({}); // item id -> user ids thêm tạm thời
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const weekEnd = days[6];
   const today = todayLocal();
   const projStart = startDate ? startDate.slice(0, 10) : null;
   const projEnd = endDate ? endDate.slice(0, 10) : null;
@@ -70,12 +70,20 @@ export default function ProjectTimesheet({
   }, [projectId]);
   useEffect(() => { loadItems(); }, [loadItems]);
 
+  const [weekEnd, setWeekEnd] = [days[6], null]; // just unused helper
   const loadEntries = useCallback(() => {
-    api.timesheets({ from: weekStart, to: weekEnd, projectId })
+    api.timesheets({ from: weekStart, to: days[6], projectId })
       .then(setEntries)
       .catch(() => setEntries([]));
-  }, [weekStart, weekEnd, projectId]);
+  }, [weekStart, days, projectId]);
   useEffect(() => { loadEntries(); }, [loadEntries]);
+
+  const loadAllEntries = useCallback(() => {
+    api.timesheets({ projectId })
+      .then(setAllEntries)
+      .catch(() => setAllEntries([]));
+  }, [projectId]);
+  useEffect(() => { loadAllEntries(); }, [loadAllEntries]);
 
   const loadWorkerRatings = useCallback(() => {
     api.projectItemRatings(projectId).then(setWorkerRatings).catch(() => setWorkerRatings([]));
@@ -104,6 +112,29 @@ export default function ProjectTimesheet({
     for (const i of items) if (i.parent_id == null) map.set(i.id, i.name);
     return map;
   }, [items]);
+
+  // Sum of hours for a specific project_item_id and user_id from the start of project
+  const workerAllTotal = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of allEntries) {
+      if (e.project_item_id) {
+        const key = `${e.user_id}-${e.project_item_id}`;
+        map.set(key, (map.get(key) ?? 0) + Number(e.hours));
+      }
+    }
+    return map;
+  }, [allEntries]);
+
+  // Sum of hours for a specific project_item_id from the start of project
+  const taskAllTotal = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const e of allEntries) {
+      if (e.project_item_id) {
+        map.set(e.project_item_id, (map.get(e.project_item_id) ?? 0) + Number(e.hours));
+      }
+    }
+    return map;
+  }, [allEntries]);
   
   const leaves = useMemo(() =>
     items.filter((i) => i.parent_id != null)
@@ -163,6 +194,7 @@ export default function ProjectTimesheet({
         user_id: uid !== currentUserId ? uid : undefined,
       });
       loadEntries();
+      loadAllEntries();
     } catch { /* noop */ }
   }
 
@@ -285,7 +317,14 @@ export default function ProjectTimesheet({
                         const v = tDayHours(d);
                         return <td key={d} className={`border border-line px-1 py-1.5 text-center tnum font-semibold text-steel ${d === today ? "bg-amber/10" : ""}`}>{v > 0 ? num1(v) : ""}</td>;
                       })}
-                      <td className="border border-line px-2 py-1.5 text-center tnum text-amber-deep font-bold">{tTotalHours > 0 ? num1(tTotalHours) : "–"}</td>
+                      {(() => {
+                        const tAllHours = taskAllTotal.get(it.id) ?? 0;
+                        return (
+                          <td className="border border-line px-2 py-1.5 text-center tnum text-amber-deep font-bold">
+                            {tAllHours > 0 ? num1(tAllHours) : "–"}
+                          </td>
+                        );
+                      })()}
                     </tr>
                     {open && (
                       <>
@@ -332,7 +371,14 @@ export default function ProjectTimesheet({
                                   </td>
                                 );
                               })}
-                              <td className={`border border-line px-2 py-1.5 text-center font-bold tnum ${wTotal > 0 ? "text-steel" : "text-muted"}`}>{wTotal > 0 ? num1(wTotal) : "–"}</td>
+                              {(() => {
+                                const wAllHours = workerAllTotal.get(`${w.id}-${it.id}`) ?? 0;
+                                return (
+                                  <td className={`border border-line px-2 py-1.5 text-center font-bold tnum ${wAllHours > 0 ? "text-steel" : "text-muted"}`}>
+                                    {wAllHours > 0 ? num1(wAllHours) : "–"}
+                                  </td>
+                                );
+                              })()}
                             </tr>
                           );
                         })}
