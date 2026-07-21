@@ -12,7 +12,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, vn_now
 from app.deps import get_current_user, is_staff_tier
 from app.models import Project, ProjectItem, Timesheet, User
 from app.routers.projects import _can_view
@@ -54,6 +54,9 @@ def upsert_timesheet(
 ):
     """Khai/sửa giờ 1 ô (người, dự án, ngày). hours = 0 -> xóa ô.
     Quản lý+ có thể khai hộ người khác (payload.user_id)."""
+    # Không cho khai giờ cho NGÀY TƯƠNG LAI (chỉ hôm nay & các ngày đã qua).
+    if payload.work_date > vn_now().date():
+        raise HTTPException(400, "Không thể khai giờ cho ngày trong tương lai.")
     target_uid = current.id
     if payload.user_id is not None and payload.user_id != current.id:
         if is_staff_tier(current):
