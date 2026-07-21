@@ -100,9 +100,11 @@ def run_seed():
                 print(f"Created user ID {u.id}")
             else:
                 u = db.query(User).filter(User.email == email).first()
-                # Đồng bộ CHỨC VỤ (role) + phòng ban đúng theo sơ đồ cho cả user đã tồn tại.
-                u.role = udef["role"]
-                u.department = udef["dept"]
+                # Đồng bộ CHỨC VỤ (role) + phòng ban theo sơ đồ — NHƯNG KHÔNG BAO GIỜ hạ
+                # vai trò Admin/Giám đốc (tránh KHÓA NHẦM tài khoản quản trị nếu trùng email).
+                if u.role not in (UserRole.ADMIN, UserRole.DIRECTOR):
+                    u.role = udef["role"]
+                    u.department = udef["dept"]
                 if "work_start" in udef:
                     u.work_start = udef["work_start"]
                 if "work_end" in udef:
