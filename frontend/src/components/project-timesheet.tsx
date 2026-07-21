@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClockIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, UserCircleIcon, StarIcon,
 } from "@heroicons/react/24/outline";
+import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal, formatDate } from "@/lib/format";
 import type { ProjectItem, ProjectItemRating, Timesheet, User } from "@/lib/types";
@@ -165,9 +166,15 @@ export default function ProjectTimesheet({
     } catch { /* noop */ }
   }
 
-  async function rate(it: ProjectItem, stars: number) {
-    if (stars === (it.rating ?? 0)) return;
-    try { await api.updateProjectItem(it.id, { rating: stars }); loadItems(); } catch { /* noop */ }
+  // Đánh dấu HOÀN THÀNH đầu việc — CHỈ người phụ trách chính (assignee) mới tích được.
+  // Set done_date (so hạn nộp -> Đúng/Trễ hạn ở tab Hạng mục) + progress 100/0.
+  async function toggleDone(it: ProjectItem) {
+    try {
+      await api.updateProjectItem(it.id, it.done_date
+        ? { done_date: null, progress: 0 }
+        : { done_date: dateLocal(new Date()), progress: 100 });
+      loadItems();
+    } catch { /* noop */ }
   }
 
   async function assign(it: ProjectItem, pid: number | null) {
@@ -223,7 +230,7 @@ export default function ProjectTimesheet({
           <thead>
             <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
               <th className="sticky left-0 z-10 border border-line bg-paper px-2 py-1.5 text-left font-semibold">Đầu việc / Người làm</th>
-              <th className="border border-line px-1 py-1 text-center font-semibold">Đánh giá</th>
+              <th className="border border-line px-1 py-1 text-center font-semibold"><div>Trạng thái</div><div className="text-[9px] font-normal">/ Đánh giá</div></th>
               {days.map((d, i) => (
                 <th key={d} className={`border border-line px-1 py-1 text-center font-semibold ${d === today ? "bg-amber text-white" : ""}`}>
                   <div>{DOW[i]}</div>
@@ -257,14 +264,22 @@ export default function ProjectTimesheet({
                         </span>
                       </td>
                       <td className="border border-line px-1 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                        <span className="inline-flex items-center gap-0.5">
-                          {[1, 2, 3, 4, 5].map((n) => {
-                            const on = n <= (it.rating ?? 0);
-                            return canManage ? (
-                              <button key={n} type="button" title={`${n} sao`} onClick={() => rate(it, n === (it.rating ?? 0) ? 0 : n)} className={on ? "text-amber" : "text-line hover:text-amber"}><StarIcon className="h-3.5 w-3.5" /></button>
-                            ) : (<StarIcon key={n} className={`h-3.5 w-3.5 ${on ? "text-amber" : "text-line"}`} />);
-                          })}
-                        </span>
+                        {(() => {
+                          const done = !!it.done_date;
+                          const canTick = it.assignee_id != null && it.assignee_id === currentUserId;
+                          return (
+                            <button
+                              type="button"
+                              disabled={!canTick}
+                              onClick={() => toggleDone(it)}
+                              title={done ? "Đã xong — bấm để bỏ" : canTick ? "Đánh dấu đã xong" : "Chỉ người phụ trách chính mới tích được"}
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${done ? "bg-ok/15 text-ok" : "bg-line/50 text-muted"} ${canTick ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
+                            >
+                              {done ? <CheckCircleIcon className="h-4 w-4" /> : <span className="h-3 w-3 rounded-full border-2 border-current" />}
+                              {done ? "Đã xong" : "Chưa xong"}
+                            </button>
+                          );
+                        })()}
                       </td>
                       {days.map((d) => {
                         const v = tDayHours(d);
@@ -366,8 +381,9 @@ export default function ProjectTimesheet({
         </table>
       </div>
       <p className="mt-1.5 text-[11px] text-muted">
-        <b className="text-ink">Đánh giá</b> = chất lượng (chỉ quản lý chấm).
-        Bấm tên đầu việc để mở rộng xem danh sách những người tham gia làm và điền giờ tương ứng của họ.
+        <b className="text-ink">Đã xong</b> = người phụ trách chính đánh dấu hoàn thành (liên kết cột &quot;Đúng hạn&quot; ở tab Hạng mục).
+        {" "}<b className="text-ink">Đánh giá</b> (sao) = chất lượng từng người (quản lý chấm).
+        Bấm tên đầu việc để mở rộng danh sách người làm.
       </p>
     </div>
   );

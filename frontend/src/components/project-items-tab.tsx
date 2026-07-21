@@ -7,11 +7,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon } from "@heroicons/react/24/outline";
-import { CheckCircleIcon } from "@heroicons/react/24/solid";
+import { StarIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { formatVND, dateLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import type { ProjectItem, Department, User } from "@/lib/types";
+
+const RATING_LABELS: Record<number, string> = {
+  1: "Cần xem xét lại",
+  2: "Cần cải thiện",
+  3: "Đạt",
+  4: "Xuất sắc",
+  5: "Rất xuất sắc",
+};
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -33,21 +41,23 @@ function itemStatus(it: ProjectItem): { done: boolean; late: boolean; days: numb
   return { done, late: done && days > 0, days };
 }
 
-/** Nút đánh dấu HOÀN THÀNH — người làm bấm khi xong (tích xanh). Bấm lại để bỏ. */
-function StatusTick({ done, canEdit, onToggle }: { done: boolean; canEdit: boolean; onToggle: () => void }) {
+/** Chấm sao 1–5 đánh giá hạng mục (0 = chưa chấm). Bấm lại sao đang chọn để bỏ về 0. */
+function ItemRating({ value, onChange, disabled = false }: { value: number; onChange: (n: number) => void; disabled?: boolean }) {
   return (
-    <button
-      type="button"
-      disabled={!canEdit}
-      onClick={onToggle}
-      title={done ? "Đã xong — bấm để bỏ đánh dấu" : canEdit ? "Đánh dấu đã xong" : "Chưa xong"}
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
-        done ? "bg-ok/15 text-ok" : "bg-line/50 text-muted"
-      } ${canEdit ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
-    >
-      {done ? <CheckCircleIcon className="h-4 w-4" /> : <span className="h-3 w-3 rounded-full border-2 border-current" />}
-      {done ? "Đã xong" : "Chưa xong"}
-    </button>
+    <span className="inline-flex items-center gap-0.5" aria-label="Đánh giá hạng mục">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(n === value ? 0 : n)}
+          title={`${n} sao`}
+          className={`${disabled ? "cursor-not-allowed opacity-75" : ""} ${n <= value ? "text-amber" : "text-line hover:text-amber"}`}
+        >
+          <StarIcon className="h-3.5 w-3.5" />
+        </button>
+      ))}
+    </span>
   );
 }
 const lineAmount = (i: ProjectItem) => num(i.quantity) * num(i.unit_price);
@@ -626,11 +636,6 @@ function GroupRows({
   canManage?: boolean;
   currentUserId?: number | null;
 }) {
-  // Đánh dấu / bỏ HOÀN THÀNH: set done_date = hôm nay + progress 100 (hoặc xoá về chưa xong).
-  const toggleDone = (it: ProjectItem) => {
-    if (it.done_date) onPersist(it.id, { done_date: null, progress: 0 });
-    else onPersist(it.id, { done_date: dateLocal(new Date()), progress: 100 });
-  };
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
   // +2 cho "Ghi chú" + "Hạn nộp", +1 cho cột "Đúng hạn" (hiện với mọi vai trò).
   const contentCols = canSeeMoney ? 8 : 5;
@@ -690,6 +695,16 @@ function GroupRows({
                 <option value={group.department}>{group.department}</option>
               )}
             </select>
+          </div>
+          {/* Đánh giá hạng mục (sao) — chủ trì/quản lý chấm chất lượng hạng mục này. */}
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-2">
+            <span className="text-[10px] font-semibold text-muted">Đánh giá:</span>
+            <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} disabled={!canManage} />
+            {num(group.rating) > 0 && (
+              <span className="text-[10px] font-bold text-amber-deep bg-amber/10 px-1 py-0.5 rounded">
+                {RATING_LABELS[num(group.rating)]}
+              </span>
+            )}
           </div>
         </td>
         {canSeeMoney && (
@@ -782,13 +797,13 @@ function GroupRows({
                   </select>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-semibold text-muted">Trạng thái:</span>
-                  {/* CHỈ người được giao đầu việc mới tích được "đã xong" (quản lý cũng không tích thay). */}
-                  <StatusTick
-                    done={!!c.done_date}
-                    canEdit={c.assignee_id != null && c.assignee_id === currentUserId}
-                    onToggle={() => toggleDone(c)}
-                  />
+                  <span className="text-[9px] font-semibold text-muted">Đánh giá:</span>
+                  <ItemRating value={num(c.rating)} onChange={(n) => onPersist(c.id, { rating: n })} disabled={!canManage} />
+                  {num(c.rating) > 0 && (
+                    <span className="text-[9px] font-bold text-amber-deep bg-amber/10 px-1 py-0.2 rounded">
+                      {RATING_LABELS[num(c.rating)]}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
