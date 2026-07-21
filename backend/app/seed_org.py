@@ -44,11 +44,11 @@ def run_seed():
         # Level 6: HOÀN, DUY, LINH37, QUÂN, DƯƠNG, ????? (UNKNOWN), KHẢI
         
         users_def = [
-            # Top-level (Level 1)
-            {"email": "giang@dosco.vn", "name": "Giang", "role": UserRole.MANAGER, "dept": "Địa hình"},
-            {"email": "nhung@dosco.vn", "name": "Nhung", "role": UserRole.MANAGER, "dept": "Địa hình"},
-            {"email": "dat@dosco.vn", "name": "Đạt", "role": UserRole.MANAGER, "dept": "Địa hình"},
-            {"email": "dung@dosco.vn", "name": "Dũng", "role": UserRole.MANAGER, "dept": "Địa hình"},
+            # NHÂN VIÊN nhánh Địa hình (dưới cùng của nhánh, dưới Cường/Phú)
+            {"email": "giang@dosco.vn", "name": "Giang", "role": UserRole.FIELD_STAFF, "dept": "Địa hình"},
+            {"email": "nhung@dosco.vn", "name": "Nhung", "role": UserRole.FIELD_STAFF, "dept": "Địa hình"},
+            {"email": "dat@dosco.vn", "name": "Đạt", "role": UserRole.FIELD_STAFF, "dept": "Địa hình"},
+            {"email": "dung@dosco.vn", "name": "Dũng", "role": UserRole.FIELD_STAFF, "dept": "Địa hình"},
             
             # Level 2
             {"email": "cuong@dosco.vn", "name": "Cường", "role": UserRole.MANAGER, "dept": "Địa hình", "work_start": "08:30", "work_end": "18:30"},
@@ -100,6 +100,9 @@ def run_seed():
                 print(f"Created user ID {u.id}")
             else:
                 u = db.query(User).filter(User.email == email).first()
+                # Đồng bộ CHỨC VỤ (role) + phòng ban đúng theo sơ đồ cho cả user đã tồn tại.
+                u.role = udef["role"]
+                u.department = udef["dept"]
                 if "work_start" in udef:
                     u.work_start = udef["work_start"]
                 if "work_end" in udef:
@@ -124,49 +127,35 @@ def run_seed():
                     return users_map[n].id
             return None
 
-        # Level 1 (Giang, Nhung, Đạt, Dũng) have no managers in diagram, report to Director if needed. Let's keep them as None or top.
-        
-        # Level 2: Cường, Phú report to Level 1 (Giang, Nhung, Đạt, Dũng)
-        for name in ["Cường", "Phú"]:
-            u = users_map.get(name)
-            if u:
-                u.manager_ids = get_ids_str(["Giang", "Nhung", "Đạt", "Dũng"])
-                u.manager_id = get_first_id(["Giang", "Nhung", "Đạt", "Dũng"])
-                
-        # Level 3: Sơn reports to Level 2 (Cường, Phú)
-        u_son = users_map.get("Sơn")
-        if u_son:
-            u_son.manager_ids = get_ids_str(["Cường", "Phú"])
-            u_son.manager_id = get_first_id(["Cường", "Phú"])
-            
-        # Level 4: Lâm, Bính report to Level 3 (Sơn)
-        for name in ["Lâm", "Bính"]:
-            u = users_map.get(name)
-            if u:
-                u.manager_ids = get_ids_str(["Sơn"])
-                u.manager_id = get_first_id(["Sơn"])
-                
-        # Level 5: Quang, Cao, Đức, Hùng report to Level 4 (Lâm, Bính)
-        for name in ["Quang", "Cao", "Đức", "Hùng"]:
-            u = users_map.get(name)
-            if u:
-                u.manager_ids = get_ids_str(["Lâm", "Bính"])
-                u.manager_id = get_first_id(["Lâm", "Bính"])
-                
-        # Level 6 under Quang: Hoàn, Duy
-        for name in ["Hoàn", "Duy"]:
-            u = users_map.get(name)
-            if u:
-                u.manager_ids = get_ids_str(["Quang"])
-                u.manager_id = get_first_id(["Quang"])
-                
-        # Level 6 under Cao, Đức, Hùng: Linh37, Quân, Dương, ?????, Khải
-        for name in ["Linh37", "Quân", "Dương", "?????", "Khải"]:
-            u = users_map.get(name)
-            if u:
-                u.manager_ids = get_ids_str(["Cao", "Đức", "Hùng"])
-                u.manager_id = get_first_id(["Cao", "Đức", "Hùng"])
-                
+        # ===== HỆ THỐNG CẤP BẬC (tỏa từ giữa ra):
+        #   Nhánh ĐỊA HÌNH:  SƠN (đầu) -> Cường, Phú -> Giang, Nhung, Đạt, Dũng (nhân viên)
+        #   Nhánh THIẾT KẾ:  LÂM, BÍNH (đầu) -> Quang, Cao, Đức, Hùng -> nhân viên
+        # SƠN, LÂM, BÍNH là CAO NHẤT (không có quản lý). =====
+
+        def set_mgr(names, mgr_names):
+            for nm in names:
+                u = users_map.get(nm)
+                if u:
+                    u.manager_ids = get_ids_str(mgr_names)
+                    u.manager_id = get_first_id(mgr_names)
+
+        def clear_mgr(names):
+            for nm in names:
+                u = users_map.get(nm)
+                if u:
+                    u.manager_ids = None
+                    u.manager_id = None
+
+        # Đầu 2 nhánh: không có quản lý.
+        clear_mgr(["Sơn", "Lâm", "Bính"])
+        # Nhánh Địa hình.
+        set_mgr(["Cường", "Phú"], ["Sơn"])
+        set_mgr(["Giang", "Nhung", "Đạt", "Dũng"], ["Cường", "Phú"])
+        # Nhánh Thiết kế.
+        set_mgr(["Quang", "Cao", "Đức", "Hùng"], ["Lâm", "Bính"])
+        set_mgr(["Hoàn", "Duy"], ["Quang"])
+        set_mgr(["Linh37", "Quân", "Dương", "?????", "Khải"], ["Cao", "Đức", "Hùng"])
+
         db.commit()
         print("Successfully set up org chart manager relationships!")
         
