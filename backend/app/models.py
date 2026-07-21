@@ -396,6 +396,9 @@ class ProjectItem(Base):
     note: Mapped[str | None] = mapped_column(Text)
     # HẠN NỘP (deadline) của hạng mục/đầu việc. Cột mới -> ALTER ở _ensure_schema.
     due_date: Mapped[date | None] = mapped_column(Date)
+    # NGÀY HOÀN THÀNH — người làm đánh dấu xong. NULL = chưa xong. So với due_date để biết
+    # nộp đúng hạn (xanh) hay trễ hạn (đỏ). Cột mới -> ALTER ở _ensure_schema.
+    done_date: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assignee: Mapped["User | None"] = relationship("User", foreign_keys=[assignee_id])

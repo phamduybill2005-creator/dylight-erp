@@ -7,19 +7,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon } from "@heroicons/react/24/outline";
-import { StarIcon } from "@heroicons/react/24/solid";
+import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { formatVND, dateLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import type { ProjectItem, Department, User } from "@/lib/types";
-
-const RATING_LABELS: Record<number, string> = {
-  1: "Cần xem xét lại",
-  2: "Cần cải thiện",
-  3: "Đạt",
-  4: "Xuất sắc",
-  5: "Rất xuất sắc",
-};
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -27,24 +19,35 @@ const num = (v: unknown) => {
 };
 // Chuẩn hoá ngày về "YYYY-MM-DD" cho ô <input type="date">.
 const dateOnly = (d?: string | null) => (d ? d.slice(0, 10) : "");
+// Số ngày TRỄ = từ hạn nộp (due) đến ngày hoàn thành (done). >0 = nộp trễ.
+function daysLate(due?: string | null, done?: string | null): number {
+  if (!due || !done) return 0;
+  const [dy, dm, dd] = due.slice(0, 10).split("-").map(Number);
+  const [ny, nm, nd] = done.slice(0, 10).split("-").map(Number);
+  return Math.round((new Date(ny, nm - 1, nd).getTime() - new Date(dy, dm - 1, dd).getTime()) / 86_400_000);
+}
+// Trạng thái nộp 1 đầu việc: đã xong chưa, có trễ hạn không, trễ mấy ngày.
+function itemStatus(it: ProjectItem): { done: boolean; late: boolean; days: number } {
+  const done = !!it.done_date;
+  const days = done ? daysLate(it.due_date, it.done_date) : 0;
+  return { done, late: done && days > 0, days };
+}
 
-/** Chấm sao 1–5 đánh giá hạng mục (0 = chưa chấm). Bấm lại sao đang chọn để bỏ về 0. */
-function ItemRating({ value, onChange, disabled = false }: { value: number; onChange: (n: number) => void; disabled?: boolean }) {
+/** Nút đánh dấu HOÀN THÀNH — người làm bấm khi xong (tích xanh). Bấm lại để bỏ. */
+function StatusTick({ done, canEdit, onToggle }: { done: boolean; canEdit: boolean; onToggle: () => void }) {
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label="Đánh giá hạng mục">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(n === value ? 0 : n)}
-          title={`${n} sao`}
-          className={`${disabled ? "cursor-not-allowed opacity-75" : ""} ${n <= value ? "text-amber" : "text-line hover:text-amber"}`}
-        >
-          <StarIcon className="h-3.5 w-3.5" />
-        </button>
-      ))}
-    </span>
+    <button
+      type="button"
+      disabled={!canEdit}
+      onClick={onToggle}
+      title={done ? "Đã xong — bấm để bỏ đánh dấu" : canEdit ? "Đánh dấu đã xong" : "Chưa xong"}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
+        done ? "bg-ok/15 text-ok" : "bg-line/50 text-muted"
+      } ${canEdit ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
+    >
+      {done ? <CheckCircleIcon className="h-4 w-4" /> : <span className="h-3 w-3 rounded-full border-2 border-current" />}
+      {done ? "Đã xong" : "Chưa xong"}
+    </button>
   );
 }
 const lineAmount = (i: ProjectItem) => num(i.quantity) * num(i.unit_price);
@@ -125,12 +128,14 @@ export default function ProjectItemsTab({
   canSeeMoney = true,
   members = [],
   canManage = false,
+  currentUserId = null,
 }: {
   projectId: number;
   /** Nhân viên (STAFF) = false: ẩn cột Khối lượng/Đơn giá/Thành tiền, tiểu tổng, tổng, xuất Excel. */
   canSeeMoney?: boolean;
   members?: User[];
   canManage?: boolean;
+  currentUserId?: number | null;
 }) {
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -545,7 +550,7 @@ export default function ProjectItemsTab({
                   {canSeeMoney && <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>}
                   <th className="w-40 px-2 py-2 text-left font-semibold">Ghi chú</th>
                   <th className="w-28 px-2 py-2 text-left font-semibold">Hạn nộp</th>
-                  <th className="w-32 px-2 py-2 text-left font-semibold">% Hoàn thành</th>
+                  <th className="w-36 px-2 py-2 text-left font-semibold">Đúng hạn</th>
                   <th className="w-8 px-1 py-2" />
                 </tr>
               </thead>
@@ -559,7 +564,6 @@ export default function ProjectItemsTab({
                       groupIndex={gi}
                       kids={kids}
                       subtotal={groupSubtotal(g.id)}
-                      groupProgress={rollupProgress(kids)}
                       canSeeMoney={canSeeMoney}
                       deptOptions={deptNames}
                       onPersist={persist}
@@ -568,6 +572,7 @@ export default function ProjectItemsTab({
                       busy={busy}
                       members={members}
                       canManage={canManage}
+                      currentUserId={currentUserId}
                     />
                   );
                 })}
@@ -597,7 +602,6 @@ function GroupRows({
   groupIndex,
   kids,
   subtotal,
-  groupProgress,
   canSeeMoney,
   deptOptions,
   onPersist,
@@ -606,12 +610,12 @@ function GroupRows({
   busy,
   members = [],
   canManage = false,
+  currentUserId = null,
 }: {
   group: ProjectItem;
   groupIndex: number;
   kids: ProjectItem[];
   subtotal: number;
-  groupProgress: number;
   canSeeMoney: boolean;
   deptOptions: string[];
   onPersist: (id: number, patch: Partial<ProjectItem>) => void;
@@ -620,9 +624,15 @@ function GroupRows({
   busy: boolean;
   members?: User[];
   canManage?: boolean;
+  currentUserId?: number | null;
 }) {
+  // Đánh dấu / bỏ HOÀN THÀNH: set done_date = hôm nay + progress 100 (hoặc xoá về chưa xong).
+  const toggleDone = (it: ProjectItem) => {
+    if (it.done_date) onPersist(it.id, { done_date: null, progress: 0 });
+    else onPersist(it.id, { done_date: dateLocal(new Date()), progress: 100 });
+  };
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
-  // +2 cho "Ghi chú" + "Hạn nộp", +1 cho "% Hoàn thành" (hiện với mọi vai trò).
+  // +2 cho "Ghi chú" + "Hạn nộp", +1 cho cột "Đúng hạn" (hiện với mọi vai trò).
   const contentCols = canSeeMoney ? 8 : 5;
   return (
     <>
@@ -681,16 +691,6 @@ function GroupRows({
               )}
             </select>
           </div>
-          {/* Đánh giá hạng mục (sao) — chủ trì/quản lý chấm chất lượng hạng mục này. */}
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-2">
-            <span className="text-[10px] font-semibold text-muted">Đánh giá:</span>
-            <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} disabled={!canManage} />
-            {num(group.rating) > 0 && (
-              <span className="text-[10px] font-bold text-amber-deep bg-amber/10 px-1 py-0.5 rounded">
-                {RATING_LABELS[num(group.rating)]}
-              </span>
-            )}
-          </div>
         </td>
         {canSeeMoney && (
           <>
@@ -717,14 +717,24 @@ function GroupRows({
             className="w-full rounded border border-line bg-white px-1.5 py-1 text-[11px] text-ink outline-none focus:border-steel disabled:cursor-not-allowed disabled:bg-transparent"
           />
         </td>
-        {/* Tiến độ nhóm (tự tính từ các đầu việc con) */}
+        {/* Trạng thái nhóm: số đầu việc đã xong; đỏ nếu có việc trễ, xanh nếu xong hết đúng hạn */}
         <td className="px-2 py-1.5">
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 min-w-[32px] flex-1 overflow-hidden rounded-full bg-line">
-              <div className="h-full bg-steel" style={{ width: `${clampPct(groupProgress)}%` }} />
-            </div>
-            <span className="w-8 shrink-0 text-right text-[10px] font-bold text-steel tnum">{Math.round(groupProgress)}%</span>
-          </div>
+          {(() => {
+            const total = kids.length;
+            const doneN = kids.filter((k) => k.done_date).length;
+            const anyLate = kids.some((k) => itemStatus(k).late);
+            const allDone = total > 0 && doneN === total;
+            const bar = anyLate ? "bg-bad" : allDone ? "bg-ok" : "bg-steel";
+            const txt = anyLate ? "text-bad" : allDone ? "text-ok" : "text-steel";
+            return (
+              <div className="flex items-center gap-1.5">
+                <div className="h-1.5 min-w-[32px] flex-1 overflow-hidden rounded-full bg-line">
+                  <div className={`h-full ${bar}`} style={{ width: `${total ? (doneN / total) * 100 : 0}%` }} />
+                </div>
+                <span className={`shrink-0 text-right text-[10px] font-bold tnum ${txt}`}>{doneN}/{total}</span>
+              </div>
+            );
+          })()}
         </td>
         <td className="px-1 py-1 text-center">
           {canManage && (
@@ -772,13 +782,12 @@ function GroupRows({
                   </select>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-semibold text-muted">Đánh giá:</span>
-                  <ItemRating value={num(c.rating)} onChange={(n) => onPersist(c.id, { rating: n })} disabled={!canManage} />
-                  {num(c.rating) > 0 && (
-                    <span className="text-[9px] font-bold text-amber-deep bg-amber/10 px-1 py-0.2 rounded">
-                      {RATING_LABELS[num(c.rating)]}
-                    </span>
-                  )}
+                  <span className="text-[9px] font-semibold text-muted">Trạng thái:</span>
+                  <StatusTick
+                    done={!!c.done_date}
+                    canEdit={canManage || (c.assignee_id != null && c.assignee_id === currentUserId)}
+                    onToggle={() => toggleDone(c)}
+                  />
                 </div>
               </div>
             </div>
@@ -826,24 +835,29 @@ function GroupRows({
               className="w-full rounded border border-line bg-white px-1.5 py-1 text-[11px] text-ink outline-none focus:border-steel disabled:cursor-not-allowed disabled:bg-transparent"
             />
           </td>
-          {/* % Hoàn thành đầu việc — gõ trực tiếp (0..100). Ai cũng sửa được (không phải tiền). */}
-          <td className="px-1 py-0.5">
-            <div className="flex items-center gap-1.5">
-              <div className="h-1.5 min-w-[28px] flex-1 overflow-hidden rounded-full bg-line">
-                <div className="h-full bg-ok" style={{ width: `${clampPct(c.progress)}%` }} />
-              </div>
-              <div className="w-11 shrink-0">
-                <EditableCell
-                  type="number"
-                  value={c.progress}
-                  onCommit={(v) => onPersist(c.id, { progress: clampPct(v) })}
-                  className="text-right"
-                  placeholder="0"
-                  disabled={!canManage}
-                />
-              </div>
-              <span className="text-[10px] text-muted">%</span>
-            </div>
+          {/* Đúng hạn: liên kết với tích Trạng thái — xanh nếu nộp đúng hạn, đỏ nếu trễ hạn */}
+          <td className="px-2 py-1.5">
+            {(() => {
+              const st = itemStatus(c);
+              if (!st.done) {
+                return (
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 min-w-[28px] flex-1 overflow-hidden rounded-full bg-line" />
+                    <span className="shrink-0 text-[10px] text-muted">Chưa xong</span>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 min-w-[28px] flex-1 overflow-hidden rounded-full bg-line">
+                    <div className={`h-full ${st.late ? "bg-bad" : "bg-ok"}`} style={{ width: "100%" }} />
+                  </div>
+                  <span className={`shrink-0 text-[10px] font-semibold ${st.late ? "text-bad" : "text-ok"}`}>
+                    {st.late ? `Trễ ${st.days} ngày` : "Đúng hạn"}
+                  </span>
+                </div>
+              );
+            })()}
           </td>
           <td className="px-1 py-1 text-center">
             {canManage && (

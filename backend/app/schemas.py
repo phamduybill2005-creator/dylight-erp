@@ -353,6 +353,7 @@ class ProjectItemBase(BaseModel):
     rating: int = 0                  # đánh giá hạng mục: 0 = chưa chấm, 1..5 sao
     note: str | None = None
     due_date: date | None = None     # hạn nộp từng hạng mục/đầu việc
+    done_date: date | None = None    # ngày đánh dấu hoàn thành (so due_date -> đúng/trễ hạn)
 
 
 class ProjectItemCreate(ProjectItemBase):
@@ -374,6 +375,7 @@ class ProjectItemUpdate(BaseModel):
     rating: int | None = None
     note: str | None = None
     due_date: date | None = None
+    done_date: date | None = None
 
 
 class ProjectItemOut(ProjectItemBase):

@@ -422,6 +422,7 @@ export interface ProjectItem {
   rating?: number;         // đánh giá hạng mục: 0 = chưa chấm, 1..5 sao
   note?: string | null;
   due_date?: string | null;    // hạn nộp (YYYY-MM-DD) từng hạng mục/đầu việc
+  done_date?: string | null;   // ngày đánh dấu hoàn thành (so due_date -> đúng/trễ hạn)
   created_at: string;
 }
 
