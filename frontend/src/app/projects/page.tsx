@@ -346,7 +346,7 @@ export default function ProjectsPage() {
               <th className={TH}>Đánh giá</th>
               <th className={TH}>Ngày nhận</th>
               <th className={TH}>Ngày hoàn thành</th>
-              <th className={TH}>Hạn nội</th>
+              <th className={TH}>Hạn nội bộ</th>
               <th className={TH}>Tổng thời gian</th>
               <th className={TH}>Trạng thái</th>
               <th className={TH}>Tiến độ</th>
