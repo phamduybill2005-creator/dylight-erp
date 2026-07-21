@@ -118,7 +118,7 @@ function EditableCell({
       onChange={(e) => !disabled && setV(e.target.value)}
       onBlur={commit}
       disabled={disabled}
-      className={`w-full bg-transparent px-2 py-1.5 text-xs text-ink outline-none ${disabled ? "cursor-not-allowed text-muted/60" : "focus:bg-amber/5 focus:ring-1 focus:ring-amber"} rounded ${className}`}
+      className={`w-full bg-transparent px-2 py-1.5 text-xs text-ink outline-none ${disabled ? "cursor-not-allowed opacity-100" : "focus:bg-amber/5 focus:ring-1 focus:ring-amber"} rounded ${className}`}
     />
   );
 }
@@ -656,7 +656,7 @@ function GroupRows({
                 value={group.assignee_id || ""}
                 onChange={(e) => onPersist(group.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
                 disabled={!canManage}
-                className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] font-semibold text-muted outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent"
+                className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] font-semibold text-ink outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100"
               >
                 <option value="">— Chưa chọn —</option>
                 {members.map((m) => (
@@ -771,7 +771,7 @@ function GroupRows({
                     value={c.assignee_id || ""}
                     onChange={(e) => onPersist(c.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
                     disabled={!canManage}
-                    className="rounded border border-line bg-white px-1 py-0.5 text-[9px] text-muted outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent"
+                    className="rounded border border-line bg-white px-1 py-0.5 text-[9px] text-ink outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100"
                   >
                     <option value="">— Chưa phân công —</option>
                     {members.map((m) => (
