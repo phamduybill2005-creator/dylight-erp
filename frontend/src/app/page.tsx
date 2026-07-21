@@ -19,14 +19,12 @@ import {
   CurrencyDollarIcon,
   CalendarDaysIcon,
   ShieldCheckIcon,
-  ArrowRightCircleIcon,
-  ArrowLeftEndOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, roleTitle, type Tier } from "@/lib/roles";
-import { formatCompactVND, formatVND, todayLocal } from "@/lib/format";
-import type { KpiSummary, ProjectProfit, User, Project, Attendance } from "@/lib/types";
+import { formatCompactVND, formatVND } from "@/lib/format";
+import type { KpiSummary, ProjectProfit, User, Project } from "@/lib/types";
 
 type ModuleDef = {
   href: string;
@@ -46,18 +44,12 @@ const MODULES: ModuleDef[] = [
   { href: "/audit", label: "Nhật ký hoạt động", icon: ShieldCheckIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
 ];
 
-const todayStr = todayLocal;
-const fmtTime = (iso?: string | null) =>
-  iso ? new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—";
-
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(api.cachedUser());
   const [projects, setProjects] = useState<Project[]>([]);
   const [kpi, setKpi] = useState<KpiSummary | null>(null);
   const [profit, setProfit] = useState<ProjectProfit[]>([]);
-  const [todayAtt, setTodayAtt] = useState<Attendance | null>(null);
-  const [attBusy, setAttBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -65,9 +57,6 @@ export default function DashboardPage() {
     function loadDashboard(tier: Tier) {
       if (tier === "STAFF") {
         api.projects().then((d) => alive && setProjects(d)).catch(() => {});
-        api.attendanceMe(todayStr(), todayStr())
-          .then((recs) => alive && setTodayAtt(recs[0] ?? null))
-          .catch(() => {});
       } else if (tier === "MANAGER") {
         // Quản lý: KHÔNG gọi /dashboard/summary|profit (đã chặn ở backend) — chỉ dữ liệu vận hành.
         api.projects().then((d) => alive && setProjects(d)).catch(() => {});
@@ -93,18 +82,6 @@ export default function DashboardPage() {
     });
     return () => { alive = false; if (timer) clearInterval(timer); };
   }, [router]);
-
-  async function quickPunch(kind: "in" | "out") {
-    setAttBusy(true);
-    try {
-      const rec = kind === "in" ? await api.checkIn() : await api.checkOut();
-      setTodayAtt(rec);
-    } catch {
-      /* nuốt lỗi — màn chấm công đầy đủ ở /attendance */
-    } finally {
-      setAttBusy(false);
-    }
-  }
 
   if (!user) {
     return (
@@ -143,49 +120,6 @@ export default function DashboardPage() {
                 <span>SĐT liên hệ: <span className="font-semibold text-white">{user.phone}</span></span>
               </div>
             )}
-          </div>
-        </section>
-
-        {/* Chấm công hôm nay */}
-        <section className="mt-5">
-          <div className="flex items-center gap-2 mb-2">
-            <ClockIcon className="h-5 w-5 text-steel" />
-            <h2 className="text-sm font-semibold text-ink">Chấm công hôm nay</h2>
-          </div>
-          <div className="rounded-xl2 bg-white p-4 shadow-card card-hover">
-            <div className="flex items-center justify-between text-center">
-              <div className="flex-1">
-                <p className="text-[10px] text-muted">Giờ vào</p>
-                <p className="mt-0.5 text-lg font-bold text-ink tnum">{fmtTime(todayAtt?.check_in)}</p>
-              </div>
-              <div className="h-8 w-px bg-line" />
-              <div className="flex-1">
-                <p className="text-[10px] text-muted">Giờ ra</p>
-                <p className="mt-0.5 text-lg font-bold text-ink tnum">{fmtTime(todayAtt?.check_out)}</p>
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                onClick={() => quickPunch("in")}
-                disabled={attBusy || !!todayAtt?.check_in}
-                className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ok/90 hover:bg-ok py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-200 active:scale-95 disabled:opacity-40"
-              >
-                <ArrowRightCircleIcon className="h-4 w-4" /> Chấm vào
-              </button>
-              <button
-                onClick={() => quickPunch("out")}
-                disabled={attBusy}
-                className="flex items-center justify-center gap-1.5 rounded-xl2 bg-ink hover:bg-ink/90 py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-200 active:scale-95 disabled:opacity-40"
-              >
-                <ArrowLeftEndOnRectangleIcon className="h-4 w-4" /> Chấm ra
-              </button>
-            </div>
-            {todayAtt?.is_late && (
-              <p className="mt-2 text-center text-[11px] font-semibold text-bad">Hôm nay bạn đi trễ.</p>
-            )}
-            <Link href="/attendance" className="mt-3 block text-center text-[11px] font-semibold text-steel hover:text-ink transition-colors">
-              Xem lịch sử chấm công →
-            </Link>
           </div>
         </section>
 
