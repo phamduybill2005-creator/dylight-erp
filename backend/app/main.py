@@ -254,6 +254,13 @@ if settings.AUTO_SEED:
     except Exception as _e:  # noqa: BLE001
         print(f"[auto-seed] bo qua (loi khi seed): {_e}")
 
+# Tự nạp sơ đồ tổ chức công ty và gán các mối quan hệ quản lý
+try:
+    from app.seed_org import run_seed as _seed_org_run
+    _seed_org_run()
+except Exception as _e:
+    print(f"[auto-seed-org] bo qua: {_e}")
+
 
 def _backfill_departments() -> None:
     """
