@@ -154,7 +154,7 @@ export default function CompanyOrgChart() {
 
       {/* Org Chart Scroll Wrapper */}
       <div className="overflow-x-auto pb-4">
-        <div className="min-w-[800px] flex flex-col items-center py-2 space-y-6">
+        <div className="min-w-[1200px] flex flex-col items-center py-2 space-y-6">
           
           {/* Level 1: GIANG, NHUNG, ĐẠT, DŨNG */}
           <div className="flex gap-4 sm:gap-6 justify-center">
@@ -179,45 +179,68 @@ export default function CompanyOrgChart() {
             {LEVEL_3.map(renderNode)}
           </div>
 
-          {/* Connection Line 3 -> 4 */}
-          <div className="w-0.5 h-6 bg-slate-300"></div>
-
-          {/* Level 4: LÂM, BÍNH */}
-          <div className="flex gap-16 sm:gap-20 justify-center">
-            {LEVEL_4.map(renderNode)}
-          </div>
-
-          {/* Connection Line 4 -> 5 */}
+          {/* Connection Line 3 -> 4 split */}
           <div className="w-0.5 h-6 bg-slate-300 relative">
-            <div className="absolute top-0 -left-32 w-64 border-t-2 border-slate-300"></div>
+            <div className="absolute top-0 -left-[230px] w-[460px] border-t-2 border-slate-300"></div>
           </div>
 
-          {/* Level 5: QUANG, CAO, ĐỨC, HÙNG */}
-          <div className="flex gap-6 sm:gap-8 justify-center">
-            {LEVEL_5.map(renderNode)}
-          </div>
-
-          {/* Level 5 to Level 6 split connection */}
-          <div className="w-full flex justify-between px-16 xl:px-24">
-            {/* Left section connection (Quang -> Hoàn, Duy) */}
-            <div className="flex flex-col items-center w-1/3">
-              <div className="w-0.5 h-6 bg-slate-300 relative">
-                <div className="absolute top-0 -left-12 w-24 border-t-2 border-slate-300"></div>
+          {/* Level 4, 5, 6 split by Department branches */}
+          <div className="flex gap-20 justify-center items-start">
+            
+            {/* Left Branch (3D Design / 3次設計) */}
+            <div className="flex flex-col items-center">
+              {/* Level 4: Lâm */}
+              <div className="mb-6">
+                {renderNode(LEVEL_4[0])}
               </div>
+              
+              {/* Connection Line Lâm -> Quang */}
+              <div className="w-0.5 h-6 bg-slate-300"></div>
+              
+              {/* Level 5: Quang */}
+              <div className="mb-6 mt-1">
+                {renderNode(LEVEL_5[0])}
+              </div>
+              
+              {/* Connection Line Quang -> Hoàn, Duy */}
+              <div className="w-0.5 h-6 bg-slate-300 relative">
+                <div className="absolute top-0 -left-16 w-32 border-t-2 border-slate-300"></div>
+              </div>
+              
+              {/* Level 6: Hoàn, Duy */}
               <div className="flex gap-3 mt-1.5 justify-center">
                 {LEVEL_6_LEFT.map(renderNode)}
               </div>
             </div>
 
-            {/* Right section connection (Cao, Đức, Hùng -> Linh37, Quân, Dương, ?????, Khải) */}
-            <div className="flex flex-col items-center w-2/3">
-              <div className="w-0.5 h-6 bg-slate-300 relative">
-                <div className="absolute top-0 -left-40 w-80 border-t-2 border-slate-300"></div>
+            {/* Right Branch (Civil Design / 土木設計) */}
+            <div className="flex flex-col items-center">
+              {/* Level 4: Bính */}
+              <div className="mb-6">
+                {renderNode(LEVEL_4[1])}
               </div>
+              
+              {/* Connection Line Bính -> Cao, Đức, Hùng */}
+              <div className="w-0.5 h-6 bg-slate-300 relative">
+                <div className="absolute top-0 -left-20 w-40 border-t-2 border-slate-300"></div>
+              </div>
+              
+              {/* Level 5: Cao, Đức, Hùng */}
+              <div className="flex gap-4 mb-6 mt-1 justify-center">
+                {LEVEL_5.slice(1).map(renderNode)}
+              </div>
+              
+              {/* Connection Line Cao, Đức, Hùng -> Linh37, Quân, Dương, ?????, Khải */}
+              <div className="w-0.5 h-6 bg-slate-300 relative">
+                <div className="absolute top-0 -left-[240px] w-[480px] border-t-2 border-slate-300"></div>
+              </div>
+              
+              {/* Level 6: Linh37, Quân, Dương, ?????, Khải */}
               <div className="flex gap-3 mt-1.5 justify-center">
                 {LEVEL_6_RIGHT.map(renderNode)}
               </div>
             </div>
+
           </div>
 
         </div>
