@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { roleTitle } from "@/lib/roles";
 import type { Colleague } from "@/lib/types";
 import { 
   UserIcon, 
@@ -272,7 +273,7 @@ export default function CompanyOrgChart() {
                 <BriefcaseIcon className="h-4 w-4 text-muted mt-0.5 shrink-0" />
                 <div>
                   <span className="font-semibold text-muted block text-[10px] uppercase">Chức vụ</span>
-                  <span className="font-semibold text-slate-800">{selectedUser.role === "DIRECTOR" ? "Giám đốc" : selectedUser.role === "MANAGER" ? "Trưởng phòng / Quản lý" : "Nhân viên"}</span>
+                  <span className="font-semibold text-slate-800">{roleTitle(selectedUser.role, selectedUser.has_subordinates)}</span>
                 </div>
               </div>
 
