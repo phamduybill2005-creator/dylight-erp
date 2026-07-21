@@ -137,13 +137,22 @@ export default function TimesheetPage() {
     return map;
   }, [entries, mode, targetUid, deptUserIds]);
 
-  // Hàng = dự án; dự án có giờ trong tuần lên đầu.
+  // Hàng = dự án. Chọn PHÒNG BAN -> chỉ hiện dự án của phòng đó (chủ trì HOẶC thành
+  // viên thuộc phòng). Dự án có giờ trong tuần lên đầu.
   const rowProjects = useMemo(() => {
     const has = new Set(entries.map((e) => e.project_id));
-    return [...projects].sort(
+    const inDept = (p: Project) => {
+      if (!dept) return true;
+      const leadDepts = (p.lead_department || "").split(",").map((s) => s.trim());
+      if (leadDepts.includes(dept)) return true;
+      return (p.members ?? []).some((m) =>
+        (m.department || "").split(",").map((s) => s.trim()).includes(dept),
+      );
+    };
+    return projects.filter(inDept).sort(
       (a, b) => (has.has(a.id) ? 0 : 1) - (has.has(b.id) ? 0 : 1) || a.name.localeCompare(b.name, "vi"),
     );
-  }, [projects, entries]);
+  }, [projects, entries, dept]);
 
   const cellValue = (pid: number, d: string) => {
     const k = key(pid, d);
@@ -235,7 +244,7 @@ export default function TimesheetPage() {
                   onClick={() => setMode(mo)}
                   className={`rounded px-2 py-1 font-semibold transition-colors duration-200 ${mode === mo ? "bg-ink text-white" : "text-muted hover:bg-paper"}`}
                 >
-                  {mo === "me" ? "1 người" : "Toàn đội (tổng)"}
+                  {mo === "me" ? "Cá nhân" : "Toàn đội (tổng)"}
                 </button>
               ))}
             </div>
