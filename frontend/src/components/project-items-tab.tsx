@@ -149,6 +149,8 @@ export default function ProjectItemsTab({
   const [fUnit, setFUnit] = useState("");
   const [fQty, setFQty] = useState("");
   const [fPrice, setFPrice] = useState("");
+  const [fDue, setFDue] = useState("");            // hạn nộp cho đầu việc mới
+  const [fAssignee, setFAssignee] = useState("");  // người làm (giao cho ai)
   const [formBusy, setFormBusy] = useState(false);
   const [formMsg, setFormMsg] = useState("");
 
@@ -301,11 +303,13 @@ export default function ProjectItemsTab({
         unit: fUnit.trim() || undefined,
         quantity: canSeeMoney ? toNum(fQty) : 0,
         unit_price: canSeeMoney ? toNum(fPrice) : 0,
+        due_date: fDue || undefined,
+        assignee_id: fAssignee ? Number(fAssignee) : undefined,
         order_index: maxOrder + 1,
       });
       setItems((prev) => [...prev, child]);
       // Reset các ô để nhập dòng kế (giữ nhóm đang chọn).
-      setFName(""); setFUnit(""); setFQty(""); setFPrice("");
+      setFName(""); setFUnit(""); setFQty(""); setFPrice(""); setFDue(""); setFAssignee("");
       setFormMsg(`✓ Đã thêm "${name}".`);
     } catch (e) {
       setFormMsg(e instanceof Error ? e.message : "Thêm hạng mục thất bại.");
@@ -434,6 +438,19 @@ export default function ProjectItemsTab({
             <label className="block sm:col-span-2">
               <span className="mb-1 block text-[11px] font-semibold text-muted">Tên đầu việc / công tác <span className="text-bad">*</span></span>
               <input value={fName} onChange={(e) => setFName(e.target.value)} placeholder="VD: Đổ bê tông móng M1"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-muted">Người làm (giao cho)</span>
+              <select value={fAssignee} onChange={(e) => setFAssignee(e.target.value)}
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
+                <option value="">— Chưa phân công —</option>
+                {members.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-muted">Hạn nộp</span>
+              <input type="date" value={fDue} onChange={(e) => setFDue(e.target.value)}
                 className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
             </label>
             {canSeeMoney && (
