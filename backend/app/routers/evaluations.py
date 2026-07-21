@@ -44,10 +44,18 @@ def create_or_update_evaluation(
     if evaluatee.id == current.id:
         raise HTTPException(400, "Không thể tự đánh giá chính mình.")
 
+    # Dự án (tùy chọn) phải thuộc cùng công ty — lấy SỚM để còn kiểm tra chủ trì.
+    proj = None
+    if payload.project_id is not None:
+        proj = db.get(Project, payload.project_id)
+        if not proj or proj.company_id != current.company_id:
+            raise HTTPException(404, "Không tìm thấy dự án.")
+
     # Xác định & kiểm tra chiều đánh giá hợp lệ.
     if current.role == UserRole.FIELD_STAFF:
-        if current.manager_id != evaluatee.id:
-            raise HTTPException(403, "Bạn chỉ được đánh giá quản lý trực tiếp của mình.")
+        # Nhân viên chấm QUẢN LÝ TRỰC TIẾP của mình, HOẶC CHỦ TRÌ (lead) của DỰ ÁN đang chọn.
+        if evaluatee.id != current.manager_id and not (proj and proj.lead_id == evaluatee.id):
+            raise HTTPException(403, "Bạn chỉ được đánh giá quản lý trực tiếp của mình hoặc chủ trì dự án đã chọn.")
         direction = EvaluationDirection.STAFF_TO_MANAGER
     elif current.role in _MANAGER_ROLES:
         if evaluatee.manager_id != current.id:
@@ -55,12 +63,6 @@ def create_or_update_evaluation(
         direction = EvaluationDirection.MANAGER_TO_STAFF
     else:
         raise HTTPException(403, "Vai trò này không tham gia chấm điểm đánh giá.")
-
-    # Dự án (tùy chọn) phải thuộc cùng công ty.
-    if payload.project_id is not None:
-        proj = db.get(Project, payload.project_id)
-        if not proj or proj.company_id != current.company_id:
-            raise HTTPException(404, "Không tìm thấy dự án.")
 
     period = _week_saturday(payload.eval_date)
 

@@ -231,7 +231,16 @@ export default function EvaluationsPage() {
 
   // ==================== NHÂN VIÊN ====================
   if (tier === "STAFF") {
-    const myWeek = user.manager_id ? weekGivenTo(user.manager_id) : [];
+    // Quản lý được chấm LIÊN KẾT với DỰ ÁN đang chọn: chọn dự án -> chấm CHỦ TRÌ (lead)
+    // dự án đó; "Chung" (không dự án) -> chấm quản lý trực tiếp của mình.
+    const selProject = evalProjectId === "" ? null : (projects.find((p) => p.id === evalProjectId) ?? null);
+    const targetMgrId = selProject ? (selProject.lead_id ?? null) : (user.manager_id ?? null);
+    const targetMgrName = selProject
+      ? (selProject.lead_id ? (selProject.lead_name || "Chủ trì dự án") : null)
+      : (user.manager_name || null);
+    const targetIsSelf = targetMgrId != null && targetMgrId === user.id;
+    const canPickTarget = user.manager_id != null || projects.some((p) => p.lead_id != null);
+    const myWeek = targetMgrId ? weekGivenTo(targetMgrId) : [];
     return (
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
@@ -240,14 +249,29 @@ export default function EvaluationsPage() {
         </header>
 
         <section className="mt-4 rounded-xl2 bg-white p-4 shadow-card lg:p-6">
-          {user.manager_id ? (
+          {canPickTarget ? (
             <>
               <p className="text-xs text-muted">
-                Chấm quản lý trực tiếp theo ngày — tổng hợp tuần đến <b className="text-ink">Thứ 7 {fmtSat(period)}</b>
+                Chọn <b className="text-ink">dự án</b> để chấm <b className="text-ink">chủ trì</b> dự án đó — để &quot;Chung&quot; thì chấm quản lý trực tiếp. Tổng hợp tuần đến <b className="text-ink">Thứ 7 {fmtSat(period)}</b>
               </p>
-              <p className="mt-1 text-base font-bold text-ink">{user.manager_name || "Quản lý"}</p>
 
               <div className="mt-3">{DateProjectPicker()}</div>
+
+              <p className="mt-3 text-[11px] font-semibold text-muted">Đang chấm:</p>
+              <p className="text-base font-bold text-ink">
+                {targetMgrName || <span className="text-muted">— chọn dự án có chủ trì —</span>}
+                {targetMgrName && (
+                  <span className="ml-1.5 text-[11px] font-normal text-steel">
+                    ({selProject ? "chủ trì dự án" : "quản lý trực tiếp"})
+                  </span>
+                )}
+              </p>
+              {selProject && !selProject.lead_id && (
+                <p className="mt-0.5 text-[11px] font-semibold text-bad">Dự án này chưa có người chủ trì — chưa chấm được.</p>
+              )}
+              {targetIsSelf && (
+                <p className="mt-0.5 text-[11px] font-semibold text-bad">Bạn là chủ trì dự án này — không thể tự chấm.</p>
+              )}
 
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-muted">Mức độ hài lòng</span>
@@ -269,8 +293,8 @@ export default function EvaluationsPage() {
               {msg && <p className="mt-2 text-[11px] font-semibold text-steel">{msg}</p>}
 
               <button
-                onClick={() => submitFor(user.manager_id!)}
-                disabled={saving || rating < 1}
+                onClick={() => targetMgrId && submitFor(targetMgrId)}
+                disabled={saving || rating < 1 || !targetMgrId || targetIsSelf}
                 className="mt-3 w-full rounded-xl2 bg-ink py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {saving ? "Đang lưu…" : "Gửi đánh giá ngày"}
@@ -297,7 +321,7 @@ export default function EvaluationsPage() {
             </>
           ) : (
             <p className="py-4 text-center text-xs text-muted">
-              Bạn chưa được phân công quản lý trực tiếp để đánh giá.
+              Chưa có quản lý trực tiếp hoặc dự án có chủ trì để đánh giá.
             </p>
           )}
         </section>
