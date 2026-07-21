@@ -783,9 +783,10 @@ function GroupRows({
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="text-[9px] font-semibold text-muted">Trạng thái:</span>
+                  {/* CHỈ người được giao đầu việc mới tích được "đã xong" (quản lý cũng không tích thay). */}
                   <StatusTick
                     done={!!c.done_date}
-                    canEdit={canManage || (c.assignee_id != null && c.assignee_id === currentUserId)}
+                    canEdit={c.assignee_id != null && c.assignee_id === currentUserId}
                     onToggle={() => toggleDone(c)}
                   />
                 </div>

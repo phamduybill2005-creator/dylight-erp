@@ -145,6 +145,9 @@ def update_item(
         if not _can_manage(db, project, current):
             raise HTTPException(403, "Chỉ chủ trì/giám đốc được giao việc cho người khác.")
         _validate_assignee(db, project, data["assignee_id"])
+    # Đánh dấu HOÀN THÀNH (done_date): CHỈ người ĐƯỢC GIAO đầu việc mới tích được.
+    if "done_date" in data and item.assignee_id != current.id:
+        raise HTTPException(403, "Chỉ người được giao đầu việc mới đánh dấu hoàn thành.")
 
     for k, v in data.items():
         setattr(item, k, v)
