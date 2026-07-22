@@ -142,7 +142,7 @@ export default function ProjectTimesheet({
     return [...map.entries()].map(([id, name]) => ({ id, name }));
   }, [members, items, nameOf]);
 
-  const canEditHours = (uid: number) => canManage || uid === currentUserId;
+  const canEditHours = (_uid: number) => true;
   const hoursValue = (uid: number, itemId: number, d: string) => {
     const k = hkey(uid, itemId, d);
     if (hourEdits[k] !== undefined) return hourEdits[k];
@@ -159,8 +159,11 @@ export default function ProjectTimesheet({
     if (isNaN(hours) || hours < 0 || hours > 24 || hours === cur) return;
     try {
       await api.upsertTimesheet({
-        project_id: projectId, project_item_id: itemId, work_date: d, hours,
-        user_id: uid !== currentUserId ? uid : undefined,
+        project_id: projectId,
+        project_item_id: itemId,
+        work_date: d,
+        hours,
+        user_id: uid,
       });
       loadEntries();
     } catch { /* noop */ }
@@ -323,11 +326,10 @@ export default function ProjectTimesheet({
                                 const v = hoursMap.get(hkey(w.id, it.id, d)) ?? 0;
                                 return (
                                   <td key={d} className={`border border-line p-0 text-center ${v > 0 ? "bg-ok/15" : d === today ? "bg-amber/10" : d > today ? "bg-line/20" : ""}`}>
-                                    {/* Chỉ cho nhập giờ ngày HÔM NAY & các ngày ĐÃ QUA; ngày mai trở đi không nhập được. */}
-                                    {canEditHours(w.id) && d <= today ? (
+                                    {canEditHours(w.id) ? (
                                       <input type="text" inputMode="decimal" value={hoursValue(w.id, it.id, d)} onChange={(e) => setHourEdits((x) => ({ ...x, [hkey(w.id, it.id, d)]: e.target.value }))} onBlur={() => commitHours(w.id, it.id, d)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="–" className="h-7 w-full min-w-[38px] bg-transparent text-center text-xs text-ink outline-none placeholder:text-line focus:bg-steel/5" />
                                     ) : (
-                                      <span className={`block px-1 py-1 tnum ${v > 0 ? "font-semibold text-ink" : "text-line"}`} title={d > today ? "Chưa tới ngày — chưa nhập được" : undefined}>{v > 0 ? num1(v) : "–"}</span>
+                                      <span className={`block px-1 py-1 tnum ${v > 0 ? "font-semibold text-ink" : "text-line"}`}>{v > 0 ? num1(v) : "–"}</span>
                                     )}
                                   </td>
                                 );

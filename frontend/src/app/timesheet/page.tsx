@@ -39,13 +39,28 @@ export default function TimesheetPage() {
   const [entries, setEntries] = useState<Timesheet[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [mode, setMode] = useState<"me" | "team">("me");        // team = tổng hợp toàn đội (chỉ đọc)
+  const [viewPeriod, setViewPeriod] = useState<"week" | "month">("week");
+  const [monthStr, setMonthStr] = useState(() => todayLocal().slice(0, 7)); // YYYY-MM
   const [viewUserId, setViewUserId] = useState<number | null>(null); // quản lý: khai/xem hộ 1 người
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [dept, setDept] = useState<string>("");
 
   const isManager = me ? roleTier(me.role) !== "STAFF" : false;
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const weekEnd = days[6];
+  const days = useMemo(() => {
+    if (viewPeriod === "week") {
+      return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    } else {
+      const [y, m] = monthStr.split("-").map(Number);
+      const count = new Date(y, m, 0).getDate();
+      return Array.from({ length: count }, (_, i) => {
+        const dd = String(i + 1).padStart(2, "0");
+        const mm = String(m).padStart(2, "0");
+        return `${y}-${mm}-${dd}`;
+      });
+    }
+  }, [viewPeriod, weekStart, monthStr]);
+
+  const weekEnd = days[days.length - 1];
   const targetUid = viewUserId ?? me?.id ?? 0;
   const editable = mode === "me";
   const today = todayLocal();
@@ -204,24 +219,81 @@ export default function TimesheetPage() {
 
       {/* Thanh điều khiển: tuần + chế độ + chọn người */}
       <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl2 border border-line bg-white p-2 shadow-card">
-        <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần trước">
-          <ChevronLeftIcon className="h-4 w-4" />
-        </button>
-        <span className="text-xs font-semibold text-ink">
-          Tuần {fmtDay(weekStart)} – {fmtDay(weekEnd)}
-        </span>
-        <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần sau">
-          <ChevronRightIcon className="h-4 w-4" />
-        </button>
-        <input
-          type="date"
-          value={weekStart}
-          onChange={(e) => e.target.value && setWeekStart(mondayOf(e.target.value))}
-          className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
-        />
-        <button onClick={() => setWeekStart(mondayOf(today))} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper">
-          Tuần này
-        </button>
+        {/* Toggle Tuần / Tháng */}
+        <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs mr-1">
+          <button
+            onClick={() => setViewPeriod("week")}
+            className={`rounded px-2.5 py-1 font-semibold transition-colors duration-200 ${viewPeriod === "week" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
+          >
+            Tuần
+          </button>
+          <button
+            onClick={() => setViewPeriod("month")}
+            className={`rounded px-2.5 py-1 font-semibold transition-colors duration-200 ${viewPeriod === "month" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
+          >
+            Tháng
+          </button>
+        </div>
+
+        {viewPeriod === "week" ? (
+          <>
+            <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần trước">
+              <ChevronLeftIcon className="h-4 w-4" />
+            </button>
+            <span className="text-xs font-semibold text-ink">
+              Tuần {fmtDay(weekStart)} – {fmtDay(weekEnd)}
+            </span>
+            <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần sau">
+              <ChevronRightIcon className="h-4 w-4" />
+            </button>
+            <input
+              type="date"
+              value={weekStart}
+              onChange={(e) => e.target.value && setWeekStart(mondayOf(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
+            />
+            <button onClick={() => setWeekStart(mondayOf(today))} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper">
+              Tuần này
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => {
+                const [y, m] = monthStr.split("-").map(Number);
+                const prev = new Date(y, m - 2, 1);
+                setMonthStr(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`);
+              }}
+              className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper"
+              title="Tháng trước"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+            </button>
+            <span className="text-xs font-semibold text-ink">
+              Tháng {Number(monthStr.slice(5, 7))}/{monthStr.slice(0, 4)}
+            </span>
+            <button
+              onClick={() => {
+                const [y, m] = monthStr.split("-").map(Number);
+                const next = new Date(y, m, 1);
+                setMonthStr(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
+              }}
+              className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper"
+              title="Tháng sau"
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+            </button>
+            <input
+              type="month"
+              value={monthStr}
+              onChange={(e) => e.target.value && setMonthStr(e.target.value)}
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
+            />
+            <button onClick={() => setMonthStr(today.slice(0, 7))} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper">
+              Tháng này
+            </button>
+          </>
+        )}
 
         {isManager && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
