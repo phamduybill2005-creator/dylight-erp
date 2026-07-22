@@ -843,6 +843,8 @@ function GroupRows({
             value={group.note}
             onCommit={(v) => onPersist(group.id, { note: String(v) })}
             placeholder="Ghi chú…"
+            // Ẩn chữ "Ghi chú…" khi chưa bấm; bấm vào mới hiện; đã có chữ thì in đậm.
+            className="placeholder:text-transparent focus:placeholder:text-muted [&:not(:placeholder-shown)]:font-semibold"
             disabled={!canManage}
           />
         </td>
@@ -967,6 +969,8 @@ function GroupRows({
               value={c.note}
               onCommit={(v) => onPersist(c.id, { note: String(v) })}
               placeholder="Ghi chú…"
+              // Ẩn chữ "Ghi chú…" khi chưa bấm; bấm vào mới hiện; đã có chữ thì in đậm.
+              className="placeholder:text-transparent focus:placeholder:text-muted [&:not(:placeholder-shown)]:font-semibold"
               disabled={!canManage}
             />
           </td>

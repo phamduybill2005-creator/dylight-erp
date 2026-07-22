@@ -326,7 +326,8 @@ export default function ProjectTimesheet({
                                 const v = hoursMap.get(hkey(w.id, it.id, d)) ?? 0;
                                 return (
                                   <td key={d} className={`border border-line p-0 text-center ${v > 0 ? "bg-ok/15" : d === today ? "bg-amber/10" : d > today ? "bg-line/20" : ""}`}>
-                                    {canEditHours(w.id) ? (
+                                    {/* Chỉ cho nhập giờ HÔM NAY & ngày ĐÃ QUA; ngày chưa tới -> chỉ hiện "–". */}
+                                    {canEditHours(w.id) && d <= today ? (
                                       <input type="text" inputMode="decimal" value={hoursValue(w.id, it.id, d)} onChange={(e) => setHourEdits((x) => ({ ...x, [hkey(w.id, it.id, d)]: e.target.value }))} onBlur={() => commitHours(w.id, it.id, d)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="–" className="h-7 w-full min-w-[38px] bg-transparent text-center text-xs text-ink outline-none placeholder:text-line focus:bg-steel/5" />
                                     ) : (
                                       <span className={`block px-1 py-1 tnum ${v > 0 ? "font-semibold text-ink" : "text-line"}`}>{v > 0 ? num1(v) : "–"}</span>

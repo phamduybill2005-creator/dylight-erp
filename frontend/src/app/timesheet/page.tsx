@@ -379,8 +379,9 @@ export default function TimesheetPage() {
                       <span className="block max-w-[180px] truncate font-medium text-ink text-[11px]" title={p.name}>{p.name}</span>
                     </td>
                     {days.map((d) => (
-                      <td key={d} className={`border border-line p-0 text-center ${d === today ? "bg-amber/10" : "bg-inherit"}`}>
-                        {editable ? (
+                      <td key={d} className={`border border-line p-0 text-center ${d === today ? "bg-amber/10" : d > today ? "bg-slate-100/70" : "bg-inherit"}`}>
+                        {/* Chỉ nhập giờ HÔM NAY & ngày ĐÃ QUA; ngày chưa tới -> chỉ hiện "–". */}
+                        {editable && d <= today ? (
                           <input
                             type="text"
                             inputMode="decimal"
