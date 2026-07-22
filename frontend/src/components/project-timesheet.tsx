@@ -86,6 +86,9 @@ export default function ProjectTimesheet({
     try {
       await api.upsertProjectItemRating({ project_item_id: itemId, user_id: userId, rating: stars });
       loadWorkerRatings();
+      // Người được giao tích xong -> BE cập nhật done_date; nạp lại items để trạng thái
+      // "Đã xong" (dòng đầu việc) + thanh N/M ở tab Hạng mục chạy theo ngay.
+      loadItems();
     } catch { /* noop */ }
   }
 

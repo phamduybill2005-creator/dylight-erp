@@ -6,7 +6,7 @@ chứa các đầu việc con. Cho phép thêm/sửa/xoá từng ô kiểu Excel
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, vn_now
 from app.deps import get_current_user, can_see_money
 from app.models import ProjectItem, Project, User, ProjectItemRating
 from app.routers.projects import _can_view, _can_manage
@@ -249,6 +249,37 @@ def upsert_project_item_rating(
 
     db.commit()
     db.refresh(rating_rec)
+
+    # LIÊN KẾT tab Tiến độ <-> Hạng mục: khi NGƯỜI ĐƯỢC GIAO tích "xong" phần của mình
+    # -> đặt done_date cho đầu việc, để thanh "N/M" + trạng thái (Đúng hạn/Trễ) ở tab Hạng
+    # mục tự chạy theo. Đầu việc CHƯA giao -> "xong" khi có ÍT NHẤT 1 người tích. Chỉ đối
+    # chiếu khi cú tích này thuộc người được giao (hoặc đầu việc chưa giao) để không đè nhau.
+    responsible_id = item.assignee_id
+    if responsible_id is None or payload.user_id == responsible_id:
+        if responsible_id is not None:
+            done = bool(payload.rating and payload.rating > 0)
+        else:
+            done = db.query(ProjectItemRating).filter(
+                ProjectItemRating.project_item_id == item.id,
+                ProjectItemRating.rating > 0,
+            ).first() is not None
+        changed = False
+        if done and item.done_date is None:
+            item.done_date = vn_now().date()
+            item.progress = 100
+            changed = True
+        elif not done and item.done_date is not None:
+            item.done_date = None
+            item.progress = 0
+            changed = True
+        if changed:
+            db.commit()
+            try:
+                from app.services.progress_snapshot import snapshot_project
+                snapshot_project(db, item.project_id, current.company_id)
+            except Exception:  # noqa: BLE001
+                db.rollback()
+
     return rating_rec
 
 
