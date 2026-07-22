@@ -14,7 +14,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL } from "@/lib/roles";
 import { dateLocal, todayLocal } from "@/lib/format";
-import type { Evaluation, EvaluationSummary, User, Project } from "@/lib/types";
+import type { Evaluation, EvaluationSummary, User, Project, Colleague } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
   1: "Cần xem xét lại",
@@ -102,6 +102,7 @@ export default function EvaluationsPage() {
   const [given, setGiven] = useState<Evaluation[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [colleagues, setColleagues] = useState<Colleague[]>([]);   // để tra tên quản lý (kể cả QL phụ)
 
   // form state (chấm 1 đối tượng đang chọn) — theo NGÀY + DỰ ÁN.
   const [target, setTarget] = useState<User | null>(null);
@@ -109,6 +110,7 @@ export default function EvaluationsPage() {
   const [comment, setComment] = useState("");
   const [evalDate, setEvalDate] = useState(todayLocal());
   const [evalProjectId, setEvalProjectId] = useState<number | "">("");
+  const [mgrKey, setMgrKey] = useState<string>("");   // NHÂN VIÊN: quản lý đang chọn để chấm
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -134,6 +136,7 @@ export default function EvaluationsPage() {
         api.evaluationsReceived().then(setReceived).catch(() => {});
         api.evaluationsGiven().then(setGiven).catch(() => {});
         api.projects().then(setProjects).catch(() => {});
+        api.colleagues().then(setColleagues).catch(() => {});
         if (t !== "STAFF") api.users().then(setUsers).catch(() => {});
         setLoading(false);
       })
@@ -168,7 +171,7 @@ export default function EvaluationsPage() {
   }
 
   // Gửi 1 phiếu cho evaluatee (dùng chung cho cả 2 chiều).
-  async function submitFor(evaluateeId: number) {
+  async function submitFor(evaluateeId: number, projectId: number | null = evalProjectId === "" ? null : Number(evalProjectId)) {
     if (rating < 1) { setMsg("Vui lòng chọn số sao."); return; }
     setSaving(true);
     setMsg("");
@@ -176,7 +179,7 @@ export default function EvaluationsPage() {
       await api.createEvaluation({
         evaluatee_id: evaluateeId,
         eval_date: evalDate,
-        project_id: evalProjectId === "" ? null : Number(evalProjectId),
+        project_id: projectId,
         rating,
         comment: comment || null,
       });
@@ -231,15 +234,30 @@ export default function EvaluationsPage() {
 
   // ==================== NHÂN VIÊN ====================
   if (tier === "STAFF") {
-    // Quản lý được chấm LIÊN KẾT với DỰ ÁN đang chọn: chọn dự án -> chấm CHỦ TRÌ (lead)
-    // dự án đó; "Chung" (không dự án) -> chấm quản lý trực tiếp của mình.
-    const selProject = evalProjectId === "" ? null : (projects.find((p) => p.id === evalProjectId) ?? null);
-    const targetMgrId = selProject ? (selProject.lead_id ?? null) : (user.manager_id ?? null);
-    const targetMgrName = selProject
-      ? (selProject.lead_id ? (selProject.lead_name || "Chủ trì dự án") : null)
-      : (user.manager_name || null);
+    // CHỈ chấm: QUẢN LÝ TRỰC TIẾP (chính + phụ) + CHỦ TRÌ các DỰ ÁN MÌNH THAM GIA.
+    const cName = (id: number) =>
+      colleagues.find((c) => c.id === id)?.full_name
+      ?? (id === user.manager_id ? user.manager_name : null)
+      ?? `#${id}`;
+    const directIds: number[] = [];
+    if (user.manager_id) directIds.push(user.manager_id);
+    if (user.manager_ids) for (const s of user.manager_ids.split(",")) {
+      const n = Number(s.trim());
+      if (n && n !== user.id && !directIds.includes(n)) directIds.push(n);
+    }
+    const mgrOptions: { key: string; mgrId: number; name: string; projectId: number | null; ctx: string }[] = [];
+    for (const id of directIds) if (id !== user.id)
+      mgrOptions.push({ key: `d${id}`, mgrId: id, name: cName(id) || "Quản lý", projectId: null, ctx: "quản lý trực tiếp" });
+    for (const p of projects) {
+      if (!p.lead_id || p.lead_id === user.id) continue;
+      if (!(p.members ?? []).some((m) => m.id === user.id)) continue;   // chỉ dự án MÌNH tham gia
+      mgrOptions.push({ key: `p${p.id}`, mgrId: p.lead_id, name: p.lead_name || "Chủ trì", projectId: p.id, ctx: `chủ trì · ${projectLabel(p)}` });
+    }
+    const selMgr = mgrOptions.find((o) => o.key === mgrKey) ?? mgrOptions[0] ?? null;
+    const targetMgrId = selMgr?.mgrId ?? null;
+    const targetMgrName = selMgr?.name ?? null;
     const targetIsSelf = targetMgrId != null && targetMgrId === user.id;
-    const canPickTarget = user.manager_id != null || projects.some((p) => p.lead_id != null);
+    const canPickTarget = mgrOptions.length > 0;
     const myWeek = targetMgrId ? weekGivenTo(targetMgrId) : [];
     return (
       <AppShell>
@@ -252,25 +270,33 @@ export default function EvaluationsPage() {
           {canPickTarget ? (
             <>
               <p className="text-xs text-muted">
-                Chọn <b className="text-ink">dự án</b> để chấm <b className="text-ink">chủ trì</b> dự án đó — để &quot;Chung&quot; thì chấm quản lý trực tiếp. Tổng hợp tuần đến <b className="text-ink">Thứ 7 {fmtSat(period)}</b>
+                Chọn <b className="text-ink">quản lý</b> cần chấm — chỉ gồm <b className="text-ink">quản lý trực tiếp</b> + <b className="text-ink">chủ trì các dự án bạn tham gia</b>. Tổng hợp tuần đến <b className="text-ink">Thứ 7 {fmtSat(period)}</b>
               </p>
 
-              <div className="mt-3">{DateProjectPicker()}</div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[10px] font-semibold text-muted">Ngày</label>
+                  <input type="date" value={evalDate} max={todayLocal()} onChange={(e) => setEvalDate(e.target.value || todayLocal())}
+                    className="w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-semibold text-muted">Quản lý cần chấm</label>
+                  <select value={selMgr?.key ?? ""} onChange={(e) => { setMgrKey(e.target.value); setRating(0); setComment(""); setMsg(""); }}
+                    className="w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel">
+                    {mgrOptions.map((o) => (
+                      <option key={o.key} value={o.key}>{o.name} — {o.ctx}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
               <p className="mt-3 text-[11px] font-semibold text-muted">Đang chấm:</p>
               <p className="text-base font-bold text-ink">
-                {targetMgrName || <span className="text-muted">— chọn dự án có chủ trì —</span>}
-                {targetMgrName && (
-                  <span className="ml-1.5 text-[11px] font-normal text-steel">
-                    ({selProject ? "chủ trì dự án" : "quản lý trực tiếp"})
-                  </span>
-                )}
+                {targetMgrName || <span className="text-muted">—</span>}
+                {selMgr && <span className="ml-1.5 text-[11px] font-normal text-steel">({selMgr.ctx})</span>}
               </p>
-              {selProject && !selProject.lead_id && (
-                <p className="mt-0.5 text-[11px] font-semibold text-bad">Dự án này chưa có người chủ trì — chưa chấm được.</p>
-              )}
               {targetIsSelf && (
-                <p className="mt-0.5 text-[11px] font-semibold text-bad">Bạn là chủ trì dự án này — không thể tự chấm.</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-bad">Đây là chính bạn — không thể tự chấm.</p>
               )}
 
               <div className="mt-3 flex items-center justify-between">
@@ -293,7 +319,7 @@ export default function EvaluationsPage() {
               {msg && <p className="mt-2 text-[11px] font-semibold text-steel">{msg}</p>}
 
               <button
-                onClick={() => targetMgrId && submitFor(targetMgrId)}
+                onClick={() => targetMgrId && submitFor(targetMgrId, selMgr?.projectId ?? null)}
                 disabled={saving || rating < 1 || !targetMgrId || targetIsSelf}
                 className="mt-3 w-full rounded-xl2 bg-ink py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
@@ -321,7 +347,7 @@ export default function EvaluationsPage() {
             </>
           ) : (
             <p className="py-4 text-center text-xs text-muted">
-              Chưa có quản lý trực tiếp hoặc dự án có chủ trì để đánh giá.
+              Bạn chưa có quản lý trực tiếp, cũng chưa tham gia dự án nào có chủ trì để chấm.
             </p>
           )}
         </section>

@@ -53,9 +53,21 @@ def create_or_update_evaluation(
 
     # Xác định & kiểm tra chiều đánh giá hợp lệ.
     if current.role == UserRole.FIELD_STAFF:
-        # Nhân viên chấm QUẢN LÝ TRỰC TIẾP của mình, HOẶC CHỦ TRÌ (lead) của DỰ ÁN đang chọn.
-        if evaluatee.id != current.manager_id and not (proj and proj.lead_id == evaluatee.id):
-            raise HTTPException(403, "Bạn chỉ được đánh giá quản lý trực tiếp của mình hoặc chủ trì dự án đã chọn.")
+        # Nhân viên chấm QUẢN LÝ TRỰC TIẾP của mình (chính + phụ qua manager_ids),
+        # HOẶC CHỦ TRÌ (lead) của DỰ ÁN đang chọn (chỉ dự án mình tham gia).
+        direct_mgrs: set[int] = set()
+        if current.manager_id:
+            direct_mgrs.add(current.manager_id)
+        if current.manager_ids:
+            for x in str(current.manager_ids).split(","):
+                x = x.strip()
+                if x.isdigit():
+                    direct_mgrs.add(int(x))
+        is_direct_mgr = evaluatee.id in direct_mgrs
+        is_member = bool(proj and any(m.id == current.id for m in (proj.members or [])))
+        is_project_lead = bool(proj and proj.lead_id == evaluatee.id and is_member)
+        if not is_direct_mgr and not is_project_lead:
+            raise HTTPException(403, "Bạn chỉ được đánh giá quản lý trực tiếp của mình hoặc chủ trì dự án bạn tham gia.")
         direction = EvaluationDirection.STAFF_TO_MANAGER
     elif current.role in _MANAGER_ROLES:
         if evaluatee.manager_id != current.id:
