@@ -6,7 +6,7 @@
 // tiểu tổng mỗi nhóm + tổng dự toán, và xuất ra Excel/CSV.
 
 import { useCallback, useEffect, useState } from "react";
-import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { formatVND, dateLocal } from "@/lib/format";
@@ -739,6 +739,7 @@ function GroupRows({
   canManage?: boolean;
   currentUserId?: number | null;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
   // +2 cho "Ghi chú" + "Hạn nộp", +1 cho cột "Đúng hạn" (hiện với mọi vai trò).
   const contentCols = canSeeMoney ? 8 : 5;
@@ -747,9 +748,21 @@ function GroupRows({
       {/* Dòng nhóm cha */}
       <tr className="border-y-2 border-indigo-100 bg-gradient-to-r from-indigo-50/90 to-sky-50/70 hover:from-indigo-100/70 hover:to-sky-100/50 transition-all">
         <td className="px-2 py-1.5 text-[11px] font-bold text-ink">
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 font-bold text-white shadow-sm">
-            {groupIndex + 1}
-          </span>
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? "Bấm để mở rộng nhóm hạng mục" : "Bấm để ẩn/thu gọn nhóm hạng mục"}
+            className="group/badge inline-flex items-center gap-1 focus:outline-none cursor-pointer"
+          >
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 font-bold text-white shadow-sm transition-transform group-hover/badge:scale-110 active:scale-95">
+              {groupIndex + 1}
+            </span>
+            <ChevronDownIcon
+              className={`h-3.5 w-3.5 text-indigo-600 transition-transform duration-200 ${
+                collapsed ? "-rotate-90 text-slate-400" : ""
+              }`}
+            />
+          </button>
         </td>
         <td className="px-1 py-1">
           <div className="flex flex-wrap items-center justify-between gap-2 pr-2">
@@ -876,7 +889,8 @@ function GroupRows({
       </tr>
 
       {/* Các đầu việc con */}
-      {kids.map((c, ci) => (
+      {!collapsed &&
+        kids.map((c, ci) => (
         <tr key={c.id} className={`border-t border-line/50 ${ci % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-sky-50/40 transition-colors`}>
           <td className="px-2 py-1 text-[10px] font-medium text-slate-500 text-center bg-slate-50/50">
             {groupIndex + 1}.{ci + 1}
@@ -1005,7 +1019,7 @@ function GroupRows({
       ))}
 
       {/* Nút thêm đầu việc vào nhóm */}
-      {canManage && (
+      {!collapsed && canManage && (
         <tr className="border-t border-line/40">
           <td />
           <td colSpan={contentCols} className="px-1 py-1">
