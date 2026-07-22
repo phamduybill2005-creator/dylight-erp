@@ -6,13 +6,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import type { Project, User } from "@/lib/types";
+import type { Project, User, ProjectStatus } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -93,6 +93,62 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterLead, setFilterLead] = useState("");
   const [filterDept, setFilterDept] = useState("");
+
+  // State Sửa dự án
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [efCode, setEfCode] = useState("");
+  const [efName, setEfName] = useState("");
+  const [efGroup, setEfGroup] = useState("");
+  const [efGeo, setEfGeo] = useState("");
+  const [efDosco, setEfDosco] = useState("");
+  const [efEval, setEfEval] = useState("");
+  const [efStatus, setEfStatus] = useState("PLANNING");
+  const [efStartDate, setEfStartDate] = useState("");
+  const [efEndDate, setEfEndDate] = useState("");
+  const [efInternalDeadline, setEfInternalDeadline] = useState("");
+  const [efLeadId, setEfLeadId] = useState<number | "">("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEditModal = (p: Project) => {
+    setEditingProject(p);
+    setEfCode(p.code || "");
+    setEfName(p.name || "");
+    setEfGroup(p.group_name || "");
+    setEfGeo(p.geo_manager || "");
+    setEfDosco(p.dosco_manager || "");
+    setEfEval(p.evaluation || "");
+    setEfStatus(p.status || "PLANNING");
+    setEfStartDate(p.start_date ? p.start_date.slice(0, 10) : "");
+    setEfEndDate(p.end_date ? p.end_date.slice(0, 10) : "");
+    setEfInternalDeadline(p.internal_deadline ? p.internal_deadline.slice(0, 10) : "");
+    setEfLeadId(p.lead_id || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingProject) return;
+    try {
+      setSavingEdit(true);
+      await api.updateProject(editingProject.id, {
+        code: efCode || undefined,
+        name: efName,
+        group_name: efGroup || undefined,
+        geo_manager: efGeo || undefined,
+        dosco_manager: efDosco || undefined,
+        evaluation: efEval || undefined,
+        status: efStatus as ProjectStatus,
+        start_date: efStartDate || null,
+        end_date: efEndDate || null,
+        internal_deadline: efInternalDeadline || null,
+        lead_id: efLeadId ? Number(efLeadId) : null,
+      });
+      setEditingProject(null);
+      api.projects().then((d) => setProjects(d)).catch(() => {});
+    } catch (err) {
+      alert("Lỗi khi lưu dự án: " + (err instanceof Error ? err.message : "Đã có lỗi xảy ra"));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const uniqueLeads = Array.from(
     new Set(projects.map((p) => p.lead_name).filter(Boolean) as string[])
@@ -367,6 +423,7 @@ export default function ProjectsPage() {
               <th className={TH}>Tổng thời gian</th>
               <th className={TH}>Trạng thái</th>
               <th className={TH}>Tiến độ</th>
+              <th className={`${TH} text-center`}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -409,6 +466,16 @@ export default function ProjectsPage() {
                       </div>
                       <span className="text-[10px] tnum text-muted">{Math.round(Number(p.progress_percent ?? 0))}%</span>
                     </div>
+                  </td>
+                  <td className={`${TD} text-center whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => openEditModal(p)}
+                      title="Sửa thông tin dự án"
+                      className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer"
+                    >
+                      <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
+                      Sửa
+                    </button>
                   </td>
                 </tr>
               );
@@ -584,6 +651,98 @@ export default function ProjectsPage() {
                 </button>
               )}
             </footer>
+          </div>
+        </div>
+      )}
+      {editingProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-xl2 bg-white p-5 shadow-2xl animate-fade-in border border-line max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h3 className="text-sm font-bold text-ink flex items-center gap-1.5">
+                <PencilSquareIcon className="h-5 w-5 text-steel" />
+                Sửa thông tin dự án [{editingProject.code || editingProject.id}]
+              </h3>
+              <button onClick={() => setEditingProject(null)} className="rounded-full p-1 text-muted hover:bg-paper">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-muted">Tên dự án <span className="text-bad">*</span></label>
+                <input value={efName} onChange={(e) => setEfName(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Mã quản lý</label>
+                  <input value={efCode} onChange={(e) => setEfCode(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm</label>
+                  <input value={efGroup} onChange={(e) => setEfGroup(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</label>
+                  <input list="geo-list-edit" value={efGeo} onChange={(e) => setEfGeo(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+                  <datalist id="geo-list-edit">
+                    {mgrs.geo.map((m) => <option key={m} value={m} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当</label>
+                  <input list="dosco-list-edit" value={efDosco} onChange={(e) => setEfDosco(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+                  <datalist id="dosco-list-edit">
+                    {mgrs.dosco.map((m) => <option key={m} value={m} />)}
+                  </datalist>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Trạng thái</label>
+                  <select value={efStatus} onChange={(e) => setEfStatus(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel">
+                    <option value="PLANNING">Chuẩn bị</option>
+                    <option value="IN_PROGRESS">Đang làm</option>
+                    <option value="COMPLETED">Hoàn thành</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Người chủ trì (Lead)</label>
+                  <select value={efLeadId} onChange={(e) => setEfLeadId(e.target.value ? Number(e.target.value) : "")} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel">
+                    <option value="">— Chưa chọn —</option>
+                    {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Ngày nhận</label>
+                  <input type="date" value={efStartDate} onChange={(e) => setEfStartDate(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-xs outline-none focus:border-steel" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Ngày hoàn thành</label>
+                  <input type="date" value={efEndDate} onChange={(e) => setEfEndDate(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-xs outline-none focus:border-steel" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Hạn nội bộ</label>
+                  <input type="date" value={efInternalDeadline} onChange={(e) => setEfInternalDeadline(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-xs outline-none focus:border-steel" />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-muted">Đánh giá</label>
+                <input value={efEval} onChange={(e) => setEfEval(e.target.value)} placeholder="VD: Tốt, Xuất sắc..." className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2 text-xs font-semibold">
+              <button onClick={() => setEditingProject(null)} className="rounded-xl2 border border-line px-4 py-2 text-muted hover:bg-paper">
+                Hủy bỏ
+              </button>
+              <button onClick={handleSaveEdit} disabled={savingEdit || !efName.trim()} className="rounded-xl2 bg-ink px-4 py-2 text-white hover:bg-steel disabled:opacity-50">
+                {savingEdit ? "Đang lưu..." : "Lưu thay đổi"}
+              </button>
+            </div>
           </div>
         </div>
       )}

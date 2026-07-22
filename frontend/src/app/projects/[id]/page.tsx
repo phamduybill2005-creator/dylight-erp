@@ -126,6 +126,7 @@ export default function ProjectDetailPage() {
     !!currentUser &&
     (currentUser.role === "DIRECTOR" ||
       currentUser.role === "ADMIN" ||
+      currentUser.role === "MANAGER" ||
       project?.lead_id === currentUser.id);
 
   // Load current user once.
@@ -383,6 +384,16 @@ export default function ProjectDetailPage() {
               >
                 <TrashIcon className="h-4 w-4" />
                 Xoá dự án
+              </button>
+            )}
+            {canManage && (
+              <button
+                onClick={() => setMembersModal(true)}
+                title="Sửa thông tin dự án"
+                className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer shadow-sm"
+              >
+                <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
+                Sửa dự án
               </button>
             )}
             {canManage ? (
