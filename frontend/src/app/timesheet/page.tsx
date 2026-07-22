@@ -115,12 +115,15 @@ export default function TimesheetPage() {
     return ids;
   }, [users, dept]);
 
+  const rangeFrom = days[0];
+  const rangeTo = days[days.length - 1];
+
   const loadEntries = useCallback(() => {
     if (!me) return;
-    const params: { from: string; to: string; userId?: number } = { from: weekStart, to: weekEnd };
+    const params: { from: string; to: string; userId?: number } = { from: rangeFrom, to: rangeTo };
     if (mode === "me") params.userId = targetUid;   // 1 người; team -> để trống = mọi người
     api.timesheets(params).then(setEntries).catch(() => setEntries([]));
-  }, [me, weekStart, weekEnd, mode, targetUid]);
+  }, [me, rangeFrom, rangeTo, mode, targetUid]);
 
   useEffect(() => {
     api.me()
@@ -342,12 +345,17 @@ export default function TimesheetPage() {
           <thead>
             <tr className="bg-slate-700 text-[10px] uppercase tracking-wide text-white">
               <th className={`${stickyLeft} sticky top-0 z-30 bg-slate-700 border border-slate-600 px-2 py-1.5 text-left font-semibold align-middle`}>Dự án</th>
-              {days.map((d, i) => (
-                <th key={d} className={`sticky top-0 z-20 border border-slate-600 px-0.5 py-1.5 text-center font-semibold whitespace-nowrap align-middle ${d === today ? "bg-amber text-white" : "bg-slate-700 text-slate-200"}`}>
-                  <div>{DOW[i]}</div>
-                  <div className="text-[9px] font-normal">{fmtDay(d)}</div>
-                </th>
-              ))}
+              {days.map((d) => {
+                const [y, m, dd] = d.split("-").map(Number);
+                const dayIdx = new Date(y, m - 1, dd).getDay();
+                const dowName = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][dayIdx];
+                return (
+                  <th key={d} className={`sticky top-0 z-20 border border-slate-600 px-0.5 py-1.5 text-center font-semibold whitespace-nowrap align-middle ${d === today ? "bg-amber text-white" : "bg-slate-700 text-slate-200"}`}>
+                    <div>{dowName}</div>
+                    <div className="text-[9px] font-normal">{fmtDay(d)}</div>
+                  </th>
+                );
+              })}
               <th className="sticky top-0 right-[50px] z-30 bg-slate-700 border border-slate-600 px-1 py-1.5 text-center font-semibold whitespace-nowrap w-[50px] min-w-[50px] align-middle">
                 <div>Giờ</div>
                 <div className="text-[9px] font-normal opacity-0">–</div>
@@ -360,7 +368,7 @@ export default function TimesheetPage() {
           </thead>
           <tbody>
             {rowProjects.length === 0 ? (
-              <tr><td colSpan={10} className="border border-line px-2 py-5 text-center text-muted">Chưa có dự án nào.</td></tr>
+              <tr><td colSpan={days.length + 3} className="border border-line px-2 py-5 text-center text-muted">Chưa có dự án nào.</td></tr>
             ) : (
               rowProjects.map((p) => {
                 const total = projTotal(p.id);
