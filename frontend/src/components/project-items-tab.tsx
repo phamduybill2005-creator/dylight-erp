@@ -893,8 +893,16 @@ function GroupRows({
       {/* Các đầu việc con */}
       {!collapsed &&
         kids.map((c, ci) => (
-        <tr key={c.id} className={`border-t border-line/50 ${ci % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-sky-50/40 transition-colors`}>
-          <td className="px-2 py-1 text-[10px] font-medium text-slate-500 text-center bg-slate-50/50">
+        <tr key={c.id} className={`border-t border-line/50 transition-colors ${
+          c.assignee_id
+            ? "bg-amber-50 hover:bg-amber-100/70"   // ĐÃ GIAO -> sáng lên (dễ nhìn)
+            : `${ci % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-sky-50/40`
+        }`}>
+          <td className={`px-2 py-1 text-[10px] font-medium text-center ${
+            c.assignee_id
+              ? "bg-amber-100/70 text-amber-800 border-l-4 border-l-amber-400"
+              : "text-slate-500 bg-slate-50/50"
+          }`}>
             {groupIndex + 1}.{ci + 1}
           </td>
           <td className="px-1 py-0.5 pl-3">
