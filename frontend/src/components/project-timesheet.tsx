@@ -47,7 +47,6 @@ export default function ProjectTimesheet({
 }) {
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayLocal()));
   const [entries, setEntries] = useState<Timesheet[]>([]);
-  const [allEntries, setAllEntries] = useState<Timesheet[]>([]);
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [workerRatings, setWorkerRatings] = useState<ProjectItemRating[]>([]);
   const [hourEdits, setHourEdits] = useState<Record<string, string>>({});
@@ -55,6 +54,7 @@ export default function ProjectTimesheet({
   const [tempWorkers, setTempWorkers] = useState<Record<number, number[]>>({}); // item id -> user ids thêm tạm thời
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const weekEnd = days[6];
   const today = todayLocal();
   const projStart = startDate ? startDate.slice(0, 10) : null;
   const projEnd = endDate ? endDate.slice(0, 10) : null;
@@ -70,20 +70,12 @@ export default function ProjectTimesheet({
   }, [projectId]);
   useEffect(() => { loadItems(); }, [loadItems]);
 
-  const [weekEnd, setWeekEnd] = [days[6], null]; // just unused helper
   const loadEntries = useCallback(() => {
-    api.timesheets({ from: weekStart, to: days[6], projectId })
+    api.timesheets({ from: weekStart, to: weekEnd, projectId })
       .then(setEntries)
       .catch(() => setEntries([]));
-  }, [weekStart, days, projectId]);
+  }, [weekStart, weekEnd, projectId]);
   useEffect(() => { loadEntries(); }, [loadEntries]);
-
-  const loadAllEntries = useCallback(() => {
-    api.timesheets({ projectId })
-      .then(setAllEntries)
-      .catch(() => setAllEntries([]));
-  }, [projectId]);
-  useEffect(() => { loadAllEntries(); }, [loadAllEntries]);
 
   const loadWorkerRatings = useCallback(() => {
     api.projectItemRatings(projectId).then(setWorkerRatings).catch(() => setWorkerRatings([]));
@@ -112,50 +104,11 @@ export default function ProjectTimesheet({
     for (const i of items) if (i.parent_id == null) map.set(i.id, i.name);
     return map;
   }, [items]);
-
-  // Sum of hours for a specific project_item_id and user_id from the start of project
-  const workerAllTotal = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of allEntries) {
-      if (e.project_item_id) {
-        const key = `${e.user_id}-${e.project_item_id}`;
-        map.set(key, (map.get(key) ?? 0) + Number(e.hours));
-      }
-    }
-    return map;
-  }, [allEntries]);
-
-  // Sum of hours for a specific project_item_id from the start of project
-  const taskAllTotal = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const e of allEntries) {
-      if (e.project_item_id) {
-        map.set(e.project_item_id, (map.get(e.project_item_id) ?? 0) + Number(e.hours));
-      }
-    }
-    return map;
-  }, [allEntries]);
   
   const leaves = useMemo(() =>
     items.filter((i) => i.parent_id != null)
       .sort((a, b) => a.order_index - b.order_index || a.id - b.id),
     [items]);
-
-  const groups = useMemo(() =>
-    items.filter((i) => i.parent_id == null)
-      .sort((a, b) => a.order_index - b.order_index || a.id - b.id),
-    [items]);
-
-  const childrenOf = useCallback((gid: number) =>
-    items.filter((i) => i.parent_id === gid)
-      .sort((a, b) => a.order_index - b.order_index || a.id - b.id),
-    [items]);
-
-  const orphanLeaves = useMemo(() => {
-    const groupIds = new Set(groups.map((g) => g.id));
-    return items.filter((i) => i.parent_id != null && !groupIds.has(i.parent_id))
-      .sort((a, b) => a.order_index - b.order_index || a.id - b.id);
-  }, [items, groups]);
 
   const taskWorkers = useCallback((it: ProjectItem): User[] => {
     const workerIds = new Set<number>();
@@ -210,7 +163,6 @@ export default function ProjectTimesheet({
         user_id: uid !== currentUserId ? uid : undefined,
       });
       loadEntries();
-      loadAllEntries();
     } catch { /* noop */ }
   }
 
@@ -236,137 +188,8 @@ export default function ProjectTimesheet({
   const isOpen = (k: number) => !collapsed.has(String(k));
   const toggle = (k: number) =>
     setCollapsed((s) => { const n = new Set(s); const key = String(k); n.has(key) ? n.delete(key) : n.add(key); return n; });
-  const COLS = 1 + 1 + 7 + 1;
 
-  const renderTaskRow = (it: ProjectItem, sttPrefix: string) => {
-    const open = isOpen(it.id);
-    const workers = taskWorkers(it);
-    const tDayHours = (d: string) => workers.reduce((sum, w) => sum + (hoursMap.get(hkey(w.id, it.id, d)) ?? 0), 0);
-    return (
-      <FragmentRows key={it.id}>
-        <tr className="cursor-pointer bg-slate-50/90 font-semibold text-ink hover:bg-sky-50/70 transition-colors" onClick={() => toggle(it.id)}>
-          <td className="sticky left-0 z-10 border border-line bg-inherit px-2 py-1.5">
-            <span className="flex items-center gap-1.5">
-              {open ? <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-slate-500" /> : <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-slate-500" />}
-              <span className="font-mono font-bold text-indigo-700 text-[11px] shrink-0">{sttPrefix}</span>
-              <div className="max-w-[220px] truncate font-medium text-slate-900" title={it.name}>
-                {it.name || <span className="italic text-muted">(chưa đặt tên)</span>}
-              </div>
-              <span className="ml-1 rounded-full bg-white px-1.5 py-0.2 text-[9px] font-semibold text-slate-500 border border-slate-200">{workers.length}</span>
-            </span>
-          </td>
-          <td className="border border-line px-1 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-            {(() => {
-              const done = !!it.done_date;
-              const canTick = it.assignee_id != null && it.assignee_id === currentUserId;
-              return (
-                <button
-                  type="button"
-                  disabled={!canTick}
-                  onClick={() => toggleDone(it)}
-                  title={done ? "Đã xong — bấm để bỏ" : canTick ? "Đánh dấu đã xong" : "Chỉ người phụ trách chính mới tích được"}
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${done ? "bg-ok/15 text-ok" : "bg-line/50 text-muted"} ${canTick ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
-                >
-                  {done ? <CheckCircleIcon className="h-4 w-4" /> : <span className="h-3 w-3 rounded-full border-2 border-current" />}
-                  {done ? "Đã xong" : "Chưa xong"}
-                </button>
-              );
-            })()}
-          </td>
-          {days.map((d) => {
-            const v = tDayHours(d);
-            return <td key={d} className={`border border-line px-1 py-1.5 text-center tnum font-semibold text-steel ${d === today ? "bg-amber/10" : ""}`}>{v > 0 ? num1(v) : ""}</td>;
-          })}
-          {(() => {
-            const tAllHours = taskAllTotal.get(it.id) ?? 0;
-            return (
-              <td className="border border-line px-2 py-1.5 text-center tnum text-amber-deep font-bold">
-                {tAllHours > 0 ? num1(tAllHours) : "–"}
-              </td>
-            );
-          })()}
-        </tr>
-        {open && (
-          <>
-            {workers.map((w) => {
-              const isMainAssignee = it.assignee_id === w.id;
-              return (
-                <tr key={w.id} className="odd:bg-white even:bg-paper/40">
-                  <td className="sticky left-0 z-10 border border-line bg-inherit px-2 py-1.5 pl-8">
-                    <div className="flex items-center gap-1.5 text-ink/90">
-                      <UserCircleIcon className="h-3.5 w-3.5 shrink-0 text-steel" />
-                      <span className="truncate">{w.full_name}</span>
-                      {isMainAssignee && <StarIcon className="h-3 w-3 text-amber fill-amber animate-pulse" title="Người phụ trách chính" />}
-                      {w.id === currentUserId && <span className="text-[9px] text-muted">(tôi)</span>}
-                    </div>
-                  </td>
-                  <td className="border border-line px-1 py-1.5 text-center">
-                    {(() => {
-                      const wDone = (workerRatings.find(r => r.project_item_id === it.id && r.user_id === w.id)?.rating ?? 0) > 0;
-                      const canTick = w.id === currentUserId;
-                      return (
-                        <button
-                          type="button"
-                          disabled={!canTick}
-                          onClick={() => rateWorker(it.id, w.id, wDone ? 0 : 1)}
-                          title={wDone ? "Đã xong — bấm để bỏ" : canTick ? "Đánh dấu phần của bạn đã xong" : "Chưa xong"}
-                          className={`inline-flex items-center justify-center transition-colors ${wDone ? "text-ok" : "text-line"} ${canTick ? "cursor-pointer hover:text-ok" : "cursor-default"}`}
-                        >
-                          {wDone ? <CheckCircleIcon className="h-5 w-5" /> : <span className="h-4 w-4 rounded-full border-2 border-current" />}
-                        </button>
-                      );
-                    })()}
-                  </td>
-                  {days.map((d) => {
-                    const v = hoursMap.get(hkey(w.id, it.id, d)) ?? 0;
-                    return (
-                      <td key={d} className={`border border-line p-0 text-center ${v > 0 ? "bg-ok/15" : d === today ? "bg-amber/10" : d > today ? "bg-line/20" : ""}`}>
-                        {canEditHours(w.id) && d <= today ? (
-                          <input type="text" inputMode="decimal" value={hoursValue(w.id, it.id, d)} onChange={(e) => setHourEdits((x) => ({ ...x, [hkey(w.id, it.id, d)]: e.target.value }))} onBlur={() => commitHours(w.id, it.id, d)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="–" className="h-7 w-full min-w-[38px] bg-transparent text-center text-xs text-ink outline-none placeholder:text-line focus:bg-steel/5" />
-                        ) : (
-                          <span className={`block px-1 py-1 tnum ${v > 0 ? "font-semibold text-ink" : "text-line"}`} title={d > today ? "Chưa tới ngày — chưa nhập được" : undefined}>{v > 0 ? num1(v) : "–"}</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                  {(() => {
-                    const wAllHours = workerAllTotal.get(`${w.id}-${it.id}`) ?? 0;
-                    return (
-                      <td className={`border border-line px-2 py-1.5 text-center font-bold tnum ${wAllHours > 0 ? "text-steel" : "text-muted"}`}>
-                        {wAllHours > 0 ? num1(wAllHours) : "–"}
-                      </td>
-                    );
-                  })()}
-                </tr>
-              );
-            })}
-            {members.length > 0 && (
-              <tr className="bg-paper/20">
-                <td colSpan={COLS} className="border border-line px-6 py-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-muted">Thêm người làm việc này:</span>
-                    <select value="" onChange={(e) => { const val = e.target.value; if (val) { const uid = Number(val); setTempWorkers(prev => { const curr = prev[it.id] ?? []; if (curr.includes(uid)) return prev; return { ...prev, [it.id]: [...curr, uid] }; }); } }} className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] text-muted outline-none focus:border-steel cursor-pointer">
-                      <option value="">— Chọn người —</option>
-                      {members.filter(m => !workers.some(w => w.id === m.id)).map(m => (<option key={m.id} value={m.id}>{m.full_name}</option>))}
-                    </select>
-                    {canManage && (
-                      <>
-                        <span className="text-[10px] text-muted ml-4">Đặt người phụ trách chính:</span>
-                        <select value={it.assignee_id ?? ""} onChange={(e) => assign(it, e.target.value === "" ? null : Number(e.target.value))} className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] text-muted outline-none focus:border-steel cursor-pointer">
-                          <option value="">— Chưa chọn —</option>
-                          {assigneeOptions.map((o) => (<option key={o.id} value={o.id}>{o.name}</option>))}
-                        </select>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            )}
-          </>
-        )}
-      </FragmentRows>
-    );
-  };
+  const COLS = 1 + 1 + 7 + 1;
 
   return (
     <div className="rounded-xl2 border border-line/40 bg-white p-3.5 shadow-card">
@@ -423,45 +246,123 @@ export default function ProjectTimesheet({
                 Chưa có đầu việc — thêm ở tab <b>Hạng mục</b>.
               </td></tr>
             ) : (
-              <>
-                {groups.map((g, gi) => {
-                  const kids = childrenOf(g.id);
-                  if (kids.length === 0) return null;
-                  return (
-                    <FragmentRows key={g.id}>
-                      {/* Dòng tiêu đề Nhóm cha */}
-                      <tr className="bg-gradient-to-r from-slate-700 to-indigo-900 text-white font-bold">
-                        <td colSpan={COLS} className="px-3 py-1.5 text-[11px] tracking-wide">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[10px] text-white font-bold shadow-sm">
-                              {gi + 1}
-                            </span>
-                            <span className="font-semibold">{g.name}</span>
-                            {g.department && (
-                              <span className="rounded bg-amber-400/20 px-2 py-0.5 text-[9px] font-semibold text-amber-200 border border-amber-400/30">
-                                {g.department}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* Danh sách các đầu việc con: 1.1, 1.2, 1.3... */}
-                      {kids.map((c, ci) => renderTaskRow(c, `${gi + 1}.${ci + 1}`))}
-                    </FragmentRows>
-                  );
-                })}
-
-                {/* Các đầu việc lẻ chưa gán nhóm (nếu có) */}
-                {orphanLeaves.length > 0 && (
-                  <FragmentRows key="orphans">
-                    <tr className="bg-slate-200 text-slate-700 font-bold">
-                      <td colSpan={COLS} className="px-3 py-1 text-[11px]">Hạng mục khác</td>
+              leaves.map((it) => {
+                const open = isOpen(it.id);
+                const workers = taskWorkers(it);
+                const grp = it.parent_id != null ? parentName.get(it.parent_id) : null;
+                const tDayHours = (d: string) => workers.reduce((sum, w) => sum + (hoursMap.get(hkey(w.id, it.id, d)) ?? 0), 0);
+                const tTotalHours = days.reduce((sum, d) => sum + tDayHours(d), 0);
+                return (
+                  <FragmentRows key={it.id}>
+                    <tr className="cursor-pointer bg-ink/5 font-semibold text-ink hover:brightness-95" onClick={() => toggle(it.id)}>
+                      <td className="sticky left-0 z-10 border border-line bg-inherit px-2 py-1.5">
+                        <span className="flex items-center gap-1.5">
+                          {open ? <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" /> : <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />}
+                          <div className="max-w-[240px] truncate" title={it.name}>{it.name || <span className="italic text-muted">(chưa đặt tên)</span>}</div>
+                          {grp && <span className="text-[9px] font-normal text-muted">({grp})</span>}
+                          <span className="ml-1 rounded-full bg-white/70 px-1.5 text-[9px] font-semibold text-muted">{workers.length}</span>
+                        </span>
+                      </td>
+                      <td className="border border-line px-1 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                          const done = !!it.done_date;
+                          const canTick = it.assignee_id != null && it.assignee_id === currentUserId;
+                          return (
+                            <button
+                              type="button"
+                              disabled={!canTick}
+                              onClick={() => toggleDone(it)}
+                              title={done ? "Đã xong — bấm để bỏ" : canTick ? "Đánh dấu đã xong" : "Chỉ người phụ trách chính mới tích được"}
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${done ? "bg-ok/15 text-ok" : "bg-line/50 text-muted"} ${canTick ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
+                            >
+                              {done ? <CheckCircleIcon className="h-4 w-4" /> : <span className="h-3 w-3 rounded-full border-2 border-current" />}
+                              {done ? "Đã xong" : "Chưa xong"}
+                            </button>
+                          );
+                        })()}
+                      </td>
+                      {days.map((d) => {
+                        const v = tDayHours(d);
+                        return <td key={d} className={`border border-line px-1 py-1.5 text-center tnum font-semibold text-steel ${d === today ? "bg-amber/10" : ""}`}>{v > 0 ? num1(v) : ""}</td>;
+                      })}
+                      <td className="border border-line px-2 py-1.5 text-center tnum text-amber-deep font-bold">{tTotalHours > 0 ? num1(tTotalHours) : "–"}</td>
                     </tr>
-                    {orphanLeaves.map((c, ci) => renderTaskRow(c, `${groups.length + 1}.${ci + 1}`))}
+                    {open && (
+                      <>
+                        {workers.map((w) => {
+                          const wTotal = days.reduce((sum, d) => sum + (hoursMap.get(hkey(w.id, it.id, d)) ?? 0), 0);
+                          const isMainAssignee = it.assignee_id === w.id;
+                          return (
+                            <tr key={w.id} className="odd:bg-white even:bg-paper/40">
+                              <td className="sticky left-0 z-10 border border-line bg-inherit px-2 py-1.5 pl-6">
+                                <div className="flex items-center gap-1.5 text-ink/90">
+                                  <UserCircleIcon className="h-3.5 w-3.5 shrink-0 text-steel" />
+                                  <span className="truncate">{w.full_name}</span>
+                                  {isMainAssignee && <StarIcon className="h-3 w-3 text-amber fill-amber animate-pulse" title="Người phụ trách chính" />}
+                                  {w.id === currentUserId && <span className="text-[9px] text-muted">(tôi)</span>}
+                                </div>
+                              </td>
+                              <td className="border border-line px-1 py-1.5 text-center">
+                                {(() => {
+                                  const wDone = (workerRatings.find(r => r.project_item_id === it.id && r.user_id === w.id)?.rating ?? 0) > 0;
+                                  const canTick = w.id === currentUserId;   // mỗi người tự tích phần của mình
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={!canTick}
+                                      onClick={() => rateWorker(it.id, w.id, wDone ? 0 : 1)}
+                                      title={wDone ? "Đã xong — bấm để bỏ" : canTick ? "Đánh dấu phần của bạn đã xong" : "Chưa xong"}
+                                      className={`inline-flex items-center justify-center transition-colors ${wDone ? "text-ok" : "text-line"} ${canTick ? "cursor-pointer hover:text-ok" : "cursor-default"}`}
+                                    >
+                                      {wDone ? <CheckCircleIcon className="h-5 w-5" /> : <span className="h-4 w-4 rounded-full border-2 border-current" />}
+                                    </button>
+                                  );
+                                })()}
+                              </td>
+                              {days.map((d) => {
+                                const v = hoursMap.get(hkey(w.id, it.id, d)) ?? 0;
+                                return (
+                                  <td key={d} className={`border border-line p-0 text-center ${v > 0 ? "bg-ok/15" : d === today ? "bg-amber/10" : d > today ? "bg-line/20" : ""}`}>
+                                    {/* Chỉ cho nhập giờ ngày HÔM NAY & các ngày ĐÃ QUA; ngày mai trở đi không nhập được. */}
+                                    {canEditHours(w.id) && d <= today ? (
+                                      <input type="text" inputMode="decimal" value={hoursValue(w.id, it.id, d)} onChange={(e) => setHourEdits((x) => ({ ...x, [hkey(w.id, it.id, d)]: e.target.value }))} onBlur={() => commitHours(w.id, it.id, d)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="–" className="h-7 w-full min-w-[38px] bg-transparent text-center text-xs text-ink outline-none placeholder:text-line focus:bg-steel/5" />
+                                    ) : (
+                                      <span className={`block px-1 py-1 tnum ${v > 0 ? "font-semibold text-ink" : "text-line"}`} title={d > today ? "Chưa tới ngày — chưa nhập được" : undefined}>{v > 0 ? num1(v) : "–"}</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className={`border border-line px-2 py-1.5 text-center font-bold tnum ${wTotal > 0 ? "text-steel" : "text-muted"}`}>{wTotal > 0 ? num1(wTotal) : "–"}</td>
+                            </tr>
+                          );
+                        })}
+                        {members.length > 0 && (
+                          <tr className="bg-paper/20">
+                            <td colSpan={COLS} className="border border-line px-6 py-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted">Thêm người làm việc này:</span>
+                                <select value="" onChange={(e) => { const val = e.target.value; if (val) { const uid = Number(val); setTempWorkers(prev => { const curr = prev[it.id] ?? []; if (curr.includes(uid)) return prev; return { ...prev, [it.id]: [...curr, uid] }; }); } }} className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] text-muted outline-none focus:border-steel cursor-pointer">
+                                  <option value="">— Chọn người —</option>
+                                  {members.filter(m => !workers.some(w => w.id === m.id)).map(m => (<option key={m.id} value={m.id}>{m.full_name}</option>))}
+                                </select>
+                                {canManage && (
+                                  <>
+                                    <span className="text-[10px] text-muted ml-4">Đặt người phụ trách chính:</span>
+                                    <select value={it.assignee_id ?? ""} onChange={(e) => assign(it, e.target.value === "" ? null : Number(e.target.value))} className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] text-muted outline-none focus:border-steel cursor-pointer">
+                                      <option value="">— Chưa chọn —</option>
+                                      {assigneeOptions.map((o) => (<option key={o.id} value={o.id}>{o.name}</option>))}
+                                    </select>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )}
                   </FragmentRows>
-                )}
-              </>
+                );
+              })
             )}
           </tbody>
           {leaves.length > 0 && (
