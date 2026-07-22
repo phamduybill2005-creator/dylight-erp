@@ -494,7 +494,7 @@ export default function ProjectDetailPage() {
       {/* Tabs điều hướng */}
       <div className="mt-6 flex border-b border-line">
         <TabButton active={activeTab === "items"} onClick={() => setActiveTab("items")} label="Hạng mục" icon={TableCellsIcon} />
-        <TabButton active={activeTab === "progress"} onClick={() => setActiveTab("progress")} label="Nhân công" icon={ClockIcon} count={progressLogs.length} />
+        <TabButton active={activeTab === "progress"} onClick={() => setActiveTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
         <TabButton active={activeTab === "team"} onClick={() => setActiveTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
       </div>
 
