@@ -268,16 +268,22 @@ export default function TimesheetPage() {
       <div className="mt-3 mr-14 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
         <table className="w-full border-collapse text-[11px]">
           <thead>
-            <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-[10px] uppercase tracking-wide text-white">
-              <th className={`${stickyLeft} sticky top-0 z-30 bg-slate-700 px-2 py-1.5 text-left font-semibold`}>Dự án</th>
+            <tr className="bg-slate-700 text-[10px] uppercase tracking-wide text-white">
+              <th className={`${stickyLeft} sticky top-0 z-30 bg-slate-700 border border-slate-600 px-2 py-1.5 text-left font-semibold align-middle`}>Dự án</th>
               {days.map((d, i) => (
-                <th key={d} className={`sticky top-0 z-20 border border-slate-600 px-0.5 py-1.5 text-center font-semibold whitespace-nowrap ${d === today ? "bg-amber text-white" : "bg-slate-700 text-slate-200"}`}>
+                <th key={d} className={`sticky top-0 z-20 border border-slate-600 px-0.5 py-1.5 text-center font-semibold whitespace-nowrap align-middle ${d === today ? "bg-amber text-white" : "bg-slate-700 text-slate-200"}`}>
                   <div>{DOW[i]}</div>
                   <div className="text-[9px] font-normal">{fmtDay(d)}</div>
                 </th>
               ))}
-              <th className={`${stickyRight} sticky top-0 z-30 bg-slate-700 px-1 py-1.5 text-center font-semibold whitespace-nowrap`} style={{right: 48}}>Giờ</th>
-              <th className={`${stickyRight} sticky top-0 z-30 bg-slate-700 px-1 py-1.5 text-center font-semibold whitespace-nowrap`}>Ngày<br />công</th>
+              <th className="sticky top-0 right-[50px] z-30 bg-slate-700 border border-slate-600 px-1 py-1.5 text-center font-semibold whitespace-nowrap w-[50px] min-w-[50px] align-middle">
+                <div>Giờ</div>
+                <div className="text-[9px] font-normal opacity-0">–</div>
+              </th>
+              <th className="sticky top-0 right-0 z-30 bg-slate-700 border border-slate-600 px-1 py-1.5 text-center font-semibold whitespace-nowrap w-[50px] min-w-[50px] align-middle">
+                <div>Ngày</div>
+                <div className="text-[9px] font-normal">công</div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -312,10 +318,10 @@ export default function TimesheetPage() {
                         )}
                       </td>
                     ))}
-                    <td className={`${stickyRight} bg-inherit px-1 py-1 text-center font-bold tnum ${total > 0 ? "text-steel" : "text-muted"}`} style={{right: 48}}>
+                    <td className={`sticky right-[50px] z-10 border border-line bg-inherit px-1 py-1 text-center font-bold tnum w-[50px] min-w-[50px] ${total > 0 ? "text-steel" : "text-muted"}`}>
                       {total > 0 ? num1(total) : "–"}
                     </td>
-                    <td className={`${stickyRight} bg-inherit px-1 py-1 text-center font-bold tnum ${total > 0 ? "text-ink" : "text-muted"}`}>
+                    <td className={`sticky right-0 z-10 border border-line bg-inherit px-1 py-1 text-center font-bold tnum w-[50px] min-w-[50px] ${total > 0 ? "text-ink" : "text-muted"}`}>
                       {total > 0 ? num1(total / 8) : "–"}
                     </td>
                   </tr>
@@ -334,10 +340,10 @@ export default function TimesheetPage() {
                   </td>
                 );
               })}
-              <td className={`${stickyRight} bg-teal-600 px-1 py-1.5 text-center text-yellow-200 tnum sticky bottom-0 z-30 border-t border-teal-500`} style={{right: 48}}>
+              <td className={`sticky bottom-0 right-[50px] z-30 bg-teal-600 border border-teal-500 px-1 py-1.5 text-center text-yellow-200 tnum w-[50px] min-w-[50px]`}>
                 {grandTotal > 0 ? num1(grandTotal) : "–"}
               </td>
-              <td className={`${stickyRight} bg-teal-600 px-1 py-1.5 text-center text-yellow-100 font-extrabold tnum sticky bottom-0 z-30 border-t border-teal-500`}>
+              <td className={`sticky bottom-0 right-0 z-30 bg-teal-600 border border-teal-500 px-1 py-1.5 text-center text-yellow-100 font-extrabold tnum w-[50px] min-w-[50px]`}>
                 {grandTotal > 0 ? num1(grandTotal / 8) : "–"}
               </td>
             </tr>
