@@ -617,11 +617,11 @@ export default function ProjectItemsTab({
               <thead>
                 <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-[10px] uppercase tracking-wide text-white">
                   <th className="w-10 px-2 py-2 text-left font-semibold">STT</th>
-                  <th className="px-2 py-2 text-left font-semibold">Tên hạng mục</th>
+                  <th className="w-[340px] min-w-[280px] px-2 py-2 text-left font-semibold">Tên hạng mục</th>
                   {canSeeMoney && <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>}
                   {canSeeMoney && <th className="w-28 px-2 py-2 text-right font-semibold">Đơn giá</th>}
                   {canSeeMoney && <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>}
-                  <th className="w-40 px-2 py-2 text-left font-semibold">Ghi chú</th>
+                  <th className="px-2 py-2 text-left font-semibold min-w-[250px]">Ghi chú</th>
                   <th className="w-28 px-2 py-2 text-left font-semibold">Hạn nộp</th>
                   <th className="w-36 px-2 py-2 text-left font-semibold">Đúng hạn</th>
                   <th className="w-8 px-1 py-2" />
