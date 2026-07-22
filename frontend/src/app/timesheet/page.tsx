@@ -289,7 +289,7 @@ export default function TimesheetPage() {
                 return (
                   <tr key={p.id} className="odd:bg-white even:bg-sky-50/60 hover:bg-sky-100/50 transition-colors">
                     <td className={`${stickyLeft} bg-inherit px-2 py-1`}>
-                      <span className="font-mono text-[9px] text-muted">{p.code}</span>
+                      <span className="font-mono text-[10px] font-bold text-bad block">{p.code}</span>
                       <span className="block max-w-[180px] truncate font-medium text-ink text-[11px]" title={p.name}>{p.name}</span>
                     </td>
                     {days.map((d) => (
