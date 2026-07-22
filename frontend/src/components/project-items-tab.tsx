@@ -11,7 +11,7 @@ import { StarIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { formatVND, dateLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import type { ProjectItem, Department, User } from "@/lib/types";
+import type { ProjectItem, Department, User, Project } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
   1: "Cần xem xét lại",
@@ -179,6 +179,37 @@ export default function ProjectItemsTab({
   const [fAssignee, setFAssignee] = useState("");  // người làm (giao cho ai)
   const [formBusy, setFormBusy] = useState(false);
   const [formMsg, setFormMsg] = useState("");
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+
+  useEffect(() => {
+    if (canManage) {
+      api.projects().then((pList) => {
+        setProjects(pList);
+        const template = pList.find((p) => p.code === "2739-0124" || p.name.includes("いちき串木野"));
+        if (template) {
+          setSelectedTemplateId(String(template.id));
+        }
+      }).catch(() => {});
+    }
+  }, [canManage]);
+
+  async function handleCopyTemplate() {
+    if (!selectedTemplateId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.copyProjectItemsTemplate(projectId, Number(selectedTemplateId));
+      load();
+      setShowCopyModal(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Sao chép hạng mục thất bại.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -419,6 +450,15 @@ export default function ProjectItemsTab({
         <div className="flex shrink-0 items-center gap-2">
           {canManage && (
             <button
+              onClick={() => { setShowCopyModal(true); }}
+              className="flex items-center gap-1.5 rounded-xl2 bg-slate-100 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 shadow hover:bg-slate-200 transition-all"
+            >
+              <TableCellsIcon className="h-4 w-4 text-slate-500" />
+              Sao chép từ dự án mẫu
+            </button>
+          )}
+          {canManage && (
+            <button
               onClick={() => { setShowForm((s) => !s); setFormMsg(""); if (fGroupId === "" && groups.length > 0) setFGroupId(String(groups[0].id)); }}
               className="flex items-center gap-1.5 rounded-xl2 bg-amber px-3 py-2 text-xs font-semibold text-ink shadow hover:bg-amber-deep hover:text-white transition-all"
             >
@@ -548,14 +588,26 @@ export default function ProjectItemsTab({
         <div className="rounded-xl2 bg-white p-8 text-center shadow-card">
           <TableCellsIcon className="mx-auto h-10 w-10 text-line" />
           <p className="mt-2 text-xs text-muted">Chưa có hạng mục dự toán nào cho dự án này.</p>
-          <button
-            onClick={addGroup}
-            disabled={busy}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl2 bg-amber px-4 py-2 text-xs font-semibold text-ink disabled:opacity-50"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Thêm nhóm hạng mục
-          </button>
+          {canManage && (
+            <div className="mt-4 flex justify-center gap-2">
+              <button
+                onClick={addGroup}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-xl2 bg-amber px-4 py-2 text-xs font-semibold text-ink disabled:opacity-50"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Thêm nhóm hạng mục
+              </button>
+              <button
+                onClick={() => setShowCopyModal(true)}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-xl2 bg-slate-100 border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+              >
+                <TableCellsIcon className="h-4 w-4" />
+                Sao chép từ dự án mẫu
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -613,6 +665,46 @@ export default function ProjectItemsTab({
             </button>
           )}
         </>
+      )}
+      {showCopyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl2 bg-white p-5 shadow-2xl animate-fade-in border border-line">
+            <h3 className="text-sm font-bold text-ink">Sao chép hạng mục từ dự án mẫu</h3>
+            <p className="mt-2 text-xs text-muted leading-relaxed">
+              Bạn có muốn sao chép toàn bộ danh mục hạng mục và các đầu việc con từ một dự án mẫu sang dự án này không?
+            </p>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[11px] font-semibold text-muted">Chọn dự án mẫu:</span>
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-slate-400"
+              >
+                <option value="">— Chọn dự án mẫu —</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code ? `[${p.code}] ` : ""}{p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="mt-5 flex justify-end gap-2 text-xs font-semibold">
+              <button
+                onClick={() => setShowCopyModal(false)}
+                className="rounded-xl2 border border-line px-4 py-2 text-muted hover:bg-paper"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleCopyTemplate}
+                disabled={busy || !selectedTemplateId}
+                className="rounded-xl2 bg-ink px-4 py-2 text-white hover:bg-steel disabled:opacity-50"
+              >
+                {busy ? "Đang sao chép..." : "Xác nhận sao chép"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

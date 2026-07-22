@@ -71,6 +71,7 @@ export default function ProjectsPage() {
   const [nfStartDate, setNfStartDate] = useState("");
   const [nfEndDate, setNfEndDate] = useState("");
   const [nfInternalDeadline, setNfInternalDeadline] = useState("");
+  const [nfTemplateId, setNfTemplateId] = useState("");
   // Danh sách GEO担当 / DOSCO担当 đã dùng -> để CHỌN (datalist) khỏi gõ tay.
   const [mgrs, setMgrs] = useState<{ geo: string[]; dosco: string[] }>({ geo: [], dosco: [] });
 
@@ -78,6 +79,15 @@ export default function ProjectsPage() {
   const [leadId, setLeadId] = useState<number | "">("");
   const [users, setUsers] = useState<User[]>([]);
   const [canManage, setCanManage] = useState(false);
+
+  useEffect(() => {
+    if (projects.length > 0 && !nfTemplateId) {
+      const template = projects.find((p) => p.code === "2739-0124" || p.name.includes("いちき串木野"));
+      if (template) {
+        setNfTemplateId(String(template.id));
+      }
+    }
+  }, [projects, nfTemplateId]);
 
   // Bộ lọc tìm kiếm
   const [searchQuery, setSearchQuery] = useState("");
@@ -239,6 +249,13 @@ export default function ProjectsPage() {
         end_date: nfEndDate || null,
         internal_deadline: nfInternalDeadline || null,
       });
+      if (nfTemplateId) {
+        try {
+          await api.copyProjectItemsTemplate(created.id, Number(nfTemplateId));
+        } catch (err) {
+          console.error("Failed to copy template items:", err);
+        }
+      }
       const fresh = await api.projects().catch(() => null);
       if (fresh) setProjects(fresh);
       // Reset để nhập dự án kế tiếp nhanh.
@@ -500,6 +517,20 @@ export default function ProjectsPage() {
                         className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
                         <option value="">— Chưa chỉ định —</option>
                         {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {canManage && (
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-muted font-bold text-steel">Sao chép hạng mục từ dự án mẫu</span>
+                      <select value={nfTemplateId} onChange={(e) => setNfTemplateId(e.target.value)}
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
+                        <option value="">— Không sao chép hạng mục —</option>
+                        {projects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.code ? `[${p.code}] ` : ""}{p.name}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   )}

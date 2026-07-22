@@ -251,3 +251,85 @@ def upsert_project_item_rating(
     db.refresh(rating_rec)
     return rating_rec
 
+
+@router.post("/copy-template")
+def copy_from_template(
+    target_project_id: int,
+    template_project_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Sao chép toàn bộ nhóm hạng mục và đầu việc con từ dự án mẫu sang dự án đích."""
+    target_project = db.get(Project, target_project_id)
+    if not target_project or target_project.company_id != current.company_id:
+        raise HTTPException(400, "Dự án đích không hợp lệ.")
+    
+    if not _can_manage(db, target_project, current):
+        raise HTTPException(403, "Bạn không có quyền chỉnh sửa dự án này.")
+        
+    template_project = db.get(Project, template_project_id)
+    if not template_project or template_project.company_id != current.company_id:
+        raise HTTPException(400, "Dự án mẫu không hợp lệ.")
+        
+    template_items = db.query(ProjectItem).filter(ProjectItem.project_id == template_project_id).all()
+    
+    parents = [item for item in template_items if item.parent_id is None]
+    children = [item for item in template_items if item.parent_id is not None]
+    
+    parent_map = {}
+    
+    for p in parents:
+        new_p = ProjectItem(
+            company_id=current.company_id,
+            project_id=target_project_id,
+            parent_id=None,
+            order_index=p.order_index,
+            code=p.code,
+            name=p.name,
+            unit=p.unit,
+            quantity=p.quantity,
+            unit_price=p.unit_price,
+            progress=0,
+            rating=0,
+            department=p.department,
+            note=p.note,
+            due_date=None,
+            done_date=None,
+        )
+        db.add(new_p)
+        db.flush()
+        parent_map[p.id] = new_p.id
+        
+    for c in children:
+        new_parent_id = parent_map.get(c.parent_id)
+        if new_parent_id:
+            assignee_id = None
+            if c.assignee_id:
+                assignee_user = db.get(User, c.assignee_id)
+                if assignee_user and _can_view(db, target_project, assignee_user):
+                    assignee_id = c.assignee_id
+                    
+            new_c = ProjectItem(
+                company_id=current.company_id,
+                project_id=target_project_id,
+                parent_id=new_parent_id,
+                order_index=c.order_index,
+                code=c.code,
+                name=c.name,
+                unit=c.unit,
+                quantity=c.quantity,
+                unit_price=c.unit_price,
+                progress=0,
+                rating=0,
+                department=c.department,
+                assignee_id=assignee_id,
+                note=c.note,
+                due_date=None,
+                done_date=None,
+            )
+            db.add(new_c)
+            
+    db.commit()
+    return {"message": "Sao chép hạng mục thành công."}
+
+

@@ -213,6 +213,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  copyProjectItemsTemplate: (targetProjectId: number, templateProjectId: number) =>
+    request<{ message: string }>(`/project-items/copy-template?target_project_id=${targetProjectId}&template_project_id=${templateProjectId}`, {
+      method: "POST",
+    }),
 
   // --- Attendance (Chấm công) ---
   attendanceMe: (fromDate?: string, toDate?: string) => {
