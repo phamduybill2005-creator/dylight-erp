@@ -549,18 +549,21 @@ class EvaluationSummary(BaseModel):
 
 
 class StarOverviewRow(BaseModel):
-    """Tổng hợp SỐ SAO 1 người NHẬN được — gộp CẢ 3 nguồn (mọi thời gian):
-      - manager_*  : đánh giá quản lý  (Evaluation, người NHẬN)
-      - project_*  : đánh giá theo dự án (ProjectEvaluation, người NHẬN)
-      - item_*     : đánh giá hạng mục công việc (ProjectItem.rating, người ĐƯỢC GIAO)
-      - overall_*  : gộp toàn bộ số sao (avg = tổng sao / tổng số phiếu).
+    """Tổng hợp SỐ SAO 1 người NHẬN được — TÁCH RÕ NGUỒN (mọi thời gian):
+      - from_manager_* : sao QUẢN LÝ TRỰC TIẾP chấm cho người này (Evaluation MANAGER_TO_STAFF).
+      - from_staff_*   : sao NHÂN VIÊN / cấp dưới chấm cho người này (Evaluation STAFF_TO_MANAGER).
+      - project_*      : đánh giá theo dự án (ProjectEvaluation, người NHẬN).
+      - item_*         : đánh giá hạng mục công việc (ProjectItem.rating, người ĐƯỢC GIAO).
+      - overall_*      : gộp toàn bộ số sao (avg = tổng sao / tổng số phiếu).
     avg = None khi count = 0 (chưa có phiếu nào ở nguồn đó)."""
     user_id: int
     full_name: str
     role: UserRole
     department: str | None = None
-    manager_avg: float | None = None
-    manager_count: int = 0
+    from_manager_avg: float | None = None    # quản lý trực tiếp chấm
+    from_manager_count: int = 0
+    from_staff_avg: float | None = None       # nhân viên / cấp dưới chấm
+    from_staff_count: int = 0
     project_avg: float | None = None
     project_count: int = 0
     item_avg: float | None = None

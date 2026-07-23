@@ -198,23 +198,32 @@ def star_overview(
         )
         return {int(k): (int(s or 0), int(c or 0)) for k, s, c in rows}
 
-    mgr = agg(Evaluation.evaluatee_id, Evaluation)
+    # Đánh giá quản lý TÁCH 2 CHIỀU (đều là sao người này NHẬN):
+    #   - MANAGER_TO_STAFF: quản lý trực tiếp chấm cho người này.
+    #   - STAFF_TO_MANAGER: nhân viên / cấp dưới chấm cho người này.
+    mgr_down = agg(Evaluation.evaluatee_id, Evaluation,
+                   Evaluation.direction == EvaluationDirection.MANAGER_TO_STAFF)
+    mgr_up = agg(Evaluation.evaluatee_id, Evaluation,
+                 Evaluation.direction == EvaluationDirection.STAFF_TO_MANAGER)
     prj = agg(ProjectEvaluation.evaluatee_id, ProjectEvaluation)
     itm = agg(ProjectItem.assignee_id, ProjectItem)
 
     users = db.query(User).filter(User.company_id == cid).all()
     out: list[StarOverviewRow] = []
     for u in users:
-        m_s, m_c = mgr.get(u.id, (0, 0))
+        md_s, md_c = mgr_down.get(u.id, (0, 0))   # quản lý trực tiếp chấm
+        mu_s, mu_c = mgr_up.get(u.id, (0, 0))     # nhân viên / cấp dưới chấm
         p_s, p_c = prj.get(u.id, (0, 0))
         i_s, i_c = itm.get(u.id, (0, 0))
-        total_s, total_c = m_s + p_s + i_s, m_c + p_c + i_c
+        total_s = md_s + mu_s + p_s + i_s
+        total_c = md_c + mu_c + p_c + i_c
         if total_c == 0:
             continue  # chưa nhận sao nào -> bỏ qua
         avg = lambda s, c: round(s / c, 2) if c else None  # noqa: E731
         out.append(StarOverviewRow(
             user_id=u.id, full_name=u.full_name, role=u.role, department=u.department,
-            manager_avg=avg(m_s, m_c), manager_count=m_c,
+            from_manager_avg=avg(md_s, md_c), from_manager_count=md_c,
+            from_staff_avg=avg(mu_s, mu_c), from_staff_count=mu_c,
             project_avg=avg(p_s, p_c), project_count=p_c,
             item_avg=avg(i_s, i_c), item_count=i_c,
             overall_avg=avg(total_s, total_c), overall_count=total_c,

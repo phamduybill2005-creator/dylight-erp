@@ -408,7 +408,7 @@ export default function EvaluationsPage() {
               Tổng hợp sao đánh giá mỗi người ({starRows.length})
             </h2>
             <p className="mt-0.5 text-[11px] text-muted">
-              Gộp cả 3 nguồn (mọi thời gian): <b className="text-steel">Quản lý</b> · <b className="text-steel">Dự án</b> · <b className="text-steel">Hạng mục công việc</b>. Số trong ngoặc = số phiếu.
+              Tách rõ nguồn (mọi thời gian): <b className="text-steel">QL trực tiếp chấm</b> · <b className="text-steel">Nhân viên chấm</b> · <b className="text-steel">Dự án</b> · <b className="text-steel">Hạng mục công việc</b>. Số trong ngoặc = số phiếu.
             </p>
           </div>
           {starRows.length === 0 ? (
@@ -417,11 +417,12 @@ export default function EvaluationsPage() {
             </p>
           ) : (
             <div className="overflow-x-auto rounded-xl2 bg-white shadow-card">
-              <table className="w-full min-w-[560px] text-xs">
+              <table className="w-full min-w-[680px] text-xs">
                 <thead>
                   <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
                     <th className="px-3 py-2 font-semibold">Người</th>
-                    <th className="px-3 py-2 text-center font-semibold">Quản lý</th>
+                    <th className="px-3 py-2 text-center font-semibold">QL trực tiếp<br/>chấm</th>
+                    <th className="px-3 py-2 text-center font-semibold">Nhân viên<br/>chấm</th>
                     <th className="px-3 py-2 text-center font-semibold">Dự án</th>
                     <th className="px-3 py-2 text-center font-semibold">Hạng mục</th>
                     <th className="px-3 py-2 text-center font-semibold">Tổng</th>
@@ -441,7 +442,8 @@ export default function EvaluationsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-center">{starCell(r.manager_avg, r.manager_count)}</td>
+                      <td className="px-3 py-2 text-center">{starCell(r.from_manager_avg, r.from_manager_count)}</td>
+                      <td className="px-3 py-2 text-center">{starCell(r.from_staff_avg, r.from_staff_count)}</td>
                       <td className="px-3 py-2 text-center">{starCell(r.project_avg, r.project_count)}</td>
                       <td className="px-3 py-2 text-center">{starCell(r.item_avg, r.item_count)}</td>
                       <td className="px-3 py-2 text-center">

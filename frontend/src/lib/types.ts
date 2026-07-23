@@ -500,19 +500,21 @@ export interface EvaluationSummary {
   num_ratings: number;
 }
 
-// Tổng hợp số sao mỗi người NHẬN — gộp 3 nguồn (quản lý / dự án / hạng mục), mọi thời gian.
+// Tổng hợp số sao mỗi người NHẬN — tách rõ nguồn, mọi thời gian.
 export interface StarOverviewRow {
   user_id: number;
   full_name: string;
   role: Role;
   department?: string | null;
-  manager_avg?: number | null;   // đánh giá quản lý
-  manager_count: number;
-  project_avg?: number | null;    // đánh giá theo dự án
+  from_manager_avg?: number | null;   // quản lý trực tiếp chấm
+  from_manager_count: number;
+  from_staff_avg?: number | null;      // nhân viên / cấp dưới chấm
+  from_staff_count: number;
+  project_avg?: number | null;         // đánh giá theo dự án
   project_count: number;
-  item_avg?: number | null;       // đánh giá hạng mục công việc
+  item_avg?: number | null;            // đánh giá hạng mục công việc
   item_count: number;
-  overall_avg?: number | null;    // gộp tất cả
+  overall_avg?: number | null;         // gộp tất cả
   overall_count: number;
 }
 
