@@ -273,7 +273,7 @@ export default function CompanyOrgChart() {
                 <BriefcaseIcon className="h-4 w-4 text-muted mt-0.5 shrink-0" />
                 <div>
                   <span className="font-semibold text-muted block text-[10px] uppercase">Chức vụ</span>
-                  <span className="font-semibold text-slate-800">{roleTitle(selectedUser.role, selectedUser.has_subordinates)}</span>
+                  <span className="font-semibold text-slate-800">{roleTitle(selectedUser.role, selectedUser.has_subordinates, !selectedUser.manager_id && !selectedUser.manager_ids)}</span>
                 </div>
               </div>
 

@@ -44,20 +44,25 @@ export const TIER_LABEL: Record<Tier, string> = {
 
 /**
  * CHỨC VỤ hiển thị (khác ROLE_LABEL — vai trò hệ thống dùng cho dropdown):
- *   MANAGER                           -> "Quản lý cấp trung"
- *   FIELD_STAFF CÓ cấp dưới trực tiếp -> "Quản lý cấp trung"
- *   FIELD_STAFF KHÔNG cấp dưới        -> "Nhân viên"
+ *   Là QUẢN LÝ (role MANAGER, hoặc FIELD_STAFF có cấp dưới) và:
+ *     - KHÔNG có ai quản lý bên trên (trưởng phòng/đầu nhánh) -> "Quản lý cấp cao"
+ *     - CÓ quản lý bên trên (báo cáo cho trưởng phòng)         -> "Quản lý cấp trung"
+ *   FIELD_STAFF KHÔNG cấp dưới -> "Nhân viên".
  * ADMIN/DIRECTOR/ACCOUNTANT giữ nhãn vai trò gốc.
- * Theo sơ đồ tổ chức DOSCO: dưới Giám đốc là các trưởng phòng = QUẢN LÝ CẤP TRUNG
- * (không có tầng "quản lý cấp cao" — chỉ Ban Giám đốc mới trên cấp trung).
- * `hasSubordinates` do backend tính (User.has_subordinates).
+ * Sơ đồ DOSCO: Giám đốc > trưởng phòng (Sơn, Lâm, Bính = cấp CAO) > quản lý trung
+ * gian (Quang, Cường... = cấp TRUNG) > nhân viên.
+ *   `hasSubordinates` do backend tính (User.has_subordinates).
+ *   `isTopManager`   = KHÔNG có manager_id/manager_ids (không ai quản lý bên trên).
+ *      Bỏ trống -> mặc định coi như cấp TRUNG (an toàn cho nơi thiếu dữ liệu quản lý).
  */
 export function roleTitle(
   role: Role | undefined | null,
   hasSubordinates?: boolean | null,
+  isTopManager?: boolean | null,
 ): string {
   if (!role) return "";
-  if (role === "MANAGER") return "Quản lý cấp trung";
-  if (role === "FIELD_STAFF") return hasSubordinates ? "Quản lý cấp trung" : "Nhân viên";
+  const isManager = role === "MANAGER" || (role === "FIELD_STAFF" && !!hasSubordinates);
+  if (isManager) return isTopManager ? "Quản lý cấp cao" : "Quản lý cấp trung";
+  if (role === "FIELD_STAFF") return "Nhân viên";
   return ROLE_LABEL[role] || role;
 }

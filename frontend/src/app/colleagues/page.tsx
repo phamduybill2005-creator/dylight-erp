@@ -134,7 +134,7 @@ export default function ColleaguesPage() {
                         )}
                       </p>
                       <p className="truncate text-[11px] text-muted">
-                        {roleTitle(c.role, c.has_subordinates)}
+                        {roleTitle(c.role, c.has_subordinates, !c.manager_id && !c.manager_ids)}
                         {c.department ? ` · ${c.department}` : ""}
                       </p>
                     </div>

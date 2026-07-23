@@ -109,7 +109,7 @@ export default function AccountMenu({
     }
   }
 
-  const role = roleTitle(user?.role, user?.has_subordinates);
+  const role = roleTitle(user?.role, user?.has_subordinates, !user?.manager_id && !user?.manager_ids);
 
   const panel = (
     <div

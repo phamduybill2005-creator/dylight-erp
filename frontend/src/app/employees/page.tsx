@@ -318,7 +318,7 @@ export default function EmployeesPage() {
         const mgr = byId.get(Number(key));
         label = mgr ? nick(mgr.id, mgr.full_name) : `Quản lý #${key}`;
         const parts: string[] = [];
-        if (mgr) parts.push(roleTitle(mgr.role, mgr.has_subordinates));
+        if (mgr) parts.push(roleTitle(mgr.role, mgr.has_subordinates, !mgr.manager_id && !mgr.manager_ids));
         if (mgr?.department) parts.push(mgr.department);
         subtitle = parts.join(" · ") || undefined;
       }
@@ -711,12 +711,12 @@ export default function EmployeesPage() {
       {/* Slide-over/Modal Form Chỉnh sửa chi tiết */}
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex justify-end bg-ink/50 backdrop-blur-sm transition-opacity">
-          <div className="w-full max-w-md bg-paper flex flex-col h-full shadow-2xl animate-slide-in">
+          <div className="relative w-full max-w-md bg-paper flex flex-col h-full shadow-2xl animate-slide-in">
             {/* Modal Header */}
             <header className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
               <div>
                 <h2 className="text-sm font-bold text-ink">{nick(selectedUser.id, selectedUser.full_name)}</h2>
-                <p className="text-[11px] text-muted">{roleTitle(selectedUser.role, selectedUser.has_subordinates)}</p>
+                <p className="text-[11px] text-muted">{roleTitle(selectedUser.role, selectedUser.has_subordinates, !selectedUser.manager_id && !selectedUser.manager_ids)}</p>
               </div>
               <button
                 onClick={() => setSelectedUser(null)}
@@ -1160,7 +1160,7 @@ export default function EmployeesPage() {
       {/* Modal Tạo nhân viên mới */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex justify-end bg-ink/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-paper flex flex-col h-full shadow-2xl animate-slide-in">
+          <div className="relative w-full max-w-md bg-paper flex flex-col h-full shadow-2xl animate-slide-in">
             <header className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
               <div className="flex items-center gap-2">
                 <UserPlusIcon className="h-5 w-5 text-steel" />
@@ -1427,7 +1427,7 @@ function EmployeeCard({
           <p className="mt-0.5 truncate font-mono text-[11px] text-muted">{u.email}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-medium text-steel">
-              {roleTitle(u.role, u.has_subordinates)}
+              {roleTitle(u.role, u.has_subordinates, !u.manager_id && !u.manager_ids)}
             </span>
             {!u.is_active && (
               <span className="rounded-full bg-bad/10 px-1.5 py-0.5 text-[9px] font-semibold text-bad">

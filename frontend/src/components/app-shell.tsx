@@ -194,7 +194,7 @@ export default function AppShell({
                       </button>
                     ))}
                     <div className="border-t border-line px-4 py-2 text-[11px] text-muted font-normal text-slate-700">
-                      Đăng nhập: {user?.full_name} · {roleTitle(user?.role, user?.has_subordinates)}
+                      Đăng nhập: {user?.full_name} · {roleTitle(user?.role, user?.has_subordinates, !user?.manager_id && !user?.manager_ids)}
                     </div>
                   </div>
                 )}

@@ -107,7 +107,7 @@ export default function DashboardPage() {
           <div className="relative z-10 mt-4 flex flex-col gap-1.5 text-xs text-white/85">
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-yellow-300 animate-pulse-glow" />
-              <span>Vai trò: <span className="font-semibold text-white">{roleTitle(user.role, user.has_subordinates)}</span></span>
+              <span>Vai trò: <span className="font-semibold text-white">{roleTitle(user.role, user.has_subordinates, !user.manager_id && !user.manager_ids)}</span></span>
             </div>
             {user.manager_name && (
               <div className="flex items-center gap-2">
