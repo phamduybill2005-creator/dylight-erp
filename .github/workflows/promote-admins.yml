@@ -1,0 +1,37 @@
+name: Nang PHAM DUY + SON len Quan tri (1 lan)
+
+# Nang tai khoan PHAM DUY (duy@dosco.vn) + SON (dhson@dosco.vn / son@dosco.vn)
+# len role ADMIN tren PROD (Neon). Idempotent — chay lai khong doi neu da la ADMIN.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - backend/scripts/promote_admins_once.py
+
+concurrency:
+  group: promote-admins
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+      - name: Promote PHAM DUY + SON to ADMIN
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/promote_admins_once.py
