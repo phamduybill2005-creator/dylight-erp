@@ -1127,7 +1127,7 @@ export default function EmployeesPage() {
             </form>
 
             {/* Modal Actions */}
-            <footer className="absolute bottom-0 inset-x-0 bg-white border-t border-line p-4 flex gap-3">
+            <footer className="absolute bottom-0 inset-x-0 bg-paper/95 backdrop-blur border-t border-line p-4 flex gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedUser(null)}
