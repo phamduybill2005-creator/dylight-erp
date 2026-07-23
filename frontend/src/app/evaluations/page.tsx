@@ -14,7 +14,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL } from "@/lib/roles";
 import { dateLocal, todayLocal } from "@/lib/format";
-import type { Evaluation, EvaluationSummary, User, Project, Colleague } from "@/lib/types";
+import type { Evaluation, EvaluationSummary, StarOverviewRow, User, Project, Colleague } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
   1: "Cần xem xét lại",
@@ -118,6 +118,7 @@ export default function EvaluationsPage() {
   const [selPeriod, setSelPeriod] = useState(weekSaturday());
   const [summary, setSummary] = useState<EvaluationSummary[]>([]);
   const [allEvals, setAllEvals] = useState<Evaluation[]>([]);
+  const [starRows, setStarRows] = useState<StarOverviewRow[]>([]);   // tổng hợp sao 3 nguồn (mọi thời gian)
 
   const period = weekSaturday();
   const tier = user ? roleTier(user.role) : "STAFF";
@@ -127,6 +128,11 @@ export default function EvaluationsPage() {
     api.evaluationsSummary(selPeriod).then(setSummary).catch(() => {});
     api.allEvaluations(selPeriod).then(setAllEvals).catch(() => {});
   }, [user, selPeriod]);
+
+  useEffect(() => {
+    if (!user || roleTier(user.role) !== "DIRECTOR") return;
+    api.evaluationsStarOverview().then(setStarRows).catch(() => {});   // mọi thời gian, không theo tuần
+  }, [user]);
 
   useEffect(() => {
     api.me()
@@ -376,12 +382,82 @@ export default function EvaluationsPage() {
     const avgAll = summary.length
       ? (summary.reduce((a, s) => a + s.avg_rating, 0) / summary.length).toFixed(2)
       : "—";
+    const starCell = (avg: number | null | undefined, count: number) =>
+      count > 0 && avg != null ? (
+        <span className="inline-flex items-center gap-0.5 font-semibold text-ink">
+          {avg.toFixed(1)}
+          <StarIcon className="h-3 w-3 text-amber" />
+          <span className="ml-0.5 text-[10px] font-normal text-muted">({count})</span>
+        </span>
+      ) : (
+        <span className="text-muted">—</span>
+      );
+    const overallColor = (v: number) =>
+      v >= 4 ? "text-ok" : v >= 2.5 ? "text-amber-deep" : "text-bad";
     return (
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
           <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự — tổng hợp tuần</h1>
         </header>
+
+        {/* TỔNG HỢP SỐ SAO mỗi người — gộp 3 nguồn, mọi thời gian */}
+        <section className="mt-4">
+          <div className="mb-2">
+            <h2 className="text-sm font-semibold text-ink">
+              Tổng hợp sao đánh giá mỗi người ({starRows.length})
+            </h2>
+            <p className="mt-0.5 text-[11px] text-muted">
+              Gộp cả 3 nguồn (mọi thời gian): <b className="text-steel">Quản lý</b> · <b className="text-steel">Dự án</b> · <b className="text-steel">Hạng mục công việc</b>. Số trong ngoặc = số phiếu.
+            </p>
+          </div>
+          {starRows.length === 0 ? (
+            <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">
+              Chưa có sao đánh giá nào.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl2 bg-white shadow-card">
+              <table className="w-full min-w-[560px] text-xs">
+                <thead>
+                  <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
+                    <th className="px-3 py-2 font-semibold">Người</th>
+                    <th className="px-3 py-2 text-center font-semibold">Quản lý</th>
+                    <th className="px-3 py-2 text-center font-semibold">Dự án</th>
+                    <th className="px-3 py-2 text-center font-semibold">Hạng mục</th>
+                    <th className="px-3 py-2 text-center font-semibold">Tổng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {starRows.map((r, i) => (
+                    <tr key={r.user_id} className="border-b border-line/50 last:border-0 hover:bg-paper/60">
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-4 shrink-0 text-right text-[10px] font-semibold text-muted">{i + 1}</span>
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-ink">{r.full_name}</p>
+                            <p className="truncate text-[10px] text-muted">
+                              {ROLE_LABEL[r.role] || "Nhân viên"}{r.department ? ` · ${r.department}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-center">{starCell(r.manager_avg, r.manager_count)}</td>
+                      <td className="px-3 py-2 text-center">{starCell(r.project_avg, r.project_count)}</td>
+                      <td className="px-3 py-2 text-center">{starCell(r.item_avg, r.item_count)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`inline-flex items-center gap-0.5 text-sm font-bold ${overallColor(r.overall_avg ?? 0)}`}>
+                          {(r.overall_avg ?? 0).toFixed(1)}
+                          <StarIcon className="h-3.5 w-3.5" />
+                          <span className="ml-0.5 text-[10px] font-normal text-muted">({r.overall_count})</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-3 shadow-card">
           <div className="text-xs text-muted">

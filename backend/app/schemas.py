@@ -548,6 +548,27 @@ class EvaluationSummary(BaseModel):
     num_ratings: int
 
 
+class StarOverviewRow(BaseModel):
+    """Tổng hợp SỐ SAO 1 người NHẬN được — gộp CẢ 3 nguồn (mọi thời gian):
+      - manager_*  : đánh giá quản lý  (Evaluation, người NHẬN)
+      - project_*  : đánh giá theo dự án (ProjectEvaluation, người NHẬN)
+      - item_*     : đánh giá hạng mục công việc (ProjectItem.rating, người ĐƯỢC GIAO)
+      - overall_*  : gộp toàn bộ số sao (avg = tổng sao / tổng số phiếu).
+    avg = None khi count = 0 (chưa có phiếu nào ở nguồn đó)."""
+    user_id: int
+    full_name: str
+    role: UserRole
+    department: str | None = None
+    manager_avg: float | None = None
+    manager_count: int = 0
+    project_avg: float | None = None
+    project_count: int = 0
+    item_avg: float | None = None
+    item_count: int = 0
+    overall_avg: float | None = None
+    overall_count: int = 0
+
+
 # --------- Đánh giá theo DỰ ÁN (chấm chéo 360° giữa các thành viên) ---------
 class ProjectEvaluationCreate(BaseModel):
     project_id: int

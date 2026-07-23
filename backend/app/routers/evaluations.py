@@ -11,12 +11,16 @@ một phiếu (gửi lại thì ghi đè); kỳ tuần (period = Thứ 7) tự s
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, require_roles
-from app.models import Evaluation, EvaluationDirection, Project, User, UserRole
-from app.schemas import EvaluationCreate, EvaluationOut, EvaluationSummary
+from app.models import (
+    Evaluation, EvaluationDirection, Project, ProjectEvaluation, ProjectItem,
+    User, UserRole,
+)
+from app.schemas import EvaluationCreate, EvaluationOut, EvaluationSummary, StarOverviewRow
 
 router = APIRouter(prefix="/evaluations", tags=["Đánh giá"])
 
@@ -169,6 +173,55 @@ def evaluations_summary(
         ))
     # Điểm thấp lên đầu để Giám đốc chú ý trước.
     return sorted(out, key=lambda s: (s.avg_rating, -s.num_ratings))
+
+
+@router.get("/star-overview", response_model=list[StarOverviewRow])
+def star_overview(
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+):
+    """TỔNG HỢP SỐ SAO mỗi người NHẬN được, gộp CẢ 3 nguồn (mọi thời gian) — Giám đốc:
+      1) Đánh giá quản lý   — Evaluation (người NHẬN = evaluatee).
+      2) Đánh giá theo dự án — ProjectEvaluation (người NHẬN = evaluatee).
+      3) Đánh giá hạng mục   — ProjectItem.rating, gán cho NGƯỜI ĐƯỢC GIAO (assignee).
+    overall = gộp tất cả sao (avg = tổng sao / tổng số phiếu). Chỉ liệt kê người có ≥1 sao.
+    Xếp hạng cao → thấp (điểm TB giảm dần)."""
+    cid = current.company_id
+
+    def agg(key_col, model, *extra):
+        """{user_id: (tổng_sao, số_phiếu)} — chỉ tính phiếu có sao (rating > 0)."""
+        rows = (
+            db.query(key_col, func.sum(model.rating), func.count(model.id))
+            .filter(model.company_id == cid, model.rating > 0, key_col.isnot(None), *extra)
+            .group_by(key_col)
+            .all()
+        )
+        return {int(k): (int(s or 0), int(c or 0)) for k, s, c in rows}
+
+    mgr = agg(Evaluation.evaluatee_id, Evaluation)
+    prj = agg(ProjectEvaluation.evaluatee_id, ProjectEvaluation)
+    itm = agg(ProjectItem.assignee_id, ProjectItem)
+
+    users = db.query(User).filter(User.company_id == cid).all()
+    out: list[StarOverviewRow] = []
+    for u in users:
+        m_s, m_c = mgr.get(u.id, (0, 0))
+        p_s, p_c = prj.get(u.id, (0, 0))
+        i_s, i_c = itm.get(u.id, (0, 0))
+        total_s, total_c = m_s + p_s + i_s, m_c + p_c + i_c
+        if total_c == 0:
+            continue  # chưa nhận sao nào -> bỏ qua
+        avg = lambda s, c: round(s / c, 2) if c else None  # noqa: E731
+        out.append(StarOverviewRow(
+            user_id=u.id, full_name=u.full_name, role=u.role, department=u.department,
+            manager_avg=avg(m_s, m_c), manager_count=m_c,
+            project_avg=avg(p_s, p_c), project_count=p_c,
+            item_avg=avg(i_s, i_c), item_count=i_c,
+            overall_avg=avg(total_s, total_c), overall_count=total_c,
+        ))
+    # Xếp hạng: điểm TB cao lên đầu; cùng điểm thì nhiều phiếu hơn lên trước.
+    out.sort(key=lambda r: (-(r.overall_avg or 0), -r.overall_count))
+    return out
 
 
 @router.get("", response_model=list[EvaluationOut])

@@ -500,6 +500,22 @@ export interface EvaluationSummary {
   num_ratings: number;
 }
 
+// Tổng hợp số sao mỗi người NHẬN — gộp 3 nguồn (quản lý / dự án / hạng mục), mọi thời gian.
+export interface StarOverviewRow {
+  user_id: number;
+  full_name: string;
+  role: Role;
+  department?: string | null;
+  manager_avg?: number | null;   // đánh giá quản lý
+  manager_count: number;
+  project_avg?: number | null;    // đánh giá theo dự án
+  project_count: number;
+  item_avg?: number | null;       // đánh giá hạng mục công việc
+  item_count: number;
+  overall_avg?: number | null;    // gộp tất cả
+  overall_count: number;
+}
+
 // Chat nội bộ — hội thoại 1-1 (DIRECT) và nhóm tự tạo (GROUP).
 export type ConversationType = "DIRECT" | "GROUP";
 
