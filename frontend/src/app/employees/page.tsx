@@ -1429,11 +1429,11 @@ function EmployeeCard({
             <span className="text-[11px] font-medium text-steel">
               {roleTitle(u.role, u.has_subordinates)}
             </span>
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${u.is_active ? "bg-ok/10 text-ok" : "bg-bad/10 text-bad"}`}
-            >
-              {u.is_active ? "Đang truy cập" : "Đã khóa"}
-            </span>
+            {!u.is_active && (
+              <span className="rounded-full bg-bad/10 px-1.5 py-0.5 text-[9px] font-semibold text-bad">
+                Đã khóa
+              </span>
+            )}
           </div>
         </div>
         {clickable && (
