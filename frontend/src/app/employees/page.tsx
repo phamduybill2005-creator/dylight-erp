@@ -19,6 +19,7 @@ import {
   Squares2X2Icon,
   UserGroupIcon,
   PlusIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
@@ -415,6 +416,32 @@ export default function EmployeesPage() {
       setSuccessMsg("Cập nhật thông tin nhân viên thành công!");
     } catch (err: any) {
       setErrorMsg(err.message || "Không thể cập nhật thông tin nhân viên.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!selectedUser || !canManage) return;
+    if (selectedUser.id === currentUser?.id) {
+      setErrorMsg("Không thể tự xóa tài khoản của chính mình.");
+      return;
+    }
+    const ok = window.confirm(
+      `XÓA HẲN tài khoản "${selectedUser.full_name}" (${selectedUser.email})?\n\n` +
+        "Toàn bộ dữ liệu cá nhân của họ (chấm công, phiếu đánh giá, lương, thành viên dự án…) " +
+        "sẽ bị xóa vĩnh viễn. KHÔNG hoàn tác.",
+    );
+    if (!ok) return;
+    setSaving(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+    try {
+      await api.deleteUser(selectedUser.id);
+      setUsers(users.filter((u) => u.id !== selectedUser.id));
+      setSelectedUser(null);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Không thể xóa tài khoản.");
     } finally {
       setSaving(false);
     }
@@ -1127,7 +1154,18 @@ export default function EmployeesPage() {
             </form>
 
             {/* Modal Actions */}
-            <footer className="absolute bottom-0 inset-x-0 bg-paper/95 backdrop-blur border-t border-line p-4 flex gap-3">
+            <footer className="absolute bottom-0 inset-x-0 bg-paper/95 backdrop-blur border-t border-line p-4 flex gap-2">
+              {canManage && selectedUser.id !== currentUser?.id && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={saving}
+                  title="Xóa hẳn tài khoản này"
+                  className="shrink-0 inline-flex items-center gap-1 rounded-xl2 border border-bad/40 bg-bad/10 px-3 py-2.5 text-xs font-semibold text-bad hover:bg-bad hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <TrashIcon className="h-4 w-4" /> Xóa
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelectedUser(null)}

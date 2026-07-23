@@ -108,14 +108,14 @@ export default function AppShell({
         {/* Chọn công ty / chi nhánh */}
         <div className="relative px-3">
           <button
-            onClick={() => setPickerOpen((v) => !v)}
+            onClick={() => companies.length > 1 && setPickerOpen((v) => !v)}
             className="flex w-full items-center gap-2 rounded-xl2 bg-white/10 px-3 py-2 text-xs hover:bg-white/15"
           >
             <BuildingOffice2Icon className="h-4 w-4 shrink-0 text-amber" />
             <span className="truncate text-left">{activeCompany?.name ?? "Đang tải…"}</span>
-            <ChevronDownIcon className="ml-auto h-3.5 w-3.5 shrink-0" />
+            {companies.length > 1 && <ChevronDownIcon className="ml-auto h-3.5 w-3.5 shrink-0" />}
           </button>
-          {pickerOpen && companies.length > 0 && (
+          {pickerOpen && companies.length > 1 && (
             <div className="absolute left-3 right-3 z-40 mt-2 overflow-hidden rounded-xl2 bg-white text-ink shadow-card">
               {companies.map((c) => (
                 <button
@@ -172,14 +172,14 @@ export default function AppShell({
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button
-                  onClick={() => setPickerOpen((v) => !v)}
+                  onClick={() => companies.length > 1 && setPickerOpen((v) => !v)}
                   className="flex max-w-[150px] items-center gap-1 rounded-xl2 bg-white/10 px-3 py-1.5 text-xs"
                 >
                   <BuildingOffice2Icon className="h-4 w-4 shrink-0 text-amber" />
                   <span className="truncate">{activeCompany?.name ?? "Đang tải…"}</span>
-                  <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />
+                  {companies.length > 1 && <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />}
                 </button>
-                {pickerOpen && companies.length > 0 && (
+                {pickerOpen && companies.length > 1 && (
                   <div className="absolute right-0 mt-2 w-60 overflow-hidden rounded-xl2 bg-white text-ink shadow-card">
                     {companies.map((c) => (
                       <button

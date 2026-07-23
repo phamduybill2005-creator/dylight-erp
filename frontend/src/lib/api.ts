@@ -395,6 +395,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ new_password }),
     }),
+  deleteUser: (id: number) => request<void>(`/auth/users/${id}`, { method: "DELETE" }),
 
   // --- Thông báo nội bộ ---
   notifications: (limit = 50) => request<Notification[]>(`/notifications/me?limit=${limit}`),

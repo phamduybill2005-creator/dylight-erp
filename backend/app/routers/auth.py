@@ -324,3 +324,77 @@ def admin_reset_password(
     user.token_version = (user.token_version or 0) + 1
     db.commit()
 
+
+def _purge_user_references(db: Session, uid: int) -> None:
+    """Dọn MỌI tham chiếu tới user #uid trước khi xóa hẳn:
+      - cột khóa ngoại CHO PHÉP NULL  -> đặt NULL (gỡ liên kết: manager_id / lead_id /
+        assignee_id... của NGƯỜI/DỰ ÁN khác vẫn giữ nguyên, chỉ bỏ trỏ tới người bị xóa);
+      - cột khóa ngoại NOT NULL       -> xóa dòng (dữ liệu CÁ NHÂN của người này: chấm
+        công, phiếu đánh giá, lương, thành viên dự án, tin nhắn...).
+    Lặp lại (retry) để thỏa mãn thứ tự khóa ngoại. Cuối cùng loại id khỏi các chuỗi
+    manager_ids (nhiều quản lý) của người khác."""
+    from app.models import Base
+
+    users_id = User.__table__.c.id
+    refs = [
+        (table, col)
+        for table in Base.metadata.sorted_tables
+        for col in table.columns
+        if col is not users_id and any(fk.column is users_id for fk in col.foreign_keys)
+    ]
+    pending, guard = refs, 0
+    while pending:
+        guard += 1
+        if guard > len(refs) + 5:
+            raise HTTPException(409, "Không thể xóa: dữ liệu liên quan ràng buộc phức tạp.")
+        still, progressed = [], False
+        for table, col in pending:
+            sp = db.begin_nested()
+            try:
+                if col.nullable:
+                    db.execute(table.update().where(col == uid).values({col.name: None}))
+                else:
+                    db.execute(table.delete().where(col == uid))
+                sp.commit()
+                progressed = True
+            except Exception:  # noqa: BLE001 — vướng FK thì thử lại vòng sau
+                sp.rollback()
+                still.append((table, col))
+        if not progressed:
+            raise HTTPException(409, "Không thể xóa: còn dữ liệu ràng buộc.")
+        pending = still
+
+    for u in db.query(User).filter(User.manager_ids.isnot(None)).all():
+        parts = [x for x in str(u.manager_ids).split(",") if x.strip() and x.strip() != str(uid)]
+        new = ",".join(parts) if parts else None
+        if new != u.manager_ids:
+            u.manager_ids = new
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    # Giám đốc & Quản trị (ADMIN luôn được phép qua require_roles) mới được XÓA tài khoản.
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+):
+    """XÓA HẲN một tài khoản + dữ liệu cá nhân của họ. Chặn: tự xóa mình; DIRECTOR xóa
+    tài khoản quản trị/giám đốc (chỉ ADMIN được); xóa ADMIN cuối cùng của công ty."""
+    target = db.get(User, user_id)
+    if not target or target.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy nhân viên.")
+    if target.id == current.id:
+        raise HTTPException(400, "Không thể tự xóa tài khoản của chính mình.")
+    if target.role in (UserRole.ADMIN, UserRole.DIRECTOR) and current.role != UserRole.ADMIN:
+        raise HTTPException(403, "Chỉ Quản trị hệ thống (ADMIN) mới được xóa tài khoản quản trị/giám đốc.")
+    if target.role == UserRole.ADMIN:
+        n_admin = db.query(User).filter(
+            User.company_id == current.company_id, User.role == UserRole.ADMIN
+        ).count()
+        if n_admin <= 1:
+            raise HTTPException(400, "Không thể xóa tài khoản Quản trị hệ thống cuối cùng.")
+
+    _purge_user_references(db, target.id)
+    db.delete(target)
+    db.commit()
+
