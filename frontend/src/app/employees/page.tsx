@@ -421,29 +421,21 @@ export default function EmployeesPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!selectedUser || !canManage) return;
-    if (selectedUser.id === currentUser?.id) {
-      setErrorMsg("Không thể tự xóa tài khoản của chính mình.");
-      return;
-    }
+  // Xóa hẳn 1 tài khoản — dùng chung cho nút Xóa trên THẺ và trong khung sửa.
+  async function removeUser(u: User) {
+    if (!canManage || u.id === currentUser?.id) return;
     const ok = window.confirm(
-      `XÓA HẲN tài khoản "${selectedUser.full_name}" (${selectedUser.email})?\n\n` +
+      `XÓA HẲN tài khoản "${u.full_name}" (${u.email})?\n\n` +
         "Toàn bộ dữ liệu cá nhân của họ (chấm công, phiếu đánh giá, lương, thành viên dự án…) " +
         "sẽ bị xóa vĩnh viễn. KHÔNG hoàn tác.",
     );
     if (!ok) return;
-    setSaving(true);
-    setErrorMsg("");
-    setSuccessMsg("");
     try {
-      await api.deleteUser(selectedUser.id);
-      setUsers(users.filter((u) => u.id !== selectedUser.id));
-      setSelectedUser(null);
+      await api.deleteUser(u.id);
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      if (selectedUser?.id === u.id) setSelectedUser(null);
     } catch (err: any) {
-      setErrorMsg(err.message || "Không thể xóa tài khoản.");
-    } finally {
-      setSaving(false);
+      alert(err.message || "Không thể xóa tài khoản.");
     }
   }
 
@@ -679,6 +671,7 @@ export default function EmployeesPage() {
                   clickable={canAssign}
                   onClick={() => canAssign && setSelectedUser(u)}
                   nick={nick}
+                  onDelete={canManage && u.id !== currentUser?.id ? removeUser : undefined}
                 />
               ))
             )}
@@ -725,6 +718,7 @@ export default function EmployeesPage() {
                         head={g.headIds.has(u.id)}
                         showDept={viewMode !== "department"}
                         showManager={viewMode !== "manager"}
+                        onDelete={canManage && u.id !== currentUser?.id ? removeUser : undefined}
                       />
                     ))}
                   </div>
@@ -1158,7 +1152,7 @@ export default function EmployeesPage() {
               {canManage && selectedUser.id !== currentUser?.id && (
                 <button
                   type="button"
-                  onClick={handleDelete}
+                  onClick={() => selectedUser && removeUser(selectedUser)}
                   disabled={saving}
                   title="Xóa hẳn tài khoản này"
                   className="shrink-0 inline-flex items-center gap-1 rounded-xl2 border border-bad/40 bg-bad/10 px-3 py-2.5 text-xs font-semibold text-bad hover:bg-bad hover:text-white transition-colors disabled:opacity-50"
@@ -1431,6 +1425,7 @@ function EmployeeCard({
   head = false,
   showDept = true,
   showManager = true,
+  onDelete,
 }: {
   u: User;
   selected: boolean;
@@ -1440,6 +1435,7 @@ function EmployeeCard({
   head?: boolean;
   showDept?: boolean;
   showManager?: boolean;
+  onDelete?: (u: User) => void;
 }) {
   return (
     <div
@@ -1474,10 +1470,27 @@ function EmployeeCard({
             )}
           </div>
         </div>
-        {clickable && (
-          <span className="shrink-0 rounded-md bg-paper p-1.5 text-muted hover:text-ink">
-            <PencilSquareIcon className="h-4 w-4" />
-          </span>
+        {(clickable || onDelete) && (
+          <div className="flex shrink-0 items-center gap-1">
+            {clickable && (
+              <span className="rounded-md bg-paper p-1.5 text-muted hover:text-ink">
+                <PencilSquareIcon className="h-4 w-4" />
+              </span>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(u);
+                }}
+                title="Xóa hẳn tài khoản này"
+                className="rounded-md bg-paper p-1.5 text-muted transition-colors hover:bg-bad hover:text-white"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         )}
       </div>
       {((showDept && u.department) || (showManager && u.manager_name)) && (
