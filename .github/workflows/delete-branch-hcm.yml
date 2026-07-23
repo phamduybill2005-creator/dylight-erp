@@ -1,0 +1,37 @@
+name: Xoa chi nhanh Mien Nam (DOSCO-HCM) (1 lan)
+
+# Xoa h-an cong ty code=DOSCO-HCM + toan bo du lieu cua no tren PROD (Neon).
+# Chi xoa DOSCO-HCM, tu choi cong ty chinh DOSCO. Idempotent.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - backend/scripts/delete_branch_hcm_once.py
+
+concurrency:
+  group: delete-branch-hcm
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+      - name: Delete branch DOSCO-HCM
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/delete_branch_hcm_once.py
