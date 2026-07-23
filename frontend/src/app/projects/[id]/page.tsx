@@ -462,15 +462,6 @@ export default function ProjectDetailPage() {
               <UsersIcon className="h-4 w-4" />
               Thành viên thực hiện ({project.members?.length ?? 0})
             </h3>
-            {canManage && (
-              <button
-                onClick={() => setMembersModal(true)}
-                className="text-[11px] font-semibold text-steel hover:text-ink underline flex items-center gap-0.5"
-              >
-                <PencilSquareIcon className="h-3 w-3" />
-                Sửa dự án
-              </button>
-            )}
           </div>
           
           <div className="mt-2 flex flex-wrap gap-1.5">
