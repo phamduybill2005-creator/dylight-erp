@@ -396,6 +396,15 @@ export const api = {
       body: JSON.stringify({ new_password }),
     }),
   deleteUser: (id: number) => request<void>(`/auth/users/${id}`, { method: "DELETE" }),
+  addUserToDept: (id: number, department: string) =>
+    request<User>(`/auth/users/${id}/departments`, {
+      method: "POST",
+      body: JSON.stringify({ department }),
+    }),
+  removeUserFromDept: (id: number, department: string) =>
+    request<User>(`/auth/users/${id}/departments?department=${encodeURIComponent(department)}`, {
+      method: "DELETE",
+    }),
 
   // --- Thông báo nội bộ ---
   notifications: (limit = 50) => request<Notification[]>(`/notifications/me?limit=${limit}`),

@@ -77,6 +77,11 @@ class UserUpdate(BaseModel):
     work_end: str | None = None      # giờ ra cơ sở "HH:MM"
 
 
+class UserDepartmentChange(BaseModel):
+    """Kéo 1 người VÀO / RA một phòng ban (thao tác trên cột users.department nhiều-phòng)."""
+    department: str
+
+
 class UserCreate(BaseModel):
     """Dữ liệu tạo tài khoản nhân viên mới (company_id lấy từ người tạo)."""
     email: EmailStr

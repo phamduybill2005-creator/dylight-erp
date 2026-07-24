@@ -12,7 +12,10 @@ from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.ratelimit import check_login_allowed, record_login_failure, clear_login_failures
 from app.models import User, UserRole, Company
-from app.schemas import Token, UserOut, UserUpdate, UserCreate, GoogleLoginRequest, ChangePassword, AdminResetPassword
+from app.schemas import (
+    Token, UserOut, UserUpdate, UserCreate, UserDepartmentChange,
+    GoogleLoginRequest, ChangePassword, AdminResetPassword,
+)
 from app.security import create_access_token, verify_password, hash_password
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
@@ -323,6 +326,73 @@ def admin_reset_password(
     # Đặt lại mật khẩu -> vô hiệu MỌI token cũ của người bị reset (buộc đăng nhập lại).
     user.token_version = (user.token_version or 0) + 1
     db.commit()
+
+
+def _dept_list(s: str | None) -> list[str]:
+    return [d.strip() for d in (s or "").split(",") if d.strip()]
+
+
+def _guard_dept_scope(current: User, dept: str) -> None:
+    """ADMIN/Giám đốc quản lý phòng bất kỳ; Quản lý chỉ được thao tác phòng CỦA MÌNH."""
+    if current.role in (UserRole.ADMIN, UserRole.DIRECTOR):
+        return
+    if dept not in _dept_list(current.department):
+        raise HTTPException(403, "Bạn chỉ được thêm/bớt người trong phòng của chính mình.")
+
+
+def _with_has_sub(db: Session, u: User, company_id: int) -> User:
+    u.has_subordinates = (
+        db.query(User.id)
+        .filter(User.manager_id == u.id, User.company_id == company_id)
+        .first()
+        is not None
+    )
+    return u
+
+
+@router.post("/users/{user_id}/departments", response_model=UserOut)
+def add_user_to_department(
+    user_id: int,
+    payload: UserDepartmentChange,
+    db: Session = Depends(get_db),
+    # Quản lý & Giám đốc (ADMIN luôn được phép) — kéo người VÀO phòng.
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.DIRECTOR)),
+):
+    """Kéo 1 người VÀO một phòng ban — CỘNG THÊM (giữ nguyên các phòng cũ)."""
+    target = db.get(User, user_id)
+    if not target or target.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy nhân viên.")
+    dept = payload.department.strip()
+    if not dept:
+        raise HTTPException(400, "Thiếu tên phòng ban.")
+    _guard_dept_scope(current, dept)
+    parts = _dept_list(target.department)
+    if dept not in parts:
+        parts.append(dept)
+        target.department = ", ".join(parts)
+        db.commit()
+        db.refresh(target)
+    return _with_has_sub(db, target, current.company_id)
+
+
+@router.delete("/users/{user_id}/departments", response_model=UserOut)
+def remove_user_from_department(
+    user_id: int,
+    department: str,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.DIRECTOR)),
+):
+    """Đá 1 người RA khỏi một phòng ban. Còn phòng khác thì giữ lại; hết phòng -> để trống."""
+    target = db.get(User, user_id)
+    if not target or target.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy nhân viên.")
+    dept = department.strip()
+    _guard_dept_scope(current, dept)
+    parts = [d for d in _dept_list(target.department) if d != dept]
+    target.department = ", ".join(parts) if parts else None
+    db.commit()
+    db.refresh(target)
+    return _with_has_sub(db, target, current.company_id)
 
 
 def _purge_user_references(db: Session, uid: int) -> None:

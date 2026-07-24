@@ -20,6 +20,7 @@ import {
   UserGroupIcon,
   PlusIcon,
   TrashIcon,
+  UserMinusIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
@@ -469,6 +470,32 @@ export default function EmployeesPage() {
   const canAssign =
     currentUser?.role === "ADMIN" || currentUser?.role === "DIRECTOR" || currentUser?.role === "MANAGER";
 
+  // Kéo người VÀO/RA phòng: ADMIN/Giám đốc mọi phòng; Quản lý chỉ phòng CỦA MÌNH.
+  const isAdminDir = currentUser?.role === "ADMIN" || currentUser?.role === "DIRECTOR";
+  const myDepts = splitDepts(currentUser?.department);
+  const canManageDept = (dept: string) => isAdminDir || myDepts.includes(dept);
+  const [addDeptTarget, setAddDeptTarget] = useState<string | null>(null);
+  const [deptPickSearch, setDeptPickSearch] = useState("");
+
+  async function addUserToDept(u: User, dept: string) {
+    try {
+      const updated = await api.addUserToDept(u.id, dept);
+      setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err: any) {
+      alert(err.message || "Không thể thêm vào phòng.");
+    }
+  }
+
+  async function removeUserFromDept(u: User, dept: string) {
+    if (!window.confirm(`Đá "${u.full_name}" ra khỏi ${dept}?`)) return;
+    try {
+      const updated = await api.removeUserFromDept(u.id, dept);
+      setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err: any) {
+      alert(err.message || "Không thể đá khỏi phòng.");
+    }
+  }
+
   async function handleAddAssignment() {
     if (!selectedUser || !assignTitle.trim()) return;
     setAssigning(true);
@@ -702,9 +729,23 @@ export default function EmployeesPage() {
                         )}
                       </div>
                     </div>
-                    <span className="shrink-0 rounded-full bg-paper px-2.5 py-0.5 text-[11px] font-semibold text-muted">
-                      {g.members.length} người
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="rounded-full bg-paper px-2.5 py-0.5 text-[11px] font-semibold text-muted">
+                        {g.members.length} người
+                      </span>
+                      {viewMode === "department" && g.key !== "__none__" && canManageDept(g.label) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddDeptTarget(g.label);
+                            setDeptPickSearch("");
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-steel px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-ink transition-colors"
+                        >
+                          <UserPlusIcon className="h-3.5 w-3.5" /> Thêm người
+                        </button>
+                      )}
+                    </div>
                   </header>
                   <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">
                     {g.members.map((u) => (
@@ -719,6 +760,11 @@ export default function EmployeesPage() {
                         showDept={viewMode !== "department"}
                         showManager={viewMode !== "manager"}
                         onDelete={canManage && u.id !== currentUser?.id ? removeUser : undefined}
+                        onRemoveFromDept={
+                          viewMode === "department" && g.key !== "__none__" && canManageDept(g.label)
+                            ? (uu) => removeUserFromDept(uu, g.label)
+                            : undefined
+                        }
                       />
                     ))}
                   </div>
@@ -1408,6 +1454,95 @@ export default function EmployeesPage() {
           }}
         />
       )}
+
+      {/* Modal "Thêm người vào phòng" — kéo người vào 1 phòng ban (cộng thêm) */}
+      {addDeptTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-sm"
+          onClick={() => setAddDeptTarget(null)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-xl2 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="flex items-center justify-between border-b border-line px-4 py-3">
+              <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink">
+                <UserPlusIcon className="h-5 w-5 shrink-0 text-steel" />
+                <span className="truncate">
+                  Thêm người vào <span className="text-steel">{addDeptTarget}</span>
+                </span>
+              </h3>
+              <button
+                onClick={() => setAddDeptTarget(null)}
+                className="shrink-0 rounded-full p-1.5 text-muted hover:bg-paper hover:text-ink"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="border-b border-line p-3">
+              <input
+                value={deptPickSearch}
+                onChange={(e) => setDeptPickSearch(e.target.value)}
+                placeholder="Tìm theo tên / email…"
+                className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {(() => {
+                const q = deptPickSearch.trim().toLowerCase();
+                const candidates = users.filter(
+                  (u) =>
+                    !splitDepts(u.department).includes(addDeptTarget) &&
+                    (!q ||
+                      u.full_name.toLowerCase().includes(q) ||
+                      (u.email || "").toLowerCase().includes(q)),
+                );
+                if (candidates.length === 0)
+                  return (
+                    <p className="py-6 text-center text-xs text-muted">
+                      Không còn ai để thêm vào phòng này.
+                    </p>
+                  );
+                return (
+                  <div className="space-y-1">
+                    {candidates.map((u) => (
+                      <div
+                        key={u.id}
+                        className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 hover:bg-paper"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-ink">
+                            {nick(u.id, u.full_name)}
+                          </p>
+                          <p className="truncate text-[10px] text-muted">
+                            {roleTitle(u.role, u.has_subordinates, !u.manager_id && !u.manager_ids)}
+                            {u.department ? ` · ${u.department}` : ""}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => addUserToDept(u, addDeptTarget)}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-steel px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-ink"
+                        >
+                          <PlusIcon className="h-3.5 w-3.5" /> Thêm
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+            <footer className="border-t border-line p-3">
+              <button
+                onClick={() => setAddDeptTarget(null)}
+                className="w-full rounded-xl2 border border-line py-2 text-xs font-semibold text-muted hover:bg-paper hover:text-ink"
+              >
+                Xong
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
@@ -1426,6 +1561,7 @@ function EmployeeCard({
   showDept = true,
   showManager = true,
   onDelete,
+  onRemoveFromDept,
 }: {
   u: User;
   selected: boolean;
@@ -1436,6 +1572,7 @@ function EmployeeCard({
   showDept?: boolean;
   showManager?: boolean;
   onDelete?: (u: User) => void;
+  onRemoveFromDept?: (u: User) => void;
 }) {
   return (
     <div
@@ -1470,12 +1607,25 @@ function EmployeeCard({
             )}
           </div>
         </div>
-        {(clickable || onDelete) && (
+        {(clickable || onDelete || onRemoveFromDept) && (
           <div className="flex shrink-0 items-center gap-1">
             {clickable && (
               <span className="rounded-md bg-paper p-1.5 text-muted hover:text-ink">
                 <PencilSquareIcon className="h-4 w-4" />
               </span>
+            )}
+            {onRemoveFromDept && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveFromDept(u);
+                }}
+                title="Đá ra khỏi phòng này"
+                className="rounded-md bg-paper p-1.5 text-muted transition-colors hover:bg-amber-deep hover:text-white"
+              >
+                <UserMinusIcon className="h-4 w-4" />
+              </button>
             )}
             {onDelete && (
               <button
