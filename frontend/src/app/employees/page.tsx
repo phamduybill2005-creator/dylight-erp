@@ -57,6 +57,9 @@ export default function EmployeesPage() {
   // Danh mục phòng ban lấy từ backend (nguồn chân lý); Admin/Giám đốc thêm/đổi tên.
   const [departments, setDepartments] = useState<Department[]>([]);
   const [showDeptManager, setShowDeptManager] = useState(false);
+  // "Thêm người vào phòng": phòng đang mở picker + ô tìm kiếm trong picker.
+  const [addDeptTarget, setAddDeptTarget] = useState<string | null>(null);
+  const [deptPickSearch, setDeptPickSearch] = useState("");
   // Bộ lọc dùng chung: theo phòng ban + theo người chủ trì (= quản lý trực tiếp).
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   
@@ -474,8 +477,6 @@ export default function EmployeesPage() {
   const isAdminDir = currentUser?.role === "ADMIN" || currentUser?.role === "DIRECTOR";
   const myDepts = splitDepts(currentUser?.department);
   const canManageDept = (dept: string) => isAdminDir || myDepts.includes(dept);
-  const [addDeptTarget, setAddDeptTarget] = useState<string | null>(null);
-  const [deptPickSearch, setDeptPickSearch] = useState("");
 
   async function addUserToDept(u: User, dept: string) {
     try {
