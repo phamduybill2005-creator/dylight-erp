@@ -12,13 +12,14 @@ from app.models import Base, User, UserRole, Company
 from app.security import hash_password
 
 def run_seed():
-    # Run _ensure_schema from app.main to add all missing columns
-    try:
-        from app.main import _ensure_schema
-        _ensure_schema()
-        print("Successfully ran _ensure_schema to add all missing columns.")
-    except Exception as e:
-        print("Failed to run _ensure_schema:", e)
+    # 2026-07-24: NGỪNG seed các tài khoản DEMO 1 tên (giang@, son@, duong@, cao@, ...)
+    # vì trùng với tài khoản THẬT dạng <initials>@dosco.vn (dhson@, nthgiang@, ...).
+    # Chúng đã bị xóa trên PROD theo yêu cầu; KHÔNG tạo lại nữa. (_ensure_schema đã chạy
+    # ở app/main.py trước lời gọi này nên không cần lặp lại.) Bật lại: đặt env SEED_ORG_DEMO=1.
+    import os
+    if not os.environ.get("SEED_ORG_DEMO"):
+        print("[seed-org] Da tat seed tai khoan demo (SEED_ORG_DEMO chua bat).")
+        return
 
     db = SessionLocal()
     try:

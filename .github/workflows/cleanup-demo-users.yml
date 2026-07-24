@@ -1,0 +1,44 @@
+name: Xoa TK demo 1-ten + Duy vao Phong AI (1 lan)
+
+# Push file script -> chay CHE DO BAO CAO (in het user + danh sach se xoa, KHONG xoa).
+# Muon XOA that: vao tab Actions -> Run workflow -> o "confirm" go YES (hoac dispatch API).
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Go YES de XOA that (bo trong = chi bao cao)'
+        required: false
+        default: 'no'
+  push:
+    branches: [main]
+    paths:
+      - backend/scripts/cleanup_demo_users_once.py
+
+concurrency:
+  group: cleanup-demo-users
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend deps
+        working-directory: backend
+        run: python -m pip install --upgrade pip -r requirements.txt
+      - name: Run cleanup (report unless confirm=YES)
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DELETE_CONFIRM: ${{ github.event.inputs.confirm == 'YES' && 'YES' || '' }}
+        run: python scripts/cleanup_demo_users_once.py
