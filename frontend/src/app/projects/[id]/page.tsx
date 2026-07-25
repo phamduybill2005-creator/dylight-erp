@@ -28,6 +28,7 @@ import ProjectTeamTab from "@/components/project-team-tab";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate } from "@/lib/format";
+import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import type { Project, Contract, Progress, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -80,13 +81,28 @@ export default function ProjectDetailPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [geoInput, setGeoInput] = useState("");       // GEO担当 (text)
   const [doscoInput, setDoscoInput] = useState("");   // DOSCO担当 (text)
-  const [groupNameInput, setGroupNameInput] = useState<string>("");              // グループ
+  const [groupNameInput, setGroupNameInput] = useState<string>("");              // グループ = phòng ban
+  const [memberDeptFilter, setMemberDeptFilter] = useState("");                  // lọc danh sách tick theo phòng ban
   const [codeInput, setCodeInput] = useState("");     // 管理番号 (mã QL)
   const [nameInput, setNameInput] = useState("");     // プロジェクト名 (tên dự án)
   const [startInput, setStartInput] = useState("");   // ngày bắt đầu YYYY-MM-DD
   const [endInput, setEndInput] = useState("");       // ngày kết thúc YYYY-MM-DD
   const [savingMembers, setSavingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tách chuỗi phòng ban "Phòng BIM, Phòng AI" -> mảng.
+  const splitDepts = (s?: string | null): string[] =>
+    (s || "").split(",").map((x) => x.trim()).filter(Boolean);
+  // Lựa chọn PHÒNG BAN: danh mục công ty + phòng ban đang có trên nhân sự + nhóm cũ của dự án.
+  const deptOptions = Array.from(
+    new Set<string>([
+      ...PRESET_DEPARTMENTS,
+      ...allUsers.flatMap((u) => splitDepts(u.department)),
+      ...(project?.group_name ? [project.group_name.trim()] : []),
+    ]),
+  )
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "vi"));
 
   // Sửa mốc tiến độ (null = đang tạo mới, khác null = đang sửa mốc này).
   const [editingProgressId, setEditingProgressId] = useState<number | null>(null);
@@ -799,13 +815,17 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
                 <div className="border-t border-line/60 pt-2.5">
-                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</label>
-                  <input
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ) — phòng ban</label>
+                  <select
                     value={groupNameInput}
                     onChange={(e) => setGroupNameInput(e.target.value)}
-                    placeholder="VD: Nhóm A"
                     className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                  />
+                  >
+                    <option value="">— Chọn phòng ban —</option>
+                    {deptOptions.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -838,12 +858,42 @@ export default function ProjectDetailPage() {
                 <b className="text-ink"> người chủ trì</b> (chỉ 1 người). Bấm lại để gỡ chủ trì.
               </p>
 
+              {/* Lọc nhanh danh sách theo PHÒNG BAN (không ảnh hưởng người đã tick) */}
+              <div className="mt-2 flex items-center gap-2">
+                <select
+                  value={memberDeptFilter}
+                  onChange={(e) => setMemberDeptFilter(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-2.5 py-2 text-xs outline-none focus:border-steel"
+                >
+                  <option value="">— Tất cả phòng ban —</option>
+                  {deptOptions.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+                {memberDeptFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setMemberDeptFilter("")}
+                    className="shrink-0 rounded-lg border border-line px-2.5 py-2 text-[11px] font-semibold text-muted hover:bg-paper hover:text-ink"
+                  >
+                    Bỏ lọc
+                  </button>
+                )}
+              </div>
+
               {/* Danh sách checklist thành viên + chọn chủ trì */}
               <div className="mt-3 max-h-60 overflow-y-auto space-y-2.5 pr-1">
                 {allUsers.length === 0 ? (
                   <p className="text-center text-xs text-muted py-4">Đang tải danh sách nhân viên…</p>
                 ) : (
-                  allUsers.map((u) => {
+                  allUsers
+                    .filter(
+                      (u) =>
+                        !memberDeptFilter ||
+                        splitDepts(u.department).includes(memberDeptFilter) ||
+                        selectedMemberIds.includes(u.id),   // giữ người ĐÃ tick dù khác phòng
+                    )
+                    .map((u) => {
                     const isChecked = selectedMemberIds.includes(u.id);
                     const isLead = selectedLeadId === u.id;
                     return (

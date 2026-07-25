@@ -4,7 +4,7 @@
 // có dòng tổng cộng. Cột tài chính (Giá trị HĐ / Chi phí / Lãi-lỗ) chỉ hiện cho
 // Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
@@ -80,14 +80,16 @@ export default function ProjectsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [canManage, setCanManage] = useState(false);
 
+  // Gợi ý dự án mẫu CHỈ MỘT LẦN (lúc nạp xong danh sách). Trước đây effect chạy lại mỗi
+  // khi ô rỗng -> chọn "— Không sao chép hạng mục —" xong bị tự điền lại. Nay người dùng
+  // chọn gì thì giữ nguyên.
+  const templateAutoPicked = useRef(false);
   useEffect(() => {
-    if (projects.length > 0 && !nfTemplateId) {
-      const template = projects.find((p) => p.code === "2739-0124" || p.name.includes("いちき串木野"));
-      if (template) {
-        setNfTemplateId(String(template.id));
-      }
-    }
-  }, [projects, nfTemplateId]);
+    if (templateAutoPicked.current || projects.length === 0) return;
+    templateAutoPicked.current = true;
+    const template = projects.find((p) => p.code === "2739-0124" || p.name.includes("いちき串木野"));
+    if (template) setNfTemplateId(String(template.id));
+  }, [projects]);
 
   // Bộ lọc tìm kiếm
   const [searchQuery, setSearchQuery] = useState("");
@@ -163,6 +165,14 @@ export default function ProjectsPage() {
       ...(projects.flatMap((p) => p.members?.flatMap((m) => m.department ? m.department.split(",").map(s => s.trim()) : []) || []).filter(Boolean))
     ])
   ).sort();
+
+  // Lựa chọn cho ô "Nhóm (グループ)" = PHÒNG BAN của công ty + các nhóm ĐANG DÙNG
+  // trong dữ liệu (giữ nguyên nhóm tiếng Nhật cũ như 土木設計 / 測量解析 để không mất).
+  const groupOptions = useMemo(() => {
+    const s = new Set<string>(PRESET_DEPARTMENTS);
+    for (const p of projects) if (p.group_name?.trim()) s.add(p.group_name.trim());
+    return Array.from(s).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [projects]);
 
   const filteredProjects = projects.filter((p) => {
     if (searchQuery) {
@@ -561,8 +571,13 @@ export default function ProjectsPage() {
                     </label>
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</span>
-                      <input value={nfGroup} onChange={(e) => setNfGroup(e.target.value)} placeholder="VD: Nhóm A"
-                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                      <select value={nfGroup} onChange={(e) => setNfGroup(e.target.value)}
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
+                        <option value="">— Chọn phòng ban —</option>
+                        {groupOptions.map((g) => (
+                          <option key={g} value={g}>{g}</option>
+                        ))}
+                      </select>
                     </label>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -707,8 +722,13 @@ export default function ProjectsPage() {
                   <input value={efCode} onChange={(e) => setEfCode(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm</label>
-                  <input value={efGroup} onChange={(e) => setEfGroup(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (phòng ban)</label>
+                  <select value={efGroup} onChange={(e) => setEfGroup(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel">
+                    <option value="">— Chọn phòng ban —</option>
+                    {groupOptions.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">

@@ -20,6 +20,7 @@ import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
 const LEAVE_REASONS = [
   "GIỖ TẾT", "HIẾU SỰ", "HỶ SỰ", "ỐM ĐAU", "NGỦ QUÊN", "TẮC ĐƯỜNG",
   "HỎNG XE", "SINH NHẬT", "THIÊN TAI", "BIA RƯỢU", "HỌC HÀNH", "YÊU ĐƯƠNG",
+  "GIA ĐÌNH",
 ];
 
 const STATUS_LABEL: Record<LeaveStatus, string> = {

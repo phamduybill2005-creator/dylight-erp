@@ -108,10 +108,29 @@ export default function ProjectTimesheet({
     return map;
   }, [items]);
   
-  const leaves = useMemo(() =>
-    items.filter((i) => i.parent_id != null)
-      .sort((a, b) => a.order_index - b.order_index || a.id - b.id),
-    [items]);
+  // TOÀN BỘ hạng mục (lớn + nhỏ) như ở tab Hạng mục, xếp theo thứ bậc:
+  // nhóm cha -> các đầu việc con của nó. Con "mồ côi" (không thấy cha) vẫn hiện ở cuối.
+  const rows = useMemo(() => {
+    const byOrder = (a: ProjectItem, b: ProjectItem) =>
+      a.order_index - b.order_index || a.id - b.id;
+    const parents = items.filter((i) => i.parent_id == null).sort(byOrder);
+    const childrenOf = new Map<number, ProjectItem[]>();
+    for (const i of items) {
+      if (i.parent_id == null) continue;
+      const arr = childrenOf.get(i.parent_id) ?? [];
+      arr.push(i);
+      childrenOf.set(i.parent_id, arr);
+    }
+    for (const arr of childrenOf.values()) arr.sort(byOrder);
+    const out: ProjectItem[] = [];
+    for (const p of parents) {
+      out.push(p);
+      for (const c of childrenOf.get(p.id) ?? []) out.push(c);
+    }
+    const seen = new Set(out.map((x) => x.id));
+    for (const i of items.slice().sort(byOrder)) if (!seen.has(i.id)) out.push(i);
+    return out;
+  }, [items]);
 
   const taskWorkers = useCallback((it: ProjectItem): User[] => {
     const workerIds = new Set<number>();
@@ -232,7 +251,16 @@ export default function ProjectTimesheet({
       </p>
 
       <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[760px] border-collapse text-xs">
+        {/* table-fixed + colgroup: 7 cột ngày RỘNG BẰNG NHAU (T7/CN không bị co lại). */}
+        <table className="w-full min-w-[820px] table-fixed border-collapse text-xs">
+          <colgroup>
+            <col className="w-[250px]" />
+            <col className="w-[92px]" />
+            {days.map((d) => (
+              <col key={d} className="w-[58px]" />
+            ))}
+            <col className="w-[62px]" />
+          </colgroup>
           <thead>
             <tr className="bg-paper text-[10px] uppercase tracking-wide text-muted">
               <th className="sticky left-0 z-10 border border-line bg-paper px-2 py-1.5 text-left font-semibold">Đầu việc / Người làm</th>
@@ -247,25 +275,31 @@ export default function ProjectTimesheet({
             </tr>
           </thead>
           <tbody>
-            {leaves.length === 0 ? (
+            {rows.length === 0 ? (
               <tr><td colSpan={COLS} className="border border-line px-3 py-5 text-center text-muted">
                 Chưa có đầu việc — thêm ở tab <b>Hạng mục</b>.
               </td></tr>
             ) : (
-              leaves.map((it) => {
+              rows.map((it) => {
                 const open = isOpen(it.id);
                 const workers = taskWorkers(it);
                 const grp = it.parent_id != null ? parentName.get(it.parent_id) : null;
+                const isParent = it.parent_id == null;   // hạng mục LỚN (nhóm cha)
                 const tDayHours = (d: string) => workers.reduce((sum, w) => sum + (hoursMap.get(hkey(w.id, it.id, d)) ?? 0), 0);
                 const tTotalHours = days.reduce((sum, d) => sum + tDayHours(d), 0);
                 return (
                   <FragmentRows key={it.id}>
-                    <tr className="cursor-pointer bg-ink/5 font-semibold text-ink hover:brightness-95" onClick={() => toggle(it.id)}>
-                      <td className="sticky left-0 z-10 border border-line bg-inherit px-2 py-1.5">
+                    <tr
+                      className={`cursor-pointer text-ink hover:brightness-95 ${isParent ? "bg-ink/10 font-bold" : "bg-ink/5 font-semibold"}`}
+                      onClick={() => toggle(it.id)}
+                    >
+                      <td className={`sticky left-0 z-10 border border-line bg-inherit py-1.5 ${isParent ? "px-2" : "pl-6 pr-2"}`}>
                         <span className="flex items-center gap-1.5">
                           {open ? <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" /> : <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />}
-                          <div className="max-w-[240px] truncate" title={it.name}>{it.name || <span className="italic text-muted">(chưa đặt tên)</span>}</div>
-                          {grp && <span className="text-[9px] font-normal text-muted">({grp})</span>}
+                          <div className="min-w-0 truncate" title={it.name}>{it.name || <span className="italic text-muted">(chưa đặt tên)</span>}</div>
+                          {isParent
+                            ? <span className="shrink-0 rounded-full bg-steel/15 px-1.5 text-[9px] font-semibold text-steel">Hạng mục</span>
+                            : grp && <span className="shrink-0 text-[9px] font-normal text-muted">({grp})</span>}
                           <span className="ml-1 rounded-full bg-white/70 px-1.5 text-[9px] font-semibold text-muted">{workers.length}</span>
                         </span>
                       </td>
@@ -371,7 +405,7 @@ export default function ProjectTimesheet({
               })
             )}
           </tbody>
-          {leaves.length > 0 && (
+          {rows.length > 0 && (
             <tfoot>
               <tr className="bg-ink/10 font-bold text-ink">
                 <td className="sticky left-0 z-10 border border-line bg-ink/10 px-2 py-1.5 text-right">Tổng ngày</td>
