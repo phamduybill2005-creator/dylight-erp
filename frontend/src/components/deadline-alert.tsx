@@ -1,6 +1,7 @@
 "use client";
 
-// Cảnh báo TO khi có dự án SẮP ĐẾN HẠN NỘP (≤5 ngày) hoặc đã quá hạn.
+// NHẮC HẠN NỘP HÀNG NGÀY: mỗi ngày mở app, liệt kê MỌI dự án còn hạn nộp (không đợi
+// sát ngày mới báo). Quá hạn / sắp đến hạn xếp lên đầu và tô đỏ - vàng để thấy trước.
 // Hạn nộp = mốc SỚM NHẤT giữa "Hạn nội bộ" và "Ngày hoàn thành".
 // Ngoài modal trong app, còn: KÊU THÀNH TIẾNG (WebAudio) + THÔNG BÁO DESKTOP
 // (Notification API) để không bỏ lỡ khi đang mở tab khác.
@@ -94,8 +95,11 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
       const first = list[0];
       const when =
         first.left < 0 ? `quá hạn ${-first.left} ngày` : first.left === 0 ? "HÔM NAY" : `còn ${first.left} ngày`;
-      const n = new Notification("⚠️ SẮP ĐẾN HẠN NỘP!", {
-        body: `${list.length} dự án cần chú ý.\nGần nhất: ${first.p.name} — ${when} (hạn ${first.due})`,
+      const overdue = list.filter((x) => x.left < 0).length;
+      const n = new Notification("🔔 NHẮC HẠN NỘP HÔM NAY", {
+        body:
+          `${list.length} dự án còn hạn nộp${overdue ? ` · ${overdue} QUÁ HẠN` : ""}.\n` +
+          `Gần nhất: ${first.p.name} — ${when} (hạn ${first.due})`,
         icon: "/logo.png",
         badge: "/logo.png",
         tag: "dosco-deadline",
@@ -119,7 +123,8 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
           .map((p) => ({ p, due: dueOf(p) }))
           .filter((x): x is { p: Project; due: string } => !!x.due)
           .map(({ p, due }) => ({ p, due, left: daysLeft(due) as number }))
-          .filter((x) => x.left <= 5)
+          // NHẮC HÀNG NGÀY: liệt kê MỌI dự án còn hạn nộp (không chỉ khi sát ngày).
+          // Gần hạn / quá hạn xếp lên đầu để nhìn thấy trước.
           .sort((a, b) => a.left - b.left);
         if (!list.length) return;
         firedRef.current = true;
@@ -165,14 +170,21 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
 
   if (!open || near.length === 0) return null;
 
+  const overdueCount = near.filter((x) => x.left < 0).length;
+  const urgentCount = near.filter((x) => x.left >= 0 && x.left <= 5).length;
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/70 p-4 backdrop-blur-sm">
       <div className="w-full max-w-lg overflow-hidden rounded-xl2 bg-white shadow-2xl">
-        <div className="flex items-center gap-3 bg-bad px-5 py-4 text-white">
+        <div className={`flex items-center gap-3 px-5 py-4 text-white ${overdueCount > 0 || urgentCount > 0 ? "bg-bad" : "bg-steel"}`}>
           <ExclamationTriangleIcon className="h-10 w-10 shrink-0" />
           <div>
-            <p className="text-lg font-bold leading-tight lg:text-xl">SẮP ĐẾN HẠN NỘP!</p>
-            <p className="text-xs text-white/90">{near.length} dự án cần chú ý (còn ≤ 5 ngày hoặc đã quá hạn)</p>
+            <p className="text-lg font-bold leading-tight lg:text-xl">NHẮC HẠN NỘP HÔM NAY</p>
+            <p className="text-xs text-white/90">
+              {near.length} dự án còn hạn nộp
+              {overdueCount > 0 && <> · <b>{overdueCount} quá hạn</b></>}
+              {urgentCount > 0 && <> · <b>{urgentCount} sắp đến hạn (≤5 ngày)</b></>}
+            </p>
           </div>
         </div>
 
@@ -189,7 +201,7 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
               </div>
               <span
                 className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                  left < 0 ? "bg-bad/15 text-bad" : "bg-amber/20 text-amber-deep"
+                  left < 0 ? "bg-bad/15 text-bad" : left <= 5 ? "bg-amber/20 text-amber-deep" : "bg-paper text-muted"
                 }`}
               >
                 {left < 0 ? `Quá ${-left} ngày` : left === 0 ? "Hôm nay!" : `Còn ${left} ngày`}
