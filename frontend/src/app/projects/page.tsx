@@ -93,6 +93,8 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterLead, setFilterLead] = useState("");
   const [filterDept, setFilterDept] = useState("");
+  // Lọc theo THÁNG NHẬN dự án, dạng "YYYY-MM" (khớp tiền tố của start_date "YYYY-MM-DD").
+  const [filterMonth, setFilterMonth] = useState("");
 
   // State Sửa dự án
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -178,6 +180,10 @@ export default function ProjectsPage() {
         return memDepts.includes(filterDept);
       }) || false;
       if (!matchLeadDept && !matchMemberDept) return false;
+    }
+    // Tháng nhận: so tiền tố "YYYY-MM" của Ngày nhận. Dự án chưa có ngày nhận -> loại.
+    if (filterMonth) {
+      if ((p.start_date || "").slice(0, 7) !== filterMonth) return false;
     }
     return true;
   });
@@ -388,16 +394,39 @@ export default function ProjectsPage() {
             ))}
           </select>
         </div>
+
+        {/* Lọc theo THÁNG NHẬN dự án */}
+        <div className="flex w-full items-center gap-1.5 sm:w-auto">
+          <input
+            type="month"
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            title="Lọc theo tháng nhận dự án"
+            aria-label="Lọc theo tháng nhận dự án"
+            className="w-full rounded-xl2 border border-line bg-white px-3 py-2.5 text-xs text-ink outline-none focus:border-steel sm:w-[170px]"
+          />
+          {filterMonth && (
+            <button
+              type="button"
+              onClick={() => setFilterMonth("")}
+              title="Bỏ lọc tháng"
+              className="shrink-0 rounded-lg p-1.5 text-muted hover:bg-paper hover:text-ink"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs text-muted">
         <span>Tìm thấy: <b>{filteredProjects.length}</b> dự án</span>
-        {(searchQuery || filterDept || filterLead) && (
+        {(searchQuery || filterDept || filterLead || filterMonth) && (
           <button
             onClick={() => {
               setSearchQuery("");
               setFilterDept("");
               setFilterLead("");
+              setFilterMonth("");
             }}
             className="text-steel hover:text-ink font-semibold"
           >
