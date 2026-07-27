@@ -395,6 +395,14 @@ export default function EmployeesPage() {
     e.preventDefault();
     // Quản lý chỉ ở chế độ giao việc — không sửa hồ sơ (chặn cả khi lỡ bấm Enter).
     if (!selectedUser || !canManage) return;
+    // "Quản lý cấp trung" theo định nghĩa = CÓ người quản lý bên trên. Nếu chưa chọn
+    // "Người quản lý" thì không thể là cấp trung (lưu xong sẽ tự về cấp cao) -> chặn,
+    // yêu cầu chọn quản lý trước để giữ đúng cấp bậc.
+    if (formData.rank === "MANAGER_MID" && !formData.manager_id && !formData.manager_ids) {
+      setErrorMsg('Quản lý cấp trung phải có "Người quản lý" bên trên — hãy tick chọn ở mục "Người quản lý" bên dưới.');
+      return;
+    }
+
     setSaving(true);
     setSuccessMsg("");
     setErrorMsg("");
@@ -960,8 +968,14 @@ export default function EmployeesPage() {
                   </div>
                   <p className="mt-1 text-[10px] text-muted">
                     <b className="text-steel">Quản lý cấp cao</b> = không có ai quản lý bên trên (chọn cấp này sẽ tự gỡ người quản lý).
+                    {" "}<b className="text-steel">Quản lý cấp trung</b> = phải có người quản lý bên trên (chọn ở mục “Người quản lý” bên dưới).
                     Thang thăng cấp: Nhân viên → Quản lý cấp trung → Quản lý cấp cao → Giám đốc.
                   </p>
+                  {formData.rank === "MANAGER_MID" && !formData.manager_id && !formData.manager_ids && (
+                    <p className="mt-1 rounded-md bg-amber/10 px-2 py-1 text-[10px] font-semibold text-amber-deep">
+                      ⚠ Chưa chọn “Người quản lý” bên dưới — cấp trung cần có quản lý bên trên, nếu không lưu xong sẽ tự về cấp cao.
+                    </p>
+                  )}
                 </div>
 
                 <div>

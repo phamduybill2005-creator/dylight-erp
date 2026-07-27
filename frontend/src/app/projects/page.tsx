@@ -49,7 +49,7 @@ function calculateDuration(start?: string | null, end?: string | null, deadline?
     if (!isNaN(deadlineDate.getTime())) {
       const diffTime = deadlineDate.getTime() - startDate.getTime();
       const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-      return `${diffDays} ngày (dự kiến)`;
+      return `${diffDays} ngày`;
     }
   }
 
