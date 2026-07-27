@@ -4,7 +4,7 @@
 // có dòng tổng cộng. Cột tài chính (Giá trị HĐ / Chi phí / Lãi-lỗ) chỉ hiện cho
 // Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
@@ -12,6 +12,7 @@ import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/fi
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
+import { PROJECT_GROUPS, groupLabel } from "@/lib/groups";
 import type { Project, User, ProjectStatus } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -165,14 +166,6 @@ export default function ProjectsPage() {
       ...(projects.flatMap((p) => p.members?.flatMap((m) => m.department ? m.department.split(",").map(s => s.trim()) : []) || []).filter(Boolean))
     ])
   ).sort();
-
-  // Lựa chọn cho ô "Nhóm (グループ)" = PHÒNG BAN của công ty + các nhóm ĐANG DÙNG
-  // trong dữ liệu (giữ nguyên nhóm tiếng Nhật cũ như 土木設計 / 測量解析 để không mất).
-  const groupOptions = useMemo(() => {
-    const s = new Set<string>(PRESET_DEPARTMENTS);
-    for (const p of projects) if (p.group_name?.trim()) s.add(p.group_name.trim());
-    return Array.from(s).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [projects]);
 
   const filteredProjects = projects.filter((p) => {
     if (searchQuery) {
@@ -485,7 +478,7 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-center text-muted tnum`}>{i + 1}</td>
                   <td className={`${TD} font-mono text-[13px] font-bold text-bad whitespace-nowrap`}>{p.code}</td>
                   <td className={`${TD} font-semibold text-ink`}>{p.name}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.group_name || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap`}>{groupLabel(p.group_name) || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.dosco_manager || "—"}</td>
                   <td className={`${TD} text-muted`}>{p.evaluation || "—"}</td>
@@ -573,9 +566,9 @@ export default function ProjectsPage() {
                       <span className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</span>
                       <select value={nfGroup} onChange={(e) => setNfGroup(e.target.value)}
                         className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
-                        <option value="">— Chọn phòng ban —</option>
-                        {groupOptions.map((g) => (
-                          <option key={g} value={g}>{g}</option>
+                        <option value="">— Chọn nhóm —</option>
+                        {PROJECT_GROUPS.map((g) => (
+                          <option key={g.ja} value={g.ja}>{g.ja} ({g.vi})</option>
                         ))}
                       </select>
                     </label>
@@ -624,7 +617,16 @@ export default function ProjectsPage() {
                   {canManage && (
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted">Người chủ trì (chỉ huy trưởng)</span>
-                      <select value={leadId} onChange={(e) => setLeadId(e.target.value === "" ? "" : Number(e.target.value))}
+                      <select
+                        value={leadId}
+                        onChange={(e) => {
+                          const id = e.target.value === "" ? "" : Number(e.target.value);
+                          setLeadId(id);
+                          // DOSCO担当 chính là người chủ trì -> TỰ ĐIỀN tên, khỏi gõ 2 lần.
+                          // Ô DOSCO担当 vẫn là input tự do nên sửa tay được.
+                          const u = id === "" ? null : users.find((x) => x.id === id);
+                          setNfDosco(u ? u.full_name : "");
+                        }}
                         className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
                         <option value="">— Chưa chỉ định —</option>
                         {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
@@ -722,12 +724,16 @@ export default function ProjectsPage() {
                   <input value={efCode} onChange={(e) => setEfCode(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (phòng ban)</label>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</label>
                   <select value={efGroup} onChange={(e) => setEfGroup(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel">
-                    <option value="">— Chọn phòng ban —</option>
-                    {groupOptions.map((g) => (
-                      <option key={g} value={g}>{g}</option>
+                    <option value="">— Chọn nhóm —</option>
+                    {PROJECT_GROUPS.map((g) => (
+                      <option key={g.ja} value={g.ja}>{g.ja} ({g.vi})</option>
                     ))}
+                    {/* Giữ giá trị CŨ không thuộc 3 nhóm chuẩn để không bị xóa mất khi lưu. */}
+                    {efGroup && !PROJECT_GROUPS.some((g) => g.ja === efGroup) && (
+                      <option value={efGroup}>{efGroup} (nhóm cũ)</option>
+                    )}
                   </select>
                 </div>
               </div>

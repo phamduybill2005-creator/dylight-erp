@@ -29,6 +29,7 @@ import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
+import { PROJECT_GROUPS, groupLabel } from "@/lib/groups";
 import type { Project, Contract, Progress, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -453,7 +454,7 @@ export default function ProjectDetailPage() {
           {project.group_name && (
             <p className="flex items-center gap-1.5">
               <UserGroupIcon className="h-4 w-4 text-muted/80" />
-              Nhóm: <span className="font-medium text-ink">{project.group_name}</span>
+              Nhóm: <span className="font-medium text-ink">{groupLabel(project.group_name)}</span>
             </p>
           )}
           {project.geo_manager && (
@@ -815,16 +816,20 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
                 <div className="border-t border-line/60 pt-2.5">
-                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ) — phòng ban</label>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</label>
                   <select
                     value={groupNameInput}
                     onChange={(e) => setGroupNameInput(e.target.value)}
                     className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                   >
-                    <option value="">— Chọn phòng ban —</option>
-                    {deptOptions.map((d) => (
-                      <option key={d} value={d}>{d}</option>
+                    <option value="">— Chọn nhóm —</option>
+                    {PROJECT_GROUPS.map((g) => (
+                      <option key={g.ja} value={g.ja}>{g.ja} ({g.vi})</option>
                     ))}
+                    {/* Giữ giá trị CŨ không thuộc 3 nhóm chuẩn để không mất khi lưu. */}
+                    {groupNameInput && !PROJECT_GROUPS.some((g) => g.ja === groupNameInput) && (
+                      <option value={groupNameInput}>{groupNameInput} (nhóm cũ)</option>
+                    )}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-2">

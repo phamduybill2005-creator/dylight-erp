@@ -779,7 +779,18 @@ function GroupRows({
               <span className="text-[10px] font-semibold text-muted">Nhóm trưởng:</span>
               <select
                 value={group.assignee_id || ""}
-                onChange={(e) => onPersist(group.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
+                title="Chọn nhóm trưởng — phòng ban bên dưới tự nhảy theo người này (vẫn sửa tay được)"
+                onChange={(e) => {
+                  const id = e.target.value ? Number(e.target.value) : null;
+                  const m = id ? members.find((x) => x.id === id) : null;
+                  // Chọn NGƯỜI -> TỰ NHẢY phòng ban của họ (người ở nhiều phòng thì lấy phòng đầu).
+                  // Ô phòng ban bên dưới vẫn cho chọn lại bằng tay để ghi đè.
+                  const dept = (m?.department || "")
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)[0];
+                  onPersist(group.id, dept ? { assignee_id: id, department: dept } : { assignee_id: id });
+                }}
                 className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 transition-all ${
                   group.assignee_id
                     ? "border-indigo-200 bg-indigo-50 text-indigo-800"
