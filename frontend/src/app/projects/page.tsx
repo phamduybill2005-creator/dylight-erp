@@ -89,6 +89,8 @@ export default function ProjectsPage() {
     (me.role === "ADMIN" ||
       me.role === "DIRECTOR" ||
       ((me.role === "MANAGER" || !!me.has_subordinates) && !me.manager_id && !me.manager_ids));
+  /** Nhập ĐÁNH GIÁ: lãnh đạo cấp 1 + cấp 2 (canDelete) HOẶC chính CHỦ TRÌ dự án đó. */
+  const canEditEval = (p: Project) => canDelete || (!!me && p.lead_id === me.id);
 
   // Gợi ý dự án mẫu CHỈ MỘT LẦN (lúc nạp xong danh sách). Trước đây effect chạy lại mỗi
   // khi ô rỗng -> chọn "— Không sao chép hạng mục —" xong bị tự điền lại. Nay người dùng
@@ -535,7 +537,7 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.dosco_manager || "—"}</td>
                   {/* ĐÁNH GIÁ — gõ THẲNG vào ô này, rời ô là tự lưu (không mở trang khác). */}
                   <td className={`${TD} align-top`} onClick={(e) => e.stopPropagation()}>
-                    {canManage ? (
+                    {canEditEval(p) ? (
                       <textarea
                         rows={2}
                         value={evalEdits[p.id] ?? p.evaluation ?? ""}
