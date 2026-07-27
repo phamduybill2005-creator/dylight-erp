@@ -24,7 +24,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { ROLE_LABEL, roleTitle } from "@/lib/roles";
+import { ROLE_LABEL, roleTitle, RANKS, rankOf, rankLabel, nextRank, type RankKey } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment, Department } from "@/lib/types";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
@@ -77,6 +77,7 @@ export default function EmployeesPage() {
     manager_id: "",
     manager_ids: "",
     role: "" as Role | "",
+    rank: "STAFF" as RankKey,
     is_active: true,
     work_start: "",
     work_end: "",
@@ -173,6 +174,11 @@ export default function EmployeesPage() {
         manager_id: selectedUser.manager_id ? String(selectedUser.manager_id) : "",
         manager_ids: selectedUser.manager_ids || "",
         role: selectedUser.role || "",
+        rank: rankOf(
+          selectedUser.role,
+          selectedUser.has_subordinates,
+          !selectedUser.manager_id && !selectedUser.manager_ids,
+        ),
         is_active: selectedUser.is_active,
         department: selectedUser.department || "",
         work_start: selectedUser.work_start || "",
@@ -403,8 +409,15 @@ export default function EmployeesPage() {
         identity_card: formData.identity_card || null,
         cv_details: formData.cv_details || null,
         schedule: formData.schedule || null,
-        manager_id: formData.manager_id ? Number(formData.manager_id) : null,
-        manager_ids: formData.manager_ids || null,
+        // "Quản lý cấp cao" theo định nghĩa là KHÔNG có ai quản lý bên trên -> gỡ sạch,
+        // để nhãn chức vụ và quyền (backend) khớp nhau.
+        manager_id:
+          formData.rank === "MANAGER_TOP"
+            ? null
+            : formData.manager_id
+            ? Number(formData.manager_id)
+            : null,
+        manager_ids: formData.rank === "MANAGER_TOP" ? null : formData.manager_ids || null,
         role: formData.role ? (formData.role as Role) : undefined,
         is_active: formData.is_active,
         department: formData.department || null,
@@ -907,18 +920,48 @@ export default function EmployeesPage() {
                 </h3>
                 
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted">Vai trò hệ thống</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as Role })}
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
-                  >
-                    {Object.keys(ROLE_LABEL).map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABEL[r as Role]}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-[11px] font-semibold text-muted">
+                    Vai trò &amp; cấp bậc
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <select
+                      value={formData.rank}
+                      onChange={(e) => {
+                        const rk = e.target.value as RankKey;
+                        const def = RANKS.find((r) => r.key === rk)!;
+                        setFormData({ ...formData, rank: rk, role: def.role });
+                      }}
+                      className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    >
+                      {RANKS.map((r) => (
+                        <option key={r.key} value={r.key}>{r.label}</option>
+                      ))}
+                    </select>
+                    {(() => {
+                      const up = nextRank(formData.rank);
+                      return (
+                        <button
+                          type="button"
+                          disabled={!up}
+                          title={up ? `Thăng lên ${rankLabel(up)}` : "Đã ở cấp cao nhất trên thang thăng cấp"}
+                          onClick={() => {
+                            if (!up) return;
+                            if (!window.confirm(`Thăng cấp "${selectedUser.full_name}" lên ${rankLabel(up)}?`)) return;
+                            const def = RANKS.find((r) => r.key === up)!;
+                            setFormData({ ...formData, rank: up, role: def.role });
+                            setSuccessMsg(`Đã đặt cấp bậc mới: ${rankLabel(up)} — bấm “Lưu thay đổi” để áp dụng.`);
+                          }}
+                          className="shrink-0 rounded-lg border border-ok/40 bg-ok/10 px-2.5 py-2 text-[11px] font-semibold text-ok transition-colors hover:bg-ok hover:text-white disabled:opacity-40 disabled:hover:bg-ok/10 disabled:hover:text-ok"
+                        >
+                          ↑ Thăng cấp
+                        </button>
+                      );
+                    })()}
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted">
+                    <b className="text-steel">Quản lý cấp cao</b> = không có ai quản lý bên trên (chọn cấp này sẽ tự gỡ người quản lý).
+                    Thang thăng cấp: Nhân viên → Quản lý cấp trung → Quản lý cấp cao → Giám đốc.
+                  </p>
                 </div>
 
                 <div>
