@@ -81,6 +81,7 @@ export default function ProjectsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [me, setMe] = useState<User | null>(null);
+  const [evalEdits, setEvalEdits] = useState<Record<number, string>>({});   // ĐÁNH GIÁ đang gõ dở
   // XOÁ nhanh dự án: tầng 1 (Giám đốc/Quản trị) + tầng 2 (Quản lý cấp cao = quản lý
   // KHÔNG có ai quản lý bên trên). Khớp đúng gate ở backend.
   const canDelete =
@@ -121,6 +122,32 @@ export default function ProjectsPage() {
   const [efInternalDeadline, setEfInternalDeadline] = useState("");
   const [efLeadId, setEfLeadId] = useState<number | "">("");
   const [savingEdit, setSavingEdit] = useState(false);
+
+  /** Lưu ĐÁNH GIÁ gõ trực tiếp trên bảng (rời ô là lưu). Đang gõ thì không bị
+   *  vòng tự làm mới 20s ghi đè, vì ưu tiên giá trị trong evalEdits. */
+  async function saveEvaluation(p: Project) {
+    const draft = evalEdits[p.id];
+    if (draft === undefined) return;
+    const clear = () =>
+      setEvalEdits((s) => {
+        const n = { ...s };
+        delete n[p.id];
+        return n;
+      });
+    const next = draft.trim();
+    if (next === (p.evaluation || "")) {
+      clear();
+      return;
+    }
+    try {
+      const updated = await api.updateProject(p.id, { evaluation: next || null });
+      setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err: any) {
+      alert(err?.message || "Không lưu được đánh giá.");
+    } finally {
+      clear();
+    }
+  }
 
   /** Xoá nhanh 1 dự án ngay ở cột Thao tác (chỉ tầng 1 + 2). */
   async function handleQuickDelete(p: Project) {
@@ -506,7 +533,35 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-muted whitespace-nowrap`}>{groupLabel(p.group_name) || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap`}>{p.dosco_manager || "—"}</td>
-                  <td className={`${TD} text-muted`}>{p.evaluation || "—"}</td>
+                  {/* ĐÁNH GIÁ — gõ THẲNG vào ô này, rời ô là tự lưu (không mở trang khác). */}
+                  <td className={`${TD} align-top`} onClick={(e) => e.stopPropagation()}>
+                    {canManage ? (
+                      <textarea
+                        rows={2}
+                        value={evalEdits[p.id] ?? p.evaluation ?? ""}
+                        onChange={(e) => setEvalEdits((s) => ({ ...s, [p.id]: e.target.value }))}
+                        onBlur={() => saveEvaluation(p)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            (e.target as HTMLTextAreaElement).blur();
+                          }
+                          if (e.key === "Escape") {
+                            setEvalEdits((s) => {
+                              const n = { ...s };
+                              delete n[p.id];
+                              return n;
+                            });
+                          }
+                        }}
+                        placeholder="Ghi chú / đánh giá…"
+                        title="Gõ trực tiếp — rời ô (hoặc Enter) là tự lưu; Esc để huỷ"
+                        className="min-h-[38px] w-full resize-y rounded border border-transparent bg-transparent px-1.5 py-1 text-[11px] text-ink outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
+                      />
+                    ) : (
+                      <span className="text-muted">{p.evaluation || "—"}</span>
+                    )}
+                  </td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.start_date || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.end_date || "—"}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.internal_deadline || "—"}</td>
