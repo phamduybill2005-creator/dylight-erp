@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
@@ -80,6 +80,14 @@ export default function ProjectsPage() {
   const [leadId, setLeadId] = useState<number | "">("");
   const [users, setUsers] = useState<User[]>([]);
   const [canManage, setCanManage] = useState(false);
+  const [me, setMe] = useState<User | null>(null);
+  // XOÁ nhanh dự án: tầng 1 (Giám đốc/Quản trị) + tầng 2 (Quản lý cấp cao = quản lý
+  // KHÔNG có ai quản lý bên trên). Khớp đúng gate ở backend.
+  const canDelete =
+    !!me &&
+    (me.role === "ADMIN" ||
+      me.role === "DIRECTOR" ||
+      ((me.role === "MANAGER" || !!me.has_subordinates) && !me.manager_id && !me.manager_ids));
 
   // Gợi ý dự án mẫu CHỈ MỘT LẦN (lúc nạp xong danh sách). Trước đây effect chạy lại mỗi
   // khi ô rỗng -> chọn "— Không sao chép hạng mục —" xong bị tự điền lại. Nay người dùng
@@ -113,6 +121,22 @@ export default function ProjectsPage() {
   const [efInternalDeadline, setEfInternalDeadline] = useState("");
   const [efLeadId, setEfLeadId] = useState<number | "">("");
   const [savingEdit, setSavingEdit] = useState(false);
+
+  /** Xoá nhanh 1 dự án ngay ở cột Thao tác (chỉ tầng 1 + 2). */
+  async function handleQuickDelete(p: Project) {
+    if (!canDelete) return;
+    const ok = window.confirm(
+      `XOÁ HẲN dự án "${p.name}"${p.code ? ` (${p.code})` : ""}?\n\n` +
+        "Toàn bộ hạng mục, tiến độ, giờ công, hợp đồng… của dự án sẽ bị xoá theo. KHÔNG hoàn tác.",
+    );
+    if (!ok) return;
+    try {
+      await api.deleteProject(p.id);
+      setProjects((prev) => prev.filter((x) => x.id !== p.id));
+    } catch (err: any) {
+      alert(err?.message || "Không xoá được dự án.");
+    }
+  }
 
   const openEditModal = (p: Project) => {
     setEditingProject(p);
@@ -202,6 +226,7 @@ export default function ProjectsPage() {
     api.me()
       .then((me) => {
         if (!alive) return;
+        setMe(me);
         if (isManagerUp(me.role)) {
           setCanManage(true);
           // Danh sách nhân sự để chọn người chủ trì khi tạo dự án.
@@ -500,14 +525,26 @@ export default function ProjectsPage() {
                     </div>
                   </td>
                   <td className={`${TD} text-center whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => openEditModal(p)}
-                      title="Sửa thông tin dự án"
-                      className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer"
-                    >
-                      <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
-                      Sửa
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => openEditModal(p)}
+                        title="Sửa thông tin dự án"
+                        className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer"
+                      >
+                        <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
+                        Sửa
+                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={() => handleQuickDelete(p)}
+                          title="Xoá dự án"
+                          className="inline-flex items-center gap-1 rounded-md border border-bad/30 bg-bad/10 px-2 py-1 text-[11px] font-semibold text-bad transition-colors hover:bg-bad hover:text-white"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" />
+                          Xoá
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

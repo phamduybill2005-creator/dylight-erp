@@ -84,6 +84,7 @@ export default function ProjectDetailPage() {
   const [doscoInput, setDoscoInput] = useState("");   // DOSCO担当 (text)
   const [groupNameInput, setGroupNameInput] = useState<string>("");              // グループ = phòng ban
   const [memberDeptFilter, setMemberDeptFilter] = useState("");                  // lọc danh sách tick theo phòng ban
+  const [evalInput, setEvalInput] = useState("");                                // Đánh giá / ghi chú dự án
   const [codeInput, setCodeInput] = useState("");     // 管理番号 (mã QL)
   const [nameInput, setNameInput] = useState("");     // プロジェクト名 (tên dự án)
   const [startInput, setStartInput] = useState("");   // ngày bắt đầu YYYY-MM-DD
@@ -192,6 +193,7 @@ export default function ProjectDetailPage() {
       setGeoInput(project.geo_manager ?? "");
       setDoscoInput(project.dosco_manager ?? "");
       setGroupNameInput(project.group_name ?? "");
+      setEvalInput(project.evaluation ?? "");
       setCodeInput(project.code ?? "");
       setNameInput(project.name ?? "");
       setStartInput(project.start_date ?? "");
@@ -231,6 +233,7 @@ export default function ProjectDetailPage() {
         geo_manager: geoInput.trim() || null,
         dosco_manager: doscoInput.trim() || null,
         group_name: groupNameInput.trim() || null,
+        evaluation: evalInput.trim() || null,
       });
       setMembersModal(false);
       loadData();
@@ -855,6 +858,16 @@ export default function ProjectDetailPage() {
                   </div>
                   <datalist id="geo-mgr-list">{mgrs.geo.map((n) => <option key={n} value={n} />)}</datalist>
                   <datalist id="dosco-mgr-list">{mgrs.dosco.map((n) => <option key={n} value={n} />)}</datalist>
+                </div>
+                <div className="border-t border-line/60 pt-2.5">
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Đánh giá / Ghi chú</label>
+                  <textarea
+                    rows={2}
+                    value={evalInput}
+                    onChange={(e) => setEvalInput(e.target.value)}
+                    placeholder="VD: Dùng Dữ liệu Ảnh hiện trường để vẽ Thoát nước…"
+                    className="w-full resize-none rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                  />
                 </div>
               </div>
 
