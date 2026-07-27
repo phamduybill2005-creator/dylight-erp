@@ -509,16 +509,16 @@ export default function ProjectsPage() {
         <table className="w-full min-w-[1280px] table-fixed border-collapse text-[11px]">
           <colgroup>
             <col className="w-[34px]" />   {/* STT */}
-            <col className="w-[80px]" />   {/* Mã QL */}
-            <col className="w-[280px]" />  {/* Tên dự án — rộng nhất */}
-            <col className="w-[104px]" />  {/* Nhóm — thu gọn */}
+            <col className="w-[96px]" />   {/* Mã QL — fit mã 9 ký tự */}
+            <col className="w-[320px]" />  {/* Tên dự án — rộng nhất */}
+            <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
             <col className="w-[62px]" />   {/* GEO担当 */}
             <col className="w-[78px]" />   {/* DOSCO担当 */}
             <col className="w-[150px]" />  {/* Ghi chú */}
-            <col className="w-[70px]" />   {/* Ngày nhận */}
-            <col className="w-[70px]" />   {/* Ngày hoàn thành */}
-            <col className="w-[70px]" />   {/* Hạn nội bộ */}
-            <col className="w-[92px]" />   {/* Tổng thời gian */}
+            <col className="w-[64px]" />   {/* Time in */}
+            <col className="w-[64px]" />   {/* Time out */}
+            <col className="w-[64px]" />   {/* Time due */}
+            <col className="w-[88px]" />   {/* Total time */}
             <col className="w-[82px]" />   {/* Trạng thái */}
             <col className="w-[74px]" />   {/* Tiến độ */}
             <col className="w-[104px]" />  {/* Thao tác */}
@@ -532,10 +532,10 @@ export default function ProjectsPage() {
               <th className={TH}>GEO担当</th>
               <th className={TH}>DOSCO担当</th>
               <th className={TH}>Ghi chú</th>
-              <th className={TH}>Ngày nhận</th>
-              <th className={TH}>Ngày hoàn thành</th>
-              <th className={TH}>Hạn nội bộ</th>
-              <th className={TH}>Tổng thời gian</th>
+              <th className={TH} title="Ngày nhận">Time in</th>
+              <th className={TH} title="Ngày hoàn thành">Time out</th>
+              <th className={TH} title="Hạn nội bộ">Time due</th>
+              <th className={TH} title="Tổng thời gian">Total time</th>
               <th className={TH}>Trạng thái</th>
               <th className={TH}>Tiến độ</th>
               <th className={`${TH} text-center`}>Thao tác</th>
