@@ -13,7 +13,7 @@ import PersonPicker from "@/components/person-picker";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import { PROJECT_GROUPS, groupLabel } from "@/lib/groups";
+import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept } from "@/lib/groups";
 import type { Project, User, ProjectStatus } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -23,6 +23,12 @@ const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   COMPLETED: { label: "Hoàn thành", cls: "bg-ok/15 text-ok" },
   CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
 };
+
+/** Ngày gọn cho bảng: "2026-07-24" -> "24/07" (bỏ năm cho đỡ chiếm chỗ). */
+function dm(s?: string | null): string {
+  const v = (s || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v.slice(8, 10)}/${v.slice(5, 7)}` : "—";
+}
 
 function calculateDuration(start?: string | null, end?: string | null, deadline?: string | null): string {
   if (!start) return "—";
@@ -498,7 +504,25 @@ export default function ProjectsPage() {
       </div>
 
       <div className="mt-3 overflow-auto rounded-xl2 border border-line bg-white shadow-card max-h-[calc(100vh-280px)]">
-        <table className="w-full min-w-[900px] border-collapse text-[11px]">
+        {/* Bề rộng cột CỐ ĐỊNH: Tên dự án rộng nhất, Nhóm + 担当 thu gọn để nhường chỗ
+            cho Ghi chú và các cột ngày. Mỗi dự án gói gọn trên MỘT dòng. */}
+        <table className="w-full min-w-[1280px] table-fixed border-collapse text-[11px]">
+          <colgroup>
+            <col className="w-[34px]" />   {/* STT */}
+            <col className="w-[80px]" />   {/* Mã QL */}
+            <col className="w-[280px]" />  {/* Tên dự án — rộng nhất */}
+            <col className="w-[104px]" />  {/* Nhóm — thu gọn */}
+            <col className="w-[62px]" />   {/* GEO担当 */}
+            <col className="w-[78px]" />   {/* DOSCO担当 */}
+            <col className="w-[150px]" />  {/* Ghi chú */}
+            <col className="w-[70px]" />   {/* Ngày nhận */}
+            <col className="w-[70px]" />   {/* Ngày hoàn thành */}
+            <col className="w-[70px]" />   {/* Hạn nội bộ */}
+            <col className="w-[92px]" />   {/* Tổng thời gian */}
+            <col className="w-[82px]" />   {/* Trạng thái */}
+            <col className="w-[74px]" />   {/* Tiến độ */}
+            <col className="w-[104px]" />  {/* Thao tác */}
+          </colgroup>
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
               <th className={`${TH} w-10 text-center`}>STT</th>
@@ -536,15 +560,25 @@ export default function ProjectsPage() {
                 >
                   <td className={`${TD} text-center text-muted tnum`}>{i + 1}</td>
                   <td className={`${TD} font-mono text-[13px] font-bold text-bad whitespace-nowrap`}>{p.code}</td>
-                  <td className={`${TD} font-semibold text-ink`}>{p.name}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap`}>{groupLabel(p.group_name) || "—"}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.geo_manager || "—"}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap`}>{p.dosco_manager || "—"}</td>
+                  <td className={`${TD} font-semibold text-ink`}>
+                    <div className="truncate" title={p.name}>{p.name}</div>
+                  </td>
+                  <td className={`${TD} text-muted`}>
+                    <div className="truncate" title={groupLabel(p.group_name)}>
+                      {DEPT_JA[normalizeDept(p.group_name)] || normalizeDept(p.group_name) || "—"}
+                    </div>
+                  </td>
+                  <td className={`${TD} text-muted`}>
+                    <div className="truncate" title={p.geo_manager || ""}>{p.geo_manager || "—"}</div>
+                  </td>
+                  <td className={`${TD} text-muted`}>
+                    <div className="truncate" title={p.dosco_manager || ""}>{p.dosco_manager || "—"}</div>
+                  </td>
                   {/* ĐÁNH GIÁ — gõ THẲNG vào ô này, rời ô là tự lưu (không mở trang khác). */}
                   <td className={`${TD} align-top`} onClick={(e) => e.stopPropagation()}>
                     {canEditEval(p) ? (
                       <textarea
-                        rows={2}
+                        rows={1}
                         value={evalEdits[p.id] ?? p.evaluation ?? ""}
                         onChange={(e) => setEvalEdits((s) => ({ ...s, [p.id]: e.target.value }))}
                         onBlur={() => saveEvaluation(p)}
@@ -563,15 +597,15 @@ export default function ProjectsPage() {
                         }}
                         placeholder="Ghi chú…"
                         title="Gõ trực tiếp — rời ô (hoặc Enter) là tự lưu; Esc để huỷ"
-                        className="min-h-[38px] w-full resize-y rounded border border-transparent bg-transparent px-1.5 py-1 text-[11px] text-ink outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
+                        className="min-h-[26px] w-full resize-y rounded border border-transparent bg-transparent px-1.5 py-1 text-[11px] text-ink outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
                       />
                     ) : (
                       <span className="text-muted">{p.evaluation || "—"}</span>
                     )}
                   </td>
-                  <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.start_date || "—"}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.end_date || "—"}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap tnum`}>{p.internal_deadline || "—"}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.start_date || ""}>{dm(p.start_date)}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.end_date || ""}>{dm(p.end_date)}</td>
+                  <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.internal_deadline || ""}>{dm(p.internal_deadline)}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`}>{calculateDuration(p.start_date, p.end_date, p.internal_deadline)}</td>
                   <td className={TD}>
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
