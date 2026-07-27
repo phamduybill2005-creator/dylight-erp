@@ -145,7 +145,7 @@ export default function ProjectsPage() {
       const updated = await api.updateProject(p.id, { evaluation: next || null });
       setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     } catch (err: any) {
-      alert(err?.message || "Không lưu được đánh giá.");
+      alert(err?.message || "Không lưu được ghi chú.");
     } finally {
       clear();
     }
@@ -390,7 +390,7 @@ export default function ProjectsPage() {
 
   const TH = "border border-line px-1.5 py-1.5 font-semibold whitespace-nowrap sticky top-0 bg-paper z-10";
   const TD = "border border-line px-1.5 py-1.5 align-middle";
-  // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Đánh giá, Ngày nhận, Ngày hoàn thành, Hạn nội, Tổng thời gian, Trạng thái, Tiến độ = 13 cột.
+  // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Ghi chú, Ngày nhận, Ngày hoàn thành, Hạn nội, Tổng thời gian, Trạng thái, Tiến độ = 13 cột.
   const infoCols = 13;
 
   return (
@@ -502,7 +502,7 @@ export default function ProjectsPage() {
               <th className={TH}>Nhóm</th>
               <th className={TH}>GEO担当</th>
               <th className={TH}>DOSCO担当</th>
-              <th className={TH}>Đánh giá</th>
+              <th className={TH}>Ghi chú</th>
               <th className={TH}>Ngày nhận</th>
               <th className={TH}>Ngày hoàn thành</th>
               <th className={TH}>Hạn nội bộ</th>
@@ -556,7 +556,7 @@ export default function ProjectsPage() {
                             });
                           }
                         }}
-                        placeholder="Ghi chú / đánh giá…"
+                        placeholder="Ghi chú…"
                         title="Gõ trực tiếp — rời ô (hoặc Enter) là tự lưu; Esc để huỷ"
                         className="min-h-[38px] w-full resize-y rounded border border-transparent bg-transparent px-1.5 py-1 text-[11px] text-ink outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
                       />
@@ -683,8 +683,8 @@ export default function ProjectsPage() {
                     </label>
                   </div>
                   <label className="block">
-                    <span className="mb-1 block text-[11px] font-semibold text-muted">Đánh giá / Ghi chú</span>
-                    <input value={nfEval} onChange={(e) => setNfEval(e.target.value)} placeholder="Nhập đánh giá hoặc ghi chú dự án…"
+                    <span className="mb-1 block text-[11px] font-semibold text-muted">Ghi chú</span>
+                    <input value={nfEval} onChange={(e) => setNfEval(e.target.value)} placeholder="Nhập ghi chú dự án…"
                       className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
                   </label>
                   <div className="grid grid-cols-3 gap-3">
@@ -885,7 +885,7 @@ export default function ProjectsPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-semibold text-muted">Đánh giá</label>
+                <label className="mb-1 block text-[11px] font-semibold text-muted">Ghi chú</label>
                 <input value={efEval} onChange={(e) => setEfEval(e.target.value)} placeholder="VD: Tốt, Xuất sắc..." className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
               </div>
             </div>

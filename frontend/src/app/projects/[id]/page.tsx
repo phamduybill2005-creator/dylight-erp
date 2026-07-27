@@ -867,7 +867,7 @@ export default function ProjectDetailPage() {
                   <datalist id="dosco-mgr-list">{mgrs.dosco.map((n) => <option key={n} value={n} />)}</datalist>
                 </div>
                 <div className="border-t border-line/60 pt-2.5">
-                  <label className="mb-1 block text-[11px] font-semibold text-muted">Đánh giá / Ghi chú</label>
+                  <label className="mb-1 block text-[11px] font-semibold text-muted">Ghi chú</label>
                   <textarea
                     rows={2}
                     value={evalInput}
