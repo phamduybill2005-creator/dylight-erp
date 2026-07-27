@@ -28,31 +28,110 @@ from app.schemas import (
 router = APIRouter(prefix="/projects", tags=["Dự án"])
 
 
+# PHÂN TẦNG QUYỀN DỰ ÁN (chốt với chủ doanh nghiệp — cao xuống thấp):
+#   1. Giám đốc + Quản trị hệ thống          -> TOÀN QUYỀN.
+#   2. Quản lý CẤP CAO (trưởng nhánh: Sơn/Lâm/Bính)
+#                                            -> thêm/sửa/xóa MỌI dự án của MỌI phòng ban.
+#   3. Quản lý CẤP TRUNG (theo sơ đồ tổ chức)-> quản dự án mình chủ trì / mình tham gia /
+#                                               dự án có CẤP DƯỚI của mình tham gia.
+#   4. Nhân viên                             -> chỉ xem + làm phần việc của mình.
+# "Cấp cao" = quản lý KHÔNG có ai quản lý bên trên (khớp nhãn roleTitle ở frontend);
+# kèm danh sách email chốt cứng để chắc chắn đúng người dù dữ liệu sơ đồ chưa chuẩn.
+SENIOR_MANAGER_EMAILS = {"dhson@dosco.vn", "hklam@dosco.vn", "ncbinh@dosco.vn"}
+
+
 def _is_director(user: User) -> bool:
     """Director/Admin — thấy & quản trị mọi dự án."""
     return user.role in (UserRole.DIRECTOR, UserRole.ADMIN)
 
 
-def _can_view(db: Session, project: Project, user: User) -> bool:
-    """Được xem nếu là Director/Admin, người chủ trì, hoặc thành viên."""
+def _has_subordinates(db: Session, user: User) -> bool:
+    return (
+        db.query(User.id)
+        .filter(User.manager_id == user.id, User.company_id == user.company_id)
+        .first()
+        is not None
+    )
+
+
+def _mgr_ids_of(u: User) -> set[int]:
+    """Tập id những người đang quản lý u (chính + phụ qua manager_ids)."""
+    out: set[int] = set()
+    if u.manager_id:
+        out.add(u.manager_id)
+    if u.manager_ids:
+        for x in str(u.manager_ids).split(","):
+            x = x.strip()
+            if x.isdigit():
+                out.add(int(x))
+    return out
+
+
+def _is_manager_tier(db: Session, user: User) -> bool:
+    """Từ quản lý cấp trung trở lên (có vai trò quản lý hoặc đang có cấp dưới)."""
+    if _is_director(user) or user.role in (UserRole.MANAGER, UserRole.ACCOUNTANT):
+        return True
+    return _has_subordinates(db, user)
+
+
+def _is_senior_manager(db: Session, user: User) -> bool:
+    """Tầng 2 — quản lý CẤP CAO: quản lý mà KHÔNG có ai quản lý bên trên."""
     if _is_director(user):
         return True
-    if project.lead_id == user.id:
+    if (user.email or "").strip().lower() in SENIOR_MANAGER_EMAILS:
         return True
-    member = (
-        db.query(project_members)
-        .filter(
-            project_members.c.project_id == project.id,
-            project_members.c.user_id == user.id,
-        )
-        .first()
-    )
-    return member is not None
+    is_mgr = user.role == UserRole.MANAGER or _has_subordinates(db, user)
+    return is_mgr and not _mgr_ids_of(user)
+
+
+def _subordinate_ids(db: Session, user: User) -> set[int]:
+    """Toàn bộ CẤP DƯỚI (trực tiếp + gián tiếp) của user theo sơ đồ tổ chức."""
+    users = db.query(User).filter(User.company_id == user.company_id).all()
+    children: dict[int, set[int]] = {}
+    for u in users:
+        for m in _mgr_ids_of(u):
+            children.setdefault(m, set()).add(u.id)
+    seen: set[int] = set()
+    stack = [user.id]
+    while stack:
+        for sub in children.get(stack.pop(), ()):
+            if sub not in seen:
+                seen.add(sub)
+                stack.append(sub)
+    return seen
+
+
+def _member_ids(db: Session, project: Project) -> set[int]:
+    return {
+        r.user_id
+        for r in db.query(project_members)
+        .filter(project_members.c.project_id == project.id)
+        .all()
+    }
+
+
+def _can_view(db: Session, project: Project, user: User) -> bool:
+    """XEM: mọi người trong công ty đều được xem dự án (khớp list_projects đã mở)."""
+    return project.company_id == user.company_id
 
 
 def _can_manage(db: Session, project: Project, user: User) -> bool:
-    """Quản trị (thành viên/chủ trì): Director/Admin hoặc chính người chủ trì."""
-    return _is_director(user) or project.lead_id == user.id
+    """SỬA/QUẢN TRỊ dự án theo 4 tầng quyền ở trên."""
+    # Tầng 1 + 2: toàn quyền mọi dự án.
+    if _is_director(user) or _is_senior_manager(db, user):
+        return True
+    # Người chủ trì luôn quản được dự án của mình.
+    if project.lead_id == user.id:
+        return True
+    # Tầng 3 — quản lý cấp trung: dự án mình tham gia, hoặc của cấp dưới mình.
+    if _is_manager_tier(db, user):
+        members = _member_ids(db, project)
+        if user.id in members:
+            return True
+        subs = _subordinate_ids(db, user)
+        if project.lead_id in subs or (members & subs):
+            return True
+    return False
 
 
 def _progress_percent(db: Session, project_id: int) -> Decimal:
@@ -122,6 +201,9 @@ def create_project(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
+    # Tầng 4 (Nhân viên) KHÔNG được tạo dự án — từ quản lý cấp trung trở lên mới được.
+    if not _is_manager_tier(db, current):
+        raise HTTPException(403, "Chỉ quản lý trở lên mới được tạo dự án.")
     data = payload.model_dump()
     # Validate người chủ trì (nếu có) thuộc cùng công ty. GEO担当/DOSCO担当 là text -> không kiểm.
     lead_id = data.get("lead_id")
@@ -189,8 +271,10 @@ def update_project(
     current: User = Depends(get_current_user),
 ):
     p = db.get(Project, project_id)
-    if not p or p.company_id != current.company_id or not _can_view(db, p, current):
+    if not p or p.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy dự án.")
+    if not _can_manage(db, p, current):
+        raise HTTPException(403, "Bạn không có quyền sửa dự án này.")
 
     data = payload.model_dump(exclude_unset=True)
 
@@ -240,8 +324,9 @@ def delete_project(
     p = db.get(Project, project_id)
     if not p or p.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy dự án.")
-    if not _is_director(current):
-        raise HTTPException(403, "Chỉ Giám đốc/Quản trị mới được xoá dự án.")
+    # Tầng 1 (Giám đốc/Quản trị) và tầng 2 (Quản lý cấp cao) được xoá dự án.
+    if not _is_senior_manager(db, current):
+        raise HTTPException(403, "Chỉ Giám đốc/Quản trị hoặc Quản lý cấp cao mới được xoá dự án.")
 
     d = lambda q: q.delete(synchronize_session=False)  # noqa: E731
 

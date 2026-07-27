@@ -937,8 +937,8 @@ export default function ProjectDetailPage() {
               </div>
               {error && <p className="mt-2 text-[11px] text-bad">{error}</p>}
 
-              {/* Actions */}
-              <div className="mt-5 flex gap-3 border-t border-line pt-3">
+              {/* Actions — GHIM ở đáy khung, không phải cuộn hết mới thấy */}
+              <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-5 flex gap-3 border-t border-line bg-white px-5 py-3">
                 <button
                   onClick={() => setMembersModal(false)}
                   className="flex-1 rounded-xl2 border border-line py-2 text-xs font-semibold text-muted hover:bg-paper hover:text-ink transition-colors"
