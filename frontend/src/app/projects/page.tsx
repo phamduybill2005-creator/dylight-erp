@@ -90,8 +90,12 @@ export default function ProjectsPage() {
     (me.role === "ADMIN" ||
       me.role === "DIRECTOR" ||
       ((me.role === "MANAGER" || !!me.has_subordinates) && !me.manager_id && !me.manager_ids));
-  /** Nhập ĐÁNH GIÁ: lãnh đạo cấp 1 + cấp 2 (canDelete) HOẶC chính CHỦ TRÌ dự án đó. */
+  /** Nhập GHI CHÚ: lãnh đạo cấp 1 + cấp 2 (canDelete) HOẶC chính CHỦ TRÌ dự án đó. */
   const canEditEval = (p: Project) => canDelete || (!!me && p.lead_id === me.id);
+  /** SỬA dự án: từ quản lý trở lên (gồm quản lý cấp trung dù vai trò còn là Nhân viên)
+   *  hoặc chính chủ trì. NHÂN VIÊN thuần KHÔNG được sửa -> ẩn luôn nút. */
+  const canEditProject = (p: Project) =>
+    canManage || !!me?.has_subordinates || (!!me && p.lead_id === me.id);
 
   // Gợi ý dự án mẫu CHỈ MỘT LẦN (lúc nạp xong danh sách). Trước đây effect chạy lại mỗi
   // khi ô rỗng -> chọn "— Không sao chép hạng mục —" xong bị tự điền lại. Nay người dùng
@@ -584,14 +588,18 @@ export default function ProjectsPage() {
                   </td>
                   <td className={`${TD} text-center whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => openEditModal(p)}
-                        title="Sửa thông tin dự án"
-                        className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer"
-                      >
-                        <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
-                        Sửa
-                      </button>
+                      {canEditProject(p) ? (
+                        <button
+                          onClick={() => openEditModal(p)}
+                          title="Sửa thông tin dự án"
+                          className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer"
+                        >
+                          <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
+                          Sửa
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-muted">—</span>
+                      )}
                       {canDelete && (
                         <button
                           onClick={() => handleQuickDelete(p)}
