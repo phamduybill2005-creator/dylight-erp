@@ -25,6 +25,7 @@ import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import ProjectTimesheet from "@/components/project-timesheet";
 import ProjectTeamTab from "@/components/project-team-tab";
+import PersonPicker from "@/components/person-picker";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate } from "@/lib/format";
@@ -145,11 +146,16 @@ export default function ProjectDetailPage() {
   // Quyền quản trị dự án (thêm/bớt thành viên, đặt chủ trì, sửa/xóa mốc):
   // Giám đốc/Admin HOẶC chính người chủ trì.
   // Backend là nguồn chân lý (chỉ Director/Admin hoặc lead) — FE gate để ẩn nút cho khớp.
+  // MỌI cấp quản lý đều xem/sửa được (kể cả "quản lý cấp trung" mà vai trò hệ thống
+  // vẫn là Nhân viên — nhận biết qua has_subordinates), cộng chính người chủ trì.
+  // Sửa được dự án = nhìn được đầy đủ các mục (thành viên, chủ trì, hạng mục…).
   const canManage =
     !!currentUser &&
     (currentUser.role === "DIRECTOR" ||
       currentUser.role === "ADMIN" ||
       currentUser.role === "MANAGER" ||
+      currentUser.role === "ACCOUNTANT" ||
+      !!currentUser.has_subordinates ||
       project?.lead_id === currentUser.id);
 
   // Load current user once.
@@ -844,27 +850,25 @@ export default function ProjectDetailPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当 (chọn hoặc gõ)</label>
-                    <input
-                      list="geo-mgr-list"
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当 — phía Nhật</label>
+                    <PersonPicker
                       value={geoInput}
-                      onChange={(e) => setGeoInput(e.target.value)}
-                      placeholder="Bấm để chọn…"
+                      onChange={setGeoInput}
+                      options={mgrs.geo}
+                      placeholder="— Chọn người phía Nhật —"
                       className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当 (chọn hoặc gõ)</label>
-                    <input
-                      list="dosco-mgr-list"
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当 — phía Việt</label>
+                    <PersonPicker
                       value={doscoInput}
-                      onChange={(e) => setDoscoInput(e.target.value)}
-                      placeholder="Bấm để chọn…"
+                      onChange={setDoscoInput}
+                      options={[...allUsers.map((u) => u.full_name), ...mgrs.dosco]}
+                      placeholder="— Chọn người phía Việt —"
                       className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     />
                   </div>
-                  <datalist id="geo-mgr-list">{mgrs.geo.map((n) => <option key={n} value={n} />)}</datalist>
-                  <datalist id="dosco-mgr-list">{mgrs.dosco.map((n) => <option key={n} value={n} />)}</datalist>
                 </div>
                 <div className="border-t border-line/60 pt-2.5">
                   <label className="mb-1 block text-[11px] font-semibold text-muted">Ghi chú</label>
