@@ -80,7 +80,9 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
   const [near, setNear] = useState<{ p: Project; left: number; due: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [canNotify, setCanNotify] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [nextAt, setNextAt] = useState<Date | null>(null);   // lần nhắc kế tiếp (dự án gấp)
   const firedRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -111,10 +113,63 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
     }
   }, []);
 
+  /** Kêu + báo desktop ngay lập tức (dùng cho lần đầu và mỗi lần nhắc lại). */
+  const alertNow = useCallback(
+    (list: { p: Project; left: number; due: string }[]) => {
+      playAlertSound();
+      if (typeof window === "undefined" || !("Notification" in window)) return;
+      if (Notification.permission === "granted") {
+        notifyDesktop(list);
+      } else if (Notification.permission === "default") {
+        Notification.requestPermission()
+          .then((perm) => {
+            setCanNotify(perm);
+            if (perm === "granted") notifyDesktop(list);
+          })
+          .catch(() => {});
+      }
+    },
+    [notifyDesktop],
+  );
+
+  /**
+   * NHẮC DỒN DẬP cho dự án GẤP (hạn hôm nay hoặc còn ≤1 ngày):
+   * mỗi lần chờ ĐÚNG MỘT NỬA thời gian CÒN LẠI rồi kêu. Cứ thế lặp lại nên các mốc
+   * nhắc rơi vào 50% → 75% → 87.5% → 93.75% … của quãng thời gian còn lại, càng gần
+   * hạn càng nhắc dày, cho tới khi hết giờ (mốc hạn = 23:59:59 của ngày đến hạn).
+   */
+  const scheduleEscalation = useCallback(
+    (list: { p: Project; left: number; due: string }[]) => {
+      const urgent = list.filter((x) => x.left <= 1);
+      if (!urgent.length) return;
+      const dueMs = Math.min(...urgent.map((x) => new Date(x.due + "T23:59:59").getTime()));
+      const MIN_GAP = 60_000;   // không nhắc dày hơn 1 phút
+      const tick = () => {
+        const remain = dueMs - Date.now();
+        if (remain <= MIN_GAP) {
+          setNextAt(null);
+          return;               // hết giờ -> dừng
+        }
+        const wait = Math.max(MIN_GAP, Math.floor(remain / 2));
+        setNextAt(new Date(Date.now() + wait));
+        timerRef.current = window.setTimeout(() => {
+          setOpen(true);
+          alertNow(list);
+          tick();               // lặp tiếp: 75% -> 87.5% -> 93.75% -> …
+        }, wait);
+      };
+      tick();
+    },
+    [alertNow],
+  );
+
+  useEffect(() => () => { if (timerRef.current) window.clearTimeout(timerRef.current); }, []);
+
   useEffect(() => {
     if (!user || roleTier(user.role) !== "DIRECTOR") return;
     if (firedRef.current) return;
-    if (typeof window !== "undefined" && localStorage.getItem(SHOWN_KEY) === todayKey()) return;
+    const shownToday =
+      typeof window !== "undefined" && localStorage.getItem(SHOWN_KEY) === todayKey();
     api
       .projects()
       .then((ps) => {
@@ -127,25 +182,18 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
           // Gần hạn / quá hạn xếp lên đầu để nhìn thấy trước.
           .sort((a, b) => a.left - b.left);
         if (!list.length) return;
+        const hasUrgent = list.some((x) => x.left <= 1);
+        // Đã nhắc hôm nay VÀ không có dự án gấp -> thôi, để yên.
+        // Có dự án GẤP (hạn hôm nay / còn ≤1 ngày) -> vẫn kêu và bật lịch nhắc dồn.
+        if (shownToday && !hasUrgent) return;
         firedRef.current = true;
         setNear(list);
         setOpen(true);
-        playAlertSound();                                   // KÊU THÀNH TIẾNG
-        if (typeof window !== "undefined" && "Notification" in window) {
-          if (Notification.permission === "granted") {
-            notifyDesktop(list);                            // BÁO TRÊN DESKTOP
-          } else if (Notification.permission === "default") {
-            Notification.requestPermission()
-              .then((perm) => {
-                setCanNotify(perm);
-                if (perm === "granted") notifyDesktop(list);
-              })
-              .catch(() => {});
-          }
-        }
+        alertNow(list);                     // KÊU THÀNH TIẾNG + BÁO DESKTOP
+        if (hasUrgent) scheduleEscalation(list);
       })
       .catch(() => {});
-  }, [user, notifyDesktop]);
+  }, [user, alertNow, scheduleEscalation]);
 
   function dismiss() {
     if (typeof window !== "undefined") localStorage.setItem(SHOWN_KEY, todayKey());
@@ -209,6 +257,14 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
             </div>
           ))}
         </div>
+
+        {nextAt && (
+          <p className="border-t border-line bg-bad/5 px-4 py-2 text-[11px] font-semibold text-bad">
+            Có dự án đến hạn hôm nay — sẽ nhắc lại lúc{" "}
+            {nextAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}, rồi nhắc dày
+            dần (mỗi lần rút một nửa thời gian còn lại) cho tới hết giờ.
+          </p>
+        )}
 
         {canNotify !== "granted" && (
           <p className="border-t border-line bg-amber/10 px-4 py-2 text-[11px] text-amber-deep">
