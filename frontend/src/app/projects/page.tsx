@@ -667,17 +667,18 @@ export default function ProjectsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <label className="block">
-                      <span className="mb-1 block text-[11px] font-semibold text-muted">GEO担当 (chọn hoặc gõ)</span>
-                      <input list="geo-mgr-list" value={nfGeo} onChange={(e) => setNfGeo(e.target.value)} placeholder="Bấm để chọn…"
-                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">GEO担当 — phía Nhật</span>
+                      <PersonPicker value={nfGeo} onChange={setNfGeo} options={mgrs.geo} placeholder="— Chọn người phía Nhật —" />
                     </label>
                     <label className="block">
-                      <span className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当 (chọn hoặc gõ)</span>
-                      <input list="dosco-mgr-list" value={nfDosco} onChange={(e) => setNfDosco(e.target.value)} placeholder="Bấm để chọn…"
-                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+                      <span className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当 — phía Việt</span>
+                      <PersonPicker
+                        value={nfDosco}
+                        onChange={setNfDosco}
+                        options={[...users.map((u) => u.full_name), ...mgrs.dosco]}
+                        placeholder="— Chọn người phía Việt —"
+                      />
                     </label>
-                    <datalist id="geo-mgr-list">{mgrs.geo.map((n) => <option key={n} value={n} />)}</datalist>
-                    <datalist id="dosco-mgr-list">{mgrs.dosco.map((n) => <option key={n} value={n} />)}</datalist>
                   </div>
                   <label className="block">
                     <span className="mb-1 block text-[11px] font-semibold text-muted">Đánh giá / Ghi chú</span>
@@ -832,15 +833,20 @@ export default function ProjectsPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</label>
-                  <input list="geo-list-edit" value={efGeo} onChange={(e) => setEfGeo(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
-                  <datalist id="geo-list-edit">
+                  <PersonPicker value={efGeo} onChange={setEfGeo} options={mgrs.geo} placeholder="— Chọn người phía Nhật —" />
+                  <datalist id="geo-list-edit" className="hidden">
                     {mgrs.geo.map((m) => <option key={m} value={m} />)}
                   </datalist>
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当</label>
-                  <input list="dosco-list-edit" value={efDosco} onChange={(e) => setEfDosco(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel" />
-                  <datalist id="dosco-list-edit">
+                  <PersonPicker
+                    value={efDosco}
+                    onChange={setEfDosco}
+                    options={[...users.map((u) => u.full_name), ...mgrs.dosco]}
+                    placeholder="— Chọn người phía Việt —"
+                  />
+                  <datalist id="dosco-list-edit" className="hidden">
                     {mgrs.dosco.map((m) => <option key={m} value={m} />)}
                   </datalist>
                 </div>
@@ -894,5 +900,75 @@ export default function ProjectsPage() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+/**
+ * Ô CHỌN NGƯỜI phụ trách (GEO担当 phía Nhật / DOSCO担当 phía Việt).
+ * Mặc định là DANH SÁCH CHỌN — khỏi gõ tay. Gặp người mới chưa có trong danh sách
+ * thì chọn "— Khác (gõ tay) —" để nhập, xong quay lại chọn được như thường.
+ */
+function PersonPicker({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+}) {
+  const opts = Array.from(
+    new Set(options.map((s) => (s || "").trim()).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b, "vi"));
+  const [manual, setManual] = useState(false);
+  const cls =
+    "w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel";
+
+  // Đang gõ tay, hoặc giá trị sẵn có không nằm trong danh sách -> hiện ô nhập.
+  if (manual || (!!value && !opts.includes(value))) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Gõ tên người phụ trách…"
+          className={cls}
+        />
+        <button
+          type="button"
+          title="Quay lại chọn từ danh sách"
+          onClick={() => {
+            setManual(false);
+            onChange("");
+          }}
+          className="shrink-0 rounded-xl2 border border-line px-2 py-2 text-[11px] font-semibold text-muted hover:bg-paper hover:text-ink"
+        >
+          ↩
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => {
+        if (e.target.value === "__manual__") {
+          setManual(true);
+          onChange("");
+        } else {
+          onChange(e.target.value);
+        }
+      }}
+      className={cls}
+    >
+      <option value="">{placeholder}</option>
+      {opts.map((o) => (
+        <option key={o} value={o}>{o}</option>
+      ))}
+      <option value="__manual__">— Khác (gõ tay) —</option>
+    </select>
   );
 }
