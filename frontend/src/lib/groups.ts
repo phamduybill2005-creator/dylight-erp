@@ -22,6 +22,19 @@ export function groupToDept(value?: string | null): string {
   return g ? g.vi : v;
 }
 
+/** Nhãn PHÒNG BAN kèm tên tiếng Nhật bên cạnh: "Phòng Bản đồ (測量解析)".
+ *  Phòng chưa có tên tiếng Nhật (vd Phòng AI) thì giữ nguyên tiếng Việt. */
+export function deptLabel(dept?: string | null): string {
+  const d = (dept || "").trim();
+  if (!d) return "";
+  const g = PROJECT_GROUPS.find((x) => x.vi === d || x.ja === d);
+  return g ? `${g.vi} (${g.ja})` : d;
+}
+
+/** Chuẩn hoá về TÊN PHÒNG BAN tiếng Việt (nhận cả khi dữ liệu ghi tên tiếng Nhật),
+ *  để không bị đếm/lọc trùng "測量解析" và "Phòng Bản đồ" thành 2 phòng khác nhau. */
+export const normalizeDept = (v?: string | null): string => groupToDept(v);
+
 /** Nhóm (tiếng Nhật) tương ứng với một PHÒNG BAN tiếng Việt. */
 export function deptToGroup(dept?: string | null): string {
   const d = (dept || "").trim();

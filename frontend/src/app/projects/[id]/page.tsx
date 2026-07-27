@@ -29,7 +29,7 @@ import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import { PROJECT_GROUPS, groupLabel } from "@/lib/groups";
+import { PROJECT_GROUPS, groupLabel, deptLabel, normalizeDept } from "@/lib/groups";
 import type { Project, Contract, Progress, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -68,6 +68,7 @@ export default function ProjectDetailPage() {
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [usersError, setUsersError] = useState(false);   // nạp danh sách nhân viên bị lỗi
   const [mgrs, setMgrs] = useState<{ geo: string[]; dosco: string[] }>({ geo: [], dosco: [] });
 
   // Nhân viên (STAFF) không được xem TIỀN của dự án. Backend là nguồn chân lý
@@ -96,15 +97,19 @@ export default function ProjectDetailPage() {
   const splitDepts = (s?: string | null): string[] =>
     (s || "").split(",").map((x) => x.trim()).filter(Boolean);
   // Lựa chọn PHÒNG BAN: danh mục công ty + phòng ban đang có trên nhân sự + nhóm cũ của dự án.
+  // Chuẩn hoá về tên tiếng Việt trước khi gộp, để "測量解析" và "Phòng Bản đồ"
+  // không bị tách thành 2 mục khác nhau trong ô chọn.
   const deptOptions = Array.from(
-    new Set<string>([
-      ...PRESET_DEPARTMENTS,
-      ...allUsers.flatMap((u) => splitDepts(u.department)),
-      ...(project?.group_name ? [project.group_name.trim()] : []),
-    ]),
-  )
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b, "vi"));
+    new Set<string>(
+      [
+        ...PRESET_DEPARTMENTS,
+        ...allUsers.flatMap((u) => splitDepts(u.department)),
+        ...(project?.group_name ? [project.group_name.trim()] : []),
+      ]
+        .map((d) => normalizeDept(d))
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b, "vi"));
 
   // Sửa mốc tiến độ (null = đang tạo mới, khác null = đang sửa mốc này).
   const [editingProgressId, setEditingProgressId] = useState<number | null>(null);
@@ -163,12 +168,14 @@ export default function ProjectDetailPage() {
 
   // Nạp danh sách nhân sự để chọn thành viên/chủ trì — chỉ khi user có quyền quản trị
   // dự án này (Director/Admin hoặc chính người chủ trì, kể cả người chủ trì là cấp trung).
+  // Nạp cả khi MỞ KHUNG SỬA (không chỉ dựa vào canManage) và BÁO LỖI rõ nếu hỏng —
+  // trước đây gọi lỗi 1 lần là kẹt mãi ở "Đang tải danh sách nhân viên…".
   useEffect(() => {
-    if (canManage && allUsers.length === 0) {
-      api.users().then(setAllUsers).catch(() => {});
-      api.projectManagers().then(setMgrs).catch(() => {});
-    }
-  }, [canManage, allUsers.length]);
+    if (!canManage && !membersModal) return;
+    if (allUsers.length > 0 || usersError) return;
+    api.users().then(setAllUsers).catch(() => setUsersError(true));
+    api.projectManagers().then(setMgrs).catch(() => {});
+  }, [canManage, membersModal, allUsers.length, usersError]);
 
   useEffect(loadData, [projectId, currentUser, showMoney]);
 
@@ -885,7 +892,7 @@ export default function ProjectDetailPage() {
                 >
                   <option value="">— Tất cả phòng ban —</option>
                   {deptOptions.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                    <option key={d} value={d}>{deptLabel(d)}</option>
                   ))}
                 </select>
                 {memberDeptFilter && (
@@ -902,13 +909,26 @@ export default function ProjectDetailPage() {
               {/* Danh sách checklist thành viên + chọn chủ trì */}
               <div className="mt-3 max-h-60 overflow-y-auto space-y-2.5 pr-1">
                 {allUsers.length === 0 ? (
-                  <p className="text-center text-xs text-muted py-4">Đang tải danh sách nhân viên…</p>
+                  usersError ? (
+                    <div className="py-4 text-center">
+                      <p className="text-xs font-semibold text-bad">Không tải được danh sách nhân viên.</p>
+                      <button
+                        type="button"
+                        onClick={() => setUsersError(false)}
+                        className="mt-1.5 rounded-lg border border-line px-3 py-1.5 text-[11px] font-semibold text-steel hover:bg-paper"
+                      >
+                        Thử lại
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-center text-xs text-muted py-4">Đang tải danh sách nhân viên…</p>
+                  )
                 ) : (
                   allUsers
                     .filter(
                       (u) =>
                         !memberDeptFilter ||
-                        splitDepts(u.department).includes(memberDeptFilter) ||
+                        splitDepts(u.department).map(normalizeDept).includes(memberDeptFilter) ||
                         selectedMemberIds.includes(u.id),   // giữ người ĐÃ tick dù khác phòng
                     )
                     .map((u) => {
