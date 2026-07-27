@@ -905,6 +905,19 @@ export default function ProjectDetailPage() {
                   </button>
                 )}
               </div>
+              {memberDeptFilter &&
+                (() => {
+                  const hidden = allUsers.filter(
+                    (u) =>
+                      selectedMemberIds.includes(u.id) &&
+                      !splitDepts(u.department).map(normalizeDept).includes(memberDeptFilter),
+                  ).length;
+                  return hidden > 0 ? (
+                    <p className="mt-1 text-[10px] text-muted">
+                      Đang ẩn <b className="text-steel">{hidden}</b> người đã chọn ở phòng khác — vẫn được giữ khi lưu.
+                    </p>
+                  ) : null;
+                })()}
 
               {/* Danh sách checklist thành viên + chọn chủ trì */}
               <div className="mt-3 max-h-60 overflow-y-auto space-y-2.5 pr-1">
@@ -925,11 +938,12 @@ export default function ProjectDetailPage() {
                   )
                 ) : (
                   allUsers
+                    // Chọn phòng ban -> CHỈ hiện người thuộc đúng phòng đó.
+                    // (Người đã tick ở phòng khác vẫn được GIỮ khi lưu, chỉ tạm ẩn khỏi danh sách.)
                     .filter(
                       (u) =>
                         !memberDeptFilter ||
-                        splitDepts(u.department).map(normalizeDept).includes(memberDeptFilter) ||
-                        selectedMemberIds.includes(u.id),   // giữ người ĐÃ tick dù khác phòng
+                        splitDepts(u.department).map(normalizeDept).includes(memberDeptFilter),
                     )
                     .map((u) => {
                     const isChecked = selectedMemberIds.includes(u.id);

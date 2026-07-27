@@ -1,0 +1,37 @@
+name: Don ten phong ban cu (Thiet ke / Dia hinh)
+
+# Bo cac token phong ban cu con sot tren users.department, giu 4 phong chinh thuc.
+# Idempotent.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - backend/scripts/clean_legacy_depts_once.py
+
+concurrency:
+  group: clean-legacy-depts
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install psycopg2
+        run: python -m pip install --upgrade pip psycopg2-binary
+      - name: Clean legacy departments
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: 'utf-8'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/clean_legacy_depts_once.py
