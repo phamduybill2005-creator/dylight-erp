@@ -12,11 +12,10 @@ import Link from "next/link";
 import { ExclamationTriangleIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
-import { todayLocal } from "@/lib/format";
 import type { Project, User } from "@/lib/types";
 
-const todayKey = todayLocal;
-const SHOWN_KEY = "deadlineAlertShown";
+// Mốc THỜI ĐIỂM (epoch ms) lần nhắc gần nhất — để giới hạn tối đa 15 phút/lần.
+const SHOWN_KEY = "deadlineAlertLastMs";
 
 /** Hạn nộp của dự án = mốc SỚM NHẤT giữa hạn nội bộ và ngày hoàn thành. */
 function dueOf(p: Project): string | null {
@@ -80,8 +79,6 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
   const [near, setNear] = useState<{ p: Project; left: number; due: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [canNotify, setCanNotify] = useState<NotificationPermission | "unsupported">("unsupported");
-  const [nextAt, setNextAt] = useState<Date | null>(null);   // lần nhắc kế tiếp (dự án gấp)
-  const firedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -132,71 +129,50 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
     [notifyDesktop],
   );
 
-  /**
-   * NHẮC DỒN DẬP cho dự án GẤP (hạn hôm nay hoặc còn ≤1 ngày):
-   * mỗi lần chờ ĐÚNG MỘT NỬA thời gian CÒN LẠI rồi kêu. Cứ thế lặp lại nên các mốc
-   * nhắc rơi vào 50% → 75% → 87.5% → 93.75% … của quãng thời gian còn lại, càng gần
-   * hạn càng nhắc dày, cho tới khi hết giờ (mốc hạn = 23:59:59 của ngày đến hạn).
-   */
-  const scheduleEscalation = useCallback(
-    (list: { p: Project; left: number; due: string }[]) => {
-      const urgent = list.filter((x) => x.left <= 1);
-      if (!urgent.length) return;
-      const dueMs = Math.min(...urgent.map((x) => new Date(x.due + "T23:59:59").getTime()));
-      const MIN_GAP = 60_000;   // không nhắc dày hơn 1 phút
-      const tick = () => {
-        const remain = dueMs - Date.now();
-        if (remain <= MIN_GAP) {
-          setNextAt(null);
-          return;               // hết giờ -> dừng
-        }
-        const wait = Math.max(MIN_GAP, Math.floor(remain / 2));
-        setNextAt(new Date(Date.now() + wait));
-        timerRef.current = window.setTimeout(() => {
-          setOpen(true);
-          alertNow(list);
-          tick();               // lặp tiếp: 75% -> 87.5% -> 93.75% -> …
-        }, wait);
-      };
-      tick();
-    },
-    [alertNow],
-  );
+  // Giữ trạng thái "đang mở" trong ref để vòng kiểm tra không tự bật lại khi popup còn hiện.
+  const openRef = useRef(false);
+  useEffect(() => { openRef.current = open; }, [open]);
 
-  useEffect(() => () => { if (timerRef.current) window.clearTimeout(timerRef.current); }, []);
-
+  // NHẮC TỐI ĐA 15 PHÚT / LẦN — không bật lại sau mỗi lần bấm/chuyển trang.
+  // Dùng localStorage timestamp để giới hạn xuyên suốt (kể cả khi component mount lại).
   useEffect(() => {
     if (!user || roleTier(user.role) !== "DIRECTOR") return;
-    if (firedRef.current) return;
-    const shownToday =
-      typeof window !== "undefined" && localStorage.getItem(SHOWN_KEY) === todayKey();
-    api
-      .projects()
-      .then((ps) => {
-        const list = ps
-          .filter((p) => p.status !== "COMPLETED" && p.status !== "CLOSED")
-          .map((p) => ({ p, due: dueOf(p) }))
-          .filter((x): x is { p: Project; due: string } => !!x.due)
-          .map(({ p, due }) => ({ p, due, left: daysLeft(due) as number }))
-          // NHẮC HÀNG NGÀY: liệt kê MỌI dự án còn hạn nộp (không chỉ khi sát ngày).
-          // Gần hạn / quá hạn xếp lên đầu để nhìn thấy trước.
-          .sort((a, b) => a.left - b.left);
-        if (!list.length) return;
-        const hasUrgent = list.some((x) => x.left <= 1);
-        // Đã nhắc hôm nay VÀ không có dự án gấp -> thôi, để yên.
-        // Có dự án GẤP (hạn hôm nay / còn ≤1 ngày) -> vẫn kêu và bật lịch nhắc dồn.
-        if (shownToday && !hasUrgent) return;
-        firedRef.current = true;
-        setNear(list);
-        setOpen(true);
-        alertNow(list);                     // KÊU THÀNH TIẾNG + BÁO DESKTOP
-        if (hasUrgent) scheduleEscalation(list);
-      })
-      .catch(() => {});
-  }, [user, alertNow, scheduleEscalation]);
+    let alive = true;
+    const THROTTLE = 15 * 60 * 1000;   // 15 phút
+
+    const check = () => {
+      if (!alive || openRef.current) return;   // đang mở thì để yên
+      const last = Number((typeof window !== "undefined" && localStorage.getItem(SHOWN_KEY)) || 0);
+      if (Date.now() - last < THROTTLE) return; // chưa đủ 15 phút kể từ lần nhắc trước
+      api
+        .projects()
+        .then((ps) => {
+          if (!alive || openRef.current) return;
+          const list = ps
+            .filter((p) => p.status !== "COMPLETED" && p.status !== "CLOSED")
+            .map((p) => ({ p, due: dueOf(p) }))
+            .filter((x): x is { p: Project; due: string } => !!x.due)
+            .map(({ p, due }) => ({ p, due, left: daysLeft(due) as number }))
+            .sort((a, b) => a.left - b.left);   // gần hạn / quá hạn lên đầu
+          if (!list.length) return;
+          setNear(list);
+          setOpen(true);
+          alertNow(list);                       // KÊU THÀNH TIẾNG + BÁO DESKTOP
+          localStorage.setItem(SHOWN_KEY, String(Date.now()));
+        })
+        .catch(() => {});
+    };
+
+    check();                                     // kiểm tra ngay khi mở app
+    timerRef.current = window.setInterval(check, 60_000);   // mỗi phút xem đã tới 15' chưa
+    return () => {
+      alive = false;
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, [user, alertNow]);
 
   function dismiss() {
-    if (typeof window !== "undefined") localStorage.setItem(SHOWN_KEY, todayKey());
+    // Đóng lại — mốc 15 phút đã đặt lúc hiện, nên sẽ không bật lại trước 15 phút.
     setOpen(false);
   }
 
@@ -257,14 +233,6 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
             </div>
           ))}
         </div>
-
-        {nextAt && (
-          <p className="border-t border-line bg-bad/5 px-4 py-2 text-[11px] font-semibold text-bad">
-            Có dự án đến hạn hôm nay — sẽ nhắc lại lúc{" "}
-            {nextAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}, rồi nhắc dày
-            dần (mỗi lần rút một nửa thời gian còn lại) cho tới hết giờ.
-          </p>
-        )}
 
         {canNotify !== "granted" && (
           <p className="border-t border-line bg-amber/10 px-4 py-2 text-[11px] text-amber-deep">
