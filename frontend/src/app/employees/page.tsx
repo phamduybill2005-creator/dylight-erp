@@ -1022,7 +1022,13 @@ export default function EmployeesPage() {
                                 } else {
                                   newIds = newIds.filter(id => id !== String(mgr.id));
                                 }
-                                setFormData({ ...formData, manager_ids: newIds.join(",") });
+                                const patch = { ...formData, manager_ids: newIds.join(",") };
+                                // Đồng bộ cấp bậc: đang là quản lý mà CÓ người quản lý bên
+                                // trên -> cấp trung; hết -> cấp cao. (Không đổi vai trò khác.)
+                                if (formData.rank === "MANAGER_TOP" || formData.rank === "MANAGER_MID") {
+                                  patch.rank = newIds.length ? "MANAGER_MID" : "MANAGER_TOP";
+                                }
+                                setFormData(patch);
                               }}
                               className="h-3.5 w-3.5 rounded border-line text-steel focus:ring-steel cursor-pointer"
                             />

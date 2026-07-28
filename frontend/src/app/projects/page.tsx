@@ -13,7 +13,7 @@ import PersonPicker from "@/components/person-picker";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept } from "@/lib/groups";
+import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf } from "@/lib/groups";
 import type { Project, User, ProjectStatus } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -161,6 +161,27 @@ export default function ProjectsPage() {
       clear();
     }
   }
+
+  // Lọc người phụ trách theo PHÒNG BAN (Nhóm) đang chọn.
+  //  - Phía Nhật (GEO担当): map cứng qua geoDeptOf.
+  //  - Phía Việt (DOSCO担当): theo cột department của nhân sự.
+  // Chưa chọn phòng -> hiện tất cả. Phòng không có ai -> cũng hiện tất cả (khỏi kẹt).
+  // Luôn kèm GIÁ TRỊ ĐANG CHỌN để không mất khi đổi phòng.
+  const geoOptsFor = (group: string, current: string) => {
+    const dept = normalizeDept(group);
+    const filtered = dept ? mgrs.geo.filter((n) => geoDeptOf(n) === dept) : mgrs.geo;
+    const base = filtered.length ? filtered : mgrs.geo;
+    return current && !base.includes(current) ? [current, ...base] : base;
+  };
+  const doscoOptsFor = (group: string, current: string) => {
+    const dept = normalizeDept(group);
+    const all = [...users.map((u) => u.full_name), ...mgrs.dosco];
+    const inDept = users
+      .filter((u) => splitDepts(u.department).map(normalizeDept).includes(dept))
+      .map((u) => u.full_name);
+    const base = dept ? (inDept.length ? inDept : all) : all;
+    return current && !base.includes(current) ? [current, ...base] : base;
+  };
 
   /** Xoá nhanh 1 dự án ngay ở cột Thao tác (chỉ tầng 1 + 2). */
   async function handleQuickDelete(p: Project) {
@@ -713,14 +734,14 @@ export default function ProjectsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted">GEO担当 — phía Nhật</span>
-                      <PersonPicker value={nfGeo} onChange={setNfGeo} options={mgrs.geo} placeholder="— Chọn người phía Nhật —" />
+                      <PersonPicker value={nfGeo} onChange={setNfGeo} options={geoOptsFor(nfGroup, nfGeo)} placeholder="— Chọn người phía Nhật —" />
                     </label>
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted">DOSCO担当 — phía Việt</span>
                       <PersonPicker
                         value={nfDosco}
                         onChange={setNfDosco}
-                        options={[...users.map((u) => u.full_name), ...mgrs.dosco]}
+                        options={doscoOptsFor(nfGroup, nfDosco)}
                         placeholder="— Chọn người phía Việt —"
                       />
                     </label>
@@ -878,7 +899,7 @@ export default function ProjectsPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当</label>
-                  <PersonPicker value={efGeo} onChange={setEfGeo} options={mgrs.geo} placeholder="— Chọn người phía Nhật —" />
+                  <PersonPicker value={efGeo} onChange={setEfGeo} options={geoOptsFor(efGroup, efGeo)} placeholder="— Chọn người phía Nhật —" />
                   <datalist id="geo-list-edit" className="hidden">
                     {mgrs.geo.map((m) => <option key={m} value={m} />)}
                   </datalist>
@@ -888,7 +909,7 @@ export default function ProjectsPage() {
                   <PersonPicker
                     value={efDosco}
                     onChange={setEfDosco}
-                    options={[...users.map((u) => u.full_name), ...mgrs.dosco]}
+                    options={doscoOptsFor(efGroup, efDosco)}
                     placeholder="— Chọn người phía Việt —"
                   />
                   <datalist id="dosco-list-edit" className="hidden">

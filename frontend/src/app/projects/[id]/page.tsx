@@ -30,7 +30,7 @@ import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { formatVND, formatDate } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import { PROJECT_GROUPS, groupLabel, deptLabel, normalizeDept } from "@/lib/groups";
+import { PROJECT_GROUPS, groupLabel, deptLabel, normalizeDept, geoDeptOf } from "@/lib/groups";
 import type { Project, Contract, Progress, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -111,6 +111,23 @@ export default function ProjectDetailPage() {
         .filter(Boolean),
     ),
   ).sort((a, b) => a.localeCompare(b, "vi"));
+
+  // Lọc người phụ trách theo PHÒNG BAN đang chọn (giống trang danh sách).
+  const geoOptsFor = (group: string, current: string) => {
+    const dept = normalizeDept(group);
+    const filtered = dept ? mgrs.geo.filter((n) => geoDeptOf(n) === dept) : mgrs.geo;
+    const base = filtered.length ? filtered : mgrs.geo;
+    return current && !base.includes(current) ? [current, ...base] : base;
+  };
+  const doscoOptsFor = (group: string, current: string) => {
+    const dept = normalizeDept(group);
+    const all = [...allUsers.map((u) => u.full_name), ...mgrs.dosco];
+    const inDept = allUsers
+      .filter((u) => splitDepts(u.department).map(normalizeDept).includes(dept))
+      .map((u) => u.full_name);
+    const base = dept ? (inDept.length ? inDept : all) : all;
+    return current && !base.includes(current) ? [current, ...base] : base;
+  };
 
   // Sửa mốc tiến độ (null = đang tạo mới, khác null = đang sửa mốc này).
   const [editingProgressId, setEditingProgressId] = useState<number | null>(null);
@@ -854,7 +871,7 @@ export default function ProjectDetailPage() {
                     <PersonPicker
                       value={geoInput}
                       onChange={setGeoInput}
-                      options={mgrs.geo}
+                      options={geoOptsFor(groupNameInput, geoInput)}
                       placeholder="— Chọn người phía Nhật —"
                       className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     />
@@ -864,7 +881,7 @@ export default function ProjectDetailPage() {
                     <PersonPicker
                       value={doscoInput}
                       onChange={setDoscoInput}
-                      options={[...allUsers.map((u) => u.full_name), ...mgrs.dosco]}
+                      options={doscoOptsFor(groupNameInput, doscoInput)}
                       placeholder="— Chọn người phía Việt —"
                       className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     />

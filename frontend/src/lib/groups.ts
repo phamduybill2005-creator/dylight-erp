@@ -50,6 +50,23 @@ export function deptLabel(dept?: string | null): string {
   return ja ? `${vi} (${ja})` : vi;
 }
 
+// ---------------------------------------------------------------------------
+// GEO担当 (người phụ trách phía NHẬT) thuộc phòng ban nào — họ không có tài khoản
+// nên map cứng theo tên. Chưa liệt kê -> mặc định "Phòng Thiết kế đường 2D".
+// Sửa ở đây khi công ty phân lại người Nhật cho phòng khác.
+// ---------------------------------------------------------------------------
+const GEO_PERSON_DEPT: Record<string, string> = {
+  "寺崎": "Phòng Bản đồ",
+  "伊藤": "Phòng Bản đồ",
+};
+const GEO_DEPT_DEFAULT = "Phòng Thiết kế đường 2D";
+
+/** Phòng ban (tiếng Việt đã chuẩn hoá) của một người phía Nhật (GEO担当). */
+export function geoDeptOf(name?: string | null): string {
+  const n = (name || "").trim();
+  return GEO_PERSON_DEPT[n] ?? GEO_DEPT_DEFAULT;
+}
+
 /** Nhóm (tiếng Nhật) tương ứng với một PHÒNG BAN tiếng Việt. */
 export function deptToGroup(dept?: string | null): string {
   const d = (dept || "").trim();
