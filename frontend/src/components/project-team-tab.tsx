@@ -25,6 +25,27 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${m.cls}`}>{m.label}</span>;
 }
 
+/** Nhãn "Xong / Xong (trễ) / Chưa xong" của 1 hạng mục (so ngày hoàn thành với hạn nộp). */
+function ItemDonePill({ item }: { item: ProjectItem }) {
+  const done = !!item.done_date;
+  const late = done && item.due_date ? item.done_date! > item.due_date : false;
+  return (
+    <span
+      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+        done ? (late ? "bg-bad/15 text-bad" : "bg-ok/10 text-ok") : "bg-line text-muted"
+      }`}
+    >
+      {done ? (late ? "Xong (trễ)" : "Xong") : "Chưa xong"}
+    </span>
+  );
+}
+
+/** Thứ tự trong bảng Hạng mục: theo order_index, cùng số thì theo id. */
+const byOrder = (a: ProjectItem, b: ProjectItem) => a.order_index - b.order_index || a.id - b.id;
+
+/** 1 khối hiển thị: ĐẦU VIỆC LỚN (nhóm cha) + các ĐẦU VIỆC CON của người đó trong nhóm. */
+type ItemBlock = { group: ProjectItem | null; groupMine: boolean; kids: ProjectItem[] };
+
 /** "xong trong 3 ngày" / "đang làm < 1 ngày" / "chưa bắt đầu" / "—". */
 function durationText(a: Assignment): string {
   // Chưa bắt đầu (mới giao, chưa bấm "Đang làm") -> không tính là đang làm.
@@ -77,12 +98,51 @@ export default function ProjectTeamTab({
     return m;
   }, [rows]);
 
-  // Tên nhóm cha của từng hạng mục (để ghi "thuộc nhóm nào").
-  const parentName = useMemo(() => {
+  // Tra nhanh 1 hạng mục theo id (để lấy ĐẦU VIỆC LỚN của một đầu việc con).
+  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+
+  // SỐ THỨ TỰ y hệt bảng "Hạng mục": đầu việc lớn = "1", đầu việc con = "1.2".
+  const itemNo = useMemo(() => {
     const m = new Map<number, string>();
-    for (const i of items) if (i.parent_id == null) m.set(i.id, i.name);
+    items
+      .filter((i) => i.parent_id == null)
+      .sort(byOrder)
+      .forEach((g, gi) => {
+        m.set(g.id, String(gi + 1));
+        items
+          .filter((i) => i.parent_id === g.id)
+          .sort(byOrder)
+          .forEach((c, ci) => m.set(c.id, `${gi + 1}.${ci + 1}`));
+      });
     return m;
   }, [items]);
+
+  // Gom hạng mục của 1 người thành các khối: ĐẦU VIỆC LỚN + đầu việc con bên dưới.
+  // Nếu chỉ được giao đầu việc con thì vẫn hiện đầu việc lớn (mờ) để biết nó thuộc đâu.
+  const blocksOf = useCallback(
+    (mine: ProjectItem[]): ItemBlock[] => {
+      const map = new Map<number, ItemBlock>();
+      const at = (key: number, group: ProjectItem | null) => {
+        let b = map.get(key);
+        if (!b) {
+          b = { group, groupMine: false, kids: [] };
+          map.set(key, b);
+        }
+        if (!b.group && group) b.group = group;
+        return b;
+      };
+      for (const i of mine) {
+        if (i.parent_id == null) at(i.id, i).groupMine = true;
+        else at(i.parent_id, itemById.get(i.parent_id) ?? null).kids.push(i);
+      }
+      const blocks = Array.from(map.values());
+      for (const b of blocks) b.kids.sort(byOrder);
+      return blocks.sort((a, b) =>
+        a.group && b.group ? byOrder(a.group, b.group) : a.group ? -1 : 1,
+      );
+    },
+    [itemById],
+  );
 
   // HẠNG MỤC đã giao, gom theo NGƯỜI ĐƯỢC GIAO — đây là nguồn chính của tab Phân công.
   const itemsByAssignee = useMemo(() => {
@@ -175,6 +235,8 @@ export default function ProjectTeamTab({
             const list = (byAssignee.get(p.id) ?? []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
             const myItems = itemsByAssignee.get(p.id) ?? [];       // HẠNG MỤC được giao
             const itemDone = myItems.filter((i) => !!i.done_date).length;
+            const myBig = myItems.filter((i) => i.parent_id == null).length;   // đầu việc lớn
+            const myKid = myItems.length - myBig;                              // đầu việc con
             const isLead = leadId === p.id;
             const doneN = list.filter((a) => a.status === "DONE").length;
             return (
@@ -189,7 +251,8 @@ export default function ProjectTeamTab({
                     <p className="mt-0.5 text-[10px] text-muted">
                       {p.role ? roleTitle(p.role) : "Nhân viên"}
                       {p.department ? ` · ${p.department}` : ""}
-                      {myItems.length > 0 && ` · ${myItems.length} hạng mục (${itemDone} xong)`}
+                      {myItems.length > 0 &&
+                        ` · ${myBig} đầu việc lớn + ${myKid} đầu việc con (${itemDone} xong)`}
                       {list.length > 0 && ` · ${list.length} việc (${doneN} xong)`}
                     </p>
                   </div>
@@ -198,41 +261,77 @@ export default function ProjectTeamTab({
 
 
 
-                {/* HẠNG MỤC được giao — lấy thẳng từ tab Hạng mục (project_items). */}
+                {/* HẠNG MỤC được giao — lấy thẳng từ tab Hạng mục (project_items).
+                    Hiển thị 2 CẤP y như bảng Hạng mục: đầu việc lớn "1" -> đầu việc con "1.2". */}
                 {myItems.length > 0 && (
-                  <div className="mt-2 space-y-1 border-t border-line/50 pt-2">
+                  <div className="mt-2 space-y-1.5 border-t border-line/50 pt-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-steel">
                       Hạng mục được giao
                     </p>
-                    {myItems.map((i) => {
-                      const grp = i.parent_id != null ? parentName.get(i.parent_id) : null;
-                      const done = !!i.done_date;
-                      const late = done && i.due_date ? i.done_date! > i.due_date : false;
-                      return (
+                    {blocksOf(myItems).map((b) => (
+                      <div
+                        key={b.group?.id ?? `k-${b.kids[0]?.id ?? 0}`}
+                        className="overflow-hidden rounded-lg border border-line/70"
+                      >
+                        {/* ĐẦU VIỆC LỚN (nhóm cha) */}
                         <div
-                          key={i.id}
-                          className="flex items-start justify-between gap-2 rounded-lg bg-paper/60 p-2"
+                          className={`flex items-start justify-between gap-2 px-2 py-1.5 ${
+                            b.groupMine
+                              ? "bg-gradient-to-r from-indigo-50 to-sky-50"
+                              : "bg-slate-50"
+                          }`}
                         >
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-medium text-ink" title={i.name}>
-                              {i.name || <span className="italic text-muted">(chưa đặt tên)</span>}
-                            </p>
-                            <p className="mt-0.5 text-[10px] text-muted">
-                              {grp ? `Nhóm: ${grp}` : "Nhóm hạng mục"}
-                              {i.department ? ` · ${i.department}` : ""}
-                              {i.due_date ? ` · hạn ${i.due_date}` : " · chưa đặt hạn"}
-                            </p>
+                          <div className="flex min-w-0 items-start gap-1.5">
+                            <span
+                              className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white ${
+                                b.groupMine ? "bg-indigo-600" : "bg-slate-400"
+                              }`}
+                            >
+                              {b.group ? itemNo.get(b.group.id) ?? "–" : "–"}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-bold text-ink" title={b.group?.name}>
+                                {b.group?.name || (
+                                  <span className="italic text-muted">(chưa đặt tên)</span>
+                                )}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-muted">
+                                Đầu việc lớn
+                                {b.groupMine ? " · phụ trách cả nhóm" : " · chỉ làm đầu việc con"}
+                                {b.group?.department ? ` · ${b.group.department}` : ""}
+                                {b.group?.due_date ? ` · hạn ${b.group.due_date}` : ""}
+                              </p>
+                            </div>
                           </div>
-                          <span
-                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
-                              done ? (late ? "bg-bad/15 text-bad" : "bg-ok/10 text-ok") : "bg-line text-muted"
-                            }`}
-                          >
-                            {done ? (late ? "Xong (trễ)" : "Xong") : "Chưa xong"}
-                          </span>
+                          {b.groupMine && b.group && <ItemDonePill item={b.group} />}
                         </div>
-                      );
-                    })}
+
+                        {/* ĐẦU VIỆC CON — nền vàng + viền trái vàng như bên Hạng mục */}
+                        {b.kids.map((c) => (
+                          <div
+                            key={c.id}
+                            className="flex items-start justify-between gap-2 border-t border-line/40 border-l-4 border-l-amber-400 bg-amber-50/60 py-1.5 pl-2 pr-2"
+                          >
+                            <div className="flex min-w-0 items-start gap-1.5">
+                              <span className="mt-0.5 shrink-0 text-[10px] font-bold tnum text-amber-800">
+                                {itemNo.get(c.id) ?? ""}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-medium text-ink" title={c.name}>
+                                  {c.name || <span className="italic text-muted">(chưa đặt tên)</span>}
+                                </p>
+                                <p className="mt-0.5 text-[10px] text-muted">
+                                  Đầu việc con
+                                  {c.department ? ` · ${c.department}` : ""}
+                                  {c.due_date ? ` · hạn ${c.due_date}` : " · chưa đặt hạn"}
+                                </p>
+                              </div>
+                            </div>
+                            <ItemDonePill item={c} />
+                          </div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 )}
 
