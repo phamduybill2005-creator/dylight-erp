@@ -10,7 +10,7 @@ import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { assignmentDays } from "@/lib/format";
 import { roleTitle } from "@/lib/roles";
-import type { Assignment, User, Role } from "@/lib/types";
+import type { Assignment, User, Role, ProjectItem } from "@/lib/types";
 
 type Person = { id: number; name: string; role?: Role; department?: string | null };
 
@@ -47,16 +47,20 @@ export default function ProjectTeamTab({
   canManage: boolean;
 }) {
   const [rows, setRows] = useState<Assignment[]>([]);
+  const [items, setItems] = useState<ProjectItem[]>([]);   // HẠNG MỤC / đầu việc đã giao
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false); // dùng cho đổi trạng thái
 
   const load = useCallback(() => {
     setLoading(true);
-    api
-      .assignments({ projectId })
-      .then(setRows)
-      .catch(() => setRows([]))
+    Promise.all([
+      api.assignments({ projectId }).catch(() => [] as Assignment[]),
+      api.projectItems(projectId).catch(() => [] as ProjectItem[]),
+    ])
+      .then(([a, it]) => {
+        setRows(a);
+        setItems(it);
+      })
       .finally(() => setLoading(false));
   }, [projectId]);
   useEffect(() => {
@@ -73,10 +77,36 @@ export default function ProjectTeamTab({
     return m;
   }, [rows]);
 
-  // Người tham gia = thành viên dự án ∪ ai được giao việc trong dự án (kể cả chưa là member).
+  // Tên nhóm cha của từng hạng mục (để ghi "thuộc nhóm nào").
+  const parentName = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const i of items) if (i.parent_id == null) m.set(i.id, i.name);
+    return m;
+  }, [items]);
+
+  // HẠNG MỤC đã giao, gom theo NGƯỜI ĐƯỢC GIAO — đây là nguồn chính của tab Phân công.
+  const itemsByAssignee = useMemo(() => {
+    const m = new Map<number, ProjectItem[]>();
+    for (const i of items) {
+      if (i.assignee_id == null) continue;
+      const list = m.get(i.assignee_id) ?? [];
+      list.push(i);
+      m.set(i.assignee_id, list);
+    }
+    for (const list of m.values())
+      list.sort((a, b) => a.order_index - b.order_index || a.id - b.id);
+    return m;
+  }, [items]);
+
+  // Người tham gia = thành viên dự án ∪ ai được giao HẠNG MỤC ∪ ai được giao việc.
   const people: Person[] = useMemo(() => {
     const map = new Map<number, Person>();
     for (const u of members) map.set(u.id, { id: u.id, name: u.full_name, role: u.role, department: u.department });
+    for (const i of items) {
+      if (i.assignee_id != null && !map.has(i.assignee_id)) {
+        map.set(i.assignee_id, { id: i.assignee_id, name: i.assignee_name ?? `#${i.assignee_id}` });
+      }
+    }
     for (const a of rows) {
       if (!map.has(a.assignee_id)) {
         map.set(a.assignee_id, { id: a.assignee_id, name: a.assignee_name ?? `#${a.assignee_id}` });
@@ -88,7 +118,7 @@ export default function ProjectTeamTab({
       if (y.id === leadId) return 1;
       return x.name.localeCompare(y.name, "vi");
     });
-  }, [members, rows, leadId]);
+  }, [members, items, rows, leadId]);
 
 
   async function changeStatus(a: Assignment, status: string) {
@@ -118,7 +148,10 @@ export default function ProjectTeamTab({
     return <p className="py-10 text-center text-xs text-muted">Đang tải phân công…</p>;
   }
 
-  const activeCount = people.filter((p) => (byAssignee.get(p.id)?.length ?? 0) > 0).length;
+  // "Đang có phần việc" = được giao hạng mục HOẶC có phần việc giao riêng.
+  const activeCount = people.filter(
+    (p) => (itemsByAssignee.get(p.id)?.length ?? 0) > 0 || (byAssignee.get(p.id)?.length ?? 0) > 0,
+  ).length;
 
   return (
     <div className="space-y-3">
@@ -140,6 +173,8 @@ export default function ProjectTeamTab({
         <div className="rounded-xl2 border border-line bg-white shadow-card divide-y divide-line">
           {people.map((p) => {
             const list = (byAssignee.get(p.id) ?? []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
+            const myItems = itemsByAssignee.get(p.id) ?? [];       // HẠNG MỤC được giao
+            const itemDone = myItems.filter((i) => !!i.done_date).length;
             const isLead = leadId === p.id;
             const doneN = list.filter((a) => a.status === "DONE").length;
             return (
@@ -154,6 +189,7 @@ export default function ProjectTeamTab({
                     <p className="mt-0.5 text-[10px] text-muted">
                       {p.role ? roleTitle(p.role) : "Nhân viên"}
                       {p.department ? ` · ${p.department}` : ""}
+                      {myItems.length > 0 && ` · ${myItems.length} hạng mục (${itemDone} xong)`}
                       {list.length > 0 && ` · ${list.length} việc (${doneN} xong)`}
                     </p>
                   </div>
@@ -162,11 +198,51 @@ export default function ProjectTeamTab({
 
 
 
+                {/* HẠNG MỤC được giao — lấy thẳng từ tab Hạng mục (project_items). */}
+                {myItems.length > 0 && (
+                  <div className="mt-2 space-y-1 border-t border-line/50 pt-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-steel">
+                      Hạng mục được giao
+                    </p>
+                    {myItems.map((i) => {
+                      const grp = i.parent_id != null ? parentName.get(i.parent_id) : null;
+                      const done = !!i.done_date;
+                      const late = done && i.due_date ? i.done_date! > i.due_date : false;
+                      return (
+                        <div
+                          key={i.id}
+                          className="flex items-start justify-between gap-2 rounded-lg bg-paper/60 p-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-medium text-ink" title={i.name}>
+                              {i.name || <span className="italic text-muted">(chưa đặt tên)</span>}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-muted">
+                              {grp ? `Nhóm: ${grp}` : "Nhóm hạng mục"}
+                              {i.department ? ` · ${i.department}` : ""}
+                              {i.due_date ? ` · hạn ${i.due_date}` : " · chưa đặt hạn"}
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+                              done ? (late ? "bg-bad/15 text-bad" : "bg-ok/10 text-ok") : "bg-line text-muted"
+                            }`}
+                          >
+                            {done ? (late ? "Xong (trễ)" : "Xong") : "Chưa xong"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Danh sách phần việc + thời gian */}
                 {list.length === 0 ? (
-                  <p className="mt-2 border-t border-line/50 pt-2 text-[11px] italic text-muted">
-                    Chưa có phần việc nào trong dự án này.
-                  </p>
+                  myItems.length === 0 && (
+                    <p className="mt-2 border-t border-line/50 pt-2 text-[11px] italic text-muted">
+                      Chưa được giao hạng mục nào trong dự án này.
+                    </p>
+                  )
                 ) : (
                   <div className="mt-2 space-y-1.5 border-t border-line/50 pt-2">
                     {list.map((a) => (
