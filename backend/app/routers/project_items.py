@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
 from app.deps import get_current_user, can_see_money
-from app.models import ProjectItem, Project, User, ProjectItemRating
+from app.models import ProjectItem, Project, User, ProjectItemRating, project_members
 from app.routers.projects import _can_view, _can_manage
 from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut, ProjectItemRatingOut, ProjectItemRatingUpsert
 
@@ -49,15 +49,25 @@ def _out(item: ProjectItem, current: User) -> ProjectItemOut:
 
 
 def _validate_assignee(db: Session, project: Project, assignee_id: int | None) -> None:
-    """Người được giao (nếu có) phải cùng công ty VÀ là thành viên/chủ trì dự án
-    (giao cho người ngoài dự án thì họ không vào xem/khai giờ được). None = bỏ giao."""
+    """Người được giao (nếu có) phải cùng công ty. Nếu chưa phải thành viên dự án thì
+    TỰ THÊM vào — giao việc ở tab Hạng mục là phải thấy họ ở tab Phân công (trước đây
+    gán xong mà Phân công vẫn trống). None = bỏ giao."""
     if assignee_id is None:
         return
     u = db.get(User, assignee_id)
     if not u or u.company_id != project.company_id:
         raise HTTPException(400, "Người được giao không hợp lệ.")
-    if not _can_view(db, project, u):
-        raise HTTPException(400, "Người được giao phải là thành viên của dự án.")
+    already = (
+        db.query(project_members)
+        .filter(
+            project_members.c.project_id == project.id,
+            project_members.c.user_id == u.id,
+        )
+        .first()
+    )
+    if not already:
+        db.execute(project_members.insert().values(project_id=project.id, user_id=u.id))
+        db.flush()
 
 
 def _validate_parent(

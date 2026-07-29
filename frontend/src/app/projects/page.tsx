@@ -542,7 +542,7 @@ export default function ProjectsPage() {
             <col className="w-[88px]" />   {/* Total time */}
             <col className="w-[82px]" />   {/* Trạng thái */}
             <col className="w-[74px]" />   {/* Tiến độ */}
-            <col className="w-[104px]" />  {/* Thao tác */}
+            <col className="w-[112px]" />  {/* Thao tác */}
           </colgroup>
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
@@ -647,9 +647,9 @@ export default function ProjectsPage() {
                         <button
                           onClick={() => openEditModal(p)}
                           title="Sửa thông tin dự án"
-                          className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 hover:text-ink"
                         >
-                          <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
+                          <PencilSquareIcon className="h-3 w-3 shrink-0 text-steel" />
                           Sửa
                         </button>
                       ) : (
@@ -659,9 +659,9 @@ export default function ProjectsPage() {
                         <button
                           onClick={() => handleQuickDelete(p)}
                           title="Xoá dự án"
-                          className="inline-flex items-center gap-1 rounded-md border border-bad/30 bg-bad/10 px-2 py-1 text-[11px] font-semibold text-bad transition-colors hover:bg-bad hover:text-white"
+                          className="inline-flex items-center gap-0.5 rounded border border-bad/30 bg-bad/10 px-1.5 py-0.5 text-[10px] font-semibold text-bad transition-colors hover:bg-bad hover:text-white"
                         >
-                          <TrashIcon className="h-3.5 w-3.5" />
+                          <TrashIcon className="h-3 w-3 shrink-0" />
                           Xoá
                         </button>
                       )}

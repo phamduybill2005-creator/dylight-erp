@@ -516,8 +516,10 @@ export default function ProjectDetailPage() {
           
           <div className="mt-2 flex flex-wrap gap-1.5">
             {(() => {
+              // Hiện CẢ chủ trì để số đếm "(N)" khớp với danh sách bên dưới —
+              // trước đây lọc bỏ chủ trì nên thấy "(1)" mà lại báo "Chưa phân công".
               const otherMembers = (project.members ?? [])
-                .filter((m) => m.id !== project.lead_id)
+                .slice()
                 .sort((a, b) => {
                   const rankA = getRoleRank(a.role, a.has_subordinates);
                   const rankB = getRoleRank(b.role, b.has_subordinates);
@@ -535,6 +537,9 @@ export default function ProjectDetailPage() {
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-amber" />
                   {member.full_name}
+                  {member.id === project.lead_id && (
+                    <span className="rounded bg-indigo-100 px-1 text-[9px] font-bold text-indigo-700">Chủ trì</span>
+                  )}
                   <span className="text-[9px] text-muted">({roleTitle(member.role, member.has_subordinates)})</span>
                 </span>
               ));
