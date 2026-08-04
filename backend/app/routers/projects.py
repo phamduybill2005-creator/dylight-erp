@@ -111,9 +111,74 @@ def _member_ids(db: Session, project: Project) -> set[int]:
     }
 
 
+def _user_dept_set(user: User) -> set[str]:
+    if not user.department:
+        return set()
+    return {d.strip().lower() for d in user.department.split(",") if d.strip()}
+
+
+def _is_project_in_user_depts(db: Session, project: Project, user: User) -> bool:
+    """Kiểm tra dự án có thuộc phòng ban của user hay không.
+    Đối với quản lý cấp trung & nhân viên: chỉ thấy các dự án thuộc phòng ban của họ."""
+    user_depts = _user_dept_set(user)
+
+    # 1. Trực tiếp user là người chủ trì dự án hoặc là thành viên dự án
+    members = _member_ids(db, project)
+    if user.id == project.lead_id or user.id in members:
+        return True
+
+    if not user_depts:
+        return False
+
+    # 2. Tên nhóm / phòng ban của dự án (group_name)
+    proj_group = (project.group_name or "").strip().lower()
+    if proj_group and any(ud in proj_group for ud in user_depts):
+        return True
+
+    # 3. Phòng ban của Người chủ trì (lead)
+    if project.lead and project.lead.department:
+        lead_depts = {d.strip().lower() for d in project.lead.department.split(",") if d.strip()}
+        if user_depts & lead_depts:
+            return True
+
+    # 4. Có thành viên dự án thuộc phòng ban của user
+    if members:
+        member_depts = (
+            db.query(User.department)
+            .filter(User.id.in_(members), User.department.isnot(None))
+            .all()
+        )
+        for row in member_depts:
+            if row[0]:
+                m_depts = {d.strip().lower() for d in row[0].split(",") if d.strip()}
+                if user_depts & m_depts:
+                    return True
+
+    # 5. Có Hạng mục (ProjectItem) nào gắn phòng ban của user
+    items = (
+        db.query(ProjectItem.department)
+        .filter(ProjectItem.project_id == project.id, ProjectItem.department.isnot(None))
+        .all()
+    )
+    for row in items:
+        if row[0]:
+            item_depts = {d.strip().lower() for d in row[0].split(",") if d.strip()}
+            if user_depts & item_depts:
+                return True
+
+    return False
+
+
 def _can_view(db: Session, project: Project, user: User) -> bool:
-    """XEM: mọi người trong công ty đều được xem dự án (khớp list_projects đã mở)."""
-    return project.company_id == user.company_id
+    """XEM:
+    - Giám đốc / Admin / Quản lý cấp cao -> Thấy TẤT CẢ dự án của công ty.
+    - Quản lý cấp trung trở xuống -> CHỈ thấy dự án thuộc PHÒNG BAN của mình.
+    """
+    if project.company_id != user.company_id:
+        return False
+    if _is_director(user) or _is_senior_manager(db, user):
+        return True
+    return _is_project_in_user_depts(db, project, user)
 
 
 def _can_manage(db: Session, project: Project, user: User) -> bool:
@@ -203,11 +268,18 @@ def _to_out(db: Session, project: Project) -> ProjectOut:
 
 @router.get("", response_model=list[ProjectOut])
 def list_projects(db: Session = Depends(get_db), current: User = Depends(get_current_user)):
-    # XEM: mọi người trong công ty đều thấy TẤT CẢ dự án (chỉ xem; sửa/tích/khai giờ
-    # vẫn theo quyền cũ — chỉ thành viên/chủ trì/giám đốc mới thao tác).
+    """Danh sách dự án:
+    - Giám đốc / Admin / Quản lý cấp cao -> xem TẤT CẢ dự án của công ty.
+    - Quản lý cấp trung trở xuống -> CHỈ xem dự án thuộc PHÒNG BAN của mình.
+    """
     q = db.query(Project).filter(Project.company_id == current.company_id)
     projects = q.order_by(Project.created_at.desc()).all()
-    return [_to_out(db, p) for p in projects]
+
+    if _is_director(current) or _is_senior_manager(db, current):
+        return [_to_out(db, p) for p in projects]
+
+    filtered = [p for p in projects if _is_project_in_user_depts(db, p, current)]
+    return [_to_out(db, p) for p in filtered]
 
 
 @router.get("/managers")
@@ -279,20 +351,16 @@ def create_project(
 @router.get("/{project_id}", response_model=ProjectOut)
 def get_project(project_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     p = db.get(Project, project_id)
-    # XEM: mọi người cùng công ty đều mở & xem được dự án (sửa vẫn theo quyền cũ).
-    if not p or p.company_id != current.company_id:
+    if not p or not _can_view(db, p, current):
         raise HTTPException(404, "Không tìm thấy dự án.")
     return _to_out(db, p)
 
 
 @router.get("/{project_id}/progress-history")
 def progress_history(project_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
-    """Lịch sử % tiến độ theo NGÀY (toàn dự án + từng phòng) để vẽ đường tiến độ.
-
-    Mở biểu đồ sẽ CHỐT điểm hôm nay (lazy upsert) rồi trả toàn bộ chuỗi ngày.
-    """
+    """Lịch sử % tiến độ theo NGÀY (toàn dự án + từng phòng) để vẽ đường tiến độ."""
     p = db.get(Project, project_id)
-    if not p or p.company_id != current.company_id:
+    if not p or not _can_view(db, p, current):
         raise HTTPException(404, "Không tìm thấy dự án.")
 
     # Chốt điểm hôm nay theo % hiện tại (không để lỗi phụ làm hỏng việc đọc).
