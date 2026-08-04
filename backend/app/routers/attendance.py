@@ -28,6 +28,11 @@ router = APIRouter(prefix="/attendance", tags=["Chấm công"])
 _MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
 
 
+def _is_senior_manager_up(user: User) -> bool:
+    is_top = not user.manager_id and (not user.manager_ids or len(user.manager_ids) == 0)
+    return user.role in (UserRole.ADMIN, UserRole.DIRECTOR) or (user.role == UserRole.MANAGER and is_top)
+
+
 def _resolve_user(db: Session, company_id: int, ref: str) -> User | None:
     """Tìm nhân viên TRONG CÔNG TY theo user_id (số) / email / số CCCD."""
     ref = (ref or "").strip()
@@ -121,13 +126,15 @@ def list_attendance(
     from_date: date | None = None,
     to_date: date | None = None,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+    current: User = Depends(get_current_user),
 ):
-    """Danh sách chấm công toàn công ty (cho Quản lý / Giám đốc).
-
-    Lọc được theo 1 ngày (work_date) hoặc theo khoảng (from_date..to_date) —
-    dùng cho việc xem chi tiết từng ngày của một nhân viên trong tháng.
+    """Danh sách chấm công.
+    - Quản trị hệ thống, Giám đốc, Quản lý cấp cao: xem được toàn bộ.
+    - Các tài khoản còn lại: CHỈ xem được của chính mình.
     """
+    if not _is_senior_manager_up(current):
+        user_id = current.id
+
     q = db.query(Attendance).filter(Attendance.company_id == current.company_id)
     if user_id:
         q = q.filter(Attendance.user_id == user_id)
@@ -148,9 +155,7 @@ def update_attendance(
     current: User = Depends(require_roles(UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)),
 ):
     """Sửa mác đi trễ & ghi chú lý do của 1 bản ghi chấm công (CHỈ Quản trị hệ thống, Giám đốc, Quản lý cấp cao)."""
-    is_top = not current.manager_id and (not current.manager_ids or len(current.manager_ids) == 0)
-    is_senior = current.role in (UserRole.ADMIN, UserRole.DIRECTOR) or (current.role == UserRole.MANAGER and is_top)
-    if not is_senior:
+    if not _is_senior_manager_up(current):
         raise HTTPException(403, "Chỉ Quản trị hệ thống, Giám đốc và Quản lý cấp cao mới được chỉnh sửa mác đi trễ và ghi chú lý do.")
 
     rec = db.get(Attendance, attendance_id)
@@ -170,19 +175,23 @@ def update_attendance(
 def attendance_summary(
     period: str | None = None,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+    current: User = Depends(get_current_user),
 ):
     """
     Tổng hợp số ngày công, số ngày đi trễ, tổng giờ làm theo từng người trong kỳ.
-    period = 'YYYY-MM' (mặc định tháng hiện tại).
+    - Quản trị hệ thống, Giám đốc, Quản lý cấp cao: xem được toàn bộ nhân sự.
+    - Các tài khoản còn lại: CHỈ xem được của chính mình.
     """
     period = period or date.today().strftime("%Y-%m")
-    records = (
+    q = (
         db.query(Attendance)
         .filter(Attendance.company_id == current.company_id)
         .filter(Attendance.work_date >= date.fromisoformat(period + "-01"))
-        .all()
     )
+    if not _is_senior_manager_up(current):
+        q = q.filter(Attendance.user_id == current.id)
+
+    records = q.all()
     # Lọc đúng tháng (so khớp tiền tố "YYYY-MM") rồi gom theo người.
     by_user: dict[int, AttendanceSummary] = {}
     users = {u.id: u for u in db.query(User).filter(User.company_id == current.company_id).all()}

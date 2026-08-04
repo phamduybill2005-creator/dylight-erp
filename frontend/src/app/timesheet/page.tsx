@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { ClockIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { roleTier } from "@/lib/roles";
+import { roleTier, isSeniorManagerUp } from "@/lib/roles";
 import { dateLocal, todayLocal } from "@/lib/format";
 import type { Timesheet, Project, User } from "@/lib/types";
 
@@ -45,7 +45,7 @@ export default function TimesheetPage() {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [dept, setDept] = useState<string>("");
 
-  const isManager = me ? roleTier(me.role) !== "STAFF" : false;
+  const isManager = isSeniorManagerUp(me);
   const days = useMemo(() => {
     if (viewPeriod === "week") {
       return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
