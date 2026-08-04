@@ -310,9 +310,7 @@ export default function AttendancePage() {
           {today?.is_late && (
             <p className="mt-2 text-center text-[11px] font-semibold text-bad">Hôm nay bạn đi trễ.</p>
           )}
-          <div className="mt-4 rounded-xl2 bg-paper p-3 text-center text-xs font-semibold text-steel border border-line/40">
-            📌 Chấm công tự động qua máy nhận diện khuôn mặt — không chấm công bằng tay.
-          </div>
+
         </section>
 
         {/* Tổng kết tháng */}
