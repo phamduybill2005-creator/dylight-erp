@@ -181,6 +181,11 @@ def _ensure_schema() -> None:
                             "CREATE UNIQUE INDEX uq_attendance_user_day ON attendance (user_id, work_date)"
                         ))
 
+        # Phục hồi tên công ty về "Công ty CP Xây dựng DOSCO" trong CSDL
+        if "companies" in insp.get_table_names():
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE companies SET name = 'Công ty CP Xây dựng DOSCO' WHERE code = 'DOSCO'"))
+
         # Timesheets: cột project_item_id (gắn giờ vào ĐẦU VIỆC của hạng mục) cho DB cũ.
         # Đồng thời BỎ ràng buộc cũ (user_id, project_id, work_date) — nay 1 người có thể
         # khai NHIỀU đầu việc trong cùng 1 dự án/ngày nên khóa cũ sẽ chặn nhầm. Dedup do
