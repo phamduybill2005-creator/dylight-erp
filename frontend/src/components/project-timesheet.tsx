@@ -382,7 +382,6 @@ export default function ProjectTimesheet({
               <th className="sticky left-0 z-10 px-2 py-2 text-left font-semibold">TÊN HẠNG MỤC</th>
               <th className="px-1 py-2 text-center font-semibold">
                 <div>Trạng thái</div>
-                <div className="text-[9px] font-normal opacity-80">/ Đánh giá</div>
               </th>
               {days.map((d, i) => (
                 <th
@@ -478,23 +477,7 @@ export default function ProjectTimesheet({
                               ))}
                             </select>
 
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] font-semibold text-muted">Đánh giá:</span>
-                              <ItemRating
-                                value={num(g.rating)}
-                                onChange={(n) => onPersist(g.id, { rating: n })}
-                                disabled={!canManage}
-                              />
-                              {num(g.rating) > 0 && (
-                                <span
-                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                    RATING_CLASSES[num(g.rating)] || "bg-amber/10 text-amber-deep"
-                                  }`}
-                                >
-                                  {RATING_LABELS[num(g.rating)]}
-                                </span>
-                              )}
-                            </div>
+
                           </div>
                         </div>
                       </td>
@@ -587,23 +570,7 @@ export default function ProjectTimesheet({
                                       </select>
                                     </div>
 
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-[9px] font-semibold text-muted">Đánh giá:</span>
-                                      <ItemRating
-                                        value={num(c.rating)}
-                                        onChange={(n) => onPersist(c.id, { rating: n })}
-                                        disabled={!canManage}
-                                      />
-                                      {num(c.rating) > 0 && (
-                                        <span
-                                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-                                            RATING_CLASSES[num(c.rating)] || "bg-amber/10 text-amber-deep"
-                                          }`}
-                                        >
-                                          {RATING_LABELS[num(c.rating)]}
-                                        </span>
-                                      )}
-                                    </div>
+
                                   </div>
                                 </div>
                               </td>
