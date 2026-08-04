@@ -235,8 +235,8 @@ def create_project(
             db.query(Project)
             .filter(
                 Project.company_id == current.company_id,
-                func.lower(func.trim(Project.code)) == code_val,
-                func.lower(func.trim(Project.name)) == name_val,
+                func.lower(func.trim(func.coalesce(Project.code, ""))) == code_val,
+                func.lower(func.trim(func.coalesce(Project.name, ""))) == name_val,
                 func.lower(func.trim(func.coalesce(Project.group_name, ""))) == group_val,
             )
             .first()

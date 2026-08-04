@@ -305,7 +305,7 @@ def copy_from_template(
     if not target_project or target_project.company_id != current.company_id:
         raise HTTPException(400, "Dự án đích không hợp lệ.")
     
-    if not _can_manage(db, target_project, current):
+    if not _can_manage(db, target_project, current) and not _is_manager_tier(db, current):
         raise HTTPException(403, "Bạn không có quyền chỉnh sửa dự án này.")
         
     template_project = db.get(Project, template_project_id)

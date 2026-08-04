@@ -32,7 +32,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  } catch (err) {
+    console.error(`API Fetch Error [${path}]:`, err);
+    throw new Error("Không thể kết nối đến máy chủ (Render đang cập nhật/khởi động lại). Vui lòng thử lại sau vài giây!");
+  }
 
   if (res.status === 401) {
     cachedMe = null;
