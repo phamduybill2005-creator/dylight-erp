@@ -731,6 +731,7 @@ class LeaveRequest(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     from_date: Mapped[date] = mapped_column(Date)
     to_date: Mapped[date] = mapped_column(Date)
+    leave_type: Mapped[str | None] = mapped_column(String(50), default="FULL")
     reason: Mapped[str | None] = mapped_column(Text)
     status: Mapped[LeaveStatus] = mapped_column(SAEnum(LeaveStatus), default=LeaveStatus.PENDING)
     decided_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
@@ -744,8 +745,13 @@ class LeaveRequest(Base):
         return self.user.full_name if self.user else None
 
     @property
-    def days(self) -> int:
-        return (self.to_date - self.from_date).days + 1 if self.from_date and self.to_date else 0
+    def days(self) -> float:
+        if not (self.from_date and self.to_date):
+            return 0
+        diff = (self.to_date - self.from_date).days + 1
+        if diff == 1 and self.leave_type in ("MORNING", "AFTERNOON"):
+            return 0.5
+        return float(diff)
 
 
 # --------------------------------------------------------------------------

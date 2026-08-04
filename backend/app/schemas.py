@@ -813,6 +813,7 @@ class NicknameSet(BaseModel):
 class LeaveCreate(BaseModel):
     from_date: date
     to_date: date
+    leave_type: str | None = "FULL"
     reason: str | None = None
 
 
@@ -827,13 +828,14 @@ class LeaveOut(BaseModel):
     user_id: int
     from_date: date
     to_date: date
+    leave_type: str | None = "FULL"
     reason: str | None = None
     status: LeaveStatus
     decided_by_id: int | None = None
     decided_at: datetime | None = None
     created_at: datetime
     user_name: str | None = None
-    days: int = 0
+    days: float = 0
 
 
 # ------------------------- EQUIPMENT (thiết bị) -------------------------

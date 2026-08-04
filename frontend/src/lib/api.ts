@@ -315,7 +315,7 @@ export const api = {
   auditLogs: (limit = 200) => request<ActivityLog[]>(`/audit?limit=${limit}`),
 
   // --- Nghỉ phép ---
-  createLeave: (payload: { from_date: string; to_date: string; reason?: string | null }) =>
+  createLeave: (payload: { from_date: string; to_date: string; leave_type?: string | null; reason?: string | null }) =>
     request<LeaveRequest>("/leave", { method: "POST", body: JSON.stringify(payload) }),
   myLeaves: () => request<LeaveRequest[]>("/leave/me"),
   leaveList: (status?: string) => request<LeaveRequest[]>(`/leave${status ? `?status=${status}` : ""}`),

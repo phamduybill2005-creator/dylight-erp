@@ -361,7 +361,7 @@ export interface Payroll {
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED";
 export interface LeaveRequest {
   id: number; company_id: number; user_id: number;
-  from_date: string; to_date: string; reason?: string | null;
+  from_date: string; to_date: string; leave_type?: string | null; reason?: string | null;
   status: LeaveStatus; decided_by_id?: number | null; decided_at?: string | null;
   created_at: string; user_name?: string | null; days: number;
 }

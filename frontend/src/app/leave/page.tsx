@@ -54,6 +54,7 @@ export default function LeavePage() {
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [leaveType, setLeaveType] = useState("FULL");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [deciding, setDeciding] = useState<number | null>(null);
@@ -79,8 +80,8 @@ export default function LeavePage() {
     if (!fromDate || !toDate || !reason) return;   // bắt buộc chọn 1 lý do
     setSaving(true);
     try {
-      await api.createLeave({ from_date: fromDate, to_date: toDate, reason: reason || null });
-      setFromDate(""); setToDate(""); setReason("");
+      await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: leaveType, reason: reason || null });
+      setFromDate(""); setToDate(""); setLeaveType("FULL"); setReason("");
       const list = await api.myLeaves();
       setMine(list);
     } catch { /* noop */ } finally { setSaving(false); }
@@ -110,6 +111,12 @@ export default function LeavePage() {
     (l) => !filters.dept || splitDepts(deptOfUser(l.user_id)).includes(filters.dept)
   );
 
+  const formatDaysDisplay = (l: LeaveRequest) => {
+    if (l.leave_type === "MORNING") return `${l.days} (Sáng)`;
+    if (l.leave_type === "AFTERNOON") return `${l.days} (Chiều)`;
+    return l.days;
+  };
+
   return (
     <AppShell>
       <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
@@ -120,16 +127,28 @@ export default function LeavePage() {
       {/* Form xin nghỉ */}
       <form onSubmit={submit} className="mt-4 rounded-xl2 border border-line bg-white p-4 shadow-card">
         <h2 className="text-sm font-bold text-ink">Gửi đơn xin nghỉ</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div>
             <label className="block text-[11px] font-semibold text-muted">Từ ngày *</label>
-            <input type="date" required value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+            <input type="date" required value={fromDate} onChange={(e) => {
+              setFromDate(e.target.value);
+              if (!toDate) setToDate(e.target.value);
+            }}
               className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-muted">Đến ngày *</label>
             <input type="date" required value={toDate} onChange={(e) => setToDate(e.target.value)}
               className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-muted">Ngày nghỉ *</label>
+            <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
+              <option value="MORNING">Buổi sáng</option>
+              <option value="AFTERNOON">Buổi chiều</option>
+              <option value="FULL">Cả ngày</option>
+            </select>
           </div>
         </div>
         <div className="mt-3">
@@ -171,7 +190,7 @@ export default function LeavePage() {
               <tr key={l.id} className="odd:bg-white even:bg-paper/40 hover:bg-amber/10">
                 <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.from_date)}</td>
                 <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.to_date)}</td>
-                <td className="border border-line px-3 py-2 text-right tnum">{l.days}</td>
+                <td className="border border-line px-3 py-2 text-right tnum">{formatDaysDisplay(l)}</td>
                 <td className="border border-line px-3 py-2 text-muted">{l.reason || "—"}</td>
                 <td className="border border-line px-3 py-2"><StatusBadge s={l.status} /></td>
               </tr>
@@ -210,7 +229,7 @@ export default function LeavePage() {
                     <td className="border border-line px-3 py-2 font-semibold text-ink">{l.user_name || "—"}</td>
                     <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.from_date)}</td>
                     <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.to_date)}</td>
-                    <td className="border border-line px-3 py-2 text-right tnum">{l.days}</td>
+                    <td className="border border-line px-3 py-2 text-right tnum">{formatDaysDisplay(l)}</td>
                     <td className="border border-line px-3 py-2 text-muted">{l.reason || "—"}</td>
                     <td className="border border-line px-3 py-2">
                       <div className="flex items-center justify-center gap-2">

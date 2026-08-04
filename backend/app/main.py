@@ -245,9 +245,10 @@ def _ensure_schema() -> None:
             if "project_item_id" not in {c["name"] for c in insp2.get_columns("timesheets")}:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE timesheets ADD COLUMN project_item_id INTEGER"))
-            if engine.dialect.name == "postgresql":
+        if "leave_requests" in tn2:
+            if "leave_type" not in {c["name"] for c in insp2.get_columns("leave_requests")}:
                 with engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE timesheets DROP CONSTRAINT IF EXISTS uq_timesheet_user_proj_day"))
+                    conn.execute(text("ALTER TABLE leave_requests ADD COLUMN leave_type VARCHAR(50) DEFAULT 'FULL'"))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] cot quan trong bo qua: {_e}")
 
