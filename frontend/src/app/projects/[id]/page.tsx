@@ -478,12 +478,7 @@ export default function ProjectDetailPage() {
               {project.manager_name}
             </p>
           )}
-          {project.lead_name && (
-            <p className="flex items-center gap-1.5">
-              <CheckBadgeSolid className="h-4 w-4 text-indigo-600" />
-              Chủ trì: <span className="font-medium text-ink">{project.lead_name}</span>
-            </p>
-          )}
+
           {project.group_name && (
             <p className="flex items-center gap-1.5">
               <UserGroupIcon className="h-4 w-4 text-muted/80" />
@@ -537,9 +532,6 @@ export default function ProjectDetailPage() {
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-amber" />
                   {member.full_name}
-                  {member.id === project.lead_id && (
-                    <span className="rounded bg-indigo-100 px-1 text-[9px] font-bold text-indigo-700">Chủ trì</span>
-                  )}
                   <span className="text-[9px] text-muted">({roleTitle(member.role, member.has_subordinates)})</span>
                 </span>
               ));
@@ -990,18 +982,6 @@ export default function ProjectDetailPage() {
                             <span className="block text-[10px] text-muted">{roleTitle(u.role, u.has_subordinates)} · {u.email}</span>
                           </span>
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedLeadId((prev) => (prev === u.id ? null : u.id))}
-                          title={isLead ? "Gỡ chủ trì" : "Đặt làm chủ trì"}
-                          className={`ml-2 shrink-0 rounded-full p-1.5 transition-colors ${isLead ? "text-indigo-600" : "text-muted hover:bg-paper hover:text-indigo-600"}`}
-                        >
-                          {isLead ? (
-                            <CheckBadgeSolid className="h-5 w-5 text-indigo-600" />
-                          ) : (
-                            <CheckBadgeIcon className="h-5 w-5 text-slate-300 hover:text-indigo-500" />
-                          )}
-                        </button>
                       </div>
                     );
                   })

@@ -469,20 +469,7 @@ export default function ProjectsPage() {
           </select>
         </div>
 
-        <div className="w-full sm:w-[200px]">
-          <select
-            value={filterLead}
-            onChange={(e) => setFilterLead(e.target.value)}
-            className="w-full rounded-xl2 border border-line bg-white px-3 py-2.5 text-xs outline-none focus:border-steel text-ink"
-          >
-            <option value="">— Tất cả chủ trì —</option>
-            {uniqueLeads.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </div>
+
 
         {/* Lọc theo THÁNG NHẬN dự án */}
         <div className="flex w-full items-center gap-1.5 sm:w-auto">
