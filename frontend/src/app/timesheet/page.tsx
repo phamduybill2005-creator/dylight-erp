@@ -341,7 +341,15 @@ export default function TimesheetPage() {
 
       {/* Lưới Dự án × Ngày */}
       <div className="mt-3 mr-14 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
-        <table className="w-full border-collapse text-[11px]">
+        <table className="w-full min-w-[850px] table-fixed border-collapse text-[11px]">
+          <colgroup>
+            <col className="w-[240px]" />
+            {days.map((d) => (
+              <col key={d} className="w-[54px]" />
+            ))}
+            <col className="w-[50px]" />
+            <col className="w-[50px]" />
+          </colgroup>
           <thead>
             <tr className="bg-slate-700 text-[10px] uppercase tracking-wide text-white">
               <th className={`${stickyLeft} sticky top-0 z-30 bg-slate-700 border border-slate-600 px-2 py-1.5 text-left font-semibold align-middle`}>Dự án</th>
