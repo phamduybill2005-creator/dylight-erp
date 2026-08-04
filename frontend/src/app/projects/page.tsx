@@ -552,7 +552,7 @@ export default function ProjectsPage() {
               <th className={TH}>Nhóm</th>
               <th className={TH}>GEO担当</th>
               <th className={TH}>DOSCO担当</th>
-              <th className={TH}>Ghi chú</th>
+              <th className={TH}>Nội dung</th>
               <th className={TH} title="Ngày nhận">Time in</th>
               <th className={TH} title="Ngày hoàn thành">Time out</th>
               <th className={TH} title="Hạn nội bộ">Time due</th>
@@ -616,7 +616,7 @@ export default function ProjectsPage() {
                             });
                           }
                         }}
-                        placeholder="Ghi chú…"
+                        placeholder="Nội dung…"
                         title="Gõ trực tiếp — rời ô (hoặc Enter) là tự lưu; Esc để huỷ"
                         className="min-h-[26px] w-full resize-y rounded border border-transparent bg-transparent px-1.5 py-1 text-[11px] text-ink outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
                       />

@@ -621,7 +621,7 @@ export default function ProjectItemsTab({
                   {canSeeMoney && <th className="w-20 px-2 py-2 text-right font-semibold">Khối lượng</th>}
                   {canSeeMoney && <th className="w-28 px-2 py-2 text-right font-semibold">Đơn giá</th>}
                   {canSeeMoney && <th className="w-32 px-2 py-2 text-right font-semibold">Thành tiền</th>}
-                  <th className="px-2 py-2 text-left font-semibold min-w-[250px]">Ghi chú</th>
+                  <th className="px-2 py-2 text-left font-semibold min-w-[250px]">Nội dung</th>
                   <th className="w-28 px-2 py-2 text-left font-semibold">Hạn nộp</th>
                   <th className="w-36 px-2 py-2 text-left font-semibold">Đúng hạn</th>
                   <th className="w-8 px-1 py-2" />
