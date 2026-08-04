@@ -225,26 +225,26 @@ def create_project(
         raise HTTPException(403, "Chỉ quản lý (hoặc chủ trì dự án) trở lên mới được tạo dự án.")
     data = payload.model_dump()
 
-    # Kiểm tra trùng Mã + Tên + Phòng ban
+    # Kiểm tra trùng ĐỒNG THỜI cả 3 mục: Mã + Tên + Nhóm/Phòng ban
     code_val = (data.get("code") or "").strip().lower()
     name_val = (data.get("name") or "").strip().lower()
     group_val = (data.get("group_name") or data.get("department") or "").strip().lower()
 
-    if name_val:
+    if code_val and name_val and group_val:
         dup = (
             db.query(Project)
             .filter(
                 Project.company_id == current.company_id,
-                func.lower(func.trim(func.coalesce(Project.name, ""))) == name_val,
-                func.lower(func.trim(func.coalesce(Project.code, ""))) == code_val,
-                func.lower(func.trim(func.coalesce(Project.group_name, Project.department, ""))) == group_val,
+                func.lower(func.trim(Project.code)) == code_val,
+                func.lower(func.trim(Project.name)) == name_val,
+                func.lower(func.trim(func.coalesce(Project.group_name, ""))) == group_val,
             )
             .first()
         )
         if dup:
             raise HTTPException(
                 400,
-                f"Dự án với Mã ({data.get('code') or 'Mặc định'}), Tên ({data.get('name')}) và Phòng ban này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại!",
+                f"Dự án với Mã ({data.get('code')}), Tên ({data.get('name')}) và Nhóm/Phòng ban ({data.get('group_name')}) này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại!",
             )
 
     # Validate người chủ trì (nếu có) thuộc cùng công ty. GEO担当/DOSCO担当 là text -> không kiểm.

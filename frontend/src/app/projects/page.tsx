@@ -403,18 +403,18 @@ export default function ProjectsPage() {
     const code = nfCode.trim();
     const groupName = nfGroup.trim();
 
-    // Kiểm tra trùng Mã + Tên + Phòng ban/Nhóm
-    const isDuplicate = projects.some((p) => {
+    // Kiểm tra trùng ĐỒNG THỜI cả 3 mục (Mã + Tên + Nhóm/Phòng ban)
+    const isDuplicate = !!code && !!name && !!groupName && projects.some((p) => {
       const matchName = (p.name || "").trim().toLowerCase() === name.toLowerCase();
-      const matchCode = code
-        ? (p.code || "").trim().toLowerCase() === code.toLowerCase()
-        : true;
-      const matchGroup = (p.group_name || "").trim().toLowerCase() === groupName.toLowerCase();
+      const matchCode = (p.code || "").trim().toLowerCase() === code.toLowerCase();
+      const pDept = normalizeDept(p.group_name).toLowerCase();
+      const newDept = normalizeDept(groupName).toLowerCase();
+      const matchGroup = pDept === newDept || (p.group_name || "").trim().toLowerCase() === groupName.toLowerCase();
       return matchName && matchCode && matchGroup;
     });
 
     if (isDuplicate) {
-      setAddResult("⚠️ Dự án với Mã, Tên và Nhóm/Phòng ban này đã tồn tại trong hệ thống. Không thể tạo mới!");
+      setAddResult("⚠️ Dự án với cùng Mã, Tên và Nhóm/Phòng ban này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại!");
       return;
     }
 
