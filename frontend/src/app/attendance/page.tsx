@@ -124,6 +124,7 @@ export default function AttendancePage() {
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
   const [detailRecs, setDetailRecs] = useState<Attendance[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
 
   // Nhập chấm công từ file CSV
   const [showImport, setShowImport] = useState(false);

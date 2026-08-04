@@ -87,11 +87,12 @@ export function rankOf(
   if (role === "ACCOUNTANT") return "ACCOUNTANT";
   if (role === "MANAGER" || (role === "FIELD_STAFF" && hasSubordinates))
     return isTopManager ? "MANAGER_TOP" : "MANAGER_MID";
+  return "STAFF";
 }
 
 /** Cho phép xem toàn bộ chấm công, nhân sự, tổng hợp: CHỈ Quản trị hệ thống, Giám đốc, Quản lý cấp cao. */
 export function isSeniorManagerUp(
-  u: { role?: Role | null; has_subordinates?: boolean | null; manager_id?: number | null; manager_ids?: number[] | null } | null | undefined
+  u: { role?: Role | null; has_subordinates?: boolean | null; manager_id?: number | null; manager_ids?: string | number[] | null } | null | undefined
 ): boolean {
   if (!u) return false;
   const isTop = !u.manager_id && (!u.manager_ids || u.manager_ids.length === 0);
