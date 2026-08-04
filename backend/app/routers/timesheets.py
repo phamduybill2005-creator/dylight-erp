@@ -33,8 +33,8 @@ def list_timesheets(
     """Danh sách giờ làm (lọc theo khoảng ngày / người / dự án).
     Nhân viên chỉ thấy giờ của mình; Quản lý+ thấy mọi người (hoặc lọc 1 người)."""
     q = db.query(Timesheet).filter(Timesheet.company_id == current.company_id)
-    if is_staff_tier(current):
-        q = q.filter(Timesheet.user_id == current.id)   # nhân viên: chỉ của mình
+    if is_staff_tier(current) and not project_id:
+        q = q.filter(Timesheet.user_id == current.id)   # xem chung: nhân viên chỉ xem giờ của mình
     elif user_id is not None:
         q = q.filter(Timesheet.user_id == user_id)
     if from_date:
