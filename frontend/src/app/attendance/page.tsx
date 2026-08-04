@@ -17,7 +17,7 @@ import {
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
-import { roleTier } from "@/lib/roles";
+import { roleTier, isSeniorManagerUp } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import { todayLocal, monthLocal } from "@/lib/format";
 import type { Attendance, AttendanceSummary, User } from "@/lib/types";
@@ -177,7 +177,7 @@ export default function AttendancePage() {
     api.me()
       .then((u) => {
         setUser(u);
-        if (roleTier(u.role) === "STAFF") {
+        if (!isSeniorManagerUp(u)) {
           api.attendanceMe(monthStr() + "-01", todayStr())
             .then(setMyRecords)
             .catch(() => {})
@@ -190,9 +190,9 @@ export default function AttendancePage() {
       .catch(() => router.push("/login"));
   }, [router]);
 
-  // Tải bảng đội theo ngày (cho quản lý/giám đốc) + poll ~20s để cập nhật quẹt thẻ mới.
+  // Tải bảng đội theo ngày (chỉ cho Quản trị hệ thống / Giám đốc / Quản lý cấp cao) + poll ~20s.
   useEffect(() => {
-    if (!user || roleTier(user.role) === "STAFF") return;
+    if (!user || !isSeniorManagerUp(user)) return;
     let alive = true;
     const load = () => api.attendanceList({ work_date: date }).then((d) => alive && setDayList(d)).catch(() => {});
     load();
@@ -202,9 +202,9 @@ export default function AttendancePage() {
     return () => { alive = false; clearInterval(id); };
   }, [user, date]);
 
-  // Tải tổng hợp theo tháng đang chọn (cho quản lý/giám đốc) + poll ~20s.
+  // Tải tổng hợp theo tháng đang chọn (chỉ cho Quản trị hệ thống / Giám đốc / Quản lý cấp cao) + poll ~20s.
   useEffect(() => {
-    if (!user || roleTier(user.role) === "STAFF") return;
+    if (!user || !isSeniorManagerUp(user)) return;
     let alive = true;
     api.attendanceSummary(summaryPeriod).then((d) => alive && setSummary(d)).catch(() => {});
     setExpandedUser(null);   // đổi tháng thì thu gọn chi tiết đang mở
@@ -217,9 +217,9 @@ export default function AttendancePage() {
     return () => { alive = false; clearInterval(id); };
   }, [user, summaryPeriod]);
 
-  // STAFF: poll lịch sử chấm công của mình (~20s) để phản ánh quẹt thẻ / đồng bộ mới.
+  // Tài khoản khác (Quản lý cấp trung / Kế toán / Nhân viên): poll lịch sử chấm công cá nhân của mình (~20s).
   useEffect(() => {
-    if (!user || roleTier(user.role) !== "STAFF") return;
+    if (!user || isSeniorManagerUp(user)) return;
     let alive = true;
     const id = setInterval(() => {
       if (document.visibilityState === "visible") {
@@ -256,8 +256,8 @@ export default function AttendancePage() {
     );
   }
 
-  // ==================== NHÂN VIÊN ====================
-  if (roleTier(user.role) === "STAFF") {
+  // ==================== CÁ NHÂN (Quản lý cấp trung, Kế toán, Nhân viên) ====================
+  if (!isSeniorManagerUp(user)) {
     const today = myRecords.find((r) => r.work_date === todayStr());
     const totalMins = myRecords.reduce((a, r) => a + r.worked_minutes, 0);
     const lateDays = myRecords.filter((r) => r.is_late).length;
