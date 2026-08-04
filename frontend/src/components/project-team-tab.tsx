@@ -244,9 +244,7 @@ export default function ProjectTeamTab({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      {isLead && <CheckBadgeIcon className="h-4 w-4 shrink-0 text-indigo-600" />}
                       <span className="truncate text-sm font-semibold text-ink">{p.name}</span>
-                      {isLead && <span className="text-[9px] font-bold text-amber-deep">(Chủ trì)</span>}
                     </div>
                     <p className="mt-0.5 text-[10px] text-muted">
                       {p.role ? roleTitle(p.role) : "Nhân viên"}

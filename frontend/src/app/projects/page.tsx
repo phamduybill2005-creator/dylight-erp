@@ -773,25 +773,7 @@ export default function ProjectsPage() {
                       Tổng thời gian: <b className="text-ink font-semibold">{calculateDuration(nfStartDate, nfEndDate, nfInternalDeadline)}</b>
                     </p>
                   )}
-                  {canManage && (
-                    <label className="block">
-                      <span className="mb-1 block text-[11px] font-semibold text-muted">Người chủ trì (chỉ huy trưởng)</span>
-                      <select
-                        value={leadId}
-                        onChange={(e) => {
-                          const id = e.target.value === "" ? "" : Number(e.target.value);
-                          setLeadId(id);
-                          // DOSCO担当 chính là người chủ trì -> TỰ ĐIỀN tên, khỏi gõ 2 lần.
-                          // Ô DOSCO担当 vẫn là input tự do nên sửa tay được.
-                          const u = id === "" ? null : users.find((x) => x.id === id);
-                          setNfDosco(u ? u.full_name : "");
-                        }}
-                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
-                        <option value="">— Chưa chỉ định —</option>
-                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                      </select>
-                    </label>
-                  )}
+
                   {canManage && (
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted font-bold text-steel">Sao chép hạng mục từ dự án mẫu</span>
@@ -819,16 +801,7 @@ export default function ProjectsPage() {
                     2738-0480, ERE三種五城目, 土木設計, 池上, DUC<br />
                     2735-0214, 松阪飯南, 土木設計, 池上, CAO
                   </div>
-                  {canManage && (
-                    <label className="block">
-                      <span className="mb-1 block text-[11px] font-semibold text-muted">Người chủ trì — áp dụng cho tất cả dự án tạo lần này</span>
-                      <select value={leadId} onChange={(e) => setLeadId(e.target.value === "" ? "" : Number(e.target.value))}
-                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
-                        <option value="">— Chưa chỉ định —</option>
-                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                      </select>
-                    </label>
-                  )}
+
                   <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={10}
                     className="w-full rounded-xl2 border border-line bg-white px-3 py-2 font-mono text-xs outline-none focus:border-steel"
                     placeholder={"QL-01, Cầu Sông Hàn, Nhóm A\nQL-02, Đường tránh QL1, Nhóm B"} />
@@ -917,22 +890,13 @@ export default function ProjectsPage() {
                   </datalist>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold text-muted">Trạng thái</label>
-                  <select value={efStatus} onChange={(e) => setEfStatus(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel">
-                    <option value="PLANNING">Chuẩn bị</option>
-                    <option value="IN_PROGRESS">Đang làm</option>
-                    <option value="COMPLETED">Hoàn thành</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold text-muted">Người chủ trì (Lead)</label>
-                  <select value={efLeadId} onChange={(e) => setEfLeadId(e.target.value ? Number(e.target.value) : "")} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel">
-                    <option value="">— Chưa chọn —</option>
-                    {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                  </select>
-                </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-muted">Trạng thái</label>
+                <select value={efStatus} onChange={(e) => setEfStatus(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel">
+                  <option value="PLANNING">Chuẩn bị</option>
+                  <option value="IN_PROGRESS">Đang làm</option>
+                  <option value="COMPLETED">Hoàn thành</option>
+                </select>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>

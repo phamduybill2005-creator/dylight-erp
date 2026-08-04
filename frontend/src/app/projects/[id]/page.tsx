@@ -905,8 +905,7 @@ export default function ProjectDetailPage() {
               </div>
 
               <p className="mt-3 text-[11px] text-muted flex items-center flex-wrap gap-1">
-                Tick chọn thành viên. Bấm <CheckBadgeSolid className="inline h-3.5 w-3.5 text-indigo-600" /> để đặt
-                <b className="text-ink"> người chủ trì</b> (chỉ 1 người). Bấm lại để gỡ chủ trì.
+                Tick chọn thành viên để tham gia dự án.
               </p>
 
               {/* Lọc nhanh danh sách theo PHÒNG BAN (không ảnh hưởng người đã tick) */}
