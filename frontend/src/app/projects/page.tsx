@@ -24,6 +24,20 @@ const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
 };
 
+function computeAutoStatus(p: Project): string {
+  const pct = Math.round(Number(p.progress_percent ?? 0));
+  const hasStart = !!p.start_date;
+  const hasEnd = !!p.end_date;
+
+  if (p.status === "ON_HOLD" || p.status === "CLOSED") {
+    if (pct < 100 && !hasEnd) return p.status;
+  }
+
+  if (pct >= 100 || hasEnd) return "COMPLETED";
+  if (pct > 0 || hasStart) return "IN_PROGRESS";
+  return "PLANNING";
+}
+
 /** Ngày gọn cho bảng: "2026-07-24" -> "24/07" (bỏ năm cho đỡ chiếm chỗ). */
 function dm(s?: string | null): string {
   const v = (s || "").slice(0, 10);
@@ -578,7 +592,8 @@ export default function ProjectsPage() {
             )}
 
             {filteredProjects.map((p, i) => {
-              const st = PROJECT_STATUS[p.status] ?? PROJECT_STATUS.PLANNING;
+              const effectiveStatus = computeAutoStatus(p);
+              const st = PROJECT_STATUS[effectiveStatus] ?? PROJECT_STATUS.PLANNING;
               return (
                 <tr
                   key={p.id}

@@ -167,10 +167,21 @@ def _progress_percent(db: Session, project_id: int) -> Decimal:
     return Decimal(pct).quantize(Decimal("0.1"))
 
 
+def _compute_auto_status(status: ProjectStatus, progress_percent: Decimal, start_date, end_date) -> ProjectStatus:
+    if status in (ProjectStatus.ON_HOLD, ProjectStatus.CLOSED) and (progress_percent < 100 and not end_date):
+        return status
+    if (progress_percent >= 100) or end_date:
+        return ProjectStatus.COMPLETED
+    if (progress_percent > 0) or start_date:
+        return ProjectStatus.IN_PROGRESS
+    return ProjectStatus.PLANNING
+
+
 def _to_out(db: Session, project: Project) -> ProjectOut:
-    """Map ORM -> ProjectOut kèm % tiến độ thực (bơm thủ công)."""
+    """Map ORM -> ProjectOut kèm % tiến độ thực & trạng thái tự động."""
     out = ProjectOut.model_validate(project)
     out.progress_percent = _progress_percent(db, project.id)
+    out.status = _compute_auto_status(project.status, out.progress_percent, project.start_date, project.end_date)
     return out
 
 
