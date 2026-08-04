@@ -830,16 +830,7 @@ function GroupRows({
               )}
             </select>
           </div>
-          {/* Đánh giá hạng mục (sao) — chủ trì/quản lý chấm chất lượng hạng mục này. */}
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-2">
-            <span className="text-[10px] font-semibold text-muted">Đánh giá:</span>
-            <ItemRating value={num(group.rating)} onChange={(n) => onPersist(group.id, { rating: n })} disabled={!canManage} />
-            {num(group.rating) > 0 && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${RATING_CLASSES[num(group.rating)] || "bg-amber/10 text-amber-deep"}`}>
-                {RATING_LABELS[num(group.rating)]}
-              </span>
-            )}
-          </div>
+
         </td>
         {canSeeMoney && (
           <>
@@ -945,15 +936,7 @@ function GroupRows({
                     ))}
                   </select>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-semibold text-muted">Đánh giá:</span>
-                  <ItemRating value={num(c.rating)} onChange={(n) => onPersist(c.id, { rating: n })} disabled={!canManage} />
-                  {num(c.rating) > 0 && (
-                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${RATING_CLASSES[num(c.rating)] || "bg-amber/10 text-amber-deep"}`}>
-                      {RATING_LABELS[num(c.rating)]}
-                    </span>
-                  )}
-                </div>
+
               </div>
             </div>
           </td>
