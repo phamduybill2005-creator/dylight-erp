@@ -549,37 +549,30 @@ export default function AttendancePage() {
                                   {new Date(r.work_date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
                                 </span>
 
-                                {/* Nút sửa/xóa mác đi trễ — CHỈ cho Quản trị hệ thống, Giám đốc, Quản lý cấp cao */}
-                                {isSeniorManagerUp(user) ? (
-                                  <button
-                                    onClick={() => handleToggleLate(r)}
-                                    title={r.is_late ? "Bấm để xóa mác đi trễ (kèm lý do)" : "Bấm để đánh dấu đi trễ"}
-                                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer shrink-0 ${
-                                      r.is_late
-                                        ? "bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-200/80"
-                                        : "bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200/80"
-                                    }`}
-                                  >
-                                    {r.is_late ? "trễ ✕" : "+ trễ"}
-                                  </button>
-                                ) : (
-                                  r.is_late && <span className="rounded bg-bad/10 px-1 py-0.5 text-[9px] font-semibold text-bad shrink-0">trễ</span>
-                                )}
+                                {/* Nút sửa/xóa mác đi trễ */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleLate(r)}
+                                  title={r.is_late ? "Bấm để xóa mác đi trễ (kèm lý do)" : "Bấm để đánh dấu đi trễ"}
+                                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer shrink-0 ${
+                                    r.is_late
+                                      ? "bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-200"
+                                      : "bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200"
+                                  }`}
+                                >
+                                  {r.is_late ? "trễ ✕" : "+ trễ"}
+                                </button>
 
-                                {/* Thanh ghi chú lý do — CHỈ cho Quản trị hệ thống, Giám đốc, Quản lý cấp cao */}
-                                {isSeniorManagerUp(user) ? (
-                                  <input
-                                    type="text"
-                                    value={editingNotes[r.id] ?? r.note ?? ""}
-                                    onChange={(e) => setEditingNotes((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                                    onBlur={() => handleSaveNote(r.id)}
-                                    onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())}
-                                    placeholder="Ghi chú lý do..."
-                                    className="min-w-[130px] max-w-[240px] flex-1 rounded border border-line/60 bg-white px-2 py-0.5 text-[11px] text-ink outline-none focus:border-steel placeholder:text-slate-300"
-                                  />
-                                ) : (
-                                  r.note && <span className="truncate text-[11px] text-muted italic">({r.note})</span>
-                                )}
+                                {/* Thanh ghi chú lý do */}
+                                <input
+                                  type="text"
+                                  value={editingNotes[r.id] ?? r.note ?? ""}
+                                  onChange={(e) => setEditingNotes((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                                  onBlur={() => handleSaveNote(r.id)}
+                                  onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())}
+                                  placeholder="Ghi chú lý do..."
+                                  className="min-w-[140px] max-w-[260px] flex-1 rounded border border-line/70 bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel placeholder:text-slate-300 shadow-sm"
+                                />
                               </div>
                               <div className="flex items-center gap-3 tnum shrink-0">
                                 <span className="text-ink">{fmtTime(r.check_in)} - {fmtTime(r.check_out)}</span>
