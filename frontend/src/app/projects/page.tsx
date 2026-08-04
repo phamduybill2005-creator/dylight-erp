@@ -385,6 +385,25 @@ export default function ProjectsPage() {
   async function handleCreateOne() {
     const name = nfName.trim();
     if (!name) { setAddResult("Vui lòng nhập Tên dự án."); return; }
+
+    const code = nfCode.trim();
+    const groupName = nfGroup.trim();
+
+    // Kiểm tra trùng Mã + Tên + Phòng ban/Nhóm
+    const isDuplicate = projects.some((p) => {
+      const matchName = (p.name || "").trim().toLowerCase() === name.toLowerCase();
+      const matchCode = code
+        ? (p.code || "").trim().toLowerCase() === code.toLowerCase()
+        : true;
+      const matchGroup = (p.group_name || "").trim().toLowerCase() === groupName.toLowerCase();
+      return matchName && matchCode && matchGroup;
+    });
+
+    if (isDuplicate) {
+      setAddResult("⚠️ Dự án với Mã, Tên và Nhóm/Phòng ban này đã tồn tại trong hệ thống. Không thể tạo mới!");
+      return;
+    }
+
     setCreating(true);
     setAddResult("");
     try {

@@ -11,7 +11,7 @@ Nguyên tắc quyền:
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import distinct
+from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -26,6 +26,7 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/projects", tags=["Dự án"])
+
 
 
 # PHÂN TẦNG QUYỀN DỰ ÁN (chốt với chủ doanh nghiệp — cao xuống thấp):
@@ -212,6 +213,29 @@ def create_project(
     if not _is_manager_tier(db, current) and not is_project_leader:
         raise HTTPException(403, "Chỉ quản lý (hoặc chủ trì dự án) trở lên mới được tạo dự án.")
     data = payload.model_dump()
+
+    # Kiểm tra trùng Mã + Tên + Phòng ban
+    code_val = (data.get("code") or "").strip().lower()
+    name_val = (data.get("name") or "").strip().lower()
+    group_val = (data.get("group_name") or data.get("department") or "").strip().lower()
+
+    if name_val:
+        dup = (
+            db.query(Project)
+            .filter(
+                Project.company_id == current.company_id,
+                func.lower(func.trim(func.coalesce(Project.name, ""))) == name_val,
+                func.lower(func.trim(func.coalesce(Project.code, ""))) == code_val,
+                func.lower(func.trim(func.coalesce(Project.group_name, Project.department, ""))) == group_val,
+            )
+            .first()
+        )
+        if dup:
+            raise HTTPException(
+                400,
+                f"Dự án với Mã ({data.get('code') or 'Mặc định'}), Tên ({data.get('name')}) và Phòng ban này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại!",
+            )
+
     # Validate người chủ trì (nếu có) thuộc cùng công ty. GEO担当/DOSCO担当 là text -> không kiểm.
     lead_id = data.get("lead_id")
     if lead_id is not None:
