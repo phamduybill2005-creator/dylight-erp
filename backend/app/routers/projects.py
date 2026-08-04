@@ -19,7 +19,7 @@ from app.deps import get_current_user
 from app.models import (
     Assignment, ChatMessage, Contract, Conversation, ConversationMember, DesignDocument,
     Invoice, MessageReaction, Payment, Progress, Project, ProjectEvaluation, ProjectItem,
-    ProgressSnapshot, Timesheet, User, UserRole, project_members,
+    ProgressSnapshot, ProjectStatus, Timesheet, User, UserRole, project_members,
 )
 from app.schemas import (
     ProjectCreate, ProjectLeadSet, ProjectMemberChange, ProjectOut, ProjectUpdate,
