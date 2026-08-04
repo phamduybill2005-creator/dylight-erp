@@ -779,22 +779,7 @@ export default function ProjectTimesheet({
                         );
                       })}
 
-                    {/* NÚT THÊM ĐẦU VIỆC VÀO NHÓM (Matching Image 1: "+ Thêm đầu việc") */}
-                    {gOpen && canManage && (
-                      <tr className="border-t border-line/40 bg-white">
-                        <td />
-                        <td colSpan={COLS} className="px-3 py-2">
-                          <button
-                            type="button"
-                            onClick={() => addChild(g)}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
-                          >
-                            <PlusIcon className="h-4 w-4" />
-                            Thêm đầu việc
-                          </button>
-                        </td>
-                      </tr>
-                    )}
+
                   </React.Fragment>
                 );
               })
