@@ -578,7 +578,7 @@ export default function ProjectsPage() {
               <th className={TH} title="Hạn nội bộ">Time due</th>
               <th className={TH} title="Tổng thời gian">Total time</th>
               <th className={TH}>Trạng thái</th>
-              <th className={TH}>Tiến độ</th>
+              <th className={TH} title="Tổng số ngày làm thực tế từ bảng Tiến độ (realtime)">Tổng số ngày</th>
               <th className={`${TH} text-center`}>Thao tác</th>
             </tr>
           </thead>
@@ -654,13 +654,8 @@ export default function ProjectsPage() {
                       {st.label}
                     </span>
                   </td>
-                  <td className={`${TD} whitespace-nowrap`}>
-                    <div className="flex items-center gap-1">
-                      <div className="h-1.5 w-10 overflow-hidden rounded-full bg-line">
-                        <div className="h-full bg-steel" style={{ width: `${Math.max(0, Math.min(100, Math.round(Number(p.progress_percent ?? 0))))}%` }} />
-                      </div>
-                      <span className="text-[10px] tnum text-muted">{Math.round(Number(p.progress_percent ?? 0))}%</span>
-                    </div>
+                  <td className={`${TD} text-center whitespace-nowrap font-bold text-steel tnum`} title={`Tổng số ngày làm thực tế khai ở bảng Tiến độ (${p.total_work_hours ?? 0}h · ${Math.round(Number(p.progress_percent ?? 0))}% hoàn thành)`}>
+                    {p.total_work_days ? `${p.total_work_days} ngày` : "0 ngày"}
                   </td>
                   <td className={`${TD} text-center whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1">
