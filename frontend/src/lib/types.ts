@@ -77,8 +77,8 @@ export interface Project {
   created_at: string;
   members?: User[];
   progress_percent?: number; // % tiến độ THỰC (trung bình các mốc), do BE tính
-  total_work_days?: number;   // Số ngày làm thực tế từ bảng Tiến độ (timesheets)
-  total_work_hours?: number;  // Số giờ làm thực tế từ bảng Tiến độ (timesheets)
+  total_hours?: number;      // tổng số giờ làm (tính từ timesheets)
+  total_days?: number;       // tổng số ngày làm (total_hours / 8)
 }
 
 export type InvoiceStatus =

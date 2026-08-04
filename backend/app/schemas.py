@@ -204,8 +204,8 @@ class ProjectOut(ProjectBase):
     lead_department: str | None = None    # phòng ban của người chủ trì
     # % tiến độ THỰC = trung bình % của các mốc Progress (bơm ở router, mặc định 0).
     progress_percent: Decimal = Decimal(0)
-    total_work_days: int = 0
-    total_work_hours: float = 0.0
+    total_hours: float = 0.0              # tổng giờ làm từ timesheets (bơm ở router)
+    total_days: float = 0.0               # tổng số ngày làm (total_hours / 8)
 
 
 # --------------------------- CONTRACT ---------------------------

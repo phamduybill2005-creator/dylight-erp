@@ -19,7 +19,7 @@ from app.deps import get_current_user
 from app.models import (
     Assignment, ChatMessage, Contract, Conversation, ConversationMember, DesignDocument,
     Invoice, MessageReaction, Payment, Progress, Project, ProjectEvaluation, ProjectItem,
-    ProgressSnapshot, ProjectStatus, Timesheet, User, UserRole, project_members,
+    ProgressSnapshot, Timesheet, User, UserRole, project_members,
 )
 from app.schemas import (
     ProjectCreate, ProjectLeadSet, ProjectMemberChange, ProjectOut, ProjectUpdate,
@@ -177,29 +177,22 @@ def _compute_auto_status(status: ProjectStatus, progress_percent: Decimal, start
     return ProjectStatus.PLANNING
 
 
-def _project_timesheet_stats(db: Session, project_id: int):
-    """Tính tổng số ngày làm thực tế (số ngày khai giờ > 0 trong Timesheet)."""
-    row = (
-        db.query(
-            func.count(distinct(Timesheet.work_date)).label("total_days"),
-            func.coalesce(func.sum(Timesheet.hours), Decimal(0)).label("total_hours"),
-        )
-        .filter(Timesheet.project_id == project_id, Timesheet.hours > 0)
-        .first()
+def _total_timesheet_hours(db: Session, project_id: int) -> float:
+    val = (
+        db.query(func.coalesce(func.sum(Timesheet.hours), 0))
+        .filter(Timesheet.project_id == project_id)
+        .scalar()
     )
-    days = row.total_days if row and row.total_days else 0
-    hours = float(row.total_hours) if row and row.total_hours else 0.0
-    return days, hours
+    return float(val or 0)
 
 
 def _to_out(db: Session, project: Project) -> ProjectOut:
-    """Map ORM -> ProjectOut kèm % tiến độ thực, tổng số ngày làm realtime & trạng thái tự động."""
+    """Map ORM -> ProjectOut kèm % tiến độ thực, tổng giờ/ngày làm & trạng thái tự động."""
     out = ProjectOut.model_validate(project)
     out.progress_percent = _progress_percent(db, project.id)
+    out.total_hours = round(_total_timesheet_hours(db, project.id), 1)
+    out.total_days = round(out.total_hours / 8.0, 1)
     out.status = _compute_auto_status(project.status, out.progress_percent, project.start_date, project.end_date)
-    days, hours = _project_timesheet_stats(db, project.id)
-    out.total_work_days = days
-    out.total_work_hours = hours
     return out
 
 
