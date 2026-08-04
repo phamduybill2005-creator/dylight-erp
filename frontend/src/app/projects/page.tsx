@@ -578,7 +578,7 @@ export default function ProjectsPage() {
               <th className={TH} title="Hạn nội bộ">Time due</th>
               <th className={TH} title="Tổng thời gian">Total time</th>
               <th className={TH}>Trạng thái</th>
-              <th className={TH} title="Tổng số ngày làm thực tế từ tiến độ (chấm công)">Tổng số ngày</th>
+              <th className={TH} title="Thời gian làm thực tế realtime (tính từ chấm công tiến độ)">Real time</th>
               <th className={`${TH} text-center`}>Thao tác</th>
             </tr>
           </thead>
