@@ -161,11 +161,10 @@ def _ensure_schema() -> None:
         # đã tồn tại mà chưa có. AN TOÀN: KHÔNG xóa dữ liệu — nếu đang còn dòng trùng thì
         # BỎ QUA + cảnh báo để admin tự gộp (tránh tự ý xóa chấm công trên prod).
         if "attendance" in insp.get_table_names():
-            cols = {c["name"] for c in insp.get_columns("attendance")}
-            if "is_late_override" not in cols:
+            acols = {c["name"] for c in insp.get_columns("attendance")}
+            if "is_late_override" not in acols:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE attendance ADD COLUMN is_late_override BOOLEAN"))
-
             have = {ix["name"] for ix in insp.get_indexes("attendance")}
             have |= {uc["name"] for uc in insp.get_unique_constraints("attendance")}
             if "uq_attendance_user_day" not in have:

@@ -241,6 +241,9 @@ export default function AttendancePage() {
         to_date: `${summaryPeriod}-31`,
       });
       setDetailRecs(recs);
+      const initialNotes: Record<number, string> = {};
+      recs.forEach((r) => { if (r.note) initialNotes[r.id] = r.note; });
+      setEditingNotes(initialNotes);
     } catch {
       setDetailRecs([]);
     } finally {
@@ -248,27 +251,26 @@ export default function AttendancePage() {
     }
   }
 
-  // Quản lý cấp cao trở lên xóa / đổi trạng thái đi trễ
-  async function toggleLateOverride(r: Attendance) {
-    const nextVal = r.is_late ? false : (r.is_late_override === false ? null : true);
+  // Quản lý cấp cao / Giám đốc / Quản trị hệ thống: Bật/tắt mác đi trễ của 1 ngày
+  async function handleToggleLate(r: Attendance) {
+    const newLate = !r.is_late;
     try {
-      const updated = await api.updateAttendance(r.id, { is_late_override: nextVal });
+      const updated = await api.updateAttendance(r.id, { is_late_override: newLate });
       setDetailRecs((prev) => prev.map((item) => (item.id === r.id ? updated : item)));
       api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Cập nhật thất bại.");
+      console.error(err);
     }
   }
 
-  // Quản lý cấp cao trở lên cập nhật ghi chú / lý do
-  async function handleNoteBlur(attendanceId: number, newNote: string) {
-    const existing = detailRecs.find((r) => r.id === attendanceId);
-    if (existing && (existing.note || "") === newNote) return;
+  // Quản lý cấp cao / Giám đốc / Quản trị hệ thống: Lưu ghi chú/lý do cho ngày công
+  async function handleSaveNote(rId: number) {
+    const note = editingNotes[rId] ?? "";
     try {
-      const updated = await api.updateAttendance(attendanceId, { note: newNote });
-      setDetailRecs((prev) => prev.map((item) => (item.id === attendanceId ? updated : item)));
+      const updated = await api.updateAttendance(rId, { note });
+      setDetailRecs((prev) => prev.map((item) => (item.id === rId ? updated : item)));
     } catch (err) {
-      console.error("Lỗi lưu ghi chú:", err);
+      console.error(err);
     }
   }
 
@@ -310,7 +312,9 @@ export default function AttendancePage() {
           {today?.is_late && (
             <p className="mt-2 text-center text-[11px] font-semibold text-bad">Hôm nay bạn đi trễ.</p>
           )}
-
+          <div className="mt-4 rounded-xl2 bg-paper p-3 text-center text-xs font-semibold text-steel border border-line/40">
+            📌 Chấm công tự động qua máy nhận diện khuôn mặt — không chấm công bằng tay.
+          </div>
         </section>
 
         {/* Tổng kết tháng */}
@@ -538,79 +542,51 @@ export default function AttendancePage() {
                       <div className="space-y-1.5">
                         {[...detailRecs]
                           .sort((a, b) => a.work_date.localeCompare(b.work_date))
-                          .map((r) => {
-                            const isSenior = isSeniorManagerUp(user);
-                            return (
-                              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-paper px-2.5 py-1.5 text-xs">
-                                <div className="flex flex-1 items-center gap-2 min-w-[200px]">
-                                  <span className="font-medium text-ink shrink-0">
-                                    {new Date(r.work_date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
-                                  </span>
+                          .map((r) => (
+                            <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-paper px-2.5 py-1.5 text-xs">
+                              <div className="flex flex-1 items-center gap-2 min-w-0">
+                                <span className="font-medium text-ink shrink-0">
+                                  {new Date(r.work_date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
+                                </span>
 
-                                  {/* Trạng thái đi trễ + nút xóa/đổi trễ cho sếp */}
-                                  {isSenior ? (
-                                    r.is_late ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleLateOverride(r)}
-                                        title="Bấm để xóa trễ"
-                                        className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 hover:bg-rose-200 transition-colors shrink-0"
-                                      >
-                                        trễ ✖
-                                      </button>
-                                    ) : r.is_late_override === false ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleLateOverride(r)}
-                                        title="Đã xóa trễ — bấm để khôi phục"
-                                        className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 transition-colors shrink-0"
-                                      >
-                                        ✓ đã xóa trễ
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleLateOverride(r)}
-                                        title="Đánh dấu đi trễ"
-                                        className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors opacity-60 hover:opacity-100 shrink-0"
-                                      >
-                                        + trễ
-                                      </button>
-                                    )
-                                  ) : (
-                                    r.is_late ? (
-                                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-600 shrink-0">trễ</span>
-                                    ) : r.is_late_override === false ? (
-                                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 shrink-0">đã xóa trễ</span>
-                                    ) : null
-                                  )}
+                                {/* Nút sửa/xóa mác đi trễ — CHỈ cho Quản trị hệ thống, Giám đốc, Quản lý cấp cao */}
+                                {isSeniorManagerUp(user) ? (
+                                  <button
+                                    onClick={() => handleToggleLate(r)}
+                                    title={r.is_late ? "Bấm để xóa mác đi trễ (kèm lý do)" : "Bấm để đánh dấu đi trễ"}
+                                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer shrink-0 ${
+                                      r.is_late
+                                        ? "bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-200/80"
+                                        : "bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200/80"
+                                    }`}
+                                  >
+                                    {r.is_late ? "trễ ✕" : "+ trễ"}
+                                  </button>
+                                ) : (
+                                  r.is_late && <span className="rounded bg-bad/10 px-1 py-0.5 text-[9px] font-semibold text-bad shrink-0">trễ</span>
+                                )}
 
-                                  {/* Thanh nhập lý do / ghi chú */}
-                                  {isSenior ? (
-                                    <input
-                                      type="text"
-                                      defaultValue={r.note || ""}
-                                      placeholder="Lý do (gặp đối tác, công tác...)"
-                                      className="flex-1 min-w-[140px] rounded-md border border-line/60 bg-white px-2 py-0.5 text-[11px] text-ink outline-none transition-colors focus:border-steel focus:ring-1 focus:ring-steel/30"
-                                      onBlur={(e) => handleNoteBlur(r.id, e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                          (e.target as HTMLInputElement).blur();
-                                        }
-                                      }}
-                                    />
-                                  ) : (
-                                    r.note && <span className="truncate text-[11px] italic text-muted">({r.note})</span>
-                                  )}
-                                </div>
-
-                                <div className="flex items-center gap-3 tnum shrink-0">
-                                  <span className="text-ink">{fmtTime(r.check_in)} - {fmtTime(r.check_out)}</span>
-                                  <span className="font-bold text-steel">{fmtHours(r.worked_minutes)}</span>
-                                </div>
+                                {/* Thanh ghi chú lý do — CHỈ cho Quản trị hệ thống, Giám đốc, Quản lý cấp cao */}
+                                {isSeniorManagerUp(user) ? (
+                                  <input
+                                    type="text"
+                                    value={editingNotes[r.id] ?? r.note ?? ""}
+                                    onChange={(e) => setEditingNotes((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                                    onBlur={() => handleSaveNote(r.id)}
+                                    onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())}
+                                    placeholder="Ghi chú lý do..."
+                                    className="min-w-[130px] max-w-[240px] flex-1 rounded border border-line/60 bg-white px-2 py-0.5 text-[11px] text-ink outline-none focus:border-steel placeholder:text-slate-300"
+                                  />
+                                ) : (
+                                  r.note && <span className="truncate text-[11px] text-muted italic">({r.note})</span>
+                                )}
                               </div>
-                            );
-                          })}
+                              <div className="flex items-center gap-3 tnum shrink-0">
+                                <span className="text-ink">{fmtTime(r.check_in)} - {fmtTime(r.check_out)}</span>
+                                <span className="font-bold text-steel">{fmtHours(r.worked_minutes)}</span>
+                              </div>
+                            </div>
+                          ))}
                       </div>
                     )}
                   </div>

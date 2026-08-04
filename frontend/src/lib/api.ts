@@ -237,10 +237,10 @@ export const api = {
     const s = qs.toString();
     return request<Attendance[]>(`/attendance${s ? `?${s}` : ""}`);
   },
+  updateAttendance: (id: number, data: { is_late_override?: boolean | null; note?: string | null }) =>
+    request<Attendance>(`/attendance/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   attendanceSummary: (period?: string) =>
     request<AttendanceSummary[]>(`/attendance/summary${period ? `?period=${period}` : ""}`),
-  updateAttendance: (id: number, data: { is_late_override?: boolean | null; note?: string | null }) =>
-    request<Attendance>(`/attendance/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   importAttendance: (punches: { employee_ref: string; timestamp: string }[]) =>
     request<{ rows: number; matched: number; days_updated: number; days_no_checkout: number; unmatched: string[] }>(
       "/attendance/import",

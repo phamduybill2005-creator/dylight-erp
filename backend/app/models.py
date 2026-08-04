@@ -501,7 +501,7 @@ class Attendance(Base):
     check_out: Mapped[datetime | None] = mapped_column(DateTime)  # giờ ra
     source: Mapped[AttendanceSource] = mapped_column(SAEnum(AttendanceSource), default=AttendanceSource.MANUAL)
     device_id: Mapped[str | None] = mapped_column(String(100))    # mã máy chấm công (nếu có)
-    is_late_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)  # ghi đè trạng thái trễ (True/False/None)
+    is_late_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)  # đè trạng thái trễ (True/False/None)
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -521,7 +521,8 @@ class Attendance(Base):
     @property
     def is_late(self) -> bool:
         """Đi trễ nếu giờ VÀO muộn hơn giờ làm CƠ SỞ của nhân viên (work_start "HH:MM").
-        Quản lý cấp cao có thể ghi đè is_late_override (True = trễ, False = bỏ trễ)."""
+        Nhân viên chưa đặt riêng thì dùng mốc chung của công ty (config WORK_START_HOUR).
+        Đúng giờ (bằng mốc) KHÔNG tính muộn. Cho phép cấp cao đè trạng thái (is_late_override)."""
         if self.is_late_override is not None:
             return self.is_late_override
         if not self.check_in:

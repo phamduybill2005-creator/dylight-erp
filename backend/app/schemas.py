@@ -440,7 +440,7 @@ class AttendanceOut(BaseModel):
     user_name: str | None = None     # tên người chấm công (điền ở router cho màn quản lý)
 
 
-class AttendanceUpdateRequest(BaseModel):
+class AttendanceUpdate(BaseModel):
     is_late_override: bool | None = None
     note: str | None = None
 
