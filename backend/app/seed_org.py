@@ -26,7 +26,7 @@ def run_seed():
         # 1. Get the company
         company = db.query(Company).filter(Company.code == "DOSCO").first()
         if not company:
-            company = Company(name="DOSCO COMPANY LIMITED", code="DOSCO", tax_code="0101234567")
+            company = Company(name="Công ty CP Xây dựng DOSCO", code="DOSCO", tax_code="0101234567")
             db.add(company)
             db.commit()
             db.refresh(company)

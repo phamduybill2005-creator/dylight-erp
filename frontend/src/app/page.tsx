@@ -102,7 +102,7 @@ export default function DashboardPage() {
         <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-br from-cyan-600 via-blue-700 to-indigo-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
           <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
           <div className="absolute left-1/4 bottom-0 -mb-10 h-36 w-36 rounded-full bg-cyan-400/25 blur-2xl" />
-          <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">DOSCO</p>
+          <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">DOSCO COMPANY LIMITED</p>
           <h1 className="mt-1 text-2xl lg:text-3xl font-bold tracking-tight">Xin chào, {user.full_name}! 👋</h1>
           <div className="relative z-10 mt-4 flex flex-col gap-1.5 text-xs text-white/85">
             <div className="flex items-center gap-2">
@@ -241,7 +241,7 @@ export default function DashboardPage() {
           <section className="relative overflow-hidden mb-4 rounded-xl2 bg-gradient-to-br from-amber-600 via-amber-700 to-slate-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
             <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
             <div className="absolute left-1/3 bottom-0 -mb-10 h-36 w-36 rounded-full bg-yellow-400/25 blur-2xl" />
-            <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">Ban Giám đốc</p>
+            <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">DOSCO COMPANY LIMITED</p>
             <h1 className="mt-1 text-xl lg:text-2xl font-bold tracking-tight">Xin chào, {user.full_name}! 👑</h1>
             <p className="relative z-10 mt-2 text-xs text-white/80">
               Hệ thống quản trị tài chính & điều hành doanh nghiệp thời gian thực.
@@ -285,7 +285,7 @@ export default function DashboardPage() {
         <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-br from-violet-600 via-purple-700 to-slate-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
           <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
           <div className="absolute left-1/3 bottom-0 -mb-10 h-36 w-36 rounded-full bg-purple-400/25 blur-2xl" />
-          <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">Trang quản lý</p>
+          <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">DOSCO COMPANY LIMITED</p>
           <h1 className="mt-1 text-xl lg:text-2xl font-bold tracking-tight">Xin chào, {user.full_name}! 👔</h1>
           <p className="relative z-10 mt-2 text-xs text-white/80">
             Điều hành dự án, nhân sự và chấm công. (Số liệu doanh thu/lãi-lỗ do Ban Giám đốc quản lý.)

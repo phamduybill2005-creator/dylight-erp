@@ -181,11 +181,6 @@ def _ensure_schema() -> None:
                             "CREATE UNIQUE INDEX uq_attendance_user_day ON attendance (user_id, work_date)"
                         ))
 
-        # Đổi tên công ty thành "DOSCO COMPANY LIMITED" cho tất cả các tài khoản
-        if "companies" in insp.get_table_names():
-            with engine.begin() as conn:
-                conn.execute(text("UPDATE companies SET name = 'DOSCO COMPANY LIMITED'"))
-
         # Timesheets: cột project_item_id (gắn giờ vào ĐẦU VIỆC của hạng mục) cho DB cũ.
         # Đồng thời BỎ ràng buộc cũ (user_id, project_id, work_date) — nay 1 người có thể
         # khai NHIỀU đầu việc trong cùng 1 dự án/ngày nên khóa cũ sẽ chặn nhầm. Dedup do

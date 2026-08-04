@@ -112,7 +112,7 @@ export default function AppShell({
             className="flex w-full items-center gap-2 rounded-xl2 bg-white/10 px-3 py-2 text-xs hover:bg-white/15"
           >
             <BuildingOffice2Icon className="h-4 w-4 shrink-0 text-amber" />
-            <span className="truncate text-left">{activeCompany?.name ?? "DOSCO COMPANY LIMITED"}</span>
+            <span className="truncate text-left">{activeCompany?.name ?? "Đang tải…"}</span>
             {companies.length > 1 && <ChevronDownIcon className="ml-auto h-3.5 w-3.5 shrink-0" />}
           </button>
           {pickerOpen && companies.length > 1 && (
@@ -176,7 +176,7 @@ export default function AppShell({
                   className="flex max-w-[150px] items-center gap-1 rounded-xl2 bg-white/10 px-3 py-1.5 text-xs"
                 >
                   <BuildingOffice2Icon className="h-4 w-4 shrink-0 text-amber" />
-                  <span className="truncate">{activeCompany?.name ?? "DOSCO COMPANY LIMITED"}</span>
+                  <span className="truncate">{activeCompany?.name ?? "Đang tải…"}</span>
                   {companies.length > 1 && <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />}
                 </button>
                 {pickerOpen && companies.length > 1 && (
