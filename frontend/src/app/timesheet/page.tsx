@@ -62,7 +62,7 @@ export default function TimesheetPage() {
 
   const weekEnd = days[days.length - 1];
   const targetUid = viewUserId ?? me?.id ?? 0;
-  const editable = mode === "me";
+  const editable = false; // Chỉ đọc: tổng hợp giờ tự động từ Tiến độ của từng Dự án, không cho sửa/nhập số
   const today = todayLocal();
 
   // Trích xuất danh sách phòng ban duy nhất từ danh sách nhân viên
@@ -216,8 +216,8 @@ export default function TimesheetPage() {
       </header>
 
       <p className="mt-3 rounded-xl2 border border-line bg-white p-3 text-[11px] text-muted shadow-card">
-        Mỗi ngày khai <b className="text-ink">số giờ thực tế</b> đã làm cho từng dự án. Bấm vào ô để gõ số giờ, tự lưu khi rời ô (để trống hoặc 0 = xóa).
-        {isManager && <> Quản lý có thể chọn <b className="text-ink">xem/khai hộ 1 người</b> hoặc xem <b className="text-ink">Toàn đội</b> (tổng giờ, chỉ đọc).</>}
+        Bảng tổng hợp <b className="text-ink">số giờ làm thực tế</b> từ mục Tiến độ của từng Dự án (chế độ chỉ đọc, dữ liệu tự động đồng bộ từ Tiến độ Dự án).
+        {isManager && <> Quản lý có thể chọn xem <b className="text-ink">Cá nhân</b> hoặc <b className="text-ink">Toàn đội</b>.</>}
       </p>
 
       {/* Thanh điều khiển: tuần + chế độ + chọn người */}
