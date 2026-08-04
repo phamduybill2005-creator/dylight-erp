@@ -16,13 +16,29 @@ from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.models import Attendance, AttendanceSource, PaymentDirection, User, UserRole
 from app.schemas import (
-    AttendanceOut, AttendanceSummary, MachinePunch, AttendanceUpdate,
+    AttendanceOut, AttendanceSummary, MachinePunch,
     AttendanceImportRequest, AttendanceImportResult,
     YunattSyncResult, YunattPerson, YunattSyncStatus,
+    AttendanceUpdateRequest,
 )
 from app.services import yunatt_service
 
 router = APIRouter(prefix="/attendance", tags=["Chấm công"])
+
+def _has_subordinates(db: Session, user: User) -> bool:
+    has_sub = db.query(User.id).filter(User.company_id == user.company_id, User.manager_id == user.id).first() is not None
+    if has_sub:
+        return True
+    return db.query(User.id).filter(User.company_id == user.company_id, User.manager_ids.like(f"%{user.id}%")).first() is not None
+
+def _is_senior_manager(db: Session, user: User) -> bool:
+    if user.role in (UserRole.ADMIN, UserRole.DIRECTOR):
+        return True
+    is_mgr = user.role == UserRole.MANAGER or _has_subordinates(db, user)
+    if is_mgr:
+        is_top = not user.manager_id and (not user.manager_ids or len(user.manager_ids) == 0)
+        return is_top
+    return False
 
 # Vai trò được xem chấm công toàn công ty (ADMIN tự được phép trong require_roles).
 _MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
@@ -143,18 +159,26 @@ def list_attendance(
 @router.patch("/{id}", response_model=AttendanceOut)
 def update_attendance(
     id: int,
-    payload: AttendanceUpdate,
+    payload: AttendanceUpdateRequest,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+    current: User = Depends(get_current_user),
 ):
-    """Sửa thông tin 1 ngày chấm công (chủ yếu là đè trạng thái trễ + nhập lý do/ghi chú)."""
+    """
+    Sửa trạng thái đi trễ (xóa trễ/đặt trễ) hoặc ghi chú lý do của 1 bản ghi chấm công.
+    Chỉ Quản trị hệ thống, Giám đốc và Quản lý cấp cao mới có quyền sửa.
+    """
+    if not _is_senior_manager(db, current):
+        raise HTTPException(403, "Chỉ Quản trị hệ thống, Giám đốc và Quản lý cấp cao mới có quyền sửa chấm công.")
+
     rec = db.get(Attendance, id)
     if not rec or rec.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy bản ghi chấm công.")
+
     if payload.is_late_override is not None:
         rec.is_late_override = payload.is_late_override
     if payload.note is not None:
         rec.note = payload.note
+
     db.commit()
     db.refresh(rec)
     return rec

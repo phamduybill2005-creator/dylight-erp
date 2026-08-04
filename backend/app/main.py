@@ -92,18 +92,19 @@ def _ensure_schema() -> None:
                     for sql in pi_missing:
                         conn.execute(text(sql))
 
-        # Attendance: cột is_late_override đè trạng thái trễ.
-        if "attendance" in insp.get_table_names():
-            acols = {c["name"] for c in insp.get_columns("attendance")}
-            a_adds = {
-                "is_late_override": "ALTER TABLE attendance ADD COLUMN is_late_override BOOLEAN",
+        # Progress: cột người thực hiện / khối lượng / trạng thái cho bảng tiến độ có cấu trúc.
+        if "progress" in insp.get_table_names():
+            prcols = {c["name"] for c in insp.get_columns("progress")}
+            pr_adds = {
+                "assignee_id": "ALTER TABLE progress ADD COLUMN assignee_id INTEGER",
+                "quantity": "ALTER TABLE progress ADD COLUMN quantity NUMERIC DEFAULT 0",
+                "status": "ALTER TABLE progress ADD COLUMN status VARCHAR(20) DEFAULT 'TODO'",
             }
-            a_missing = [sql for col, sql in a_adds.items() if col not in acols]
-            if a_missing:
+            pr_missing = [sql for col, sql in pr_adds.items() if col not in prcols]
+            if pr_missing:
                 with engine.begin() as conn:
-                    for sql in a_missing:
+                    for sql in pr_missing:
                         conn.execute(text(sql))
-
 
         # Assignments: cột started_at (bắt đầu) + done_at (hoàn thành) cho DB cũ
         # -> đo "làm trong bao lâu". TIMESTAMP hợp lệ cả SQLite & Postgres, nullable.
@@ -160,6 +161,11 @@ def _ensure_schema() -> None:
         # đã tồn tại mà chưa có. AN TOÀN: KHÔNG xóa dữ liệu — nếu đang còn dòng trùng thì
         # BỎ QUA + cảnh báo để admin tự gộp (tránh tự ý xóa chấm công trên prod).
         if "attendance" in insp.get_table_names():
+            cols = {c["name"] for c in insp.get_columns("attendance")}
+            if "is_late_override" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE attendance ADD COLUMN is_late_override BOOLEAN"))
+
             have = {ix["name"] for ix in insp.get_indexes("attendance")}
             have |= {uc["name"] for uc in insp.get_unique_constraints("attendance")}
             if "uq_attendance_user_day" not in have:
