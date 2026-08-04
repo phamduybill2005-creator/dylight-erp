@@ -181,6 +181,7 @@ export interface Attendance {
   note?: string | null;
   worked_minutes: number;
   is_late: boolean;
+  is_late_override?: boolean | null;
   created_at: string;
   user_name?: string | null;
 }

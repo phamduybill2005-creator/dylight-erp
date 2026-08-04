@@ -248,6 +248,16 @@ export default function AttendancePage() {
     }
   }
 
+  // Quản lý cấp cao / Giám đốc / Admin: toggle xóa hoặc đè trạng thái đi trễ
+  async function toggleLate(rec: Attendance) {
+    const newOverride = !rec.is_late;
+    try {
+      const updated = await api.updateAttendance(rec.id, { is_late_override: newOverride });
+      setDetailRecs((prev) => prev.map((x) => (x.id === rec.id ? { ...x, is_late: updated.is_late, is_late_override: updated.is_late_override } : x)));
+      api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
+    } catch { /* bỏ qua */ }
+  }
+
   if (loading || !user) {
     return (
       <AppShell><div className="flex min-h-[70vh] items-center justify-center">
@@ -517,14 +527,46 @@ export default function AttendancePage() {
                         {[...detailRecs]
                           .sort((a, b) => a.work_date.localeCompare(b.work_date))
                           .map((r) => (
-                            <div key={r.id} className="flex items-center justify-between rounded-lg bg-paper px-2.5 py-1.5 text-xs">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-ink">
+                            <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg bg-paper px-2.5 py-1.5 text-xs">
+                              <div className="flex flex-1 items-center gap-2 min-w-0">
+                                <span className="shrink-0 font-medium text-ink">
                                   {new Date(r.work_date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
                                 </span>
-                                {r.is_late && <span className="rounded bg-bad/10 px-1 text-[9px] font-semibold text-bad">trễ</span>}
+                                {isSeniorManagerUp(user) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleLate(r)}
+                                    title={r.is_late ? "Bấm để gỡ nhãn đi trễ" : "Bấm để đánh dấu đi trễ"}
+                                    className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold transition-colors cursor-pointer ${
+                                      r.is_late ? "bg-rose-100 text-rose-600 hover:bg-rose-200" : "bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                                    }`}
+                                  >
+                                    {r.is_late ? "trễ ✕" : "+ trễ"}
+                                  </button>
+                                ) : (
+                                  r.is_late && <span className="shrink-0 rounded bg-bad/10 px-1 text-[9px] font-semibold text-bad">trễ</span>
+                                )}
+
+                                {/* Thanh ghi chú / lý do ẩn bên cạnh ngày */}
+                                <input
+                                  type="text"
+                                  defaultValue={r.note || ""}
+                                  onBlur={async (e) => {
+                                    const val = e.target.value;
+                                    if (val !== (r.note || "")) {
+                                      try {
+                                        await api.updateAttendance(r.id, { note: val });
+                                        setDetailRecs((prev) => prev.map((x) => (x.id === r.id ? { ...x, note: val } : x)));
+                                      } catch { /* bỏ qua */ }
+                                    }
+                                  }}
+                                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                  placeholder={isSeniorManagerUp(user) ? "Ghi lý do / ghi chú…" : (r.note || "")}
+                                  readOnly={!isSeniorManagerUp(user)}
+                                  className="min-w-0 flex-1 rounded border border-transparent px-2 py-0.5 text-[11px] text-ink outline-none transition-colors hover:border-line focus:border-steel focus:bg-white placeholder:text-muted/40"
+                                />
                               </div>
-                              <div className="flex items-center gap-3 tnum">
+                              <div className="flex shrink-0 items-center gap-3 tnum">
                                 <span className="text-ink">{fmtTime(r.check_in)} - {fmtTime(r.check_out)}</span>
                                 <span className="font-bold text-steel">{fmtHours(r.worked_minutes)}</span>
                               </div>

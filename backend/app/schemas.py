@@ -435,8 +435,14 @@ class AttendanceOut(BaseModel):
     note: str | None = None
     worked_minutes: int = 0
     is_late: bool = False
+    is_late_override: bool | None = None
     created_at: datetime
     user_name: str | None = None     # tên người chấm công (điền ở router cho màn quản lý)
+
+
+class AttendanceUpdate(BaseModel):
+    is_late_override: bool | None = None
+    note: str | None = None
 
 
 class MachinePunch(BaseModel):

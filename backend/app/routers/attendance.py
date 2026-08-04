@@ -16,7 +16,7 @@ from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.models import Attendance, AttendanceSource, PaymentDirection, User, UserRole
 from app.schemas import (
-    AttendanceOut, AttendanceSummary, MachinePunch,
+    AttendanceOut, AttendanceSummary, MachinePunch, AttendanceUpdate,
     AttendanceImportRequest, AttendanceImportResult,
     YunattSyncResult, YunattPerson, YunattSyncStatus,
 )
@@ -138,6 +138,26 @@ def list_attendance(
     if to_date:
         q = q.filter(Attendance.work_date <= to_date)
     return q.order_by(Attendance.work_date.desc(), Attendance.user_id.asc()).all()
+
+
+@router.patch("/{id}", response_model=AttendanceOut)
+def update_attendance(
+    id: int,
+    payload: AttendanceUpdate,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+):
+    """Sửa thông tin 1 ngày chấm công (chủ yếu là đè trạng thái trễ + nhập lý do/ghi chú)."""
+    rec = db.get(Attendance, id)
+    if not rec or rec.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy bản ghi chấm công.")
+    if payload.is_late_override is not None:
+        rec.is_late_override = payload.is_late_override
+    if payload.note is not None:
+        rec.note = payload.note
+    db.commit()
+    db.refresh(rec)
+    return rec
 
 
 @router.get("/summary", response_model=list[AttendanceSummary])
