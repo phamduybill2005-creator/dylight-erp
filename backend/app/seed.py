@@ -32,7 +32,7 @@ def run():
             return
 
         # --- Công ty ---
-        c1 = Company(name="Công ty CP Xây dựng DOSCO", code="DOSCO", tax_code="0101234567")
+        c1 = Company(name="DOSCO COMPANY LIMITED", code="DOSCO", tax_code="0101234567")
         c2 = Company(name="Chi nhánh Miền Nam DOSCO", code="DOSCO-HCM", tax_code="0107654321")
         db.add_all([c1, c2])
         db.flush()
