@@ -41,10 +41,10 @@ function deskNav(tier: Tier): NavLink[] {
     return [
       { href: "/", label: "Trang chủ", icon: HomeIcon },
       { href: "/projects", label: "Dự án", icon: FolderIcon },
-      { href: "/timesheet", label: "Nhân công", icon: TableCellsIcon },
-      { href: "/attendance", label: "Chấm công", icon: ClockIcon },
+      { href: "/timesheet", label: "Tiến độ", icon: TableCellsIcon },
+      { href: "/attendance", label: "Tổng hợp", icon: ClockIcon },
       { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
-      { href: "/evaluations", label: "Đánh giá quản lý", icon: StarIcon },
+      { href: "/evaluations", label: "Đánh giá", icon: StarIcon },
       { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
       { href: "/profile", label: "Cá nhân", icon: UserCircleIcon },
     ];
@@ -52,12 +52,12 @@ function deskNav(tier: Tier): NavLink[] {
   const items: NavLink[] = [
     { href: "/", label: "Tổng quan", icon: HomeIcon },
     { href: "/projects", label: "Dự án", icon: FolderIcon },
-    { href: "/timesheet", label: "Nhân công", icon: TableCellsIcon },
-    { href: "/attendance", label: "Chấm công", icon: ClockIcon },
+    { href: "/timesheet", label: "Tiến độ", icon: TableCellsIcon },
+    { href: "/attendance", label: "Tổng hợp", icon: ClockIcon },
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
-    { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon },
-    { href: "/employees", label: "Nhân sự", icon: UsersIcon },
+    { href: "/evaluations", label: "Đánh giá", icon: StarIcon },
+    { href: "/employees", label: "Profile", icon: UsersIcon },
     { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
   ];
   return items;
@@ -222,14 +222,14 @@ export default function AppShell({
               <>
                 <NavItem href="/" label="Trang chủ" icon={HomeIcon} active={pathname === "/"} />
                 <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
-                <NavItem href="/attendance" label="Chấm công" icon={ClockIcon} active={pathname.startsWith("/attendance")} />
+                <NavItem href="/attendance" label="Tổng hợp" icon={ClockIcon} active={pathname.startsWith("/attendance")} />
                 <NavItem href="/profile" label="Cá nhân" icon={UserCircleIcon} active={pathname === "/profile"} />
               </>
             ) : (
               <>
                 <NavItem href="/" label="Tổng quan" icon={HomeIcon} active={pathname === "/"} />
                 <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
-                <NavItem href="/employees" label="Nhân sự" icon={UsersIcon} active={pathname.startsWith("/employees")} />
+                <NavItem href="/employees" label="Profile" icon={UsersIcon} active={pathname.startsWith("/employees")} />
               </>
             )}
           </div>
