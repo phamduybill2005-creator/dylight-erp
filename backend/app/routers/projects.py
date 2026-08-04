@@ -178,11 +178,16 @@ def _compute_auto_status(status: ProjectStatus, progress_percent: Decimal, start
 
 
 def _total_timesheet_hours(db: Session, project_id: int) -> float:
-    val = (
-        db.query(func.coalesce(func.sum(Timesheet.hours), 0))
-        .filter(Timesheet.project_id == project_id)
-        .scalar()
-    )
+    # Lấy ID của các NHÓM HẠNG MỤC LỚN (parent_id IS NULL) để tránh cộng trùng khi có cả giờ ở nhóm và giờ ở đầu việc con
+    parent_ids = [
+        r[0] for r in db.query(ProjectItem.id)
+        .filter(ProjectItem.project_id == project_id, ProjectItem.parent_id.is_(None))
+        .all()
+    ]
+    q = db.query(func.coalesce(func.sum(Timesheet.hours), 0)).filter(Timesheet.project_id == project_id)
+    if parent_ids:
+        q = q.filter(Timesheet.project_item_id.not_in(parent_ids))
+    val = q.scalar()
     return float(val or 0)
 
 

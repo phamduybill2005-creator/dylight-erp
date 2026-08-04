@@ -283,9 +283,30 @@ export default function ProjectTimesheet({
     }
   }
 
-  const dayGrand = (d: string) =>
-    entries.filter((e) => e.work_date === d && e.project_item_id != null).reduce((sum, e) => sum + Number(e.hours), 0);
-  const grand = entries.filter((e) => e.project_item_id != null).reduce((sum, e) => sum + Number(e.hours), 0);
+  const dayGrand = useCallback(
+    (d: string) => {
+      let total = 0;
+      for (const g of parents) {
+        const kids = childrenOf(g.id);
+        for (const c of kids) {
+          const workers = taskWorkers(c);
+          for (const w of workers) {
+            total += hoursMap.get(hkey(w.id, c.id, d)) ?? 0;
+          }
+        }
+      }
+      return total;
+    },
+    [parents, childrenOf, taskWorkers, hoursMap]
+  );
+
+  const grand = useMemo(() => {
+    let total = 0;
+    for (const d of days) {
+      total += dayGrand(d);
+    }
+    return total;
+  }, [days, dayGrand]);
 
   const isOpen = (k: number) => !collapsed.has(String(k));
   const toggle = (k: number) =>
