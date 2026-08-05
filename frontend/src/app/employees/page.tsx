@@ -408,6 +408,9 @@ export default function EmployeesPage() {
     setErrorMsg("");
 
     try {
+      // X определяем vai trò hệ thống (role) tương ứng với cấp bậc (rank) để tránh lệch dữ liệu.
+      const targetRole = (RANKS.find((r) => r.key === formData.rank)?.role || formData.role || "FIELD_STAFF") as Role;
+
       const payload: Partial<User> = {
         full_name: formData.full_name.trim() || undefined,
         email: formData.email.trim().toLowerCase() || undefined,
@@ -426,7 +429,7 @@ export default function EmployeesPage() {
             ? Number(formData.manager_id)
             : null,
         manager_ids: formData.rank === "MANAGER_TOP" ? null : formData.manager_ids || null,
-        role: formData.role ? (formData.role as Role) : undefined,
+        role: targetRole,
         is_active: formData.is_active,
         department: formData.department || null,
         work_start: formData.work_start || null,
@@ -1027,6 +1030,7 @@ export default function EmployeesPage() {
                                 // trên -> cấp trung; hết -> cấp cao. (Không đổi vai trò khác.)
                                 if (formData.rank === "MANAGER_TOP" || formData.rank === "MANAGER_MID") {
                                   patch.rank = newIds.length ? "MANAGER_MID" : "MANAGER_TOP";
+                                  patch.role = "MANAGER";
                                 }
                                 setFormData(patch);
                               }}

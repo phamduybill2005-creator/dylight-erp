@@ -236,7 +236,7 @@ def create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    return _with_has_sub(db, user, current.company_id)
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -296,7 +296,8 @@ def update_user(
 
     db.commit()
     db.refresh(user)
-    return user
+    # Tính has_subordinates (runtime attr) để frontend nhận đúng cấp bậc ngay sau khi lưu.
+    return _with_has_sub(db, user, current.company_id)
 
 
 @router.post("/users/{user_id}/reset-password", status_code=204)
