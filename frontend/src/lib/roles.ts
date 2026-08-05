@@ -135,8 +135,6 @@ export function roleTitle(
   isTopManager?: boolean | null,
 ): string {
   if (!role) return "";
-  const isManager = role === "MANAGER" || (role === "FIELD_STAFF" && !!hasSubordinates);
-  if (isManager) return isTopManager ? "Quản lý cấp cao" : "Quản lý cấp trung";
-  if (role === "FIELD_STAFF") return "Nhân viên";
-  return ROLE_LABEL[role] || role;
+  const r = rankOf(role, hasSubordinates, isTopManager);
+  return rankLabel(r);
 }

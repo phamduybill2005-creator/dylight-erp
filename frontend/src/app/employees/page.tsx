@@ -815,7 +815,7 @@ export default function EmployeesPage() {
             <header className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
               <div>
                 <h2 className="text-sm font-bold text-ink">{nick(selectedUser.id, selectedUser.full_name)}</h2>
-                <p className="text-[11px] text-muted">{roleTitle(selectedUser.role, selectedUser.has_subordinates, !selectedUser.manager_id && !selectedUser.manager_ids)}</p>
+                <p className="text-[11px] font-semibold text-steel">{rankLabel(formData.rank)}</p>
               </div>
               <button
                 onClick={() => setSelectedUser(null)}
