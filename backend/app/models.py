@@ -145,7 +145,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     full_name: Mapped[str] = mapped_column(String(255))
     hashed_password: Mapped[str] = mapped_column(String(255))
-    role: Mapped[UserRole] = mapped_column(SAEnum(UserRole), default=UserRole.FIELD_STAFF)
+    role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, native_enum=False), default=UserRole.FIELD_STAFF)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # False = tài khoản tự đăng ký bằng Google, đang CHỜ Giám đốc/Quản trị duyệt & phân vị trí.
     is_approved: Mapped[bool] = mapped_column(Boolean, default=True)

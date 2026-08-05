@@ -56,6 +56,18 @@ def _ensure_schema() -> None:
                 for sql in missing:
                     conn.execute(text(sql))
 
+        # Đảm bảo Postgres enum hoặc string column nhận giá trị MANAGER_MID
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'MANAGER_MID'"))
+        except Exception:
+            pass
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(50)"))
+        except Exception:
+            pass
+
         # Projects: cột lead_id + group_name/geo_manager_id/dosco_manager_id cho DB cũ.
         if "projects" in insp.get_table_names():
             pcols = {c["name"] for c in insp.get_columns("projects")}
