@@ -9,6 +9,7 @@ import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon } from "@heroicons/react/24/
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
+import { useEscapeKey } from "@/lib/use-escape-key";
 import type { Notification, User } from "@/lib/types";
 
 const TARGETS_DIRECTOR = [
@@ -46,6 +47,12 @@ export default function NotificationsBell() {
   const tier = me ? roleTier(me.role) : "STAFF";
   const canCompose = tier !== "STAFF";
   const targets = tier === "DIRECTOR" ? TARGETS_DIRECTOR : TARGETS_MANAGER;
+
+  // Đóng modal soạn thông báo hoặc khung danh sách thông báo khi nhấn phím ESC
+  useEscapeKey(() => {
+    if (compose) setCompose(false);
+    else if (open) setOpen(false);
+  }, Boolean(compose || open));
 
   const showDesktopNotification = useCallback((titleStr: string, bodyStr: string) => {
     if (typeof window === "undefined" || !("Notification" in window)) return;

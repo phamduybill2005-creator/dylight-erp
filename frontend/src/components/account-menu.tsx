@@ -24,6 +24,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { roleTitle } from "@/lib/roles";
+import { useEscapeKey } from "@/lib/use-escape-key";
 import type { User } from "@/lib/types";
 
 type IconType = React.ComponentType<{ className?: string }>;
@@ -72,6 +73,11 @@ export default function AccountMenu({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
+
+  useEscapeKey(() => {
+    if (showPw) setShowPw(false);
+    else if (open) setOpen(false);
+  }, Boolean(showPw || open));
 
   async function changePassword() {
     if (newPw.length < 6) {

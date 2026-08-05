@@ -21,6 +21,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { useNicknames } from "@/lib/nicknames";
+import { useEscapeKey } from "@/lib/use-escape-key";
 import type { Conversation, ChatMessage, Colleague, User } from "@/lib/types";
 
 const POLL_MS = 8000;
@@ -139,6 +140,16 @@ export default function ChatWidget() {
   const draftRef = useRef<HTMLTextAreaElement | null>(null);
   const activeId = active?.id ?? null;
   const [lastConvStates, setLastConvStates] = useState<Record<number, { unread: number; lastMsgAt: string | null }>>({});
+
+  // Đóng picker emoji / info nhóm / tạo phòng / đoạn chat / cửa sổ chat khi bấm ESC
+  useEscapeKey(() => {
+    if (showEmoji) setShowEmoji(false);
+    else if (reactFor !== null) setReactFor(null);
+    else if (showGroupInfo) setShowGroupInfo(false);
+    else if (creating) setCreating(false);
+    else if (active) setActive(null);
+    else if (open) setOpen(false);
+  }, Boolean(showEmoji || reactFor !== null || showGroupInfo || creating || active || open));
 
   const showDesktopNotification = useCallback((titleStr: string, bodyStr: string) => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
