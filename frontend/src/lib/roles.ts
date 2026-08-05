@@ -47,8 +47,8 @@ export type RankKey =
   | "ADMIN" | "DIRECTOR" | "MANAGER_TOP" | "MANAGER_MID" | "ACCOUNTANT" | "STAFF";
 
 export const RANKS: { key: RankKey; label: string; role: Role; top?: boolean }[] = [
-  { key: "ADMIN", label: "Quản trị hệ thống", role: "ADMIN" },
   { key: "DIRECTOR", label: "Giám đốc", role: "DIRECTOR" },
+  { key: "ADMIN", label: "Quản trị hệ thống", role: "ADMIN" },
   { key: "MANAGER_TOP", label: "Quản lý cấp cao", role: "MANAGER", top: true },
   { key: "MANAGER_MID", label: "Quản lý cấp trung", role: "MANAGER_MID", top: false },
   { key: "ACCOUNTANT", label: "Kế toán", role: "ACCOUNTANT" },
@@ -83,10 +83,10 @@ export function isSeniorManagerUp(
   return r === "ADMIN" || r === "DIRECTOR" || r === "MANAGER_TOP";
 }
 
-/** Thứ tự cấp bậc từ CAO đến THẤP (0 = cao nhất). */
+/** Thứ tự cấp bậc từ CAO đến THẤP (0 = Giám đốc lớn nhất). */
 export const RANK_WEIGHT: Record<RankKey, number> = {
-  ADMIN: 0,
-  DIRECTOR: 1,
+  DIRECTOR: 0,
+  ADMIN: 1,
   MANAGER_TOP: 2,
   MANAGER_MID: 3,
   ACCOUNTANT: 4,
@@ -102,8 +102,8 @@ export function userRankWeight(
   return RANK_WEIGHT[r] ?? 99;
 }
 
-/** Thang THĂNG CẤP theo thời gian (thấp → cao). Kế toán & Quản trị là nhánh riêng. */
-export const PROMOTION_LADDER: RankKey[] = ["STAFF", "MANAGER_MID", "MANAGER_TOP", "DIRECTOR"];
+/** Thang THĂNG CẤP theo thời gian (thấp → cao). Kế toán là nhánh riêng. */
+export const PROMOTION_LADDER: RankKey[] = ["STAFF", "MANAGER_MID", "MANAGER_TOP", "ADMIN", "DIRECTOR"];
 
 /** Cấp kế tiếp khi thăng cấp; null = đã kịch trần hoặc không nằm trên thang. */
 export function nextRank(cur: RankKey): RankKey | null {
