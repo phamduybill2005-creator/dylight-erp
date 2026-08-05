@@ -429,15 +429,8 @@ export default function EmployeesPage() {
         identity_card: formData.identity_card || null,
         cv_details: formData.cv_details || null,
         schedule: formData.schedule || null,
-        // "Quản lý cấp cao" theo định nghĩa là KHÔNG có ai quản lý bên trên -> gỡ sạch,
-        // để nhãn chức vụ và quyền (backend) khớp nhau.
-        manager_id:
-          formData.rank === "MANAGER_TOP"
-            ? null
-            : formData.manager_id
-            ? Number(formData.manager_id)
-            : null,
-        manager_ids: formData.rank === "MANAGER_TOP" ? null : formData.manager_ids || null,
+        manager_id: formData.manager_id ? Number(formData.manager_id) : null,
+        manager_ids: formData.manager_ids || null,
         role: targetRole,
         is_active: formData.is_active,
         department: formData.department || null,

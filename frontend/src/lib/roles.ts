@@ -86,7 +86,7 @@ export function rankOf(
   if (role === "DIRECTOR") return "DIRECTOR";
   if (role === "ACCOUNTANT") return "ACCOUNTANT";
   if (role === "MANAGER" || (role === "FIELD_STAFF" && hasSubordinates))
-    return isTopManager ? "MANAGER_TOP" : "MANAGER_MID";
+    return isTopManager || hasSubordinates ? "MANAGER_TOP" : "MANAGER_MID";
   return "STAFF";
 }
 
