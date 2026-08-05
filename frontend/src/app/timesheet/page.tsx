@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClockIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, ChevronLeftIcon, ChevronRightIcon, UserIcon, UsersIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal } from "@/lib/format";
@@ -36,6 +36,7 @@ export default function TimesheetPage() {
   const [entries, setEntries] = useState<Timesheet[]>([]);
   const [viewPeriod, setViewPeriod] = useState<"week" | "month">("week");
   const [monthStr, setMonthStr] = useState(() => todayLocal().slice(0, 7)); // YYYY-MM
+  const [viewScope, setViewScope] = useState<"all" | "personal">("all");
 
   const days = useMemo(() => {
     if (viewPeriod === "week") {
@@ -57,7 +58,7 @@ export default function TimesheetPage() {
   const rangeFrom = days[0];
   const rangeTo = days[days.length - 1];
 
-  // Luôn lấy TẤT CẢ entries (không lọc userId) — tổng hợp real-time từ Tiến độ Dự án
+  // Lấy TẤT CẢ entries trong khoảng ngày — tổng hợp từ Tiến độ Dự án
   const loadEntries = useCallback(() => {
     if (!me) return;
     api.timesheets({ from: rangeFrom, to: rangeTo }).then(setEntries).catch(() => setEntries([]));
@@ -77,23 +78,43 @@ export default function TimesheetPage() {
 
   const key = (pid: number, d: string) => `${pid}:${d}`;
 
-  // Tổng hợp giờ MỌI NGƯỜI cho mỗi ô (project × day) — giá trị real-time từ Tiến độ Dự án
+  // Tính tổng giờ cho mỗi ô (project × day) theo chế độ xem (Toàn đội / Cá nhân)
   const cellHours = useMemo(() => {
     const map = new Map<string, number>();
     for (const e of entries) {
+      if (viewScope === "personal" && e.user_id !== me?.id) {
+        continue;
+      }
       const k = key(e.project_id, e.work_date);
       map.set(k, (map.get(k) ?? 0) + Number(e.hours));
     }
     return map;
-  }, [entries]);
+  }, [entries, viewScope, me?.id]);
 
-  // Hàng = dự án. Dự án có giờ trong tuần lên đầu.
+  // Tổng giờ cá nhân & tổng giờ toàn đội trong khoảng thời gian đang chọn
+  const personalTotal = useMemo(() => {
+    return entries
+      .filter((e) => e.user_id === me?.id && days.includes(e.work_date))
+      .reduce((s, e) => s + Number(e.hours), 0);
+  }, [entries, me?.id, days]);
+
+  const teamTotal = useMemo(() => {
+    return entries
+      .filter((e) => days.includes(e.work_date))
+      .reduce((s, e) => s + Number(e.hours), 0);
+  }, [entries, days]);
+
+  // Hàng = dự án. Dự án có giờ trong đợt lên đầu.
   const rowProjects = useMemo(() => {
-    const has = new Set(entries.map((e) => e.project_id));
+    const has = new Set(
+      entries
+        .filter((e) => viewScope === "all" || e.user_id === me?.id)
+        .map((e) => e.project_id)
+    );
     return [...projects].sort(
       (a, b) => (has.has(a.id) ? 0 : 1) - (has.has(b.id) ? 0 : 1) || a.name.localeCompare(b.name, "vi"),
     );
-  }, [projects, entries]);
+  }, [projects, entries, viewScope, me?.id]);
 
   const projTotal = (pid: number) => days.reduce((s, d) => s + (cellHours.get(key(pid, d)) ?? 0), 0);
   const dayTotal = (d: string) => rowProjects.reduce((s, p) => s + (cellHours.get(key(p.id, d)) ?? 0), 0);
@@ -111,92 +132,136 @@ export default function TimesheetPage() {
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
-      <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
-        <ClockIcon className="h-5 w-5 text-amber" />
-        <h1 className="text-base lg:text-xl font-bold">Nhân công theo ngày</h1>
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
+        <div className="flex items-center gap-2">
+          <ClockIcon className="h-5 w-5 text-amber" />
+          <h1 className="text-base lg:text-xl font-bold">Nhân công theo ngày</h1>
+        </div>
+        
+        {/* Badge thống kê giờ nhanh */}
+        <div className="flex items-center gap-2 text-xs">
+          <div className="rounded-lg bg-teal-900/60 border border-teal-500/40 px-3 py-1.5 text-slate-200">
+            <span>Toàn đội: </span>
+            <b className="text-amber">{num1(teamTotal)}h</b> ({num1(teamTotal / 8)} công)
+          </div>
+          <div className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-slate-200">
+            <span>Cá nhân: </span>
+            <b className="text-emerald-400">{num1(personalTotal)}h</b> ({num1(personalTotal / 8)} công)
+          </div>
+        </div>
       </header>
 
       <p className="mt-3 rounded-xl2 border border-line bg-white p-3 text-[11px] text-muted shadow-card">
         Bảng tổng hợp <b className="text-ink">số giờ làm thực tế</b> từ mục Tiến độ của từng Dự án (chế độ chỉ đọc, dữ liệu tự động đồng bộ real-time từ Tiến độ Dự án).
       </p>
 
-      {/* Thanh điều khiển: tuần/tháng */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl2 border border-line bg-white p-2 shadow-card">
-        {/* Toggle Tuần / Tháng */}
-        <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs mr-1">
-          <button
-            onClick={() => setViewPeriod("week")}
-            className={`rounded px-2.5 py-1 font-semibold transition-colors duration-200 ${viewPeriod === "week" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
-          >
-            Tuần
-          </button>
-          <button
-            onClick={() => setViewPeriod("month")}
-            className={`rounded px-2.5 py-1 font-semibold transition-colors duration-200 ${viewPeriod === "month" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
-          >
-            Tháng
-          </button>
+      {/* Thanh điều khiển: chế độ xem Toàn đội / Cá nhân & Tuần / Tháng */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-2 shadow-card">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Tab chọn phạm vi: Toàn đội / Cá nhân */}
+          <div className="flex items-center gap-1 rounded-lg border border-line bg-slate-100/70 p-0.5 text-xs mr-2">
+            <button
+              onClick={() => setViewScope("all")}
+              className={`flex items-center gap-1.5 rounded px-3 py-1 font-semibold transition-all duration-200 ${
+                viewScope === "all"
+                  ? "bg-teal-700 text-white shadow"
+                  : "text-slate-600 hover:bg-white/80"
+              }`}
+            >
+              <UsersIcon className="h-3.5 w-3.5" />
+              Toàn đội
+            </button>
+            <button
+              onClick={() => setViewScope("personal")}
+              className={`flex items-center gap-1.5 rounded px-3 py-1 font-semibold transition-all duration-200 ${
+                viewScope === "personal"
+                  ? "bg-teal-700 text-white shadow"
+                  : "text-slate-600 hover:bg-white/80"
+              }`}
+            >
+              <UserIcon className="h-3.5 w-3.5" />
+              Cá nhân ({me.full_name?.split(" ").pop() ?? "Tôi"})
+            </button>
+          </div>
+
+          {/* Toggle Tuần / Tháng */}
+          <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs mr-1">
+            <button
+              onClick={() => setViewPeriod("week")}
+              className={`rounded px-2.5 py-1 font-semibold transition-colors duration-200 ${viewPeriod === "week" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
+            >
+              Tuần
+            </button>
+            <button
+              onClick={() => setViewPeriod("month")}
+              className={`rounded px-2.5 py-1 font-semibold transition-colors duration-200 ${viewPeriod === "month" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
+            >
+              Tháng
+            </button>
+          </div>
         </div>
 
-        {viewPeriod === "week" ? (
-          <>
-            <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần trước">
-              <ChevronLeftIcon className="h-4 w-4" />
-            </button>
-            <span className="text-xs font-semibold text-ink">
-              Tuần {fmtDay(weekStart)} – {fmtDay(weekEnd)}
-            </span>
-            <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần sau">
-              <ChevronRightIcon className="h-4 w-4" />
-            </button>
-            <input
-              type="date"
-              value={weekStart}
-              onChange={(e) => e.target.value && setWeekStart(mondayOf(e.target.value))}
-              className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
-            />
-            <button onClick={() => setWeekStart(mondayOf(today))} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper">
-              Tuần này
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => {
-                const [y, m] = monthStr.split("-").map(Number);
-                const prev = new Date(y, m - 2, 1);
-                setMonthStr(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`);
-              }}
-              className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper"
-              title="Tháng trước"
-            >
-              <ChevronLeftIcon className="h-4 w-4" />
-            </button>
-            <span className="text-xs font-semibold text-ink">
-              Tháng {Number(monthStr.slice(5, 7))}/{monthStr.slice(0, 4)}
-            </span>
-            <button
-              onClick={() => {
-                const [y, m] = monthStr.split("-").map(Number);
-                const next = new Date(y, m, 1);
-                setMonthStr(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
-              }}
-              className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper"
-              title="Tháng sau"
-            >
-              <ChevronRightIcon className="h-4 w-4" />
-            </button>
-            <input
-              type="month"
-              value={monthStr}
-              onChange={(e) => e.target.value && setMonthStr(e.target.value)}
-              className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
-            />
-            <button onClick={() => setMonthStr(today.slice(0, 7))} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper">
-              Tháng này
-            </button>
-          </>
-        )}
+        <div className="flex items-center gap-2">
+          {viewPeriod === "week" ? (
+            <>
+              <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần trước">
+                <ChevronLeftIcon className="h-4 w-4" />
+              </button>
+              <span className="text-xs font-semibold text-ink">
+                Tuần {fmtDay(weekStart)} – {fmtDay(weekEnd)}
+              </span>
+              <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần sau">
+                <ChevronRightIcon className="h-4 w-4" />
+              </button>
+              <input
+                type="date"
+                value={weekStart}
+                onChange={(e) => e.target.value && setWeekStart(mondayOf(e.target.value))}
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
+              />
+              <button onClick={() => setWeekStart(mondayOf(today))} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper">
+                Tuần này
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  const [y, m] = monthStr.split("-").map(Number);
+                  const prev = new Date(y, m - 2, 1);
+                  setMonthStr(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`);
+                }}
+                className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper"
+                title="Tháng trước"
+              >
+                <ChevronLeftIcon className="h-4 w-4" />
+              </button>
+              <span className="text-xs font-semibold text-ink">
+                Tháng {Number(monthStr.slice(5, 7))}/{monthStr.slice(0, 4)}
+              </span>
+              <button
+                onClick={() => {
+                  const [y, m] = monthStr.split("-").map(Number);
+                  const next = new Date(y, m, 1);
+                  setMonthStr(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
+                }}
+                className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper"
+                title="Tháng sau"
+              >
+                <ChevronRightIcon className="h-4 w-4" />
+              </button>
+              <input
+                type="month"
+                value={monthStr}
+                onChange={(e) => e.target.value && setMonthStr(e.target.value)}
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
+              />
+              <button onClick={() => setMonthStr(today.slice(0, 7))} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper">
+                Tháng này
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Lưới Dự án × Ngày — CHỈ ĐỌC */}
