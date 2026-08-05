@@ -24,7 +24,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { ROLE_LABEL, roleTitle, RANKS, rankOf, rankLabel, nextRank, type RankKey } from "@/lib/roles";
+import { ROLE_LABEL, roleTitle, RANKS, rankOf, rankLabel, nextRank, userRankWeight, type RankKey } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment, Department } from "@/lib/types";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
@@ -231,22 +231,27 @@ export default function EmployeesPage() {
   const canManage =
     currentUser.role === "ADMIN" || currentUser.role === "DIRECTOR";
 
-  // Filter possible managers: ADMIN, DIRECTOR, MANAGER
-  const potentialManagers = users.filter(
-    (u) => (u.role === "ADMIN" || u.role === "DIRECTOR" || u.role === "MANAGER") && u.id !== selectedUser?.id
-  );
+  // Filter possible managers: ADMIN, DIRECTOR, MANAGER (sắp xếp từ CAO đến THẤP)
+  const potentialManagers = users
+    .filter(
+      (u) => (u.role === "ADMIN" || u.role === "DIRECTOR" || u.role === "MANAGER") && u.id !== selectedUser?.id
+    )
+    .sort((a, b) => userRankWeight(a) - userRankWeight(b) || a.full_name.localeCompare(b.full_name, "vi"));
 
   // Chờ duyệt = tự đăng ký Google, chưa được duyệt và chưa bị từ chối.
   const pendingUsers = users.filter((u) => !u.is_approved && u.is_active);
   const approvedUsers = users.filter((u) => u.is_approved);
 
-  const filteredUsers = approvedUsers.filter(
-    (u) =>
-      (u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      (!filters.dept || splitDepts(u.department).includes(filters.dept)) &&
-      (filters.leadId === "" || u.manager_id === filters.leadId)
-  );
+  // Danh sách nhân sự lọc & sắp xếp từ CẤP BẬC CAO ĐẾN THẤP (Admin -> Giám đốc -> QL Cấp cao -> QL Cấp trung -> Kế toán -> Nhân viên)
+  const filteredUsers = approvedUsers
+    .filter(
+      (u) =>
+        (u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          u.email.toLowerCase().includes(searchQuery.toLowerCase())) &&
+        (!filters.dept || splitDepts(u.department).includes(filters.dept)) &&
+        (filters.leadId === "" || u.manager_id === filters.leadId)
+    )
+    .sort((a, b) => userRankWeight(a) - userRankWeight(b) || a.full_name.localeCompare(b.full_name, "vi"));
 
   // Gợi ý phòng ban: danh mục từ backend (Admin/Giám đốc quản lý) + phòng nào đã có
   // sẵn trong dữ liệu nhưng chưa nằm trong danh mục (giữ tương thích dữ liệu cũ).

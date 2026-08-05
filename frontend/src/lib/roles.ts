@@ -100,6 +100,25 @@ export function isSeniorManagerUp(
   return r === "ADMIN" || r === "DIRECTOR" || r === "MANAGER_TOP";
 }
 
+/** Thứ tự cấp bậc từ CAO đến THẤP (0 = cao nhất). */
+export const RANK_WEIGHT: Record<RankKey, number> = {
+  ADMIN: 0,
+  DIRECTOR: 1,
+  MANAGER_TOP: 2,
+  MANAGER_MID: 3,
+  ACCOUNTANT: 4,
+  STAFF: 5,
+};
+
+export function userRankWeight(
+  u: { role?: Role | null; has_subordinates?: boolean | null; manager_id?: number | null; manager_ids?: string | number[] | null } | null | undefined
+): number {
+  if (!u) return 99;
+  const isTop = !u.manager_id && (!u.manager_ids || u.manager_ids.length === 0);
+  const r = rankOf(u.role, u.has_subordinates, isTop);
+  return RANK_WEIGHT[r] ?? 99;
+}
+
 /** Thang THĂNG CẤP theo thời gian (thấp → cao). Kế toán & Quản trị là nhánh riêng. */
 export const PROMOTION_LADDER: RankKey[] = ["STAFF", "MANAGER_MID", "MANAGER_TOP", "DIRECTOR"];
 
