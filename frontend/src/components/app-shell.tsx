@@ -89,6 +89,13 @@ export default function AppShell({
     companies.find((c) => c.id === user?.company_id) ?? companies[0];
   const tier = roleTier(user?.role);
 
+  // Nhận biết tài khoản P.A.DUNG để áp dụng giao diện Manchester United Red Devils độc quyền
+  const isMUUser = Boolean(
+    user?.full_name?.toUpperCase().includes("DUNG") ||
+    user?.full_name?.toUpperCase().includes("P.A.DUNG") ||
+    user?.email?.toLowerCase().includes("hientruong")
+  );
+
   function logout() {
     tokenStore.clear();
     router.replace("/login");
@@ -98,20 +105,29 @@ export default function AppShell({
     href === "/" ? pathname === "/" : pathname.startsWith(href.split("?")[0]);
 
   return (
-    <div className="min-h-screen bg-paper lg:flex">
+    <div className={`min-h-screen lg:flex ${isMUUser ? "bg-gradient-to-br from-[#0c0406] via-[#140608] to-[#09080b] text-slate-100" : "bg-paper"}`}>
       {/* ====================== SIDEBAR (DESKTOP) ====================== */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-ink text-white lg:flex">
-        <div className="flex items-center justify-center px-5 py-5">
-          <img src="/logo.png" alt="DOSCO" className="h-12 w-auto rounded-lg bg-white/95 px-3 py-1.5 object-contain" />
+      <aside className={`fixed inset-y-0 left-0 z-30 hidden w-64 flex-col text-white lg:flex ${
+        isMUUser ? "bg-gradient-to-b from-[#1c0004] via-[#120002] to-[#0a0002] border-r border-red-900/40 shadow-2xl" : "bg-ink"
+      }`}>
+        <div className="flex flex-col items-center justify-center px-5 py-4">
+          <img src="/logo.png" alt="DOSCO" className="h-11 w-auto rounded-lg bg-white/95 px-3 py-1.5 object-contain shadow-md" />
+          {isMUUser && (
+            <div className="mt-2.5 flex items-center gap-1.5 rounded-full bg-red-950/80 border border-red-500/60 px-3 py-0.5 text-[10px] font-extrabold text-yellow-400 shadow-md">
+              <span className="text-red-500">⚽</span> MU EDITION <span className="text-yellow-400">👹</span>
+            </div>
+          )}
         </div>
 
         {/* Chọn công ty / chi nhánh */}
         <div className="relative px-3">
           <button
             onClick={() => companies.length > 1 && setPickerOpen((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-xl2 bg-white/10 px-3 py-2 text-xs hover:bg-white/15"
+            className={`flex w-full items-center gap-2 rounded-xl2 px-3 py-2 text-xs transition-all ${
+              isMUUser ? "bg-red-950/40 border border-red-800/40 hover:bg-red-900/40" : "bg-white/10 hover:bg-white/15"
+            }`}
           >
-            <BuildingOffice2Icon className="h-4 w-4 shrink-0 text-amber" />
+            <BuildingOffice2Icon className={`h-4 w-4 shrink-0 ${isMUUser ? "text-yellow-400" : "text-amber"}`} />
             <span className="truncate text-left">{activeCompany?.name ?? "Đang tải…"}</span>
             {companies.length > 1 && <ChevronDownIcon className="ml-auto h-3.5 w-3.5 shrink-0" />}
           </button>
@@ -134,7 +150,7 @@ export default function AppShell({
         </div>
 
         {/* Menu dọc */}
-        <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+        <nav className="mt-4 flex-1 space-y-1.5 overflow-y-auto px-3 pb-4">
           {deskNav(tier).map((item) => {
             const active = isActive(item.href);
             return (
@@ -143,7 +159,11 @@ export default function AppShell({
                 href={item.href}
                 className={`flex items-center gap-3 rounded-xl2 px-3 py-2.5 text-sm transition-all duration-200 hover:translate-x-1.5 ${
                   active
-                    ? "bg-gradient-to-r from-amber/95 to-amber-deep font-semibold text-white shadow-md shadow-amber/20"
+                    ? isMUUser
+                      ? "bg-gradient-to-r from-[#DA020E] to-[#990000] font-bold text-white shadow-lg shadow-red-900/60 border-l-4 border-yellow-400"
+                      : "bg-gradient-to-r from-amber/95 to-amber-deep font-semibold text-white shadow-md shadow-amber/20"
+                    : isMUUser
+                    ? "text-white/75 hover:bg-red-950/40 hover:text-white"
                     : "text-white/70 hover:bg-white/5 hover:text-white"
                 }`}
               >
@@ -155,7 +175,7 @@ export default function AppShell({
         </nav>
 
         {/* Tài khoản — bấm vào ảnh + tên để xem thông tin cá nhân / đổi mật khẩu / đăng xuất */}
-        <div className="border-t border-white/10 px-3 py-3">
+        <div className={`border-t px-3 py-3 ${isMUUser ? "border-red-900/40 bg-red-950/30" : "border-white/10"}`}>
           <AccountMenu user={user} onLogout={logout} variant="sidebar" />
         </div>
       </aside>
