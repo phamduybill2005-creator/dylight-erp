@@ -161,20 +161,8 @@ export default function ProjectDetailPage() {
       .finally(() => setLoading(false));
   }
 
-  // Quyền quản trị dự án (thêm/bớt thành viên, đặt chủ trì, sửa/xóa mốc):
-  // Giám đốc/Admin HOẶC chính người chủ trì.
-  // Backend là nguồn chân lý (chỉ Director/Admin hoặc lead) — FE gate để ẩn nút cho khớp.
-  // MỌI cấp quản lý đều xem/sửa được (kể cả "quản lý cấp trung" mà vai trò hệ thống
-  // vẫn là Nhân viên — nhận biết qua has_subordinates), cộng chính người chủ trì.
-  // Sửa được dự án = nhìn được đầy đủ các mục (thành viên, chủ trì, hạng mục…).
-  const canManage =
-    !!currentUser &&
-    (currentUser.role === "DIRECTOR" ||
-      currentUser.role === "ADMIN" ||
-      currentUser.role === "MANAGER" ||
-      currentUser.role === "ACCOUNTANT" ||
-      !!currentUser.has_subordinates ||
-      project?.lead_id === currentUser.id);
+  // Tất cả tài khoản đã đăng nhập đều có quyền quản lý, chỉnh sửa dự án & hạng mục (giống Hình 2)
+  const canManage = !!currentUser;
 
   // Load current user once.
   useEffect(() => {
