@@ -104,86 +104,103 @@ export default function DashboardPage() {
   if (tier === "STAFF") {
     return (
       <AppShell>
-        {/* Lời chào — Giao diện Manchester United Red Devils Độc quyền cho P.A.DUNG */}
-        {isMUUser ? (
-          <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-r from-[#7a0000] via-[#C7010C] to-[#120002] p-5 lg:p-6 text-white shadow-2xl border border-red-500/40 transition-all duration-300 hover:shadow-red-900/50">
-            {/* Lớp hoa văn sọc bóng đá MU */}
-            <div className="absolute inset-0 opacity-15 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[size:24px_24px] pointer-events-none" />
-            <div className="absolute right-0 top-0 -mr-10 -mt-10 h-44 w-44 rounded-full bg-red-500/20 blur-3xl pointer-events-none" />
-            <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-yellow-500/15 blur-2xl pointer-events-none" />
-            
-            <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-black/50 border border-yellow-400/80 px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-yellow-300 shadow-md">
-                    ⚽ MANCHESTER UNITED EDITION 👹
-                  </span>
-                  <span className="text-[11px] text-yellow-200 font-bold tracking-wider">GLORY GLORY MAN UNITED</span>
-                </div>
-                <h1 className="mt-2 text-2xl lg:text-3xl font-extrabold tracking-tight text-white drop-shadow-md">
-                  Xin chào, {user.full_name}! 👹 
-                </h1>
-                <p className="mt-1 text-xs text-yellow-200 font-medium italic">
-                  "Old Trafford Special Theme — Giao diện độc quyền Red Devils!" 🏆
-                </p>
-              </div>
-
-              {/* Hình ảnh Cristiano Ronaldo CR7 Manchester United */}
-              <div className="relative flex items-center justify-center shrink-0">
-                <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-yellow-400 via-red-500 to-yellow-300 blur-sm opacity-80 animate-pulse" />
-                <img
-                  src="/ronaldo.png"
-                  alt="CR7 Manchester United"
-                  className="relative h-20 w-20 lg:h-24 lg:w-24 object-cover object-top rounded-2xl border-2 border-yellow-400 shadow-2xl transition-transform duration-300 hover:scale-105"
-                />
-              </div>
-            </div>
-
-            <div className="relative z-10 mt-4 flex flex-wrap items-center gap-4 text-xs text-white/95 border-t border-red-500/40 pt-3">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
-                <span>Vai trò: <span className="font-bold text-white">{roleTitle(user.role, user.has_subordinates, !user.manager_id && !user.manager_ids)}</span></span>
-              </div>
-              {user.manager_name && (
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-yellow-400" />
-                  <span>Người quản lý: <span className="font-bold text-white">{user.manager_name}</span></span>
-                </div>
-              )}
-              {user.phone && (
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-yellow-400" />
-                  <span>SĐT liên hệ: <span className="font-bold text-white">{user.phone}</span></span>
-                </div>
-              )}
-            </div>
-          </section>
-        ) : (
-          <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-br from-cyan-600 via-blue-700 to-indigo-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
-            <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
-            <div className="absolute left-1/4 bottom-0 -mb-10 h-36 w-36 rounded-full bg-cyan-400/25 blur-2xl" />
-            <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">DOSCO COMPANY LIMITED</p>
-            <h1 className="mt-1 text-2xl lg:text-3xl font-bold tracking-tight">Xin chào, {user.full_name}! 👋</h1>
-            <div className="relative z-10 mt-4 flex flex-col gap-1.5 text-xs text-white/85">
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-yellow-300 animate-pulse-glow" />
-                <span>Vai trò: <span className="font-semibold text-white">{roleTitle(user.role, user.has_subordinates, !user.manager_id && !user.manager_ids)}</span></span>
-              </div>
-              {user.manager_name && (
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
-                  <span>Người quản lý: <span className="font-semibold text-white">{user.manager_name}</span></span>
-                </div>
-              )}
-              {user.phone && (
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
-                  <span>SĐT liên hệ: <span className="font-semibold text-white">{user.phone}</span></span>
-                </div>
-              )}
-            </div>
-          </section>
+        {/* Họa vết logo Manchester United làm background watermark mờ sang trọng cho riêng trang Tổng quan của P.A.DUNG */}
+        {isMUUser && (
+          <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-[0.05]">
+            <img
+              src="/mu_logo.png"
+              alt="Manchester United Crest Watermark"
+              className="h-[550px] w-[550px] lg:h-[700px] lg:w-[700px] max-w-none object-contain filter drop-shadow-2xl"
+            />
+          </div>
         )}
+
+        <div className="relative z-10 space-y-4">
+          {/* Lời chào — Giao diện Manchester United Red Devils Độc quyền cho P.A.DUNG */}
+          {isMUUser ? (
+            <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-r from-[#7a0000] via-[#C7010C] to-[#120002] p-5 lg:p-6 text-white shadow-2xl border border-red-500/40 transition-all duration-300 hover:shadow-red-900/50">
+              {/* Lớp hoa văn sọc bóng đá MU & Watermark logo MU */}
+              <div className="absolute inset-0 opacity-15 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[size:24px_24px] pointer-events-none" />
+              <img
+                src="/mu_logo.png"
+                alt="MU Crest Watermark"
+                className="absolute right-32 top-1/2 -translate-y-1/2 h-36 w-36 lg:h-48 lg:w-48 object-contain opacity-20 pointer-events-none mix-blend-screen"
+              />
+              <div className="absolute right-0 top-0 -mr-10 -mt-10 h-44 w-44 rounded-full bg-red-500/20 blur-3xl pointer-events-none" />
+              <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-yellow-500/15 blur-2xl pointer-events-none" />
+              
+              <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-black/50 border border-yellow-400/80 px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-yellow-300 shadow-md">
+                      ⚽ MANCHESTER UNITED EDITION 👹
+                    </span>
+                    <span className="text-[11px] text-yellow-200 font-bold tracking-wider">GLORY GLORY MAN UNITED</span>
+                  </div>
+                  <h1 className="mt-2 text-2xl lg:text-3xl font-extrabold tracking-tight text-white drop-shadow-md">
+                    Xin chào, {user.full_name}! 👹 
+                  </h1>
+                  <p className="mt-1 text-xs text-yellow-200 font-medium italic">
+                    "Old Trafford Special Theme — Giao diện độc quyền Red Devils!" 🏆
+                  </p>
+                </div>
+
+                {/* Hình ảnh Cristiano Ronaldo CR7 Manchester United */}
+                <div className="relative flex items-center justify-center shrink-0">
+                  <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-yellow-400 via-red-500 to-yellow-300 blur-sm opacity-80 animate-pulse" />
+                  <img
+                    src="/ronaldo.png"
+                    alt="CR7 Manchester United"
+                    className="relative h-20 w-20 lg:h-24 lg:w-24 object-cover object-top rounded-2xl border-2 border-yellow-400 shadow-2xl transition-transform duration-300 hover:scale-105"
+                  />
+                </div>
+              </div>
+
+              <div className="relative z-10 mt-4 flex flex-wrap items-center gap-4 text-xs text-white/95 border-t border-red-500/40 pt-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
+                  <span>Vai trò: <span className="font-bold text-white">{roleTitle(user.role, user.has_subordinates, !user.manager_id && !user.manager_ids)}</span></span>
+                </div>
+                {user.manager_name && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-yellow-400" />
+                    <span>Người quản lý: <span className="font-bold text-white">{user.manager_name}</span></span>
+                  </div>
+                )}
+                {user.phone && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-yellow-400" />
+                    <span>SĐT liên hệ: <span className="font-bold text-white">{user.phone}</span></span>
+                  </div>
+                )}
+              </div>
+            </section>
+          ) : (
+            <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-br from-cyan-600 via-blue-700 to-indigo-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
+              <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+              <div className="absolute left-1/4 bottom-0 -mb-10 h-36 w-36 rounded-full bg-cyan-400/25 blur-2xl" />
+              <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">DOSCO COMPANY LIMITED</p>
+              <h1 className="mt-1 text-2xl lg:text-3xl font-bold tracking-tight">Xin chào, {user.full_name}! 👋</h1>
+              <div className="relative z-10 mt-4 flex flex-col gap-1.5 text-xs text-white/85">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-300 animate-pulse-glow" />
+                  <span>Vai trò: <span className="font-semibold text-white">{roleTitle(user.role, user.has_subordinates, !user.manager_id && !user.manager_ids)}</span></span>
+                </div>
+                {user.manager_name && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
+                    <span>Người quản lý: <span className="font-semibold text-white">{user.manager_name}</span></span>
+                  </div>
+                )}
+                {user.phone && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
+                    <span>SĐT liên hệ: <span className="font-semibold text-white">{user.phone}</span></span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
         {/* Đánh giá quản lý */}
         <section className="mt-5">
