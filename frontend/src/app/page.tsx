@@ -303,6 +303,7 @@ export default function DashboardPage() {
         <section className="mt-5">
           <CompanyOrgChart />
         </section>
+        </div>
       </AppShell>
     );
   }
