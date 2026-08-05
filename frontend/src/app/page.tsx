@@ -145,13 +145,13 @@ export default function DashboardPage() {
                   </p>
                 </div>
 
-                {/* Hình ảnh Cristiano Ronaldo CR7 Manchester United */}
-                <div className="relative flex items-center justify-center shrink-0">
-                  <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-yellow-400 via-red-500 to-yellow-300 blur-sm opacity-80 animate-pulse" />
+                {/* Hình ảnh Cristiano Ronaldo CR7 Manchester United — Tăng kích thước to & rõ nét */}
+                <div className="relative flex items-center justify-center shrink-0 my-1">
+                  <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-yellow-400 via-red-500 to-yellow-300 blur-md opacity-90 animate-pulse" />
                   <img
                     src="/ronaldo.png"
                     alt="CR7 Manchester United"
-                    className="relative h-20 w-20 lg:h-24 lg:w-24 object-cover object-top rounded-2xl border-2 border-yellow-400 shadow-2xl transition-transform duration-300 hover:scale-105"
+                    className="relative h-32 w-32 sm:h-36 sm:w-36 lg:h-44 lg:w-44 object-cover object-top rounded-2xl border-3 border-yellow-400 shadow-2xl transition-transform duration-300 hover:scale-105"
                   />
                 </div>
               </div>
