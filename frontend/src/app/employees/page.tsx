@@ -29,6 +29,7 @@ import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment, Department } from "@/lib/types";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import FilterBar, { NO_FILTERS, type Filters } from "@/components/filter-bar";
+import { useEscapeKey } from "@/lib/use-escape-key";
 
 // Một người có thể thuộc NHIỀU phòng cùng lúc — lưu trong cột `department`,
 // các phòng ngăn cách bởi dấu phẩy (VD: "Phòng BIM, Phòng AI").
@@ -195,6 +196,14 @@ export default function EmployeesPage() {
       api.assignments({ assigneeId: selectedUser.id }).then(setAssignmentsList).catch(() => setAssignmentsList([]));
     }
   }, [selectedUser]);
+
+  // Đóng modal / drawer khi bấm phím ESC
+  useEscapeKey(() => {
+    if (addDeptTarget) setAddDeptTarget(null);
+    else if (showCreate) setShowCreate(false);
+    else if (showDeptManager) setShowDeptManager(false);
+    else if (selectedUser) setSelectedUser(null);
+  }, Boolean(addDeptTarget || showCreate || showDeptManager || selectedUser));
 
   if (loading) {
     return (

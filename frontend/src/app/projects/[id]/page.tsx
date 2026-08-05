@@ -28,6 +28,7 @@ import ProjectTeamTab from "@/components/project-team-tab";
 import PersonPicker from "@/components/person-picker";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
+import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatVND, formatDate } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, deptLabel, normalizeDept, geoDeptOf } from "@/lib/groups";
@@ -268,11 +269,21 @@ export default function ProjectDetailPage() {
       setMembersModal(false);
       loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cập nhật dự án thất bại.");
+      setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra");
     } finally {
       setSavingMembers(false);
     }
   }
+
+  // Đóng modal cập nhật tiến độ / sửa dự án khi bấm ESC
+  useEscapeKey(() => {
+    if (progressModal) {
+      setProgressModal(false);
+      setEditingProgressId(null);
+    } else if (membersModal) {
+      setMembersModal(false);
+    }
+  }, Boolean(progressModal || membersModal));
 
   // Mở nhóm chat của dự án (ChatWidget lắng nghe sự kiện này để get-or-create nhóm).
   function openProjectChat() {

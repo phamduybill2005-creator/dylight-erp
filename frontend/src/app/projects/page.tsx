@@ -15,6 +15,7 @@ import { isManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf } from "@/lib/groups";
 import type { Project, User, ProjectStatus } from "@/lib/types";
+import { useEscapeKey } from "@/lib/use-escape-key";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -253,6 +254,12 @@ export default function ProjectsPage() {
       setSavingEdit(false);
     }
   };
+
+  // Đóng modal thêm / sửa dự án khi nhấn ESC
+  useEscapeKey(() => {
+    if (editingProject) setEditingProject(null);
+    else if (showAdd) setShowAdd(false);
+  }, Boolean(editingProject || showAdd));
 
   const uniqueLeads = Array.from(
     new Set(projects.map((p) => p.lead_name).filter(Boolean) as string[])

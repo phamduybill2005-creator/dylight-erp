@@ -14,6 +14,7 @@ import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
+import { useEscapeKey } from "@/lib/use-escape-key";
 import type { DesignDocument, DesignPhase, DesignDocStatus, Project, User } from "@/lib/types";
 
 const PHASE_LABEL: Record<DesignPhase, string> = {
@@ -64,6 +65,8 @@ export default function DesignDocsPage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  useEscapeKey(() => setShowForm(false), showForm);
 
   function openCreate() {
     setForm({ ...empty, project_id: projects[0]?.id ?? 0 });

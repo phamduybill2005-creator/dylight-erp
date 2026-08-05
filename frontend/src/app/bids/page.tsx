@@ -16,6 +16,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { canSeeMoney } from "@/lib/roles";
+import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatVND, formatDate, todayLocal } from "@/lib/format";
 import type { Bid, BidStatus, Project, User } from "@/lib/types";
 
@@ -66,6 +67,12 @@ export default function BidsPage() {
   });
 
   const [error, setError] = useState<string | null>(null);
+
+  useEscapeKey(() => {
+    if (projectModalOpen) setProjectModalOpen(false);
+    else if (createModalOpen) setCreateModalOpen(false);
+    else if (selectedBid) setSelectedBid(null);
+  }, Boolean(projectModalOpen || createModalOpen || selectedBid));
 
   function loadData() {
     setLoading(true);

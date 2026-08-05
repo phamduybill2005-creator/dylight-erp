@@ -12,6 +12,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
+import { useEscapeKey } from "@/lib/use-escape-key";
 import type { Partner, PartnerType, User } from "@/lib/types";
 
 const TYPE_LABEL: Record<PartnerType, string> = {
@@ -52,6 +53,8 @@ export default function PartnersPage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  useEscapeKey(() => setShowForm(false), showForm);
 
   function openCreate() { setForm(empty); setShowForm(true); }
   function openEdit(p: Partner) {

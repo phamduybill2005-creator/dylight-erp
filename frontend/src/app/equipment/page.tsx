@@ -12,6 +12,7 @@ import {
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
+import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatDate } from "@/lib/format";
 import type { Equipment, EquipmentLog, Project, User } from "@/lib/types";
 
@@ -61,6 +62,11 @@ export default function EquipmentPage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  useEscapeKey(() => {
+    if (showLogForm) setShowLogForm(false);
+    else if (showEquipForm) setShowEquipForm(false);
+  }, Boolean(showLogForm || showEquipForm));
 
   function openEquipCreate() { setEquipForm(emptyEquip); setShowEquipForm(true); }
   function openLogCreate(eq?: Equipment) {
