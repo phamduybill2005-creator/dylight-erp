@@ -119,12 +119,12 @@ export default function DashboardPage() {
           {/* Lời chào — Giao diện Manchester United Red Devils Độc quyền cho P.A.DUNG */}
           {isMUUser ? (
             <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-r from-[#800000] via-[#DA020E] to-[#120002] p-5 lg:p-6 text-white shadow-2xl border border-yellow-500/40 transition-all duration-300 hover:shadow-red-900/60">
-              {/* Lớp hoa văn sọc bóng đá MU & Watermark logo MU */}
+              {/* Lớp hoa văn sọc bóng đá MU & Watermark logo MU căng rộng ra chính giữa */}
               <div className="absolute inset-0 opacity-20 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[size:24px_24px] pointer-events-none" />
               <img
-                src="/mu_logo.png?v=5"
-                alt="MU Crest"
-                className="absolute right-40 top-1/2 -translate-y-1/2 h-36 w-36 lg:h-52 lg:w-52 object-contain opacity-25 pointer-events-none filter drop-shadow-lg"
+                src="/mu_logo.png?v=6"
+                alt="MU Crest Center Watermark"
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-48 w-48 sm:h-56 sm:w-56 lg:h-64 lg:w-64 object-contain opacity-20 pointer-events-none filter drop-shadow-2xl mix-blend-screen"
               />
               <div className="absolute right-0 top-0 -mr-10 -mt-10 h-44 w-44 rounded-full bg-red-500/30 blur-3xl pointer-events-none" />
               <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-yellow-500/20 blur-2xl pointer-events-none" />
