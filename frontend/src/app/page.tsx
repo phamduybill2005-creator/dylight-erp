@@ -104,13 +104,13 @@ export default function DashboardPage() {
   if (tier === "STAFF") {
     return (
       <AppShell>
-        {/* Họa vết logo Manchester United làm background watermark mờ sang trọng cho riêng trang Tổng quan của P.A.DUNG */}
+        {/* Họa vết logo Manchester United chuẩn làm background watermark mờ sang trọng cho riêng trang Tổng quan của P.A.DUNG */}
         {isMUUser && (
-          <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-[0.06]">
+          <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-10">
             <img
-              src="/mu_logo.png?v=3"
-              alt="Manchester United Crest Watermark"
-              className="h-[550px] w-[550px] lg:h-[700px] lg:w-[700px] max-w-none object-contain filter drop-shadow-2xl"
+              src="/mu_logo.png?v=4"
+              alt="Official Manchester United Crest Watermark"
+              className="h-[550px] w-[550px] lg:h-[700px] lg:w-[700px] max-w-none object-contain filter drop-shadow-[0_0_60px_rgba(218,2,14,0.35)]"
             />
           </div>
         )}
@@ -118,21 +118,21 @@ export default function DashboardPage() {
         <div className="relative z-10 space-y-4">
           {/* Lời chào — Giao diện Manchester United Red Devils Độc quyền cho P.A.DUNG */}
           {isMUUser ? (
-            <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-r from-[#7a0000] via-[#C7010C] to-[#120002] p-5 lg:p-6 text-white shadow-2xl border border-red-500/40 transition-all duration-300 hover:shadow-red-900/50">
+            <section className="relative overflow-hidden rounded-xl2 bg-gradient-to-r from-[#800000] via-[#DA020E] to-[#120002] p-5 lg:p-6 text-white shadow-2xl border border-yellow-500/40 transition-all duration-300 hover:shadow-red-900/60">
               {/* Lớp hoa văn sọc bóng đá MU & Watermark logo MU */}
-              <div className="absolute inset-0 opacity-15 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[size:24px_24px] pointer-events-none" />
+              <div className="absolute inset-0 opacity-20 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[size:24px_24px] pointer-events-none" />
               <img
-                src="/mu_logo.png?v=3"
-                alt="MU Crest Watermark"
-                className="absolute right-32 top-1/2 -translate-y-1/2 h-36 w-36 lg:h-48 lg:w-48 object-contain opacity-20 pointer-events-none mix-blend-screen"
+                src="/mu_logo.png?v=4"
+                alt="MU Crest"
+                className="absolute right-40 top-1/2 -translate-y-1/2 h-36 w-36 lg:h-52 lg:w-52 object-contain opacity-25 pointer-events-none filter drop-shadow-lg"
               />
-              <div className="absolute right-0 top-0 -mr-10 -mt-10 h-44 w-44 rounded-full bg-red-500/20 blur-3xl pointer-events-none" />
-              <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-yellow-500/15 blur-2xl pointer-events-none" />
+              <div className="absolute right-0 top-0 -mr-10 -mt-10 h-44 w-44 rounded-full bg-red-500/30 blur-3xl pointer-events-none" />
+              <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-yellow-500/20 blur-2xl pointer-events-none" />
               
               <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-black/50 border border-yellow-400/80 px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-yellow-300 shadow-md">
+                    <span className="rounded-full bg-black/60 border border-yellow-400 px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-yellow-300 shadow-md">
                       ⚽ MANCHESTER UNITED EDITION 👹
                     </span>
                     <span className="text-[11px] text-yellow-200 font-bold tracking-wider">GLORY GLORY MAN UNITED</span>
@@ -145,11 +145,11 @@ export default function DashboardPage() {
                   </p>
                 </div>
 
-                {/* Hình ảnh Cristiano Ronaldo CR7 Manchester United — Tăng kích thước to & rõ nét */}
+                {/* Hình ảnh Cristiano Ronaldo CR7 Manchester United — HD Phóng to sắc nét */}
                 <div className="relative flex items-center justify-center shrink-0 my-1">
                   <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-yellow-400 via-red-500 to-yellow-300 blur-md opacity-90 animate-pulse" />
                   <img
-                    src="/ronaldo.png?v=3"
+                    src="/ronaldo.png?v=4"
                     alt="CR7 Manchester United"
                     className="relative h-32 w-32 sm:h-36 sm:w-36 lg:h-44 lg:w-44 object-cover object-top rounded-2xl border-3 border-yellow-400 shadow-2xl transition-transform duration-300 hover:scale-105"
                   />
