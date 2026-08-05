@@ -31,11 +31,10 @@ def list_timesheets(
     current: User = Depends(get_current_user),
 ):
     """Danh sách giờ làm (lọc theo khoảng ngày / người / dự án).
-    Nhân viên chỉ thấy giờ của mình; Quản lý+ thấy mọi người (hoặc lọc 1 người)."""
+    Trang Tiến độ giờ là chế độ chỉ đọc, mọi tài khoản đều thấy tổng hợp
+    giờ từ phần Tiến độ của dự án."""
     q = db.query(Timesheet).filter(Timesheet.company_id == current.company_id)
-    if is_staff_tier(current) and not project_id:
-        q = q.filter(Timesheet.user_id == current.id)   # xem chung: nhân viên chỉ xem giờ của mình
-    elif user_id is not None:
+    if user_id is not None:
         q = q.filter(Timesheet.user_id == user_id)
     if from_date:
         q = q.filter(Timesheet.work_date >= from_date)

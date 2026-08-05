@@ -1,16 +1,14 @@
 "use client";
 
-// Bảng NHÂN CÔNG theo ngày — mỗi người khai GIỜ LÀM THỰC TẾ cho từng dự án theo ngày
-// (Dự án × Ngày = số giờ), để kiểm soát dự án từng ngày.
-//  - "Của tôi": lưới nhập giờ của chính mình theo tuần (bấm ô gõ số giờ, tự lưu khi rời ô).
-//  - Quản lý+: chọn xem/khai hộ 1 người, hoặc xem "Toàn đội" (tổng giờ mọi người, chỉ đọc).
+// Bảng NHÂN CÔNG theo ngày — CHẾ ĐỘ CHỈ ĐỌC.
+// Tổng hợp giá trị real-time từ phần Tiến độ của từng Dự án (bảng timesheets).
+// Tất cả tài khoản đều nhìn thấy dữ liệu nhưng không sửa/nhập được.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ClockIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { roleTier, isSeniorManagerUp } from "@/lib/roles";
 import { dateLocal, todayLocal } from "@/lib/format";
 import type { Timesheet, Project, User } from "@/lib/types";
 
@@ -26,7 +24,6 @@ function addDays(d: string, n: number): string {
   const [y, m, dd] = d.split("-").map(Number);
   return dateLocal(new Date(y, m - 1, dd + n));
 }
-const DOW = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const fmtDay = (d: string) => `${Number(d.slice(8, 10))}/${Number(d.slice(5, 7))}`;
 const num1 = (n: number) => (Math.round(n * 10) / 10).toString();
 
@@ -37,15 +34,9 @@ export default function TimesheetPage() {
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayLocal()));
   const [projects, setProjects] = useState<Project[]>([]);
   const [entries, setEntries] = useState<Timesheet[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [mode, setMode] = useState<"me" | "team">("me");        // team = tổng hợp toàn đội (chỉ đọc)
   const [viewPeriod, setViewPeriod] = useState<"week" | "month">("week");
   const [monthStr, setMonthStr] = useState(() => todayLocal().slice(0, 7)); // YYYY-MM
-  const [viewUserId, setViewUserId] = useState<number | null>(null); // quản lý: khai/xem hộ 1 người
-  const [edits, setEdits] = useState<Record<string, string>>({});
-  const [dept, setDept] = useState<string>("");
 
-  const isManager = isSeniorManagerUp(me);
   const days = useMemo(() => {
     if (viewPeriod === "week") {
       return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -61,76 +52,22 @@ export default function TimesheetPage() {
   }, [viewPeriod, weekStart, monthStr]);
 
   const weekEnd = days[days.length - 1];
-  const targetUid = viewUserId ?? me?.id ?? 0;
-  const editable = false; // Chỉ đọc: tổng hợp giờ tự động từ Tiến độ của từng Dự án, không cho sửa/nhập số
   const today = todayLocal();
-
-  // Trích xuất danh sách phòng ban duy nhất từ danh sách nhân viên
-  const departments = useMemo(() => {
-    const set = new Set<string>();
-    for (const u of users) {
-      if (u.department) {
-        u.department.split(",").forEach((d) => {
-          const trimmed = d.trim();
-          if (trimmed) set.add(trimmed);
-        });
-      }
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [users]);
-
-  // Bộ lọc danh sách nhân viên để chọn khai/xem hộ
-  const filteredUsers = useMemo(() => {
-    if (!dept) return users;
-    return users.filter((u) => {
-      const userDepts = (u.department || "").split(",").map((x) => x.trim());
-      return userDepts.includes(dept);
-    });
-  }, [users, dept]);
-
-  // Tự động reset viewUserId về null (Tôi) nếu đổi phòng ban mà nhân viên đang chọn không thuộc phòng ban đó
-  useEffect(() => {
-    if (!dept) return;
-    if (viewUserId) {
-      const selectedUser = users.find((u) => u.id === viewUserId);
-      if (selectedUser) {
-        const userDepts = (selectedUser.department || "").split(",").map((x) => x.trim());
-        if (!userDepts.includes(dept)) {
-          setViewUserId(null);
-        }
-      }
-    }
-  }, [dept, users, viewUserId]);
-
-  // Danh sách ID người dùng thuộc phòng ban được chọn để tính tổng trong chế độ "team"
-  const deptUserIds = useMemo(() => {
-    if (!dept) return null;
-    const ids = new Set<number>();
-    for (const u of users) {
-      const userDepts = (u.department || "").split(",").map((x) => x.trim());
-      if (userDepts.includes(dept)) {
-        ids.add(u.id);
-      }
-    }
-    return ids;
-  }, [users, dept]);
 
   const rangeFrom = days[0];
   const rangeTo = days[days.length - 1];
 
+  // Luôn lấy TẤT CẢ entries (không lọc userId) — tổng hợp real-time từ Tiến độ Dự án
   const loadEntries = useCallback(() => {
     if (!me) return;
-    const params: { from: string; to: string; userId?: number } = { from: rangeFrom, to: rangeTo };
-    if (mode === "me") params.userId = targetUid;   // 1 người; team -> để trống = mọi người
-    api.timesheets(params).then(setEntries).catch(() => setEntries([]));
-  }, [me, rangeFrom, rangeTo, mode, targetUid]);
+    api.timesheets({ from: rangeFrom, to: rangeTo }).then(setEntries).catch(() => setEntries([]));
+  }, [me, rangeFrom, rangeTo]);
 
   useEffect(() => {
     api.me()
       .then((u) => {
         setMe(u);
         api.projects().then(setProjects).catch(() => {});
-        if (roleTier(u.role) !== "STAFF") api.users().then(setUsers).catch(() => {});
         setLoading(false);
       })
       .catch(() => router.push("/login"));
@@ -140,58 +77,23 @@ export default function TimesheetPage() {
 
   const key = (pid: number, d: string) => `${pid}:${d}`;
 
-  // Giờ mỗi ô: "me" = giờ của targetUid; "team" = TỔNG giờ mọi người (có lọc phòng ban).
+  // Tổng hợp giờ MỌI NGƯỜI cho mỗi ô (project × day) — giá trị real-time từ Tiến độ Dự án
   const cellHours = useMemo(() => {
     const map = new Map<string, number>();
     for (const e of entries) {
-      if (mode === "me") {
-        if (e.user_id !== targetUid) continue;
-      } else { // team mode
-        if (deptUserIds && !deptUserIds.has(e.user_id)) continue;
-      }
       const k = key(e.project_id, e.work_date);
       map.set(k, (map.get(k) ?? 0) + Number(e.hours));
     }
     return map;
-  }, [entries, mode, targetUid, deptUserIds]);
+  }, [entries]);
 
-  // Hàng = dự án. Chọn PHÒNG BAN -> chỉ hiện dự án của phòng đó (chủ trì HOẶC thành
-  // viên thuộc phòng). Dự án có giờ trong tuần lên đầu.
+  // Hàng = dự án. Dự án có giờ trong tuần lên đầu.
   const rowProjects = useMemo(() => {
     const has = new Set(entries.map((e) => e.project_id));
-    const inDept = (p: Project) => {
-      if (!dept) return true;
-      const leadDepts = (p.lead_department || "").split(",").map((s) => s.trim());
-      if (leadDepts.includes(dept)) return true;
-      return (p.members ?? []).some((m) =>
-        (m.department || "").split(",").map((s) => s.trim()).includes(dept),
-      );
-    };
-    return projects.filter(inDept).sort(
+    return [...projects].sort(
       (a, b) => (has.has(a.id) ? 0 : 1) - (has.has(b.id) ? 0 : 1) || a.name.localeCompare(b.name, "vi"),
     );
-  }, [projects, entries, dept]);
-
-  const cellValue = (pid: number, d: string) => {
-    const k = key(pid, d);
-    if (edits[k] !== undefined) return edits[k];
-    const h = cellHours.get(k);
-    return h ? num1(h) : "";
-  };
-
-  async function commitCell(pid: number, d: string) {
-    const k = key(pid, d);
-    if (edits[k] === undefined) return;
-    const raw = edits[k].trim().replace(",", ".");
-    const hours = raw === "" ? 0 : Number(raw);
-    const cur = cellHours.get(k) ?? 0;
-    setEdits((p) => { const n = { ...p }; delete n[k]; return n; });
-    if (isNaN(hours) || hours < 0 || hours > 24 || hours === cur) return;
-    try {
-      await api.upsertTimesheet({ project_id: pid, work_date: d, hours, user_id: viewUserId ?? undefined });
-      loadEntries();
-    } catch { /* noop */ }
-  }
+  }, [projects, entries]);
 
   const projTotal = (pid: number) => days.reduce((s, d) => s + (cellHours.get(key(pid, d)) ?? 0), 0);
   const dayTotal = (d: string) => rowProjects.reduce((s, p) => s + (cellHours.get(key(p.id, d)) ?? 0), 0);
@@ -206,7 +108,6 @@ export default function TimesheetPage() {
   }
 
   const stickyLeft = "sticky left-0 z-10 border border-line";
-  const stickyRight = "sticky right-0 z-10 border border-line";
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -216,11 +117,10 @@ export default function TimesheetPage() {
       </header>
 
       <p className="mt-3 rounded-xl2 border border-line bg-white p-3 text-[11px] text-muted shadow-card">
-        Bảng tổng hợp <b className="text-ink">số giờ làm thực tế</b> từ mục Tiến độ của từng Dự án (chế độ chỉ đọc, dữ liệu tự động đồng bộ từ Tiến độ Dự án).
-        {isManager && <> Quản lý có thể chọn xem <b className="text-ink">Cá nhân</b> hoặc <b className="text-ink">Toàn đội</b>.</>}
+        Bảng tổng hợp <b className="text-ink">số giờ làm thực tế</b> từ mục Tiến độ của từng Dự án (chế độ chỉ đọc, dữ liệu tự động đồng bộ real-time từ Tiến độ Dự án).
       </p>
 
-      {/* Thanh điều khiển: tuần + chế độ + chọn người */}
+      {/* Thanh điều khiển: tuần/tháng */}
       <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl2 border border-line bg-white p-2 shadow-card">
         {/* Toggle Tuần / Tháng */}
         <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs mr-1">
@@ -297,49 +197,9 @@ export default function TimesheetPage() {
             </button>
           </>
         )}
-
-        {isManager && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {/* Bộ lọc phòng ban */}
-            <select
-              value={dept}
-              onChange={(e) => setDept(e.target.value)}
-              className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel cursor-pointer"
-            >
-              <option value="">Tất cả phòng ban</option>
-              {departments.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-
-            <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs">
-              {(["me", "team"] as const).map((mo) => (
-                <button
-                  key={mo}
-                  onClick={() => setMode(mo)}
-                  className={`rounded px-2 py-1 font-semibold transition-colors duration-200 ${mode === mo ? "bg-ink text-white" : "text-muted hover:bg-paper"}`}
-                >
-                  {mo === "me" ? "Cá nhân" : "Toàn đội (tổng)"}
-                </button>
-              ))}
-            </div>
-            {mode === "me" && (
-              <select
-                value={viewUserId ?? me.id}
-                onChange={(e) => setViewUserId(Number(e.target.value) === me.id ? null : Number(e.target.value))}
-                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel cursor-pointer"
-              >
-                <option value={me.id}>Tôi ({me.full_name})</option>
-                {filteredUsers.filter((u) => u.id !== me.id).map((u) => (
-                  <option key={u.id} value={u.id}>{u.full_name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Lưới Dự án × Ngày */}
+      {/* Lưới Dự án × Ngày — CHỈ ĐỌC */}
       <div className="mt-3 mr-14 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
         <table className="w-full min-w-[850px] table-fixed border-collapse text-[11px]">
           <colgroup>
@@ -388,23 +248,9 @@ export default function TimesheetPage() {
                     </td>
                     {days.map((d) => (
                       <td key={d} className={`border border-line p-0 text-center ${d === today ? "bg-amber/10" : d > today ? "bg-slate-100/70" : "bg-inherit"}`}>
-                        {/* Chỉ nhập giờ HÔM NAY & ngày ĐÃ QUA; ngày chưa tới -> chỉ hiện "–". */}
-                        {editable && d <= today ? (
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={cellValue(p.id, d)}
-                            onChange={(e) => setEdits((x) => ({ ...x, [key(p.id, d)]: e.target.value }))}
-                            onBlur={() => commitCell(p.id, d)}
-                            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                            placeholder="–"
-                            className="h-7 w-full min-w-[32px] bg-transparent text-center text-[11px] text-ink outline-none placeholder:text-line focus:bg-steel/5"
-                          />
-                        ) : (
-                          <span className={`block px-0.5 py-1 tnum ${cellHours.get(key(p.id, d)) ? "font-semibold text-ink" : "text-line"}`}>
-                            {cellHours.get(key(p.id, d)) ? num1(cellHours.get(key(p.id, d))!) : "–"}
-                          </span>
-                        )}
+                        <span className={`block px-0.5 py-1 tnum ${cellHours.get(key(p.id, d)) ? "font-semibold text-ink" : "text-line"}`}>
+                          {cellHours.get(key(p.id, d)) ? num1(cellHours.get(key(p.id, d))!) : "–"}
+                        </span>
                       </td>
                     ))}
                     <td className={`sticky right-[50px] z-10 border border-line bg-inherit px-1 py-1 text-center font-bold tnum w-[50px] min-w-[50px] ${total > 0 ? "text-steel" : "text-muted"}`}>
