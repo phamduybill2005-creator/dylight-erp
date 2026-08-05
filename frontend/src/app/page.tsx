@@ -108,7 +108,7 @@ export default function DashboardPage() {
         {isMUUser && (
           <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-10">
             <img
-              src="/mu_logo.png?v=4"
+              src="/mu_logo.png?v=5"
               alt="Official Manchester United Crest Watermark"
               className="h-[550px] w-[550px] lg:h-[700px] lg:w-[700px] max-w-none object-contain filter drop-shadow-[0_0_60px_rgba(218,2,14,0.35)]"
             />
@@ -122,7 +122,7 @@ export default function DashboardPage() {
               {/* Lớp hoa văn sọc bóng đá MU & Watermark logo MU */}
               <div className="absolute inset-0 opacity-20 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[size:24px_24px] pointer-events-none" />
               <img
-                src="/mu_logo.png?v=4"
+                src="/mu_logo.png?v=5"
                 alt="MU Crest"
                 className="absolute right-40 top-1/2 -translate-y-1/2 h-36 w-36 lg:h-52 lg:w-52 object-contain opacity-25 pointer-events-none filter drop-shadow-lg"
               />
