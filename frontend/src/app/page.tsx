@@ -106,9 +106,9 @@ export default function DashboardPage() {
       <AppShell>
         {/* Họa vết logo Manchester United làm background watermark mờ sang trọng cho riêng trang Tổng quan của P.A.DUNG */}
         {isMUUser && (
-          <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-[0.05]">
+          <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-[0.06]">
             <img
-              src="/mu_logo.png"
+              src="/mu_logo.png?v=3"
               alt="Manchester United Crest Watermark"
               className="h-[550px] w-[550px] lg:h-[700px] lg:w-[700px] max-w-none object-contain filter drop-shadow-2xl"
             />
@@ -122,7 +122,7 @@ export default function DashboardPage() {
               {/* Lớp hoa văn sọc bóng đá MU & Watermark logo MU */}
               <div className="absolute inset-0 opacity-15 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[size:24px_24px] pointer-events-none" />
               <img
-                src="/mu_logo.png"
+                src="/mu_logo.png?v=3"
                 alt="MU Crest Watermark"
                 className="absolute right-32 top-1/2 -translate-y-1/2 h-36 w-36 lg:h-48 lg:w-48 object-contain opacity-20 pointer-events-none mix-blend-screen"
               />
@@ -149,7 +149,7 @@ export default function DashboardPage() {
                 <div className="relative flex items-center justify-center shrink-0 my-1">
                   <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-yellow-400 via-red-500 to-yellow-300 blur-md opacity-90 animate-pulse" />
                   <img
-                    src="/ronaldo.png"
+                    src="/ronaldo.png?v=3"
                     alt="CR7 Manchester United"
                     className="relative h-32 w-32 sm:h-36 sm:w-36 lg:h-44 lg:w-44 object-cover object-top rounded-2xl border-3 border-yellow-400 shadow-2xl transition-transform duration-300 hover:scale-105"
                   />
