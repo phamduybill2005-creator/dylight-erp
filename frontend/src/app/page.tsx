@@ -128,9 +128,14 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              {/* Logo quỷ đỏ MU */}
-              <div className="flex h-14 w-14 lg:h-16 lg:w-16 shrink-0 items-center justify-center rounded-2xl bg-black/60 border-2 border-yellow-400/80 shadow-2xl backdrop-blur-md">
-                <span className="text-3xl lg:text-4xl select-none" title="Manchester United Red Devils">⚽</span>
+              {/* Hình ảnh Cristiano Ronaldo CR7 Manchester United */}
+              <div className="relative flex items-center justify-center shrink-0">
+                <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-yellow-400 via-red-500 to-yellow-300 blur-sm opacity-80 animate-pulse" />
+                <img
+                  src="/ronaldo.png"
+                  alt="CR7 Manchester United"
+                  className="relative h-20 w-20 lg:h-24 lg:w-24 object-cover object-top rounded-2xl border-2 border-yellow-400 shadow-2xl transition-transform duration-300 hover:scale-105"
+                />
               </div>
             </div>
 
