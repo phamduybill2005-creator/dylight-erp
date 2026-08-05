@@ -24,7 +24,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { ROLE_LABEL, roleTitle, RANKS, rankOf, rankLabel, nextRank, userRankWeight, type RankKey } from "@/lib/roles";
+import { ROLE_LABEL, roleTitle, RANKS, rankOf, rankLabel, nextRank, userRankWeight, isSeniorManagerUp, type RankKey } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import type { User, Role, Project, Assignment, Department } from "@/lib/types";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
@@ -226,15 +226,22 @@ export default function EmployeesPage() {
     );
   }
 
-  // CHỈ Quản trị web (ADMIN) & Giám đốc được thêm/sửa người truy cập (khớp quyền backend).
-  // Các vai trò khác chỉ XEM danh sách (không thêm/sửa/khóa).
+  // CHỈ Quản trị web (ADMIN), Giám đốc, và Quản lý cấp cao được thêm/sửa/thăng cấp người truy cập.
   const canManage =
-    currentUser.role === "ADMIN" || currentUser.role === "DIRECTOR";
+    currentUser.role === "ADMIN" ||
+    currentUser.role === "DIRECTOR" ||
+    currentUser.role === "MANAGER" ||
+    isSeniorManagerUp(currentUser);
 
   // Filter possible managers: ADMIN, DIRECTOR, MANAGER (sắp xếp từ CAO đến THẤP)
   const potentialManagers = users
     .filter(
-      (u) => (u.role === "ADMIN" || u.role === "DIRECTOR" || u.role === "MANAGER") && u.id !== selectedUser?.id
+      (u) =>
+        (u.role === "ADMIN" ||
+          u.role === "DIRECTOR" ||
+          u.role === "MANAGER" ||
+          u.role === "MANAGER_MID") &&
+        u.id !== selectedUser?.id
     )
     .sort((a, b) => userRankWeight(a) - userRankWeight(b) || a.full_name.localeCompare(b.full_name, "vi"));
 
@@ -409,13 +416,7 @@ export default function EmployeesPage() {
     e.preventDefault();
     // Quản lý chỉ ở chế độ giao việc — không sửa hồ sơ (chặn cả khi lỡ bấm Enter).
     if (!selectedUser || !canManage) return;
-    // "Quản lý cấp trung" theo định nghĩa = CÓ người quản lý bên trên. Nếu chưa chọn
-    // "Người quản lý" thì không thể là cấp trung (lưu xong sẽ tự về cấp cao) -> chặn,
-    // yêu cầu chọn quản lý trước để giữ đúng cấp bậc.
-    if (formData.rank === "MANAGER_MID" && !formData.manager_id && !formData.manager_ids) {
-      setErrorMsg('Quản lý cấp trung phải có "Người quản lý" bên trên — hãy tick chọn ở mục "Người quản lý" bên dưới.');
-      return;
-    }
+
 
     setSaving(true);
     setSuccessMsg("");

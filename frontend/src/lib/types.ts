@@ -1,6 +1,6 @@
 // Kiểu dữ liệu phản chiếu schema của backend (giữ đồng bộ với app/schemas.py).
 
-export type Role = "ADMIN" | "DIRECTOR" | "MANAGER" | "ACCOUNTANT" | "FIELD_STAFF";
+export type Role = "ADMIN" | "DIRECTOR" | "MANAGER" | "MANAGER_MID" | "ACCOUNTANT" | "FIELD_STAFF";
 
 export interface User {
   id: number;

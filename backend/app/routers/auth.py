@@ -244,8 +244,8 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    # CHỈ Giám đốc & Quản trị web (ADMIN) mới được đổi vai trò / khóa-mở truy cập.
-    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+    # Quản trị (ADMIN), Giám đốc (DIRECTOR), Quản lý cấp cao (MANAGER) đều được đổi vai trò / thăng cấp.
+    current: User = Depends(require_roles(UserRole.DIRECTOR, UserRole.MANAGER)),
 ):
     """Cập nhật vai trò, trạng thái truy cập, hồ sơ, lịch làm việc của nhân viên."""
     user = db.get(User, user_id)
@@ -253,7 +253,6 @@ def update_user(
         raise HTTPException(404, "Không tìm thấy nhân viên.")
 
     # Chỉ ADMIN (quản trị hệ thống) mới được cấp quyền ADMIN cho người khác.
-    # Chặn Giám đốc (DIRECTOR) tự tạo thêm ADMIN -> leo thang quyền tối đa.
     if payload.role == UserRole.ADMIN and current.role != UserRole.ADMIN:
         raise HTTPException(403, "Chỉ Quản trị hệ thống (ADMIN) mới được cấp quyền ADMIN.")
 
@@ -265,7 +264,7 @@ def update_user(
     if user.id == current.id:
         if payload.is_active is False:
             raise HTTPException(400, "Không thể tự khóa tài khoản của chính mình.")
-        if payload.role is not None and payload.role not in (UserRole.ADMIN, UserRole.DIRECTOR):
+        if payload.role is not None and payload.role not in (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER):
             raise HTTPException(400, "Không thể tự hạ quyền quản trị của chính mình.")
 
     if payload.email is not None:

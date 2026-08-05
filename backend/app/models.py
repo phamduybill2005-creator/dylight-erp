@@ -43,7 +43,8 @@ project_members = Table(
 class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"              # Quản trị hệ thống
     DIRECTOR = "DIRECTOR"        # Giám đốc (xem báo cáo, lãi/lỗ)
-    MANAGER = "MANAGER"          # Chỉ huy trưởng / quản lý dự án
+    MANAGER = "MANAGER"          # Quản lý cấp cao
+    MANAGER_MID = "MANAGER_MID"  # Quản lý cấp trung
     ACCOUNTANT = "ACCOUNTANT"    # Kế toán (duyệt hóa đơn, quyết toán)
     FIELD_STAFF = "FIELD_STAFF"  # Cán bộ hiện trường (chụp hóa đơn)
 
