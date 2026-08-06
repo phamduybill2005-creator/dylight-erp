@@ -22,7 +22,6 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import CompanyOrgChart from "@/components/company-org-chart";
-import GloryAnthemAudio from "@/components/glory-anthem";
 import { api } from "@/lib/api";
 import { roleTier, roleTitle, type Tier } from "@/lib/roles";
 import { formatCompactVND, formatVND } from "@/lib/format";
@@ -136,7 +135,7 @@ export default function DashboardPage() {
                     <span className="rounded-full bg-black/60 border border-yellow-400 px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-yellow-300 shadow-md">
                       ⚽ MANCHESTER UNITED EDITION 👹
                     </span>
-                    <GloryAnthemAudio autoPlay />
+                    <span className="text-[11px] text-yellow-200 font-bold tracking-wider">GLORY GLORY MAN UNITED</span>
                   </div>
                   <h1 className="mt-2 text-2xl lg:text-3xl font-extrabold tracking-tight text-white drop-shadow-md">
                     Xin chào, {user.full_name}! 👹 
