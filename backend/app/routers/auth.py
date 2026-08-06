@@ -183,7 +183,7 @@ def logout_all_devices(
 @router.get("/users", response_model=list[UserOut])
 def list_users(
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER, UserRole.ACCOUNTANT)),
+    current: User = Depends(get_current_user),
 ):
     """Liệt kê toàn bộ nhân sự cùng công ty."""
     users = db.query(User).filter(User.company_id == current.company_id).all()

@@ -71,6 +71,100 @@ function ItemRating({ value, onChange, disabled = false }: { value: number; onCh
 const lineAmount = (i: ProjectItem) => num(i.quantity) * num(i.unit_price);
 const clampPct = (v: unknown) => Math.max(0, Math.min(100, num(v)));
 
+function renderUserOptions(
+  members: User[],
+  companyUsers: User[],
+  targetDept?: string | null
+) {
+  const allUsersMap = new Map<number, User>();
+  for (const m of members) allUsersMap.set(m.id, m);
+  for (const u of companyUsers) {
+    if (!allUsersMap.has(u.id)) allUsersMap.set(u.id, u);
+  }
+  const allUsersList = Array.from(allUsersMap.values());
+
+  const isMatchDept = (userDept?: string | null, deptFilter?: string | null) => {
+    if (!userDept || !deptFilter) return false;
+    const tf = deptFilter.trim().toLowerCase();
+    return userDept.split(",").map((s) => s.trim().toLowerCase()).some((p) => p === tf || p.includes(tf) || tf.includes(p));
+  };
+
+  const cleanDept = targetDept?.trim() || "";
+
+  if (cleanDept) {
+    const deptUsers = allUsersList.filter((u) => isMatchDept(u.department, cleanDept));
+    const deptUserIds = new Set(deptUsers.map((u) => u.id));
+
+    const projectOtherUsers = members.filter((m) => !deptUserIds.has(m.id));
+    const projectOtherUserIds = new Set(projectOtherUsers.map((m) => m.id));
+
+    const otherCompanyUsers = allUsersList
+      .filter((u) => !deptUserIds.has(u.id) && !projectOtherUserIds.has(u.id))
+      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "vi"));
+
+    return (
+      <>
+        {deptUsers.length > 0 && (
+          <optgroup label={`★ Nhân sự ${cleanDept} (${deptUsers.length})`}>
+            {deptUsers.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.full_name} {m.department ? `(${m.department})` : ""}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {projectOtherUsers.length > 0 && (
+          <optgroup label={`Thành viên khác của dự án (${projectOtherUsers.length})`}>
+            {projectOtherUsers.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.full_name} {m.department ? `(${m.department})` : ""}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {otherCompanyUsers.length > 0 && (
+          <optgroup label={`Nhân sự phòng ban khác (${otherCompanyUsers.length})`}>
+            {otherCompanyUsers.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.full_name} {m.department ? `(${m.department})` : ""}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </>
+    );
+  }
+
+  // Nếu nhóm chưa có phòng ban
+  const memberIds = new Set(members.map((m) => m.id));
+  const otherUsers = companyUsers
+    .filter((u) => !memberIds.has(u.id))
+    .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "vi"));
+
+  return (
+    <>
+      {members.length > 0 && (
+        <optgroup label={`Thành viên dự án (${members.length})`}>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.full_name} {m.department ? `(${m.department})` : ""}
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {otherUsers.length > 0 && (
+        <optgroup label={`Tất cả nhân sự công ty (${otherUsers.length})`}>
+          {otherUsers.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.full_name} {m.department ? `(${m.department})` : ""}
+            </option>
+          ))}
+        </optgroup>
+      )}
+    </>
+  );
+}
+
 /** Tiến độ 1 nhóm/dự án = bình quân % đầu việc con, ưu tiên theo trọng số thành tiền
  * (giống backend). Chưa nhập tiền -> bình quân đều. Không có đầu việc con -> 0. */
 function rollupProgress(kids: ProjectItem[]): number {
@@ -779,10 +873,8 @@ function GroupRows({
   currentUserId?: number | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
-  const memberIds = new Set(members.map((m) => m.id));
-  const otherUsers = (companyUsers || [])
-    .filter((u) => !memberIds.has(u.id))
-    .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "vi"));
+  const leaderUser = group.assignee_id ? (members.find((x) => x.id === group.assignee_id) || companyUsers.find((x) => x.id === group.assignee_id)) : null;
+  const groupDept = group.department || leaderUser?.department || null;
 
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
   // +2 cho "Ghi chú" + "Hạn nộp", +1 cho cột "Đúng hạn" (hiện với mọi vai trò).
@@ -842,24 +934,7 @@ function GroupRows({
                 }`}
               >
                 <option value="">— Chưa chọn —</option>
-                {members.length > 0 && (
-                  <optgroup label="Thành viên dự án">
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.full_name} {m.department ? `(${m.department})` : ""}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {otherUsers.length > 0 && (
-                  <optgroup label="Tất cả nhân sự công ty / phòng ban">
-                    {otherUsers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.full_name} {m.department ? `(${m.department})` : ""}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
+                {renderUserOptions(members, companyUsers, groupDept)}
               </select>
             </div>
           </div>
@@ -986,24 +1061,7 @@ function GroupRows({
                     }`}
                   >
                     <option value="">— Chưa phân công —</option>
-                    {members.length > 0 && (
-                      <optgroup label="Thành viên dự án">
-                        {members.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.full_name} {m.department ? `(${m.department})` : ""}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {otherUsers.length > 0 && (
-                      <optgroup label="Tất cả nhân sự công ty / phòng ban">
-                        {otherUsers.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.full_name} {m.department ? `(${m.department})` : ""}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
+                    {renderUserOptions(members, companyUsers, groupDept)}
                   </select>
                 </div>
 
