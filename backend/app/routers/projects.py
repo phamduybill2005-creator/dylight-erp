@@ -117,31 +117,64 @@ def _user_dept_set(user: User) -> set[str]:
     return {d.strip().lower() for d in user.department.split(",") if d.strip()}
 
 
-def _is_project_in_user_depts(db: Session, project: Project, user: User) -> bool:
-    """Kiểm tra dự án có thuộc phòng ban của user hay không.
-    Đối với quản lý cấp trung & nhân viên: chỉ thấy các dự án thuộc phòng ban của họ."""
-    user_depts = _user_dept_set(user)
+DEPT_SYNONYMS: dict[str, str] = {
+    "3d": "3d", "3次元": "3d", "3次元設計": "3d", "thiet ke 3d": "3d", "phong 3d": "3d",
+    "do duong": "civil", "civil": "civil", "土木": "civil", "土木設計": "civil", "đường": "civil", "cầu": "civil", "thiết kế đường": "civil",
+    "trac dia": "survey", "trắc địa": "survey", "測量": "survey", "測量解析": "survey", "uav": "survey",
+    "kien truc": "arch", "kiến trúc": "arch", "建築": "arch", "建築設計": "arch",
+}
 
+
+def _normalize_dept_key(dept_str: str) -> str:
+    s = (dept_str or "").strip().lower()
+    for k, v in DEPT_SYNONYMS.items():
+        if k in s or s in k:
+            return v
+    return s
+
+
+def _is_project_in_user_depts(db: Session, project: Project, user: User) -> bool:
+    """Kiểm tra dự án có thuộc về user / phòng ban của user hay không."""
     # 1. Trực tiếp user là người chủ trì dự án hoặc là thành viên dự án
     members = _member_ids(db, project)
     if user.id == project.lead_id or user.id in members:
         return True
 
+    # 2. Khớp với DOSCO担当 hoặc GEO担当 (tên hiển thị dạng chữ)
+    if user.full_name:
+        fn = user.full_name.strip().lower()
+        if project.dosco_manager and (project.dosco_manager.strip().lower() in fn or fn in project.dosco_manager.strip().lower()):
+            return True
+        if project.geo_manager and (project.geo_manager.strip().lower() in fn or fn in project.geo_manager.strip().lower()):
+            return True
+
+    # 3. Nếu user thuộc tầng Quản lý (_is_manager_tier):
+    # Cấp dưới của user là lead hoặc thành viên dự án
+    if _is_manager_tier(db, user):
+        subs = _subordinate_ids(db, user)
+        if project.lead_id in subs or bool(members & subs):
+            return True
+
+    # 4. Kiểm tra phòng ban (chuẩn hóa đồng nghĩa Tiếng Việt/Tiếng Nhật)
+    user_depts = _user_dept_set(user)
     if not user_depts:
         return False
 
-    # 2. Tên nhóm / phòng ban của dự án (group_name)
-    proj_group = (project.group_name or "").strip().lower()
-    if proj_group and any(ud in proj_group for ud in user_depts):
-        return True
+    user_norm_depts = {_normalize_dept_key(d) for d in user_depts}
 
-    # 3. Phòng ban của Người chủ trì (lead)
-    if project.lead and project.lead.department:
-        lead_depts = {d.strip().lower() for d in project.lead.department.split(",") if d.strip()}
-        if user_depts & lead_depts:
+    # Group / Nhóm của dự án
+    if project.group_name:
+        proj_group_norm = _normalize_dept_key(project.group_name)
+        if proj_group_norm in user_norm_depts or any(ud in project.group_name.lower() for ud in user_depts):
             return True
 
-    # 4. Có thành viên dự án thuộc phòng ban của user
+    # Lead department
+    if project.lead and project.lead.department:
+        lead_depts = {_normalize_dept_key(d) for d in project.lead.department.split(",") if d.strip()}
+        if user_norm_depts & lead_depts:
+            return True
+
+    # Member departments
     if members:
         member_depts = (
             db.query(User.department)
@@ -150,11 +183,11 @@ def _is_project_in_user_depts(db: Session, project: Project, user: User) -> bool
         )
         for row in member_depts:
             if row[0]:
-                m_depts = {d.strip().lower() for d in row[0].split(",") if d.strip()}
-                if user_depts & m_depts:
+                m_depts = {_normalize_dept_key(d) for d in row[0].split(",") if d.strip()}
+                if user_norm_depts & m_depts:
                     return True
 
-    # 5. Có Hạng mục (ProjectItem) nào gắn phòng ban của user
+    # Item departments
     items = (
         db.query(ProjectItem.department)
         .filter(ProjectItem.project_id == project.id, ProjectItem.department.isnot(None))
@@ -162,8 +195,8 @@ def _is_project_in_user_depts(db: Session, project: Project, user: User) -> bool
     )
     for row in items:
         if row[0]:
-            item_depts = {d.strip().lower() for d in row[0].split(",") if d.strip()}
-            if user_depts & item_depts:
+            item_depts = {_normalize_dept_key(d) for d in row[0].split(",") if d.strip()}
+            if user_norm_depts & item_depts:
                 return True
 
     return False
@@ -172,7 +205,7 @@ def _is_project_in_user_depts(db: Session, project: Project, user: User) -> bool
 def _can_view(db: Session, project: Project, user: User) -> bool:
     """XEM:
     - Giám đốc / Admin / Quản lý cấp cao -> Thấy TẤT CẢ dự án của công ty.
-    - Quản lý cấp trung trở xuống -> CHỈ thấy dự án thuộc PHÒNG BAN của mình.
+    - Quản lý cấp trung trở xuống -> CHỈ thấy dự án thuộc PHÒNG BAN hoặc phân công của mình.
     """
     if project.company_id != user.company_id:
         return False
@@ -270,7 +303,7 @@ def _to_out(db: Session, project: Project) -> ProjectOut:
 def list_projects(db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     """Danh sách dự án:
     - Giám đốc / Admin / Quản lý cấp cao -> xem TẤT CẢ dự án của công ty.
-    - Quản lý cấp trung trở xuống -> CHỈ xem dự án thuộc PHÒNG BAN của mình.
+    - Quản lý cấp trung trở xuống -> CHỈ xem dự án thuộc PHÒNG BAN hoặc phân công của mình.
     """
     q = db.query(Project).filter(Project.company_id == current.company_id)
     projects = q.order_by(Project.created_at.desc()).all()
@@ -341,8 +374,29 @@ def create_project(
         lead = db.get(User, lead_id)
         if not lead or lead.company_id != current.company_id:
             raise HTTPException(400, "Người chủ trì không hợp lệ.")
+    
+    # Nếu chưa chỉ định lead_id, tự động gán creator làm lead_id mặc định
+    if lead_id is None and _is_manager_tier(db, current):
+        data["lead_id"] = current.id
+
     project = Project(**data, company_id=current.company_id)
     db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    # TỰ ĐỘNG thêm người tạo (current) vào thành viên dự án
+    db.execute(project_members.insert().values(project_id=project.id, user_id=current.id))
+
+    # Nếu có DOSCO担当 dạng chữ trùng tên user trong công ty -> tự động gắn vào thành viên luôn
+    if project.dosco_manager:
+        dm_clean = project.dosco_manager.strip().lower()
+        company_users = db.query(User).filter(User.company_id == current.company_id).all()
+        for u in company_users:
+            if u.id != current.id and u.full_name:
+                fn_clean = u.full_name.strip().lower()
+                if dm_clean in fn_clean or fn_clean in dm_clean:
+                    db.execute(project_members.insert().values(project_id=project.id, user_id=u.id))
+
     db.commit()
     db.refresh(project)
     return _to_out(db, project)
