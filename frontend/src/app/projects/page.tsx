@@ -235,21 +235,21 @@ export default function ProjectsPage() {
     if (!editingProject) return;
     try {
       setSavingEdit(true);
-      await api.updateProject(editingProject.id, {
-        code: efCode || undefined,
-        name: efName,
-        group_name: efGroup || undefined,
-        geo_manager: efGeo || undefined,
-        dosco_manager: efDosco || undefined,
-        evaluation: efEval || undefined,
+      const updated = await api.updateProject(editingProject.id, {
+        code: efCode.trim() || undefined,
+        name: efName.trim(),
+        group_name: efGroup.trim() || null,
+        geo_manager: efGeo.trim() || null,
+        dosco_manager: efDosco.trim() || null,
+        evaluation: efEval.trim() || null,
         status: efStatus as ProjectStatus,
         start_date: efStartDate || null,
         end_date: efEndDate || null,
         internal_deadline: efInternalDeadline || null,
         lead_id: efLeadId ? Number(efLeadId) : null,
       });
+      setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
       setEditingProject(null);
-      api.projects().then((d) => setProjects(d)).catch(() => {});
     } catch (err) {
       alert("Lỗi khi lưu dự án: " + (err instanceof Error ? err.message : "Đã có lỗi xảy ra"));
     } finally {
