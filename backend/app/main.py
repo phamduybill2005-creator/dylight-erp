@@ -110,6 +110,14 @@ def _ensure_schema() -> None:
                     for sql in pi_missing:
                         conn.execute(text(sql))
 
+        # Đảm bảo các hàng cũ trên DB nhận is_deleted = FALSE (nếu đang là NULL)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE projects SET is_deleted = FALSE WHERE is_deleted IS NULL"))
+                conn.execute(text("UPDATE project_items SET is_deleted = FALSE WHERE is_deleted IS NULL"))
+        except Exception:
+            pass
+
         # Progress: cột người thực hiện / khối lượng / trạng thái cho bảng tiến độ có cấu trúc.
         if "progress" in insp.get_table_names():
             prcols = {c["name"] for c in insp.get_columns("progress")}

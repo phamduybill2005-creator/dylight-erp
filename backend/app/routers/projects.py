@@ -307,7 +307,7 @@ def list_projects(db: Session = Depends(get_db), current: User = Depends(get_cur
     """
     q = db.query(Project).filter(
         Project.company_id == current.company_id,
-        or_(Project.is_deleted == False, Project.is_deleted.is_(None)),
+        func.coalesce(Project.is_deleted, False) == False,
     )
     projects = q.order_by(Project.created_at.desc()).all()
 
@@ -408,7 +408,7 @@ def create_project(
 @router.get("/{project_id}", response_model=ProjectOut)
 def get_project(project_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     p = db.get(Project, project_id)
-    if not p or p.is_deleted or not _can_view(db, p, current):
+    if not p or p.is_deleted is True or not _can_view(db, p, current):
         raise HTTPException(404, "Không tìm thấy dự án.")
     return _to_out(db, p)
 
@@ -417,7 +417,7 @@ def get_project(project_id: int, db: Session = Depends(get_db), current: User = 
 def progress_history(project_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     """Lịch sử % tiến độ theo NGÀY (toàn dự án + từng phòng) để vẽ đường tiến độ."""
     p = db.get(Project, project_id)
-    if not p or p.is_deleted or not _can_view(db, p, current):
+    if not p or p.is_deleted is True or not _can_view(db, p, current):
         raise HTTPException(404, "Không tìm thấy dự án.")
 
     # Chốt điểm hôm nay theo % hiện tại (không để lỗi phụ làm hỏng việc đọc).

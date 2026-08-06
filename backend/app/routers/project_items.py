@@ -4,7 +4,7 @@ Bảng khối lượng chi tiết theo dự án, mô hình 2 cấp: nhóm cha (p
 chứa các đầu việc con. Cho phép thêm/sửa/xoá từng ô kiểu Excel.
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
@@ -103,7 +103,7 @@ def list_items(
         .filter(
             ProjectItem.company_id == current.company_id,
             ProjectItem.project_id == project_id,
-            or_(ProjectItem.is_deleted == False, ProjectItem.is_deleted.is_(None)),
+            func.coalesce(ProjectItem.is_deleted, False) == False,
         )
         .order_by(ProjectItem.order_index.asc(), ProjectItem.id.asc())
         .all()
