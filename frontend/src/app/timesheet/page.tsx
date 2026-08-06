@@ -265,91 +265,158 @@ export default function TimesheetPage() {
       </div>
 
       {/* Lưới Dự án × Ngày — CHỈ ĐỌC */}
-      <div className="mt-3 mr-14 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
-        <table className="w-full min-w-[850px] table-fixed border-collapse text-[11px]">
-          <colgroup>
-            <col className="w-[240px]" />
-            {days.map((d) => (
-              <col key={d} className="w-[54px]" />
-            ))}
-            <col className="w-[50px]" />
-            <col className="w-[50px]" />
-          </colgroup>
-          <thead>
-            <tr className="bg-slate-700 text-[10px] uppercase tracking-wide text-white">
-              <th className={`${stickyLeft} sticky top-0 z-30 bg-slate-700 border border-slate-600 px-2 py-1.5 text-left font-semibold align-middle`}>Dự án</th>
-              {days.map((d) => {
-                const [y, m, dd] = d.split("-").map(Number);
-                const dayIdx = new Date(y, m - 1, dd).getDay();
-                const dowName = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][dayIdx];
-                return (
-                  <th key={d} className={`sticky top-0 z-20 border border-slate-600 px-0.5 py-1.5 text-center font-semibold whitespace-nowrap align-middle ${d === today ? "bg-amber text-white" : "bg-slate-700 text-slate-200"}`}>
-                    <div>{dowName}</div>
-                    <div className="text-[9px] font-normal">{fmtDay(d)}</div>
+      {(() => {
+        const isMonth = viewPeriod === "month";
+        const totalRightOffset = isMonth ? "right-[40px]" : "right-[50px]";
+        const totalColClass = isMonth ? "w-[40px] min-w-[40px]" : "w-[50px] min-w-[50px]";
+        return (
+          <div className="mt-3 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
+            <table className={`w-full border-collapse text-[11px] table-fixed ${isMonth ? "min-w-0" : "min-w-[850px]"}`}>
+              <colgroup>
+                <col className={isMonth ? "w-[150px] lg:w-[180px]" : "w-[240px]"} />
+                {days.map((d) => (
+                  <col key={d} className={isMonth ? "w-auto" : "w-[54px]"} />
+                ))}
+                <col className={totalColClass} />
+                <col className={totalColClass} />
+              </colgroup>
+              <thead>
+                <tr className="bg-slate-700 text-[10px] uppercase tracking-wide text-white">
+                  <th className={`${stickyLeft} sticky top-0 z-30 bg-slate-700 border border-slate-600 ${isMonth ? "px-1.5 py-1 text-[10px]" : "px-2 py-1.5 text-left"} font-semibold align-middle`}>
+                    Dự án
                   </th>
-                );
-              })}
-              <th className="sticky top-0 right-[50px] z-30 bg-slate-700 border border-slate-600 px-1 py-1.5 text-center font-semibold whitespace-nowrap w-[50px] min-w-[50px] align-middle">
-                <div>Giờ</div>
-                <div className="text-[9px] font-normal opacity-0">–</div>
-              </th>
-              <th className="sticky top-0 right-0 z-30 bg-slate-700 border border-slate-600 px-1 py-1.5 text-center font-semibold whitespace-nowrap w-[50px] min-w-[50px] align-middle">
-                <div>Ngày</div>
-                <div className="text-[9px] font-normal">công</div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rowProjects.length === 0 ? (
-              <tr><td colSpan={days.length + 3} className="border border-line px-2 py-5 text-center text-muted">Chưa có dự án nào.</td></tr>
-            ) : (
-              rowProjects.map((p) => {
-                const total = projTotal(p.id);
-                return (
-                  <tr key={p.id} className="odd:bg-white even:bg-sky-50/60 hover:bg-sky-100/50 transition-colors">
-                    <td className={`${stickyLeft} bg-inherit px-2 py-1`}>
-                      <span className="font-mono text-[10px] font-bold text-bad">{p.code}</span>
-                      <span className="block max-w-[180px] truncate font-medium text-ink text-[11px]" title={p.name}>{p.name}</span>
-                    </td>
-                    {days.map((d) => (
-                      <td key={d} className={`border border-line p-0 text-center ${d === today ? "bg-amber/10" : d > today ? "bg-slate-100/70" : "bg-inherit"}`}>
-                        <span className={`block px-0.5 py-1 tnum ${cellHours.get(key(p.id, d)) ? "font-semibold text-ink" : "text-line"}`}>
-                          {cellHours.get(key(p.id, d)) ? num1(cellHours.get(key(p.id, d))!) : "–"}
-                        </span>
-                      </td>
-                    ))}
-                    <td className={`sticky right-[50px] z-10 border border-line bg-inherit px-1 py-1 text-center font-bold tnum w-[50px] min-w-[50px] ${total > 0 ? "text-steel" : "text-muted"}`}>
-                      {total > 0 ? num1(total) : "–"}
-                    </td>
-                    <td className={`sticky right-0 z-10 border border-line bg-inherit px-1 py-1 text-center font-bold tnum w-[50px] min-w-[50px] ${total > 0 ? "text-ink" : "text-muted"}`}>
-                      {total > 0 ? num1(total / 8) : "–"}
+                  {days.map((d) => {
+                    const [y, m, dd] = d.split("-").map(Number);
+                    const dayIdx = new Date(y, m - 1, dd).getDay();
+                    const dowName = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][dayIdx];
+                    const isWeekend = dayIdx === 0 || dayIdx === 6;
+                    return (
+                      <th
+                        key={d}
+                        className={`sticky top-0 z-20 border border-slate-600 text-center font-semibold align-middle overflow-hidden ${
+                          isMonth ? "px-0 py-0.5 text-[8px]" : "px-0.5 py-1.5 text-[10px] whitespace-nowrap"
+                        } ${
+                          d === today
+                            ? "bg-amber text-white font-bold"
+                            : isWeekend
+                            ? "bg-slate-800 text-slate-300"
+                            : "bg-slate-700 text-slate-200"
+                        }`}
+                      >
+                        <div className="leading-none">{dowName}</div>
+                        <div className={`font-normal leading-tight ${isMonth ? "text-[8px]" : "text-[9px]"}`}>
+                          {fmtDay(d)}
+                        </div>
+                      </th>
+                    );
+                  })}
+                  <th className={`sticky top-0 ${totalRightOffset} z-30 bg-slate-700 border border-slate-600 px-0.5 py-1 text-center font-semibold whitespace-nowrap ${totalColClass} align-middle ${isMonth ? "text-[9px]" : "text-[10px]"}`}>
+                    <div>Giờ</div>
+                    <div className="text-[8px] font-normal opacity-0">–</div>
+                  </th>
+                  <th className={`sticky top-0 right-0 z-30 bg-slate-700 border border-slate-600 px-0.5 py-1 text-center font-semibold whitespace-nowrap ${totalColClass} align-middle ${isMonth ? "text-[9px]" : "text-[10px]"}`}>
+                    <div>Công</div>
+                    <div className="text-[8px] font-normal opacity-0">–</div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rowProjects.length === 0 ? (
+                  <tr>
+                    <td colSpan={days.length + 3} className="border border-line px-2 py-5 text-center text-muted">
+                      Chưa có dự án nào.
                     </td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-          <tfoot>
-            <tr className="bg-gradient-to-r from-teal-600 to-teal-700 font-bold text-white">
-              <td className={`${stickyLeft} bg-teal-600 px-2 py-1.5 text-right sticky bottom-0 z-30 border-t border-teal-500 text-[11px]`}>Tổng ngày</td>
-              {days.map((d) => {
-                const t = dayTotal(d);
-                return (
-                  <td key={d} className="border border-teal-500/50 bg-teal-600 px-0.5 py-1.5 text-center tnum sticky bottom-0 z-20 border-t border-teal-500">
-                    {t > 0 ? num1(t) : "–"}
+                ) : (
+                  rowProjects.map((p) => {
+                    const total = projTotal(p.id);
+                    return (
+                      <tr key={p.id} className="odd:bg-white even:bg-sky-50/60 hover:bg-sky-100/50 transition-colors">
+                        <td className={`${stickyLeft} bg-inherit ${isMonth ? "px-1.5 py-0.5" : "px-2 py-1"}`}>
+                          <span className="font-mono text-[9px] font-bold text-bad leading-none block">{p.code}</span>
+                          <span
+                            className={`block ${isMonth ? "max-w-[130px] lg:max-w-[160px] text-[10px]" : "max-w-[180px] text-[11px]"} truncate font-medium text-ink leading-tight`}
+                            title={p.name}
+                          >
+                            {p.name}
+                          </span>
+                        </td>
+                        {days.map((d) => {
+                          const hrs = cellHours.get(key(p.id, d));
+                          return (
+                            <td
+                              key={d}
+                              className={`border border-line p-0 text-center ${
+                                d === today ? "bg-amber/10" : d > today ? "bg-slate-100/70" : "bg-inherit"
+                              }`}
+                            >
+                              <span
+                                className={`block ${isMonth ? "px-0 py-0.5 text-[9px]" : "px-0.5 py-1 text-[11px]"} tnum ${
+                                  hrs ? "font-semibold text-ink" : "text-slate-300"
+                                }`}
+                              >
+                                {hrs ? num1(hrs) : "–"}
+                              </span>
+                            </td>
+                          );
+                        })}
+                        <td
+                          className={`sticky ${totalRightOffset} z-10 border border-line bg-inherit px-0.5 py-0.5 text-center font-bold tnum ${totalColClass} ${
+                            isMonth ? "text-[10px]" : "text-xs"
+                          } ${total > 0 ? "text-steel" : "text-muted"}`}
+                        >
+                          {total > 0 ? num1(total) : "–"}
+                        </td>
+                        <td
+                          className={`sticky right-0 z-10 border border-line bg-inherit px-0.5 py-0.5 text-center font-bold tnum ${totalColClass} ${
+                            isMonth ? "text-[10px]" : "text-xs"
+                          } ${total > 0 ? "text-ink" : "text-muted"}`}
+                        >
+                          {total > 0 ? num1(total / 8) : "–"}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gradient-to-r from-teal-600 to-teal-700 font-bold text-white">
+                  <td
+                    className={`${stickyLeft} bg-teal-600 ${isMonth ? "px-1.5 py-1 text-[10px]" : "px-2 py-1.5 text-[11px]"} text-right sticky bottom-0 z-30 border-t border-teal-500`}
+                  >
+                    Tổng ngày
                   </td>
-                );
-              })}
-              <td className={`sticky bottom-0 right-[50px] z-30 bg-teal-600 border border-teal-500 px-1 py-1.5 text-center text-yellow-200 tnum w-[50px] min-w-[50px]`}>
-                {grandTotal > 0 ? num1(grandTotal) : "–"}
-              </td>
-              <td className={`sticky bottom-0 right-0 z-30 bg-teal-600 border border-teal-500 px-1 py-1.5 text-center text-yellow-100 font-extrabold tnum w-[50px] min-w-[50px]`}>
-                {grandTotal > 0 ? num1(grandTotal / 8) : "–"}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+                  {days.map((d) => {
+                    const t = dayTotal(d);
+                    return (
+                      <td
+                        key={d}
+                        className={`border border-teal-500/50 bg-teal-600 ${isMonth ? "px-0 py-1 text-[9px]" : "px-0.5 py-1.5 text-[11px]"} text-center tnum sticky bottom-0 z-20 border-t border-teal-500`}
+                      >
+                        {t > 0 ? num1(t) : "–"}
+                      </td>
+                    );
+                  })}
+                  <td
+                    className={`sticky bottom-0 ${totalRightOffset} z-30 bg-teal-600 border border-teal-500 px-0.5 py-1 text-center text-yellow-200 tnum ${totalColClass} ${
+                      isMonth ? "text-[10px]" : "text-xs"
+                    }`}
+                  >
+                    {grandTotal > 0 ? num1(grandTotal) : "–"}
+                  </td>
+                  <td
+                    className={`sticky bottom-0 right-0 z-30 bg-teal-600 border border-teal-500 px-0.5 py-1 text-center text-yellow-100 font-extrabold tnum ${totalColClass} ${
+                      isMonth ? "text-[10px]" : "text-xs"
+                    }`}
+                  >
+                    {grandTotal > 0 ? num1(grandTotal / 8) : "–"}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        );
+      })()}
     </AppShell>
   );
 }
