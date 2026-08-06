@@ -106,9 +106,9 @@ export default function DashboardPage() {
       <AppShell>
         {/* Họa vết logo Manchester United chuẩn làm background watermark mờ sang trọng cho riêng trang Tổng quan của P.A.DUNG */}
         {isMUUser && (
-          <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-10">
+          <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-15">
             <img
-              src="/mu_logo.png?v=5"
+              src="/mu_logo.png?v=7"
               alt="Official Manchester United Crest Watermark"
               className="h-[550px] w-[550px] lg:h-[700px] lg:w-[700px] max-w-none object-contain filter drop-shadow-[0_0_60px_rgba(218,2,14,0.35)]"
             />
@@ -122,9 +122,9 @@ export default function DashboardPage() {
               {/* Lớp hoa văn sọc bóng đá MU & Watermark logo MU căng rộng ra chính giữa */}
               <div className="absolute inset-0 opacity-20 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[size:24px_24px] pointer-events-none" />
               <img
-                src="/mu_logo.png?v=6"
+                src="/mu_logo.png?v=7"
                 alt="MU Crest Center Watermark"
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-48 w-48 sm:h-56 sm:w-56 lg:h-64 lg:w-64 object-contain opacity-20 pointer-events-none filter drop-shadow-2xl mix-blend-screen"
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-48 w-48 sm:h-56 sm:w-56 lg:h-64 lg:w-64 object-contain opacity-25 pointer-events-none filter drop-shadow-2xl"
               />
               <div className="absolute right-0 top-0 -mr-10 -mt-10 h-44 w-44 rounded-full bg-red-500/30 blur-3xl pointer-events-none" />
               <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-yellow-500/20 blur-2xl pointer-events-none" />
