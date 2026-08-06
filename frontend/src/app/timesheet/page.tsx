@@ -97,7 +97,7 @@ export default function TimesheetPage() {
       }
     }
     if (set.size === 0) {
-      PRESET_DEPARTMENTS.forEach((p) => set.add(p.name));
+      PRESET_DEPARTMENTS.forEach((p) => set.add(p));
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
   }, [departments, allUsers]);

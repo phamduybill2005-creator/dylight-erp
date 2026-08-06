@@ -585,3 +585,9 @@ export interface ChatMessage {
   reactions?: ReactionAgg[];
 }
 
+// Phòng ban (danh mục) — quản trị viên / giám đốc tạo, mọi người xem.
+export interface Department {
+  id: number;
+  name: string;
+  order_index: number;
+}
