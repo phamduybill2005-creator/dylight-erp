@@ -79,6 +79,34 @@ export interface Project {
   progress_percent?: number; // % tiến độ THỰC (trung bình các mốc), do BE tính
   total_hours?: number;      // tổng số giờ làm (tính từ timesheets)
   total_days?: number;       // tổng số ngày làm (total_hours / 8)
+  is_deleted?: boolean;
+  deleted_at?: string | null;
+  deleted_by_id?: number | null;
+}
+
+export interface DeletedProject {
+  id: number;
+  code: string;
+  name: string;
+  group_name?: string | null;
+  geo_manager?: string | null;
+  dosco_manager?: string | null;
+  deleted_at?: string | null;
+  deleted_by_name?: string | null;
+}
+
+export interface DeletedItem {
+  id: number;
+  project_id: number;
+  project_code?: string | null;
+  project_name?: string | null;
+  code?: string | null;
+  name: string;
+  department?: string | null;
+  unit?: string | null;
+  parent_id?: number | null;
+  deleted_at?: string | null;
+  deleted_by_name?: string | null;
 }
 
 export type InvoiceStatus =

@@ -6,10 +6,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon, ArchiveBoxIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import PersonPicker from "@/components/person-picker";
+import ArchiveModal from "@/components/archive-modal";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
@@ -150,6 +151,7 @@ export default function ProjectsPage() {
   const [efInternalDeadline, setEfInternalDeadline] = useState("");
   const [efLeadId, setEfLeadId] = useState<number | "">("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [archiveModal, setArchiveModal] = useState(false);
 
   /** Lưu ĐÁNH GIÁ gõ trực tiếp trên bảng (rời ô là lưu). Đang gõ thì không bị
    *  vòng tự làm mới 20s ghi đè, vì ưu tiên giá trị trong evalEdits. */
@@ -474,12 +476,21 @@ export default function ProjectsPage() {
             Theo dõi vòng đời dự án từ đấu thầu tới quyết toán.
           </p>
         </div>
-        <button
-          onClick={() => { setShowAdd(true); setAddResult(""); }}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-3.5 py-2.5 text-xs font-semibold text-white shadow-card hover:bg-steel transition-colors"
-        >
-          <PlusIcon className="h-4 w-4" /> Thêm dự án
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setArchiveModal(true)}
+            title="Thùng rác & Khôi phục"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-xl2 border border-amber-500/40 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-500 hover:text-white transition-colors cursor-pointer shadow-sm"
+          >
+            <ArchiveBoxIcon className="h-4 w-4 text-amber-600" /> Thùng rác
+          </button>
+          <button
+            onClick={() => { setShowAdd(true); setAddResult(""); }}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-3.5 py-2.5 text-xs font-semibold text-white shadow-card hover:bg-steel transition-colors"
+          >
+            <PlusIcon className="h-4 w-4" /> Thêm dự án
+          </button>
+        </div>
       </div>
 
       {/* Bộ lọc dự án */}
@@ -959,6 +970,12 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
+
+      <ArchiveModal
+        isOpen={archiveModal}
+        onClose={() => setArchiveModal(false)}
+        onRestored={() => api.projects().then(setProjects)}
+      />
     </AppShell>
   );
 }

@@ -19,7 +19,7 @@ from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, project_evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-    chat, iclock, departments, timesheets,
+    chat, iclock, departments, timesheets, archive,
 )
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
@@ -80,6 +80,9 @@ def _ensure_schema() -> None:
                 "dosco_manager": "ALTER TABLE projects ADD COLUMN dosco_manager VARCHAR(255)",
                 "internal_deadline": "ALTER TABLE projects ADD COLUMN internal_deadline DATE",
                 "evaluation": "ALTER TABLE projects ADD COLUMN evaluation VARCHAR(500)",
+                "is_deleted": "ALTER TABLE projects ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE",
+                "deleted_at": "ALTER TABLE projects ADD COLUMN deleted_at TIMESTAMP",
+                "deleted_by_id": "ALTER TABLE projects ADD COLUMN deleted_by_id INTEGER",
             }
             pmissing = [sql for col, sql in padds.items() if col not in pcols]
             if pmissing:
@@ -97,6 +100,9 @@ def _ensure_schema() -> None:
                 "assignee_id": "ALTER TABLE project_items ADD COLUMN assignee_id INTEGER",
                 "due_date": "ALTER TABLE project_items ADD COLUMN due_date DATE",
                 "done_date": "ALTER TABLE project_items ADD COLUMN done_date DATE",
+                "is_deleted": "ALTER TABLE project_items ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE",
+                "deleted_at": "ALTER TABLE project_items ADD COLUMN deleted_at TIMESTAMP",
+                "deleted_by_id": "ALTER TABLE project_items ADD COLUMN deleted_by_id INTEGER",
             }
             pi_missing = [sql for col, sql in pi_adds.items() if col not in picols]
             if pi_missing:
@@ -472,7 +478,7 @@ P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
           project_items, attendance, evaluations, project_evaluations, partners, payroll,
           leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-          chat, departments, timesheets):
+          chat, departments, timesheets, archive):
     app.include_router(r.router, prefix=P)
 
 # Máy chấm công đẩy trực tiếp (ZKTeco PUSH/ADMS) gọi đúng /iclock/... -> KHÔNG thêm tiền tố /api/v1.

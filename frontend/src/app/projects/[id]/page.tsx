@@ -19,6 +19,7 @@ import {
   StarIcon,
   TrashIcon,
   PencilSquareIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
 import { CheckBadgeIcon as CheckBadgeSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
@@ -26,6 +27,7 @@ import ProjectItemsTab from "@/components/project-items-tab";
 import ProjectTimesheet from "@/components/project-timesheet";
 import ProjectTeamTab from "@/components/project-team-tab";
 import PersonPicker from "@/components/person-picker";
+import ArchiveModal from "@/components/archive-modal";
 import { api } from "@/lib/api";
 import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
@@ -81,6 +83,7 @@ export default function ProjectDetailPage() {
   // Modals & Member management states
   const [progressModal, setProgressModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
+  const [archiveModal, setArchiveModal] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [geoInput, setGeoInput] = useState("");       // GEO担当 (text)
@@ -424,6 +427,14 @@ export default function ProjectDetailPage() {
             >
               <ChatBubbleLeftRightIcon className="h-4 w-4" />
               Chat dự án
+            </button>
+            <button
+              onClick={() => setArchiveModal(true)}
+              title="Thùng rác & Khôi phục"
+              className="inline-flex items-center gap-1 rounded-xl2 border border-amber-500/40 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-500 hover:text-white transition-colors cursor-pointer shadow-sm"
+            >
+              <ArchiveBoxIcon className="h-4 w-4 text-amber-600" />
+              Thùng rác
             </button>
             {isDirector(currentUser?.role) && (
               <button
@@ -1012,6 +1023,13 @@ export default function ProjectDetailPage() {
           </div>
         )}
       </AnimatePresence>
+
+      <ArchiveModal
+        isOpen={archiveModal}
+        onClose={() => setArchiveModal(false)}
+        projectId={projectId}
+        onRestored={loadData}
+      />
     </AppShell>
   );
 }

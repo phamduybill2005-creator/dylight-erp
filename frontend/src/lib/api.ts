@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, StarOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, StarOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -223,6 +223,15 @@ export const api = {
     request<{ message: string }>(`/project-items/copy-template?target_project_id=${targetProjectId}&template_project_id=${templateProjectId}`, {
       method: "POST",
     }),
+
+  // --- Archive / Recycle Bin (Thùng rác & Khôi phục) ---
+  getDeletedProjects: () => request<DeletedProject[]>("/archive/deleted-projects"),
+  restoreProject: (projectId: number) =>
+    request<Project>(`/archive/restore-project/${projectId}`, { method: "POST" }),
+  getDeletedItems: (projectId?: number) =>
+    request<DeletedItem[]>(`/archive/deleted-items${projectId ? `?project_id=${projectId}` : ""}`),
+  restoreItem: (itemId: number) =>
+    request<{ message: string }>(`/archive/restore-item/${itemId}`, { method: "POST" }),
 
   // --- Attendance (Chấm công) ---
   attendanceMe: (fromDate?: string, toDate?: string) => {

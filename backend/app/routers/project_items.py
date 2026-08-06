@@ -4,6 +4,7 @@ Bảng khối lượng chi tiết theo dự án, mô hình 2 cấp: nhóm cha (p
 chứa các đầu việc con. Cho phép thêm/sửa/xoá từng ô kiểu Excel.
 """
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
@@ -102,6 +103,7 @@ def list_items(
         .filter(
             ProjectItem.company_id == current.company_id,
             ProjectItem.project_id == project_id,
+            or_(ProjectItem.is_deleted == False, ProjectItem.is_deleted.is_(None)),
         )
         .order_by(ProjectItem.order_index.asc(), ProjectItem.id.asc())
         .all()
@@ -183,18 +185,25 @@ def delete_item(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    """Xoá hạng mục. Nếu là nhóm cha thì xoá luôn các đầu việc con."""
+    """Xoá hạng mục (Soft-delete chuyển vào Thùng rác). Nếu là nhóm cha thì xoá luôn các đầu việc con."""
     item = db.get(ProjectItem, item_id)
-    if not item or item.company_id != current.company_id:
+    if not item or item.company_id != current.company_id or item.is_deleted:
         raise HTTPException(404, "Không tìm thấy hạng mục.")
     _assert_member(db, current, item.project_id)   # chặn IDOR: chỉ thành viên dự án
+
+    item.is_deleted = True
+    item.deleted_at = vn_now()
+    item.deleted_by_id = current.id
 
     if item.parent_id is None:
         db.query(ProjectItem).filter(
             ProjectItem.parent_id == item.id,
             ProjectItem.company_id == current.company_id,
-        ).delete(synchronize_session=False)
-    db.delete(item)
+        ).update(
+            {"is_deleted": True, "deleted_at": vn_now(), "deleted_by_id": current.id},
+            synchronize_session=False,
+        )
+
     db.commit()
     return None
 
