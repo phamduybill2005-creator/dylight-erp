@@ -181,16 +181,13 @@ export default function ProjectDetailPage() {
       .catch(() => {});
   }, []);
 
-  // Nạp danh sách nhân sự để chọn thành viên/chủ trì — chỉ khi user có quyền quản trị
-  // dự án này (Director/Admin hoặc chính người chủ trì, kể cả người chủ trì là cấp trung).
-  // Nạp cả khi MỞ KHUNG SỬA (không chỉ dựa vào canManage) và BÁO LỖI rõ nếu hỏng —
-  // trước đây gọi lỗi 1 lần là kẹt mãi ở "Đang tải danh sách nhân viên…".
+  // Nạp danh sách tất cả nhân sự công ty để chọn người giao việc
   useEffect(() => {
-    if (!canManage && !membersModal) return;
+    if (!currentUser) return;
     if (allUsers.length > 0 || usersError) return;
     api.users().then(setAllUsers).catch(() => setUsersError(true));
     api.projectManagers().then(setMgrs).catch(() => {});
-  }, [canManage, membersModal, allUsers.length, usersError]);
+  }, [currentUser, allUsers.length, usersError]);
 
   useEffect(loadData, [projectId, currentUser, showMoney]);
 
@@ -563,7 +560,17 @@ export default function ProjectDetailPage() {
         {/* Tab Hạng mục (bảng dự toán Excel) */}
         {/* Bảng dự toán: ẩn Khối lượng + Đơn giá + Thành tiền + tiểu tổng + tổng cho MỌI
             vai trò (theo yêu cầu bỏ phần dự toán) — chỉ giữ tên hạng mục, ĐVT, % hoàn thành. */}
-        {activeTab === "items" && <ProjectItemsTab projectId={projectId} canSeeMoney={false} members={project.members ?? []} canManage={canManage} currentUserId={currentUser?.id ?? null} />}
+        {activeTab === "items" && (
+          <ProjectItemsTab
+            projectId={projectId}
+            canSeeMoney={false}
+            members={project.members ?? []}
+            allUsers={allUsers}
+            canManage={canManage}
+            currentUserId={currentUser?.id ?? null}
+            onMemberAdded={loadData}
+          />
+        )}
 
         {/* Tab Phân công — ai làm gì, bao lâu (từ giao việc lọc theo dự án) */}
         {activeTab === "team" && (

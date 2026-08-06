@@ -148,15 +148,19 @@ export default function ProjectItemsTab({
   projectId,
   canSeeMoney = true,
   members = [],
+  allUsers = [],
   canManage = false,
   currentUserId = null,
+  onMemberAdded,
 }: {
   projectId: number;
   /** Nhân viên (STAFF) = false: ẩn cột Khối lượng/Đơn giá/Thành tiền, tiểu tổng, tổng, xuất Excel. */
   canSeeMoney?: boolean;
   members?: User[];
+  allUsers?: User[];
   canManage?: boolean;
   currentUserId?: number | null;
+  onMemberAdded?: () => void;
 }) {
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,6 +170,15 @@ export default function ProjectItemsTab({
   const [deptFilter, setDeptFilter] = useState<string>("");
   // Danh mục phòng ban của công ty (nguồn chân lý từ backend). Lùi về PRESET nếu chưa nạp.
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [companyUsers, setCompanyUsers] = useState<User[]>(allUsers && allUsers.length > 0 ? allUsers : []);
+
+  useEffect(() => {
+    if (allUsers && allUsers.length > 0) {
+      setCompanyUsers(allUsers);
+    } else {
+      api.users().then(setCompanyUsers).catch(() => {});
+    }
+  }, [allUsers]);
 
   // ----- Form "Thêm hạng mục" (nhập từng ô riêng, dễ dùng trên điện thoại) -----
   const [showForm, setShowForm] = useState(false);
@@ -284,6 +297,9 @@ export default function ProjectItemsTab({
     try {
       const updated = await api.updateProjectItem(id, patch);
       setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      if (patch.assignee_id && onMemberAdded) {
+        onMemberAdded();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lưu hạng mục thất bại.");
       load();
@@ -511,7 +527,27 @@ export default function ProjectItemsTab({
               <select value={fAssignee} onChange={(e) => setFAssignee(e.target.value)}
                 className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
                 <option value="">— Chưa phân công —</option>
-                {members.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                {members.length > 0 && (
+                  <optgroup label="Thành viên dự án">
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.full_name} {m.department ? `(${m.department})` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {companyUsers.filter((u) => !members.some((m) => m.id === u.id)).length > 0 && (
+                  <optgroup label="Tất cả nhân sự công ty / phòng ban">
+                    {companyUsers
+                      .filter((u) => !members.some((m) => m.id === u.id))
+                      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "vi"))
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.full_name} {m.department ? `(${m.department})` : ""}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
               </select>
             </label>
             <label className="block">
@@ -644,6 +680,7 @@ export default function ProjectItemsTab({
                       onRemove={remove}
                       busy={busy}
                       members={members}
+                      companyUsers={companyUsers}
                       canManage={canManage}
                       currentUserId={currentUserId}
                     />
@@ -722,6 +759,7 @@ function GroupRows({
   onRemove,
   busy,
   members = [],
+  companyUsers = [],
   canManage = false,
   currentUserId = null,
 }: {
@@ -736,10 +774,16 @@ function GroupRows({
   onRemove: (i: ProjectItem) => void;
   busy: boolean;
   members?: User[];
+  companyUsers?: User[];
   canManage?: boolean;
   currentUserId?: number | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const memberIds = new Set(members.map((m) => m.id));
+  const otherUsers = (companyUsers || [])
+    .filter((u) => !memberIds.has(u.id))
+    .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "vi"));
+
   // Số cột nội dung (không tính cột nút xoá) để colSpan cho dòng "Thêm đầu việc".
   // +2 cho "Ghi chú" + "Hạn nộp", +1 cho cột "Đúng hạn" (hiện với mọi vai trò).
   const contentCols = canSeeMoney ? 8 : 5;
@@ -782,7 +826,7 @@ function GroupRows({
                 title="Chọn nhóm trưởng — phòng ban bên dưới tự nhảy theo người này (vẫn sửa tay được)"
                 onChange={(e) => {
                   const id = e.target.value ? Number(e.target.value) : null;
-                  const m = id ? members.find((x) => x.id === id) : null;
+                  const m = id ? (members.find((x) => x.id === id) || companyUsers.find((x) => x.id === id)) : null;
                   // Chọn NGƯỜI -> TỰ NHẢY phòng ban của họ (người ở nhiều phòng thì lấy phòng đầu).
                   // Ô phòng ban bên dưới vẫn cho chọn lại bằng tay để ghi đè.
                   const dept = (m?.department || "")
@@ -798,11 +842,24 @@ function GroupRows({
                 }`}
               >
                 <option value="">— Chưa chọn —</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.full_name}
-                  </option>
-                ))}
+                {members.length > 0 && (
+                  <optgroup label="Thành viên dự án">
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.full_name} {m.department ? `(${m.department})` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {otherUsers.length > 0 && (
+                  <optgroup label="Tất cả nhân sự công ty / phòng ban">
+                    {otherUsers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.full_name} {m.department ? `(${m.department})` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
           </div>
@@ -929,11 +986,24 @@ function GroupRows({
                     }`}
                   >
                     <option value="">— Chưa phân công —</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.full_name}
-                      </option>
-                    ))}
+                    {members.length > 0 && (
+                      <optgroup label="Thành viên dự án">
+                        {members.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.full_name} {m.department ? `(${m.department})` : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {otherUsers.length > 0 && (
+                      <optgroup label="Tất cả nhân sự công ty / phòng ban">
+                        {otherUsers.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.full_name} {m.department ? `(${m.department})` : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
 
