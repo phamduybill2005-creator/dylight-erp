@@ -11,6 +11,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
+import { isSeniorManagerUp } from "@/lib/roles";
 import type { Timesheet, Project, User, Department } from "@/lib/types";
 
 /** Thứ 2 của tuần chứa ngày d (YYYY-MM-DD), giờ địa phương. */
@@ -229,23 +230,25 @@ export default function TimesheetPage() {
             </button>
           </div>
 
-          {/* Bộ lọc chọn Phòng ban (dành cho Giám đốc, Quản trị & Quản lý cấp cao xem từng phòng) */}
-          <div className="flex items-center gap-1.5 rounded-lg border border-line bg-slate-100/70 px-2.5 py-1 text-xs mr-2">
-            <BuildingOfficeIcon className="h-4 w-4 text-steel shrink-0" />
-            <span className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">Phòng ban:</span>
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-ink outline-none focus:border-steel cursor-pointer transition-all hover:border-slate-400"
-            >
-              <option value="">— Tất cả phòng ban —</option>
-              {deptOptions.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Bộ lọc chọn Phòng ban (CHỈ HIỆN với Giám đốc, Quản trị & Quản lý cấp cao xem từng phòng) */}
+          {isSeniorManagerUp(me) && (
+            <div className="flex items-center gap-1.5 rounded-lg border border-line bg-slate-100/70 px-2.5 py-1 text-xs mr-2">
+              <BuildingOfficeIcon className="h-4 w-4 text-steel shrink-0" />
+              <span className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">Phòng ban:</span>
+              <select
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-ink outline-none focus:border-steel cursor-pointer transition-all hover:border-slate-400"
+              >
+                <option value="">— Tất cả phòng ban —</option>
+                {deptOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Toggle Tuần / Tháng */}
           <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs mr-1">
