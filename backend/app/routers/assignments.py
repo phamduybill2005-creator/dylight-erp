@@ -16,7 +16,7 @@ from app.schemas import AssignmentCreate, AssignmentUpdate, AssignmentOut
 router = APIRouter(prefix="/assignments", tags=["Giao việc"])
 
 _DIRECTORS = (UserRole.ADMIN, UserRole.DIRECTOR)
-_ASSIGNERS = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)
+_ASSIGNERS = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER, UserRole.MANAGER_MID)
 
 
 @router.get("", response_model=list[AssignmentOut])
@@ -41,7 +41,7 @@ def list_assignments(
         # Không lọc dự án: giữ phạm vi theo vai trò như cũ.
         if current.role in _DIRECTORS:
             pass  # Giám đốc/Quản trị: thấy toàn bộ
-        elif current.role in (UserRole.MANAGER, UserRole.ACCOUNTANT):
+        elif current.role in (UserRole.MANAGER, UserRole.MANAGER_MID, UserRole.ACCOUNTANT):
             q = q.filter((Assignment.assigner_id == current.id) | (Assignment.assignee_id == current.id))
         else:
             q = q.filter(Assignment.assignee_id == current.id)

@@ -70,7 +70,7 @@ def _mgr_ids_of(u: User) -> set[int]:
 
 def _is_manager_tier(db: Session, user: User) -> bool:
     """Từ quản lý cấp trung trở lên (có vai trò quản lý hoặc đang có cấp dưới)."""
-    if _is_director(user) or user.role in (UserRole.MANAGER, UserRole.ACCOUNTANT):
+    if _is_director(user) or user.role in (UserRole.MANAGER, UserRole.MANAGER_MID, UserRole.ACCOUNTANT):
         return True
     return _has_subordinates(db, user)
 
@@ -222,13 +222,15 @@ def _can_manage(db: Session, project: Project, user: User) -> bool:
     # Người chủ trì luôn quản được dự án của mình.
     if project.lead_id == user.id:
         return True
-    # Tầng 3 — quản lý cấp trung: dự án mình tham gia, hoặc của cấp dưới mình.
+    # Tầng 3 — quản lý cấp trung: dự án mình tham gia, dự án của cấp dưới mình, HOẶC dự án thuộc phòng ban của mình.
     if _is_manager_tier(db, user):
         members = _member_ids(db, project)
         if user.id in members:
             return True
         subs = _subordinate_ids(db, user)
-        if project.lead_id in subs or (members & subs):
+        if project.lead_id in subs or bool(members & subs):
+            return True
+        if _is_project_in_user_depts(db, project, user):
             return True
     return False
 
