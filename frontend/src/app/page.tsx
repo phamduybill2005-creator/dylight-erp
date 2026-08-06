@@ -22,6 +22,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import CompanyOrgChart from "@/components/company-org-chart";
+import { ArcReactorWatermark, IronManBanner } from "@/components/ironman-theme";
 import { api } from "@/lib/api";
 import { roleTier, roleTitle, type Tier } from "@/lib/roles";
 import { formatCompactVND, formatVND } from "@/lib/format";
@@ -98,6 +99,12 @@ export default function DashboardPage() {
     user.full_name?.toUpperCase().includes("DUNG") ||
     user.full_name?.toUpperCase().includes("P.A.DUNG") ||
     user.email?.toLowerCase().includes("hientruong")
+  );
+
+  const isIronManUser = Boolean(
+    user.full_name?.toUpperCase().includes("SON") ||
+    user.full_name?.toUpperCase().includes("D.H.SON") ||
+    user.email?.toLowerCase().includes("son")
   );
 
   // ==================== GIAO DIỆN NHÂN VIÊN (STAFF) ====================
@@ -314,34 +321,49 @@ export default function DashboardPage() {
 
   return (
     <AppShell>
-      {isDir ? (
-        <>
-          {/* Lời chào Giám đốc */}
-          <section className="relative overflow-hidden mb-4 rounded-xl2 bg-gradient-to-br from-amber-600 via-amber-700 to-slate-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
-            <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
-            <div className="absolute left-1/3 bottom-0 -mb-10 h-36 w-36 rounded-full bg-yellow-400/25 blur-2xl" />
-            <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">DOSCO COMPANY LIMITED</p>
-            <h1 className="mt-1 text-xl lg:text-2xl font-bold tracking-tight">Xin chào, {user.full_name}! 👑</h1>
-            <p className="relative z-10 mt-2 text-xs text-white/80">
-              Hệ thống quản trị tài chính & điều hành doanh nghiệp thời gian thực.
-            </p>
-          </section>
+      {isIronManUser && <ArcReactorWatermark />}
 
-          {/* ---- Hai thẻ KPI chính (chỉ Giám đốc) ---- */}
-          <section className="grid grid-cols-2 gap-3 lg:gap-4">
-            <div className="rounded-xl2 bg-gradient-to-br from-slate-900 to-ink p-4 lg:p-6 text-white card-hover border border-white/5">
-              <p className="text-xs text-white/60">Hợp đồng đang quản lý</p>
-              <p className="mt-2 text-3xl lg:text-4xl font-bold tnum text-amber">{kpi?.active_contracts ?? "—"}</p>
-              <p className="mt-1 text-[11px] text-white/50">gói thầu / dự án</p>
-            </div>
-            <div className="rounded-xl2 bg-gradient-to-br from-steel to-slate-800 p-4 lg:p-6 text-white card-hover border border-white/5">
-              <p className="text-xs text-white/70">Tổng giá trị HĐ</p>
-              <p className="mt-2 text-3xl lg:text-4xl font-bold tnum text-amber">
-                {kpi ? formatCompactVND(kpi.total_contract_value) : "—"}
-              </p>
-              <p className="mt-1 text-[11px] text-white/60">chưa gồm VAT</p>
-            </div>
-          </section>
+      <div className="relative z-10 space-y-4">
+        {isDir ? (
+          <>
+            {/* Lời chào Giám đốc — Giao diện Iron Man J.A.R.V.I.S Độc quyền cho D.H.SON */}
+            {isIronManUser ? (
+              <IronManBanner fullName={user.full_name} />
+            ) : (
+              <section className="relative overflow-hidden mb-4 rounded-xl2 bg-gradient-to-br from-amber-600 via-amber-700 to-slate-900 p-5 lg:p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl">
+                <div className="absolute right-0 top-0 -mr-6 -mt-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+                <div className="absolute left-1/3 bottom-0 -mb-10 h-36 w-36 rounded-full bg-yellow-400/25 blur-2xl" />
+                <p className="text-xs text-yellow-300 font-bold uppercase tracking-wider">DOSCO COMPANY LIMITED</p>
+                <h1 className="mt-1 text-xl lg:text-2xl font-bold tracking-tight">Xin chào, {user.full_name}! 👑</h1>
+                <p className="relative z-10 mt-2 text-xs text-white/80">
+                  Hệ thống quản trị tài chính & điều hành doanh nghiệp thời gian thực.
+                </p>
+              </section>
+            )}
+
+            {/* ---- Hai thẻ KPI chính (chỉ Giám đốc) ---- */}
+            <section className="grid grid-cols-2 gap-3 lg:gap-4">
+              <div className={`rounded-xl2 p-4 lg:p-6 text-white card-hover ${
+                isIronManUser 
+                  ? "bg-gradient-to-br from-slate-950 via-[#1A0003] to-slate-900 border-2 border-cyan-500/60 shadow-[0_0_25px_rgba(0,240,255,0.25)]" 
+                  : "bg-gradient-to-br from-slate-900 to-ink border border-white/5"
+              }`}>
+                <p className="text-xs text-cyan-200/70 font-mono">Hợp đồng đang quản lý</p>
+                <p className="mt-2 text-3xl lg:text-4xl font-bold tnum text-cyan-400 drop-shadow-[0_0_10px_rgba(0,240,255,0.7)]">{kpi?.active_contracts ?? "—"}</p>
+                <p className="mt-1 text-[11px] text-white/50 font-mono">gói thầu / dự án</p>
+              </div>
+              <div className={`rounded-xl2 p-4 lg:p-6 text-white card-hover ${
+                isIronManUser 
+                  ? "bg-gradient-to-br from-slate-950 via-[#260006] to-slate-900 border-2 border-yellow-500/60 shadow-[0_0_25px_rgba(255,215,0,0.25)]" 
+                  : "bg-gradient-to-br from-steel to-slate-800 border border-white/5"
+              }`}>
+                <p className="text-xs text-yellow-200/70 font-mono">Tổng giá trị HĐ</p>
+                <p className="mt-2 text-3xl lg:text-4xl font-bold tnum text-yellow-400 drop-shadow-[0_0_10px_rgba(255,215,0,0.7)]">
+                  {kpi ? formatCompactVND(kpi.total_contract_value) : "—"}
+                </p>
+                <p className="mt-1 text-[11px] text-white/60 font-mono">chưa gồm VAT</p>
+              </div>
+            </section>
 
           {/* ---- Dải lợi nhuận ước tính (chỉ Giám đốc) ---- */}
           <section className="mt-3 lg:mt-4 rounded-xl2 bg-white p-4 lg:p-6 shadow-card card-hover border-l-4 border-ok">
@@ -401,7 +423,7 @@ export default function DashboardPage() {
       <section className="mt-6">
         <CompanyOrgChart />
       </section>
-
+      </div>
     </AppShell>
   );
 }
