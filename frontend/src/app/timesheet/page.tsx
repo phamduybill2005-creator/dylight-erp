@@ -11,6 +11,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
+import { getProjectDept } from "@/lib/groups";
 import { isSeniorManagerUp } from "@/lib/roles";
 import type { Timesheet, Project, User, Department } from "@/lib/types";
 
@@ -85,7 +86,7 @@ export default function TimesheetPage() {
 
   // Danh sách phòng ban để lọc
   const deptOptions = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(PRESET_DEPARTMENTS);
     for (const d of departments) {
       if (d.name) set.add(d.name.trim());
     }
@@ -96,9 +97,6 @@ export default function TimesheetPage() {
           if (trimmed) set.add(trimmed);
         });
       }
-    }
-    if (set.size === 0) {
-      PRESET_DEPARTMENTS.forEach((p) => set.add(p));
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
   }, [departments, allUsers]);
@@ -119,15 +117,19 @@ export default function TimesheetPage() {
       }
       if (selectedDept !== "") {
         const uDept = userDeptMap.get(e.user_id) || "";
-        const isMatch = uDept
+        const isUserMatch = uDept
           .split(",")
           .map((s) => s.trim().toLowerCase())
           .some((p) => p === selectedDept.toLowerCase() || p.includes(selectedDept.toLowerCase()));
-        if (!isMatch) return false;
+        
+        const proj = projects.find((p) => p.id === e.project_id);
+        const isProjMatch = proj ? getProjectDept(proj) === selectedDept : false;
+        
+        if (!isUserMatch && !isProjMatch) return false;
       }
       return true;
     });
-  }, [entries, viewScope, me?.id, selectedDept, userDeptMap]);
+  }, [entries, viewScope, me?.id, selectedDept, userDeptMap, projects]);
 
   const key = (pid: number, d: string) => `${pid}:${d}`;
 
@@ -154,13 +156,17 @@ export default function TimesheetPage() {
       .reduce((s, e) => s + Number(e.hours), 0);
   }, [filteredEntries, days]);
 
-  // Hàng = dự án. Dự án có giờ trong đợt lên đầu.
+  // Hàng = dự án. Nếu chọn Phòng ban, chỉ hiển thị dự án thuộc phòng ban đó.
   const rowProjects = useMemo(() => {
+    let list = projects;
+    if (selectedDept !== "") {
+      list = projects.filter((p) => getProjectDept(p) === selectedDept);
+    }
     const has = new Set(filteredEntries.map((e) => e.project_id));
-    return [...projects].sort(
+    return [...list].sort(
       (a, b) => (has.has(a.id) ? 0 : 1) - (has.has(b.id) ? 0 : 1) || a.name.localeCompare(b.name, "vi"),
     );
-  }, [projects, filteredEntries]);
+  }, [projects, selectedDept, filteredEntries]);
 
   const projTotal = (pid: number) => days.reduce((s, d) => s + (cellHours.get(key(pid, d)) ?? 0), 0);
   const dayTotal = (d: string) => rowProjects.reduce((s, p) => s + (cellHours.get(key(p.id, d)) ?? 0), 0);
