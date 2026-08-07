@@ -79,10 +79,11 @@ type BanDoDetails = {
   analysis: string;
   trace: string;
   section: string;
+  tieu_de: string;
 };
 
 function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
-  const empty: BanDoDetails = { riegl: "", qlcl: "", data: "", analysis: "", trace: "", section: "" };
+  const empty: BanDoDetails = { riegl: "", qlcl: "", data: "", analysis: "", trace: "", section: "", tieu_de: "" };
   if (!evalStr) return empty;
   const s = evalStr.trim();
   if (s.startsWith("{")) {
@@ -95,12 +96,13 @@ function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
         analysis: parsed.analysis || "",
         trace: parsed.trace || "",
         section: parsed.section || "",
+        tieu_de: parsed.tieu_de || "",
       };
     } catch {
-      return { ...empty, riegl: s };
+      return { ...empty, tieu_de: s };
     }
   }
-  return { ...empty, riegl: s };
+  return { ...empty, tieu_de: s };
 }
 
 function stringifyBanDoDetails(details: BanDoDetails): string {
@@ -503,7 +505,7 @@ export default function ProjectsPage() {
 
   const TH = `border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 ${isBanDoMode ? "px-1 py-1 text-[10px]" : "px-1.5 py-1.5"}`;
   const TD = `border border-line align-middle ${isBanDoMode ? "px-1 py-1 text-[10.5px]" : "px-1.5 py-1.5"}`;
-  const infoCols = isBanDoMode ? 18 : 13;
+  const infoCols = isBanDoMode ? 19 : 13;
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -604,22 +606,23 @@ export default function ProjectsPage() {
       </div>
 
       <div className="mt-3 overflow-auto rounded-xl2 border border-line bg-white shadow-card max-h-[calc(100vh-280px)]">
-        {/* Bề rộng cột CỐ ĐỊNH: Tên dự án rộng nhất (co 1/2 đối với Phòng Bản đồ), các cột ngày & 担当 thu gọn. */}
-        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1080px]" : "min-w-[1280px]"}`}>
+        {/* Bề rộng cột CỐ ĐỊNH: Tên dự án rộng nhất (co 1/2 đối với Phòng Bản đồ), 6 cột nhập số thu gọn + cột TIÊU ĐỀ lớn nhất trong 7 cột. */}
+        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1200px]" : "min-w-[1280px]"}`}>
           {isBanDoMode ? (
             <colgroup>
               <col className="w-[28px]" />   {/* STT */}
               <col className="w-[80px]" />   {/* Mã QL */}
-              <col className="w-[150px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
-              <col className="w-[60px]" />   {/* Nhóm */}
+              <col className="w-[145px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
+              <col className="w-[58px]" />   {/* Nhóm */}
               <col className="w-[54px]" />   {/* GEO担当 */}
               <col className="w-[64px]" />   {/* DOSCO担当 */}
-              <col className="w-[75px]" />   {/* RIEGL */}
-              <col className="w-[75px]" />   {/* QLCL */}
-              <col className="w-[75px]" />   {/* DATA */}
-              <col className="w-[75px]" />   {/* Analysis */}
-              <col className="w-[75px]" />   {/* Trace */}
-              <col className="w-[75px]" />   {/* Section */}
+              <col className="w-[48px]" />   {/* RIEGL (nhập số) */}
+              <col className="w-[48px]" />   {/* QLCL (nhập số) */}
+              <col className="w-[48px]" />   {/* DATA (nhập số) */}
+              <col className="w-[48px]" />   {/* Analysis (nhập số) */}
+              <col className="w-[48px]" />   {/* Trace (nhập số) */}
+              <col className="w-[48px]" />   {/* Section (nhập số) */}
+              <col className="w-[145px]" />  {/* TIÊU ĐỀ (cột to nhất trong 7 cột mới) */}
               <col className="w-[50px]" />   {/* Time in */}
               <col className="w-[50px]" />   {/* Time out */}
               <col className="w-[50px]" />   {/* Time due */}
@@ -656,12 +659,13 @@ export default function ProjectsPage() {
               <th className={TH}>DOSCO担当</th>
               {isBanDoMode ? (
                 <>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>RIEGL</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>QLCL</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>DATA</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>Analysis</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>Trace</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>Section</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>RIEGL</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>QLCL</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>DATA</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Analysis</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Trace</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Section</th>
+                  <th className={`${TH} text-center bg-amber-50 text-amber-900 border-amber-200 font-bold text-[10px]`}>TIÊU ĐỀ</th>
                 </>
               ) : (
                 <th className={TH}>Nội dung</th>
@@ -714,10 +718,11 @@ export default function ProjectsPage() {
                   {isBanDoMode ? (
                     <>
                       {(["riegl", "qlcl", "data", "analysis", "trace", "section"] as const).map((key) => (
-                        <td key={key} className={`${TD} align-top p-0.5`} onClick={(e) => e.stopPropagation()}>
+                        <td key={key} className={`${TD} align-top p-0.5 text-center`} onClick={(e) => e.stopPropagation()}>
                           {canEditBanDoCols ? (
                             <input
                               type="text"
+                              inputMode="decimal"
                               value={bando[key] || ""}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -739,17 +744,52 @@ export default function ProjectsPage() {
                                   });
                                 }
                               }}
-                              placeholder="..."
-                              title="Gõ trực tiếp — rời ô (hoặc Enter) là tự lưu"
-                              className="h-6 w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[10.5px] text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white"
+                              placeholder="0"
+                              title="Nhập số"
+                              className="h-6 w-full rounded border border-transparent bg-transparent px-0.5 py-0.5 text-center text-[10.5px] font-mono text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white"
                             />
                           ) : (
-                            <span className="text-muted text-[10.5px] truncate block" title={bando[key] || ""}>
+                            <span className="text-muted text-[10.5px] font-mono text-center block" title={bando[key] || ""}>
                               {bando[key] || "—"}
                             </span>
                           )}
                         </td>
                       ))}
+                      <td className={`${TD} align-top p-0.5`} onClick={(e) => e.stopPropagation()}>
+                        {canEditBanDoCols ? (
+                          <input
+                            type="text"
+                            value={bando.tieu_de || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const newDetails = { ...bando, tieu_de: val };
+                              const jsonStr = stringifyBanDoDetails(newDetails);
+                              setEvalEdits((s) => ({ ...s, [p.id]: jsonStr }));
+                            }}
+                            onBlur={() => saveEvaluation(p)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                (e.target as HTMLInputElement).blur();
+                              }
+                              if (e.key === "Escape") {
+                                setEvalEdits((s) => {
+                                  const n = { ...s };
+                                  delete n[p.id];
+                                  return n;
+                                });
+                              }
+                            }}
+                            placeholder="Nhập tiêu đề…"
+                            title="Gõ tiêu đề — rời ô (hoặc Enter) là tự lưu"
+                            className="h-6 w-full rounded border border-transparent bg-transparent px-1.5 py-0.5 text-[10.5px] text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white"
+                          />
+                        ) : (
+                          <span className="text-muted text-[10.5px] truncate block" title={bando.tieu_de || ""}>
+                            {bando.tieu_de || "—"}
+                          </span>
+                        )}
+                      </td>
                     </>
                   ) : (
                     /* ĐÁNH GIÁ — gõ THẲNG vào ô này, rời ô là tự lưu (không mở trang khác). */
