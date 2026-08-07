@@ -73,3 +73,40 @@ export function deptToGroup(dept?: string | null): string {
   const g = PROJECT_GROUPS.find((x) => x.vi === d || x.ja === d);
   return g ? g.ja : "";
 }
+
+/** Tên phòng ban chính chủ của dự án dựa theo Nhóm (group_name), Tên/Mã dự án hoặc Phòng người chủ trì. */
+export function getProjectDept(p: {
+  group_name?: string | null;
+  name?: string | null;
+  code?: string | null;
+  lead_department?: string | null;
+}): string {
+  // 1. Phân loại theo NHÓM (group_name) chính của dự án:
+  // "3次元設計" -> "Phòng BIM"
+  // "測量解析" -> "Phòng Bản đồ"
+  // "土木設計" -> "Phòng Thiết kế đường 2D"
+  if (p.group_name) {
+    const deptFromGroup = normalizeDept(p.group_name);
+    if (deptFromGroup) return deptFromGroup;
+  }
+
+  // 2. Nếu group_name chứa từ khóa AI -> "Phòng AI"
+  if (p.group_name && /AI/i.test(p.group_name)) {
+    return "Phòng AI";
+  }
+
+  // 3. Kiểm tra TÊN hoặc MÃ DỰ ÁN nếu có chứa thông tin phòng ban
+  const text = `${p.code || ""} ${p.name || ""}`;
+  if (/phòng:\s*bản\s*đồ|bản\s*đồ/i.test(text)) return "Phòng Bản đồ";
+  if (/phòng:\s*bim|\bbim\b/i.test(text)) return "Phòng BIM";
+  if (/phòng:\s*thiết\s*kế\s*đường|2d/i.test(text)) return "Phòng Thiết kế đường 2D";
+  if (/phòng:\s*ai|\bai\b/i.test(text)) return "Phòng AI";
+
+  // 4. Nếu không có group_name, suy ra từ phòng ban của người chủ trì (lead_department)
+  if (p.lead_department) {
+    const leadDepts = p.lead_department.split(",").map((s) => normalizeDept(s.trim())).filter(Boolean);
+    if (leadDepts.length > 0) return leadDepts[0];
+  }
+
+  return "";
+}

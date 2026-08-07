@@ -14,7 +14,7 @@ import ArchiveModal from "@/components/archive-modal";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf } from "@/lib/groups";
+import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept } from "@/lib/groups";
 import type { Project, User, ProjectStatus } from "@/lib/types";
 import { useEscapeKey } from "@/lib/use-escape-key";
 
@@ -270,8 +270,7 @@ export default function ProjectsPage() {
   const uniqueDepts = Array.from(
     new Set([
       ...PRESET_DEPARTMENTS,
-      ...(projects.flatMap((p) => p.lead_department ? p.lead_department.split(",").map(s => s.trim()) : []).filter(Boolean)),
-      ...(projects.flatMap((p) => p.members?.flatMap((m) => m.department ? m.department.split(",").map(s => s.trim()) : []) || []).filter(Boolean))
+      ...projects.map((p) => getProjectDept(p)).filter(Boolean)
     ])
   ).sort();
 
@@ -284,13 +283,8 @@ export default function ProjectsPage() {
       if (p.lead_name !== filterLead) return false;
     }
     if (filterDept) {
-      const leadDepts = p.lead_department ? p.lead_department.split(",").map(s => s.trim()) : [];
-      const matchLeadDept = leadDepts.includes(filterDept);
-      const matchMemberDept = p.members?.some((m) => {
-        const memDepts = m.department ? m.department.split(",").map(s => s.trim()) : [];
-        return memDepts.includes(filterDept);
-      }) || false;
-      if (!matchLeadDept && !matchMemberDept) return false;
+      const projDept = getProjectDept(p);
+      if (projDept !== filterDept) return false;
     }
     // Tháng nhận: so tiền tố "YYYY-MM" của Ngày nhận. Dự án chưa có ngày nhận -> loại.
     if (filterMonth) {
