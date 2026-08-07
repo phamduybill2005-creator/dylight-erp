@@ -6,20 +6,20 @@ import { BoltIcon, ShieldCheckIcon, FireIcon } from "@heroicons/react/24/solid";
 // ==================== BẢN VẼ IRON MAN LIVE WALLPAPER VIDEO FOR D.H.SON ====================
 export function ArcReactorWatermark() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-35">
+    <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-65">
       <div className="relative flex items-center justify-center">
         {/* Vòng hào quang Neon Cyan & Gold phản chiếu rộng */}
         <div className="absolute h-[650px] w-[650px] lg:h-[850px] lg:w-[850px] rounded-full bg-gradient-to-r from-cyan-500/30 via-red-600/30 to-amber-500/30 blur-[130px] animate-pulse" />
 
         {/* Video chuyển động Live Wallpaper Iron Man chuẩn từ link Pinterest */}
-        <div className="relative flex items-center justify-center rounded-3xl p-2 bg-black/60 border-2 border-cyan-400/60 shadow-[0_0_100px_rgba(0,240,255,0.6)] backdrop-blur-md">
+        <div className="relative flex items-center justify-center rounded-3xl p-2 bg-black/40 border-2 border-cyan-400/60 shadow-[0_0_100px_rgba(0,240,255,0.6)] backdrop-blur-md">
           <video
             src="/ironman_video.mp4"
             autoPlay
             loop
             muted
             playsInline
-            className="h-[480px] w-auto lg:h-[620px] object-contain rounded-2xl filter drop-shadow-[0_0_60px_rgba(0,240,255,0.8)]"
+            className="h-[520px] w-auto lg:h-[680px] object-contain rounded-2xl filter drop-shadow-[0_0_60px_rgba(0,240,255,0.8)]"
           />
         </div>
       </div>
@@ -39,7 +39,7 @@ export function IronManBanner({ fullName }: { fullName: string }) {
   }, []);
 
   return (
-    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#4A0006] via-[#8B000D] to-[#120409] p-5 lg:p-7 text-white shadow-[0_0_50px_rgba(220,38,38,0.4)] border-2 border-amber-400/60 transition-all duration-500 hover:border-cyan-400/90 hover:shadow-[0_0_70px_rgba(0,240,255,0.5)]">
+    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-950/45 via-red-900/35 to-black/45 backdrop-blur-md p-5 lg:p-7 text-white shadow-[0_0_50px_rgba(220,38,38,0.4)] border-2 border-amber-400/70 transition-all duration-500 hover:border-cyan-400/90 hover:shadow-[0_0_70px_rgba(0,240,255,0.5)]">
       {/* Hiệu ứng Cyber Grid Scanline */}
       <div className="absolute inset-0 opacity-15 bg-[linear-gradient(to_right,#00f0ff_1px,transparent_1px),linear-gradient(to_bottom,#00f0ff_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,rgba(0,240,255,0.08)_50%,transparent_100%)] animate-[pulse_4s_infinite] pointer-events-none" />

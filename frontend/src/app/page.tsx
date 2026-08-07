@@ -407,7 +407,7 @@ export default function DashboardPage() {
             <section className="grid grid-cols-2 gap-3 lg:gap-4">
               <div className={`rounded-xl2 p-4 lg:p-6 text-white card-hover ${
                 isIronManUser 
-                  ? "bg-gradient-to-br from-slate-950 via-[#1A0003] to-slate-900 border-2 border-cyan-500/60 shadow-[0_0_25px_rgba(0,240,255,0.25)]" 
+                  ? "bg-black/45 backdrop-blur-md border-2 border-cyan-500/60 shadow-[0_0_25px_rgba(0,240,255,0.25)]" 
                   : "bg-gradient-to-br from-slate-900 to-ink border border-white/5"
               }`}>
                 <p className="text-xs text-cyan-200/70 font-mono">Hợp đồng đang quản lý</p>
@@ -416,7 +416,7 @@ export default function DashboardPage() {
               </div>
               <div className={`rounded-xl2 p-4 lg:p-6 text-white card-hover ${
                 isIronManUser 
-                  ? "bg-gradient-to-br from-slate-950 via-[#260006] to-slate-900 border-2 border-yellow-500/60 shadow-[0_0_25px_rgba(255,215,0,0.25)]" 
+                  ? "bg-black/45 backdrop-blur-md border-2 border-yellow-500/60 shadow-[0_0_25px_rgba(255,215,0,0.25)]" 
                   : "bg-gradient-to-br from-steel to-slate-800 border border-white/5"
               }`}>
                 <p className="text-xs text-yellow-200/70 font-mono">Tổng giá trị HĐ</p>
