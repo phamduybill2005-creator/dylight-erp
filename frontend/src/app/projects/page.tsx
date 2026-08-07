@@ -622,7 +622,7 @@ export default function ProjectsPage() {
               <col className="w-[48px]" />   {/* Analysis (nhập số) */}
               <col className="w-[48px]" />   {/* Trace (nhập số) */}
               <col className="w-[48px]" />   {/* Section (nhập số) */}
-              <col className="w-[145px]" />  {/* TIÊU ĐỀ (cột to nhất trong 7 cột mới) */}
+              <col className="w-[145px]" />  {/* GHI CHÚ (cột to nhất trong 7 cột mới) */}
               <col className="w-[50px]" />   {/* Time in */}
               <col className="w-[50px]" />   {/* Time out */}
               <col className="w-[50px]" />   {/* Time due */}
@@ -665,7 +665,7 @@ export default function ProjectsPage() {
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Analysis</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Trace</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Section</th>
-                  <th className={`${TH} text-center bg-amber-50 text-amber-900 border-amber-200 font-bold text-[10px]`}>TIÊU ĐỀ</th>
+                  <th className={`${TH} text-center bg-amber-50 text-amber-900 border-amber-200 font-bold text-[10px]`}>GHI CHÚ</th>
                 </>
               ) : (
                 <th className={TH}>Nội dung</th>
@@ -780,8 +780,8 @@ export default function ProjectsPage() {
                                 });
                               }
                             }}
-                            placeholder="Nhập tiêu đề…"
-                            title="Gõ tiêu đề — rời ô (hoặc Enter) là tự lưu"
+                            placeholder="Nhập ghi chú…"
+                            title="Gõ ghi chú — rời ô (hoặc Enter) là tự lưu"
                             className="h-6 w-full rounded border border-transparent bg-transparent px-1.5 py-0.5 text-[10.5px] text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white"
                           />
                         ) : (
