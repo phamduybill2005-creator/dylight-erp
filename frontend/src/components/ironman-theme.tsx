@@ -3,20 +3,23 @@
 import { useEffect, useState } from "react";
 import { BoltIcon, ShieldCheckIcon, FireIcon } from "@heroicons/react/24/solid";
 
-// ==================== BẢN VẼ IRON MAN LIVE WALLPAPER WATERMARK FOR D.H.SON ====================
+// ==================== BẢN VẼ IRON MAN LIVE WALLPAPER VIDEO FOR D.H.SON ====================
 export function ArcReactorWatermark() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-30">
+    <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-35">
       <div className="relative flex items-center justify-center">
         {/* Vòng hào quang Neon Cyan & Gold phản chiếu rộng */}
-        <div className="absolute h-[650px] w-[650px] lg:h-[850px] lg:w-[850px] rounded-full bg-gradient-to-r from-cyan-500/25 via-red-600/25 to-amber-500/25 blur-[120px] animate-pulse" />
+        <div className="absolute h-[650px] w-[650px] lg:h-[850px] lg:w-[850px] rounded-full bg-gradient-to-r from-cyan-500/30 via-red-600/30 to-amber-500/30 blur-[130px] animate-pulse" />
 
-        {/* Ảnh động / Live Wallpaper Iron Man từ Pinterest link */}
-        <div className="relative flex items-center justify-center rounded-3xl p-3 bg-black/40 border border-cyan-400/50 shadow-[0_0_90px_rgba(0,240,255,0.5)] backdrop-blur-md">
-          <img
-            src="/ironman_bg.jpg?v=1"
-            alt="Iron Man Don't Touch My Phone"
-            className="h-[480px] w-auto lg:h-[620px] object-contain rounded-2xl filter drop-shadow-[0_0_50px_rgba(0,240,255,0.7)] animate-[pulse_5s_ease-in-out_infinite] transition-transform duration-700 hover:scale-105"
+        {/* Video chuyển động Live Wallpaper Iron Man chuẩn từ link Pinterest */}
+        <div className="relative flex items-center justify-center rounded-3xl p-2 bg-black/60 border-2 border-cyan-400/60 shadow-[0_0_100px_rgba(0,240,255,0.6)] backdrop-blur-md">
+          <video
+            src="/ironman_video.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="h-[480px] w-auto lg:h-[620px] object-contain rounded-2xl filter drop-shadow-[0_0_60px_rgba(0,240,255,0.8)]"
           />
         </div>
       </div>
