@@ -118,9 +118,10 @@ def _user_dept_set(user: User) -> set[str]:
 
 
 DEPT_SYNONYMS: dict[str, str] = {
-    "3d": "3d", "3次元": "3d", "3次元設計": "3d", "thiet ke 3d": "3d", "phong 3d": "3d",
-    "do duong": "civil", "civil": "civil", "土木": "civil", "土木設計": "civil", "đường": "civil", "cầu": "civil", "thiết kế đường": "civil",
-    "trac dia": "survey", "trắc địa": "survey", "測量": "survey", "測量解析": "survey", "uav": "survey",
+    "3d": "3d", "3次元": "3d", "3次元設計": "3d", "thiet ke 3d": "3d", "phong 3d": "3d", "bim": "3d", "phong bim": "3d", "phòng bim": "3d",
+    "do duong": "civil", "civil": "civil", "土木": "civil", "土木設計": "civil", "đường": "civil", "cầu": "civil", "thiết kế đường": "civil", "2d": "civil", "phòng thiết kế đường 2d": "civil",
+    "trac dia": "survey", "trắc địa": "survey", "測量": "survey", "測量解析": "survey", "uav": "survey", "bản đồ": "survey", "phòng bản đồ": "survey",
+    "ai": "ai", "ai開発": "ai", "phòng ai": "ai", "phong ai": "ai",
     "kien truc": "arch", "kiến trúc": "arch", "建築": "arch", "建築設計": "arch",
 }
 
@@ -131,6 +132,30 @@ def _normalize_dept_key(dept_str: str) -> str:
         if k in s or s in k:
             return v
     return s
+
+
+def _get_project_dept_key(project: Project) -> str:
+    """Xác định mã phòng ban chuẩn hóa của bản thân dự án."""
+    if project.group_name:
+        key = _normalize_dept_key(project.group_name)
+        if key:
+            return key
+    text = f"{project.code or ''} {project.name or ''}".lower()
+    if "bản đồ" in text or "trắc địa" in text:
+        return "survey"
+    if "bim" in text or "3d" in text:
+        return "3d"
+    if "thiết kế đường" in text or "đường" in text or "2d" in text:
+        return "civil"
+    if "ai" in text:
+        return "ai"
+    if project.lead and project.lead.department:
+        for d in project.lead.department.split(","):
+            if d.strip():
+                k = _normalize_dept_key(d)
+                if k:
+                    return k
+    return ""
 
 
 def _is_project_in_user_depts(db: Session, project: Project, user: User) -> bool:
@@ -155,49 +180,23 @@ def _is_project_in_user_depts(db: Session, project: Project, user: User) -> bool
         if project.lead_id in subs or bool(members & subs):
             return True
 
-    # 4. Kiểm tra phòng ban (chuẩn hóa đồng nghĩa Tiếng Việt/Tiếng Nhật)
+    # 4. Kiểm tra phòng ban chính chủ của DỰ ÁN với phòng ban của USER
     user_depts = _user_dept_set(user)
     if not user_depts:
         return False
 
     user_norm_depts = {_normalize_dept_key(d) for d in user_depts}
 
-    # Group / Nhóm của dự án
+    # Lấy phòng ban chính chủ của dự án
+    proj_dept_key = _get_project_dept_key(project)
+    if proj_dept_key and proj_dept_key in user_norm_depts:
+        return True
+
+    # Khớp tên phòng trực tiếp nếu group_name chứa tên phòng của user
     if project.group_name:
-        proj_group_norm = _normalize_dept_key(project.group_name)
-        if proj_group_norm in user_norm_depts or any(ud in project.group_name.lower() for ud in user_depts):
+        gn_lower = project.group_name.lower()
+        if any(ud in gn_lower for ud in user_depts if ud):
             return True
-
-    # Lead department
-    if project.lead and project.lead.department:
-        lead_depts = {_normalize_dept_key(d) for d in project.lead.department.split(",") if d.strip()}
-        if user_norm_depts & lead_depts:
-            return True
-
-    # Member departments
-    if members:
-        member_depts = (
-            db.query(User.department)
-            .filter(User.id.in_(members), User.department.isnot(None))
-            .all()
-        )
-        for row in member_depts:
-            if row[0]:
-                m_depts = {_normalize_dept_key(d) for d in row[0].split(",") if d.strip()}
-                if user_norm_depts & m_depts:
-                    return True
-
-    # Item departments
-    items = (
-        db.query(ProjectItem.department)
-        .filter(ProjectItem.project_id == project.id, ProjectItem.department.isnot(None))
-        .all()
-    )
-    for row in items:
-        if row[0]:
-            item_depts = {_normalize_dept_key(d) for d in row[0].split(",") if d.strip()}
-            if user_norm_depts & item_depts:
-                return True
 
     return False
 
