@@ -3,47 +3,22 @@
 import { useEffect, useState } from "react";
 import { BoltIcon, ShieldCheckIcon, FireIcon } from "@heroicons/react/24/solid";
 
-// ==================== BẢN VẼ ARC REACTOR CORE (STARK INDUSTRIES) ====================
+// ==================== BẢN VẼ IRON MAN LIVE WALLPAPER WATERMARK FOR D.H.SON ====================
 export function ArcReactorWatermark() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-20">
+    <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-30">
       <div className="relative flex items-center justify-center">
-        {/* Vòng hào quang Neon Blue Cyan phản chiếu rộng */}
-        <div className="absolute h-[600px] w-[600px] lg:h-[750px] lg:w-[750px] rounded-full bg-cyan-500/20 blur-[100px] animate-pulse" />
-        
-        {/* SVG Arc Reactor quay 360 độ */}
-        <svg
-          viewBox="0 0 500 500"
-          className="h-[500px] w-[500px] lg:h-[650px] lg:w-[650px] max-w-none animate-[spin_60s_linear_infinite] filter drop-shadow-[0_0_50px_rgba(0,240,255,0.6)]"
-        >
-          {/* Vòng ngoài Titanium Metallic */}
-          <circle cx="250" cy="250" r="230" fill="none" stroke="#D4AF37" strokeWidth="4" strokeDasharray="15 10" />
-          <circle cx="250" cy="250" r="215" fill="none" stroke="#00F0FF" strokeWidth="8" opacity="0.8" />
-          <circle cx="250" cy="250" r="195" fill="none" stroke="#FFD700" strokeWidth="2" strokeDasharray="5 5" />
-          
-          {/* 10 Cuộn cảm biến năng lượng Arc LED */}
-          {Array.from({ length: 10 }).map((_, i) => {
-            const angle = (i * 36) * (Math.PI / 180);
-            const x1 = 250 + 140 * Math.cos(angle);
-            const y1 = 250 + 140 * Math.sin(angle);
-            const x2 = 250 + 185 * Math.cos(angle);
-            const y2 = 250 + 185 * Math.sin(angle);
-            return (
-              <g key={i}>
-                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#00F0FF" strokeWidth="12" strokeLinecap="round" />
-                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
-              </g>
-            );
-          })}
+        {/* Vòng hào quang Neon Cyan & Gold phản chiếu rộng */}
+        <div className="absolute h-[650px] w-[650px] lg:h-[850px] lg:w-[850px] rounded-full bg-gradient-to-r from-cyan-500/25 via-red-600/25 to-amber-500/25 blur-[120px] animate-pulse" />
 
-          {/* Vòng trong & Lõi Palladium Cyan phát sáng */}
-          <circle cx="250" cy="250" r="120" fill="none" stroke="#00F0FF" strokeWidth="6" />
-          <polygon points="250,155 330,295 170,295" fill="none" stroke="#FFD700" strokeWidth="5" />
-          <polygon points="250,345 170,205 330,205" fill="none" stroke="#00F0FF" strokeWidth="5" opacity="0.9" />
-          <circle cx="250" cy="250" r="65" fill="#00F0FF" opacity="0.25" />
-          <circle cx="250" cy="250" r="45" fill="#FFFFFF" opacity="0.9" className="animate-ping" />
-          <circle cx="250" cy="250" r="35" fill="#00F0FF" />
-        </svg>
+        {/* Ảnh động / Live Wallpaper Iron Man từ Pinterest link */}
+        <div className="relative flex items-center justify-center rounded-3xl p-3 bg-black/40 border border-cyan-400/50 shadow-[0_0_90px_rgba(0,240,255,0.5)] backdrop-blur-md">
+          <img
+            src="/ironman_bg.jpg?v=1"
+            alt="Iron Man Don't Touch My Phone"
+            className="h-[480px] w-auto lg:h-[620px] object-contain rounded-2xl filter drop-shadow-[0_0_50px_rgba(0,240,255,0.7)] animate-[pulse_5s_ease-in-out_infinite] transition-transform duration-700 hover:scale-105"
+          />
+        </div>
       </div>
     </div>
   );
