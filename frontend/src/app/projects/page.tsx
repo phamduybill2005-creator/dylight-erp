@@ -456,8 +456,15 @@ export default function ProjectsPage() {
     }
   }
 
-  const TH = "border border-line px-1.5 py-1.5 font-semibold whitespace-nowrap sticky top-0 bg-paper z-10";
-  const TD = "border border-line px-1.5 py-1.5 align-middle";
+  const isBanDoUser = !!me?.department && (
+    normalizeDept(me.department) === "Phòng Bản đồ" || 
+    me.department.includes("Bản đồ") || 
+    me.department.includes("測量解析")
+  );
+  const isBanDoMode = filterDept === "Phòng Bản đồ" || filterDept === "測量解析" || (filterDept === "" && isBanDoUser);
+
+  const TH = `border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 ${isBanDoMode ? "px-1 py-1 text-[10px]" : "px-1.5 py-1.5"}`;
+  const TD = `border border-line align-middle ${isBanDoMode ? "px-1 py-1 text-[10.5px]" : "px-1.5 py-1.5"}`;
   // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Ghi chú, Ngày nhận, Ngày hoàn thành, Hạn nội, Tổng thời gian, Trạng thái, Tiến độ = 13 cột.
   const infoCols = 13;
 
@@ -560,25 +567,43 @@ export default function ProjectsPage() {
       </div>
 
       <div className="mt-3 overflow-auto rounded-xl2 border border-line bg-white shadow-card max-h-[calc(100vh-280px)]">
-        {/* Bề rộng cột CỐ ĐỊNH: Tên dự án rộng nhất, Nhóm + 担当 thu gọn để nhường chỗ
-            cho Ghi chú và các cột ngày. Mỗi dự án gói gọn trên MỘT dòng. */}
-        <table className="w-full min-w-[1280px] table-fixed border-collapse text-[11px]">
-          <colgroup>
-            <col className="w-[34px]" />   {/* STT */}
-            <col className="w-[96px]" />   {/* Mã QL — fit mã 9 ký tự */}
-            <col className="w-[320px]" />  {/* Tên dự án — rộng nhất */}
-            <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
-            <col className="w-[62px]" />   {/* GEO担当 */}
-            <col className="w-[78px]" />   {/* DOSCO担当 */}
-            <col className="w-[150px]" />  {/* Ghi chú */}
-            <col className="w-[64px]" />   {/* Time in */}
-            <col className="w-[64px]" />   {/* Time out */}
-            <col className="w-[64px]" />   {/* Time due */}
-            <col className="w-[88px]" />   {/* Total time */}
-            <col className="w-[82px]" />   {/* Trạng thái */}
-            <col className="w-[74px]" />   {/* Tiến độ */}
-            <col className="w-[112px]" />  {/* Thao tác */}
-          </colgroup>
+        {/* Bề rộng cột CỐ ĐỊNH: Tên dự án rộng nhất (co 1/2 đối với Phòng Bản đồ), các cột ngày & 担当 thu gọn. */}
+        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[980px]" : "min-w-[1280px]"}`}>
+          {isBanDoMode ? (
+            <colgroup>
+              <col className="w-[30px]" />   {/* STT */}
+              <col className="w-[85px]" />   {/* Mã QL */}
+              <col className="w-[160px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
+              <col className="w-[66px]" />   {/* Nhóm */}
+              <col className="w-[56px]" />   {/* GEO担当 */}
+              <col className="w-[68px]" />   {/* DOSCO担当 */}
+              <col className="w-[100px]" />  {/* Nội dung */}
+              <col className="w-[52px]" />   {/* Time in */}
+              <col className="w-[52px]" />   {/* Time out */}
+              <col className="w-[52px]" />   {/* Time due */}
+              <col className="w-[72px]" />   {/* Total time */}
+              <col className="w-[74px]" />   {/* Trạng thái */}
+              <col className="w-[64px]" />   {/* Real time */}
+              <col className="w-[98px]" />   {/* Thao tác */}
+            </colgroup>
+          ) : (
+            <colgroup>
+              <col className="w-[34px]" />   {/* STT */}
+              <col className="w-[96px]" />   {/* Mã QL — fit mã 9 ký tự */}
+              <col className="w-[320px]" />  {/* Tên dự án — rộng nhất */}
+              <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
+              <col className="w-[62px]" />   {/* GEO担当 */}
+              <col className="w-[78px]" />   {/* DOSCO担当 */}
+              <col className="w-[150px]" />  {/* Ghi chú */}
+              <col className="w-[64px]" />   {/* Time in */}
+              <col className="w-[64px]" />   {/* Time out */}
+              <col className="w-[64px]" />   {/* Time due */}
+              <col className="w-[88px]" />   {/* Total time */}
+              <col className="w-[82px]" />   {/* Trạng thái */}
+              <col className="w-[74px]" />   {/* Tiến độ */}
+              <col className="w-[112px]" />  {/* Thao tác */}
+            </colgroup>
+          )}
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
               <th className={`${TH} w-10 text-center`}>STT</th>
