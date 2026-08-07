@@ -5,7 +5,7 @@
 //  - MANAGER  (Quản lý)  : KHÔNG có doanh thu/lãi-lỗ; tập trung vận hành + nhân sự + chấm công + đánh giá.
 //  - STAFF    (Nhân viên): việc cá nhân — chấm công, lịch làm, dự án, đánh giá quản lý.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -27,6 +27,67 @@ import { api } from "@/lib/api";
 import { roleTier, roleTitle, type Tier } from "@/lib/roles";
 import { formatCompactVND, formatVND } from "@/lib/format";
 import type { KpiSummary, ProjectProfit, User, Project } from "@/lib/types";
+
+function MUAudioPlayer() {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Tự động phát tệp âm thanh "audio mu.mp3" trong thư mục public khi P.A.DUNG mở tab Tổng quan
+    const audio = new Audio("/audio%20mu.mp3");
+    audio.loop = true;
+    audio.volume = 0.7;
+    audioRef.current = audio;
+
+    const playAudio = () => {
+      audio
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch((err) => {
+          console.log("Browser autoplay policy:", err);
+          // Lắng nghe tương tác click chuột đầu tiên để kích hoạt âm thanh nếu trình duyệt chặn tự động
+          const handleInteraction = () => {
+            audio.play().then(() => setIsPlaying(true)).catch(() => {});
+            window.removeEventListener("click", handleInteraction);
+            window.removeEventListener("keydown", handleInteraction);
+          };
+          window.addEventListener("click", handleInteraction);
+          window.addEventListener("keydown", handleInteraction);
+        });
+    };
+
+    playAudio();
+
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, []);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {});
+    }
+  };
+
+  return (
+    <button
+      onClick={togglePlay}
+      className="flex items-center gap-1.5 rounded-full bg-black/70 border border-yellow-400/90 px-3 py-1 text-[11px] font-extrabold text-yellow-300 shadow-xl hover:bg-black/90 transition-all active:scale-95 cursor-pointer"
+      title="Bật/Tắt âm thanh Manchester United"
+    >
+      <span className="text-sm">{isPlaying ? "🔊" : "🔈"}</span>
+      <span>{isPlaying ? "MU Anthem: BẬT" : "MU Anthem: TẮT (Click để bật)"}</span>
+    </button>
+  );
+}
 
 type ModuleDef = {
   href: string;
@@ -143,6 +204,7 @@ export default function DashboardPage() {
                       ⚽ MANCHESTER UNITED EDITION 👹
                     </span>
                     <span className="text-[11px] text-yellow-200 font-bold tracking-wider">GLORY GLORY MAN UNITED</span>
+                    <MUAudioPlayer />
                   </div>
                   <h1 className="mt-2 text-2xl lg:text-3xl font-extrabold tracking-tight text-white drop-shadow-md">
                     Xin chào, {user.full_name}! 👹 
