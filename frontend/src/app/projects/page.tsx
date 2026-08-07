@@ -72,7 +72,7 @@ function calculateDuration(start?: string | null, end?: string | null, deadline?
   return "—";
 }
 
-export type BanDoDetails = {
+type BanDoDetails = {
   riegl: string;
   qlcl: string;
   data: string;
@@ -81,7 +81,7 @@ export type BanDoDetails = {
   section: string;
 };
 
-export function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
+function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
   const empty: BanDoDetails = { riegl: "", qlcl: "", data: "", analysis: "", trace: "", section: "" };
   if (!evalStr) return empty;
   const s = evalStr.trim();
@@ -103,7 +103,7 @@ export function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
   return { ...empty, riegl: s };
 }
 
-export function stringifyBanDoDetails(details: BanDoDetails): string {
+function stringifyBanDoDetails(details: BanDoDetails): string {
   const allEmpty = Object.values(details).every((v) => !v.trim());
   if (allEmpty) return "";
   return JSON.stringify(details);
