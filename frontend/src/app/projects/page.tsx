@@ -72,6 +72,43 @@ function calculateDuration(start?: string | null, end?: string | null, deadline?
   return "—";
 }
 
+export type BanDoDetails = {
+  riegl: string;
+  qlcl: string;
+  data: string;
+  analysis: string;
+  trace: string;
+  section: string;
+};
+
+export function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
+  const empty: BanDoDetails = { riegl: "", qlcl: "", data: "", analysis: "", trace: "", section: "" };
+  if (!evalStr) return empty;
+  const s = evalStr.trim();
+  if (s.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(s);
+      return {
+        riegl: parsed.riegl || "",
+        qlcl: parsed.qlcl || "",
+        data: parsed.data || "",
+        analysis: parsed.analysis || "",
+        trace: parsed.trace || "",
+        section: parsed.section || "",
+      };
+    } catch {
+      return { ...empty, riegl: s };
+    }
+  }
+  return { ...empty, riegl: s };
+}
+
+export function stringifyBanDoDetails(details: BanDoDetails): string {
+  const allEmpty = Object.values(details).every((v) => !v.trim());
+  if (allEmpty) return "";
+  return JSON.stringify(details);
+}
+
 export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -462,11 +499,11 @@ export default function ProjectsPage() {
     me.department.includes("測量解析")
   );
   const isBanDoMode = filterDept === "Phòng Bản đồ" || filterDept === "測量解析" || (filterDept === "" && isBanDoUser);
+  const canEditBanDoCols = isBanDoUser || canManage || isSeniorManagerUp(me);
 
   const TH = `border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 ${isBanDoMode ? "px-1 py-1 text-[10px]" : "px-1.5 py-1.5"}`;
   const TD = `border border-line align-middle ${isBanDoMode ? "px-1 py-1 text-[10.5px]" : "px-1.5 py-1.5"}`;
-  // STT, Mã QL, Tên, Nhóm, GEO担当, DOSCO担当, Ghi chú, Ngày nhận, Ngày hoàn thành, Hạn nội, Tổng thời gian, Trạng thái, Tiến độ = 13 cột.
-  const infoCols = 13;
+  const infoCols = isBanDoMode ? 18 : 13;
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -568,23 +605,28 @@ export default function ProjectsPage() {
 
       <div className="mt-3 overflow-auto rounded-xl2 border border-line bg-white shadow-card max-h-[calc(100vh-280px)]">
         {/* Bề rộng cột CỐ ĐỊNH: Tên dự án rộng nhất (co 1/2 đối với Phòng Bản đồ), các cột ngày & 担当 thu gọn. */}
-        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[980px]" : "min-w-[1280px]"}`}>
+        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1080px]" : "min-w-[1280px]"}`}>
           {isBanDoMode ? (
             <colgroup>
-              <col className="w-[30px]" />   {/* STT */}
-              <col className="w-[85px]" />   {/* Mã QL */}
-              <col className="w-[160px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
-              <col className="w-[66px]" />   {/* Nhóm */}
-              <col className="w-[56px]" />   {/* GEO担当 */}
-              <col className="w-[68px]" />   {/* DOSCO担当 */}
-              <col className="w-[100px]" />  {/* Nội dung */}
-              <col className="w-[52px]" />   {/* Time in */}
-              <col className="w-[52px]" />   {/* Time out */}
-              <col className="w-[52px]" />   {/* Time due */}
-              <col className="w-[72px]" />   {/* Total time */}
-              <col className="w-[74px]" />   {/* Trạng thái */}
-              <col className="w-[64px]" />   {/* Real time */}
-              <col className="w-[98px]" />   {/* Thao tác */}
+              <col className="w-[28px]" />   {/* STT */}
+              <col className="w-[80px]" />   {/* Mã QL */}
+              <col className="w-[150px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
+              <col className="w-[60px]" />   {/* Nhóm */}
+              <col className="w-[54px]" />   {/* GEO担当 */}
+              <col className="w-[64px]" />   {/* DOSCO担当 */}
+              <col className="w-[75px]" />   {/* RIEGL */}
+              <col className="w-[75px]" />   {/* QLCL */}
+              <col className="w-[75px]" />   {/* DATA */}
+              <col className="w-[75px]" />   {/* Analysis */}
+              <col className="w-[75px]" />   {/* Trace */}
+              <col className="w-[75px]" />   {/* Section */}
+              <col className="w-[50px]" />   {/* Time in */}
+              <col className="w-[50px]" />   {/* Time out */}
+              <col className="w-[50px]" />   {/* Time due */}
+              <col className="w-[68px]" />   {/* Total time */}
+              <col className="w-[72px]" />   {/* Trạng thái */}
+              <col className="w-[60px]" />   {/* Real time */}
+              <col className="w-[90px]" />   {/* Thao tác */}
             </colgroup>
           ) : (
             <colgroup>
@@ -612,7 +654,18 @@ export default function ProjectsPage() {
               <th className={TH}>Nhóm</th>
               <th className={TH}>GEO担当</th>
               <th className={TH}>DOSCO担当</th>
-              <th className={TH}>Nội dung</th>
+              {isBanDoMode ? (
+                <>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>RIEGL</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>QLCL</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>DATA</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>Analysis</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>Trace</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold`}>Section</th>
+                </>
+              ) : (
+                <th className={TH}>Nội dung</th>
+              )}
               <th className={TH} title="Ngày nhận">Time in</th>
               <th className={TH} title="Ngày hoàn thành">Time out</th>
               <th className={TH} title="Hạn nội bộ">Time due</th>
@@ -634,6 +687,8 @@ export default function ProjectsPage() {
             {filteredProjects.map((p, i) => {
               const effectiveStatus = computeAutoStatus(p);
               const st = PROJECT_STATUS[effectiveStatus] ?? PROJECT_STATUS.PLANNING;
+              const bando = parseBanDoDetails(evalEdits[p.id] !== undefined ? evalEdits[p.id] : p.evaluation);
+
               return (
                 <tr
                   key={p.id}
@@ -656,35 +711,77 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-muted`}>
                     <div className="truncate" title={p.dosco_manager || ""}>{p.dosco_manager || "—"}</div>
                   </td>
-                  {/* ĐÁNH GIÁ — gõ THẲNG vào ô này, rời ô là tự lưu (không mở trang khác). */}
-                  <td className={`${TD} align-top`} onClick={(e) => e.stopPropagation()}>
-                    {canEditEval(p) ? (
-                      <textarea
-                        rows={1}
-                        value={evalEdits[p.id] ?? p.evaluation ?? ""}
-                        onChange={(e) => setEvalEdits((s) => ({ ...s, [p.id]: e.target.value }))}
-                        onBlur={() => saveEvaluation(p)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            (e.target as HTMLTextAreaElement).blur();
-                          }
-                          if (e.key === "Escape") {
-                            setEvalEdits((s) => {
-                              const n = { ...s };
-                              delete n[p.id];
-                              return n;
-                            });
-                          }
-                        }}
-                        placeholder="Nội dung…"
-                        title="Gõ trực tiếp — rời ô (hoặc Enter) là tự lưu; Esc để huỷ"
-                        className="min-h-[26px] w-full resize-y rounded border border-transparent bg-transparent px-1.5 py-1 text-[11px] text-ink outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
-                      />
-                    ) : (
-                      <span className="text-muted">{p.evaluation || "—"}</span>
-                    )}
-                  </td>
+                  {isBanDoMode ? (
+                    <>
+                      {(["riegl", "qlcl", "data", "analysis", "trace", "section"] as const).map((key) => (
+                        <td key={key} className={`${TD} align-top p-0.5`} onClick={(e) => e.stopPropagation()}>
+                          {canEditBanDoCols ? (
+                            <input
+                              type="text"
+                              value={bando[key] || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const newDetails = { ...bando, [key]: val };
+                                const jsonStr = stringifyBanDoDetails(newDetails);
+                                setEvalEdits((s) => ({ ...s, [p.id]: jsonStr }));
+                              }}
+                              onBlur={() => saveEvaluation(p)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                                if (e.key === "Escape") {
+                                  setEvalEdits((s) => {
+                                    const n = { ...s };
+                                    delete n[p.id];
+                                    return n;
+                                  });
+                                }
+                              }}
+                              placeholder="..."
+                              title="Gõ trực tiếp — rời ô (hoặc Enter) là tự lưu"
+                              className="h-6 w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[10.5px] text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white"
+                            />
+                          ) : (
+                            <span className="text-muted text-[10.5px] truncate block" title={bando[key] || ""}>
+                              {bando[key] || "—"}
+                            </span>
+                          )}
+                        </td>
+                      ))}
+                    </>
+                  ) : (
+                    /* ĐÁNH GIÁ — gõ THẲNG vào ô này, rời ô là tự lưu (không mở trang khác). */
+                    <td className={`${TD} align-top`} onClick={(e) => e.stopPropagation()}>
+                      {canEditEval(p) ? (
+                        <textarea
+                          rows={1}
+                          value={evalEdits[p.id] ?? p.evaluation ?? ""}
+                          onChange={(e) => setEvalEdits((s) => ({ ...s, [p.id]: e.target.value }))}
+                          onBlur={() => saveEvaluation(p)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              (e.target as HTMLTextAreaElement).blur();
+                            }
+                            if (e.key === "Escape") {
+                              setEvalEdits((s) => {
+                                const n = { ...s };
+                                delete n[p.id];
+                                return n;
+                              });
+                            }
+                          }}
+                          placeholder="Nội dung…"
+                          title="Gõ trực tiếp — rời ô (hoặc Enter) là tự lưu; Esc để huỷ"
+                          className="min-h-[26px] w-full resize-y rounded border border-transparent bg-transparent px-1.5 py-1 text-[11px] text-ink outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
+                        />
+                      ) : (
+                        <span className="text-muted">{p.evaluation || "—"}</span>
+                      )}
+                    </td>
+                  )}
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.start_date || ""}>{dm(p.start_date)}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.end_date || ""}>{dm(p.end_date)}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.internal_deadline || ""}>{dm(p.internal_deadline)}</td>
