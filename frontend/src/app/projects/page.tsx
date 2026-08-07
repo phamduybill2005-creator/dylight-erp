@@ -12,7 +12,7 @@ import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/fi
 import PersonPicker from "@/components/person-picker";
 import ArchiveModal from "@/components/archive-modal";
 import { api } from "@/lib/api";
-import { isManagerUp } from "@/lib/roles";
+import { isManagerUp, isSeniorManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept } from "@/lib/groups";
 import type { Project, User, ProjectStatus } from "@/lib/types";
@@ -499,20 +499,23 @@ export default function ProjectsPage() {
           />
         </div>
 
-        <div className="w-full sm:w-[200px]">
-          <select
-            value={filterDept}
-            onChange={(e) => setFilterDept(e.target.value)}
-            className="w-full rounded-xl2 border border-line bg-white px-3 py-2.5 text-xs outline-none focus:border-steel text-ink"
-          >
-            <option value="">— Tất cả phòng ban —</option>
-            {uniqueDepts.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Bộ lọc phòng ban — CHỈ HIỆN DÀNH CHO GIÁM ĐỐC, QUẢN TRỊ & QUẢN LÝ CẤP CAO */}
+        {isSeniorManagerUp(me) && (
+          <div className="w-full sm:w-[200px]">
+            <select
+              value={filterDept}
+              onChange={(e) => setFilterDept(e.target.value)}
+              className="w-full rounded-xl2 border border-line bg-white px-3 py-2.5 text-xs outline-none focus:border-steel text-ink"
+            >
+              <option value="">— Tất cả phòng ban —</option>
+              {uniqueDepts.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
 
 

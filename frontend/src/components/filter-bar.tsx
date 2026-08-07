@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
+import { isSeniorManagerUp } from "@/lib/roles";
 import type { User, Project } from "@/lib/types";
 
 export type Filters = { dept: string; leadId: number | ""; projectId: number | "" };
@@ -31,11 +32,13 @@ export default function FilterBar({
   onChange: (v: Filters) => void;
   leadLabel?: string;
 }) {
+  const [me, setMe] = useState<User | null>(api.cachedUser());
   const [depts, setDepts] = useState<string[]>([]);
   const [leads, setLeads] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
+    api.me().then(setMe).catch(() => {});
     if (show.dept) api.departments().then((d) => setDepts(d.map((x) => x.name))).catch(() => {});
     if (show.lead) api.users().then(setLeads).catch(() => {});
     if (show.project) api.projects().then(setProjects).catch(() => {});
@@ -62,7 +65,7 @@ export default function FilterBar({
         <FunnelIcon className="h-4 w-4" /> Lọc
       </span>
 
-      {show.dept && (
+      {show.dept && isSeniorManagerUp(me) && (
         <select
           value={value.dept}
           onChange={(e) => onChange({ ...value, dept: e.target.value })}
