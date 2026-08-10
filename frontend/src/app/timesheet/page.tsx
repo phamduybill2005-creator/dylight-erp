@@ -187,7 +187,7 @@ export default function TimesheetPage() {
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
         <div className="flex items-center gap-2">
           <ClockIcon className="h-5 w-5 text-amber" />
-          <h1 className="text-base lg:text-xl font-bold">Nhân công theo ngày</h1>
+          <h1 className="text-base lg:text-xl font-bold">Thời gian thực hiện dự án</h1>
         </div>
         
         {/* Badge thống kê giờ nhanh */}
