@@ -332,6 +332,23 @@ export default function ProjectsPage() {
     return true;
   });
 
+  // Sắp xếp dự án theo TIME IN (start_date) từ CŨ đến MỚI (tăng dần). Dự án chưa có TIME IN xếp phía dưới.
+  const displayProjects = useMemo(() => {
+    return [...filteredProjects].sort((a, b) => {
+      const da = a.start_date ? a.start_date.trim() : "";
+      const db = b.start_date ? b.start_date.trim() : "";
+
+      if (da && db) {
+        if (da !== db) return da.localeCompare(db);
+        return (a.code || "").localeCompare(b.code || "", "vi");
+      }
+      if (da && !db) return -1;
+      if (!da && db) return 1;
+
+      return (a.created_at || "").localeCompare(b.created_at || "");
+    });
+  }, [filteredProjects]);
+
   useEffect(() => {
     let alive = true;
     // Nạp danh sách dự án — dùng cho lần đầu và polling.
@@ -589,7 +606,7 @@ export default function ProjectsPage() {
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs text-muted">
-        <span>Tìm thấy: <b>{filteredProjects.length}</b> dự án</span>
+        <span>Tìm thấy: <b>{displayProjects.length}</b> dự án</span>
         {(searchQuery || filterDept || filterLead || filterMonth) && (
           <button
             onClick={() => {
@@ -680,7 +697,7 @@ export default function ProjectsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredProjects.length === 0 && (
+            {displayProjects.length === 0 && (
               <tr>
                 <td className={`${TD} text-center text-muted`} colSpan={infoCols}>
                   Không tìm thấy dự án nào khớp với bộ lọc.
@@ -688,7 +705,7 @@ export default function ProjectsPage() {
               </tr>
             )}
 
-            {filteredProjects.map((p, i) => {
+            {displayProjects.map((p, i) => {
               const effectiveStatus = computeAutoStatus(p);
               const st = PROJECT_STATUS[effectiveStatus] ?? PROJECT_STATUS.PLANNING;
               const bando = parseBanDoDetails(evalEdits[p.id] !== undefined ? evalEdits[p.id] : p.evaluation);
