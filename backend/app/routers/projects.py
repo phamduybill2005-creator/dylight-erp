@@ -310,7 +310,7 @@ def list_projects(db: Session = Depends(get_db), current: User = Depends(get_cur
         Project.company_id == current.company_id,
         func.coalesce(Project.is_deleted, False) == False,
     )
-    projects = q.order_by(Project.created_at.desc()).all()
+    projects = q.order_by(Project.start_date.asc().nullslast(), Project.created_at.asc()).all()
 
     if _is_director(current) or _is_senior_manager(db, current):
         return [_to_out(db, p) for p in projects]

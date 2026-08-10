@@ -195,6 +195,12 @@ export default function TimesheetPage() {
       const bHas = has.has(b.id) ? 1 : 0;
       if (aHas !== bHas) return bHas - aHas;
 
+      const da = a.start_date ? a.start_date.trim() : "";
+      const db = b.start_date ? b.start_date.trim() : "";
+      if (da && db && da !== db) return da.localeCompare(db);
+      if (da && !db) return -1;
+      if (!da && db) return 1;
+
       return a.name.localeCompare(b.name, "vi");
     });
   }, [projects, selectedDept, filteredEntries, pinnedIds]);

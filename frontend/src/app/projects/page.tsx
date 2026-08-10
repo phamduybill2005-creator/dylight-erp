@@ -47,6 +47,19 @@ function dm(s?: string | null): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v.slice(8, 10)}/${v.slice(5, 7)}` : "—";
 }
 
+function parseTimestamp(s?: string | null): number | null {
+  if (!s) return null;
+  const str = s.trim();
+  if (!str) return null;
+  const v = str.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const [y, m, d] = v.split("-").map(Number);
+    return new Date(y, m - 1, d).getTime();
+  }
+  const t = new Date(str).getTime();
+  return isNaN(t) ? null : t;
+}
+
 function calculateDuration(start?: string | null, end?: string | null, deadline?: string | null): string {
   if (!start) return "—";
   const startDate = new Date(start);
@@ -375,18 +388,18 @@ export default function ProjectsPage() {
       const bPin = pinnedSet.has(b.id) ? 1 : 0;
       if (aPin !== bPin) return bPin - aPin;
 
-      // 2. Sắp xếp theo TIME IN (start_date) từ CŨ đến MỚI
-      const da = a.start_date ? a.start_date.trim() : "";
-      const db = b.start_date ? b.start_date.trim() : "";
+      // 2. Sắp xếp theo TIME IN (start_date) từ CŨ đến MỚI (tăng dần)
+      const ta = parseTimestamp(a.start_date);
+      const tb = parseTimestamp(b.start_date);
 
-      if (da && db) {
-        if (da !== db) return da.localeCompare(db);
+      if (ta !== null && tb !== null) {
+        if (ta !== tb) return ta - tb;
         return (a.code || "").localeCompare(b.code || "", "vi");
       }
-      if (da && !db) return -1;
-      if (!da && db) return 1;
+      if (ta !== null && tb === null) return -1;
+      if (ta === null && tb !== null) return 1;
 
-      return (a.created_at || "").localeCompare(b.created_at || "");
+      return (a.code || "").localeCompare(b.code || "", "vi");
     });
   }, [filteredProjects, pinnedIds]);
 
