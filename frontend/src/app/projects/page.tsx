@@ -4,9 +4,10 @@
 // có dòng tổng cộng. Cột tài chính (Giá trị HĐ / Chi phí / Lãi-lỗ) chỉ hiện cho
 // Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon, ArchiveBoxIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon, ArchiveBoxIcon, StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
+import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import PersonPicker from "@/components/person-picker";
@@ -116,6 +117,39 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   // Bộ lọc: theo phòng ban (thành viên) / người chủ trì / dự án cụ thể.
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+
+  // Danh sách ID dự án được GHIM (đồng bộ hoàn toàn với tab Tiến độ)
+  const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("timesheet_pinned_projects");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const syncPinned = () => {
+      try {
+        const saved = localStorage.getItem("timesheet_pinned_projects");
+        if (saved) setPinnedIds(JSON.parse(saved));
+      } catch {}
+    };
+    window.addEventListener("storage", syncPinned);
+    return () => window.removeEventListener("storage", syncPinned);
+  }, []);
+
+  const togglePin = useCallback((pid: number) => {
+    setPinnedIds((prev) => {
+      const next = prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid];
+      try {
+        localStorage.setItem("timesheet_pinned_projects", JSON.stringify(next));
+        window.dispatchEvent(new Event("storage"));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // Thêm dự án — mặc định FORM từng ô; "bulk" = dán nhiều dòng từ Excel (tùy chọn).
   const [showAdd, setShowAdd] = useState(false);
@@ -332,9 +366,16 @@ export default function ProjectsPage() {
     return true;
   });
 
-  // Sắp xếp dự án theo TIME IN (start_date) từ CŨ đến MỚI (tăng dần). Dự án chưa có TIME IN xếp phía dưới.
+  // Sắp xếp dự án: 1. Dự án GHIM (Pinned) lên đầu -> 2. TIME IN (start_date) từ CŨ đến MỚI (tăng dần).
   const displayProjects = useMemo(() => {
+    const pinnedSet = new Set(pinnedIds);
     return [...filteredProjects].sort((a, b) => {
+      // 1. Ưu tiên dự án được GHIM lên đầu bảng
+      const aPin = pinnedSet.has(a.id) ? 1 : 0;
+      const bPin = pinnedSet.has(b.id) ? 1 : 0;
+      if (aPin !== bPin) return bPin - aPin;
+
+      // 2. Sắp xếp theo TIME IN (start_date) từ CŨ đến MỚI
       const da = a.start_date ? a.start_date.trim() : "";
       const db = b.start_date ? b.start_date.trim() : "";
 
@@ -347,7 +388,7 @@ export default function ProjectsPage() {
 
       return (a.created_at || "").localeCompare(b.created_at || "");
     });
-  }, [filteredProjects]);
+  }, [filteredProjects, pinnedIds]);
 
   useEffect(() => {
     let alive = true;
@@ -522,7 +563,7 @@ export default function ProjectsPage() {
 
   const TH = `border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 ${isBanDoMode ? "px-1 py-1 text-[10px]" : "px-1.5 py-1.5"}`;
   const TD = `border border-line align-middle ${isBanDoMode ? "px-1 py-1 text-[10.5px]" : "px-1.5 py-1.5"}`;
-  const infoCols = isBanDoMode ? 19 : 13;
+  const infoCols = isBanDoMode ? 20 : 14;
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -628,6 +669,7 @@ export default function ProjectsPage() {
           {isBanDoMode ? (
             <colgroup>
               <col className="w-[28px]" />   {/* STT */}
+              <col className="w-[24px]" />   {/* Ghim ★ */}
               <col className="w-[80px]" />   {/* Mã QL */}
               <col className="w-[145px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
               <col className="w-[58px]" />   {/* Nhóm */}
@@ -650,7 +692,8 @@ export default function ProjectsPage() {
             </colgroup>
           ) : (
             <colgroup>
-              <col className="w-[34px]" />   {/* STT */}
+              <col className="w-[32px]" />   {/* STT */}
+              <col className="w-[26px]" />   {/* Ghim ★ */}
               <col className="w-[96px]" />   {/* Mã QL — fit mã 9 ký tự */}
               <col className="w-[320px]" />  {/* Tên dự án — rộng nhất */}
               <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
@@ -668,7 +711,8 @@ export default function ProjectsPage() {
           )}
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
-              <th className={`${TH} w-10 text-center`}>STT</th>
+              <th className={`${TH} text-center`}>STT</th>
+              <th className={`${TH} text-center text-amber`} title="Ghim yêu thích lên đầu">★</th>
               <th className={TH}>Mã QL</th>
               <th className={TH}>Tên dự án</th>
               <th className={TH}>Nhóm</th>
@@ -709,15 +753,48 @@ export default function ProjectsPage() {
               const effectiveStatus = computeAutoStatus(p);
               const st = PROJECT_STATUS[effectiveStatus] ?? PROJECT_STATUS.PLANNING;
               const bando = parseBanDoDetails(evalEdits[p.id] !== undefined ? evalEdits[p.id] : p.evaluation);
+              const isPinned = pinnedIds.includes(p.id);
 
               return (
                 <tr
                   key={p.id}
                   onClick={() => router.push(`/projects/${p.id}`)}
-                  className="cursor-pointer transition-colors odd:bg-white even:bg-paper/40 hover:bg-amber/10"
+                  className={`cursor-pointer transition-colors ${
+                    isPinned
+                      ? "bg-amber/10 hover:bg-amber/15 font-medium"
+                      : "odd:bg-white even:bg-paper/40 hover:bg-amber/10"
+                  }`}
                 >
                   <td className={`${TD} text-center text-muted tnum`}>{i + 1}</td>
-                  <td className={`${TD} font-mono text-[13px] font-bold text-bad whitespace-nowrap`}>{p.code}</td>
+                  <td
+                    className={`${TD} text-center`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePin(p.id);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="p-0.5 transition-transform hover:scale-125 focus:outline-none cursor-pointer"
+                      title={isPinned ? "Bỏ ghim dự án" : "Ghim dự án lên đầu bảng"}
+                    >
+                      {isPinned ? (
+                        <StarIconSolid className="h-4 w-4 text-amber" />
+                      ) : (
+                        <StarIconOutline className="h-4 w-4 text-slate-300 hover:text-amber" />
+                      )}
+                    </button>
+                  </td>
+                  <td className={`${TD} font-mono text-[13px] font-bold text-bad whitespace-nowrap`}>
+                    <div className="flex items-center gap-1">
+                      <span>{p.code}</span>
+                      {isPinned && (
+                        <span className="rounded bg-amber/20 px-1 text-[8px] font-bold text-amber-700 leading-none shrink-0">
+                          Ghim
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className={`${TD} font-semibold text-ink`}>
                     <div className="truncate" title={p.name}>{p.name}</div>
                   </td>
