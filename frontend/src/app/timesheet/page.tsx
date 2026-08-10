@@ -6,7 +6,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClockIcon, ChevronLeftIcon, ChevronRightIcon, UserIcon, UsersIcon, BuildingOfficeIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, ChevronLeftIcon, ChevronRightIcon, UserIcon, UsersIcon, BuildingOfficeIcon, StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
+import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal } from "@/lib/format";
@@ -43,6 +44,25 @@ export default function TimesheetPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("");
+  const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("timesheet_pinned_projects");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const togglePin = useCallback((pid: number) => {
+    setPinnedIds((prev) => {
+      const next = prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid];
+      try {
+        localStorage.setItem("timesheet_pinned_projects", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   const days = useMemo(() => {
     if (viewPeriod === "week") {
@@ -157,16 +177,27 @@ export default function TimesheetPage() {
   }, [filteredEntries, days]);
 
   // Hàng = dự án. Nếu chọn Phòng ban, chỉ hiển thị dự án thuộc phòng ban đó.
+  // Thứ tự sắp xếp: 1. Dự án GHIM (Pinned) -> 2. Dự án có giờ -> 3. Tên A-Z.
   const rowProjects = useMemo(() => {
     let list = projects;
     if (selectedDept !== "") {
       list = projects.filter((p) => getProjectDept(p) === selectedDept);
     }
     const has = new Set(filteredEntries.map((e) => e.project_id));
-    return [...list].sort(
-      (a, b) => (has.has(a.id) ? 0 : 1) - (has.has(b.id) ? 0 : 1) || a.name.localeCompare(b.name, "vi"),
-    );
-  }, [projects, selectedDept, filteredEntries]);
+    const pinnedSet = new Set(pinnedIds);
+
+    return [...list].sort((a, b) => {
+      const aPin = pinnedSet.has(a.id) ? 1 : 0;
+      const bPin = pinnedSet.has(b.id) ? 1 : 0;
+      if (aPin !== bPin) return bPin - aPin;
+
+      const aHas = has.has(a.id) ? 1 : 0;
+      const bHas = has.has(b.id) ? 1 : 0;
+      if (aHas !== bHas) return bHas - aHas;
+
+      return a.name.localeCompare(b.name, "vi");
+    });
+  }, [projects, selectedDept, filteredEntries, pinnedIds]);
 
   const projTotal = (pid: number) => days.reduce((s, d) => s + (cellHours.get(key(pid, d)) ?? 0), 0);
   const dayTotal = (d: string) => rowProjects.reduce((s, p) => s + (cellHours.get(key(p.id, d)) ?? 0), 0);
@@ -345,7 +376,7 @@ export default function TimesheetPage() {
           <div className="mt-3 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
             <table className={`w-full border-collapse text-[11px] table-fixed ${isMonth ? "min-w-0" : "min-w-[850px]"}`}>
               <colgroup>
-                <col className={isMonth ? "w-[150px] lg:w-[180px]" : "w-[240px]"} />
+                <col className={isMonth ? "w-[180px] lg:w-[210px]" : "w-[260px]"} />
                 {days.map((d) => (
                   <col key={d} className={isMonth ? "w-auto" : "w-[54px]"} />
                 ))}
@@ -354,8 +385,12 @@ export default function TimesheetPage() {
               </colgroup>
               <thead>
                 <tr className="bg-slate-700 text-[10px] uppercase tracking-wide text-white">
-                  <th className={`${stickyLeft} sticky top-0 z-30 bg-slate-700 border border-slate-600 ${isMonth ? "px-1.5 py-1 text-[10px]" : "px-2 py-1.5 text-left"} font-semibold align-middle`}>
-                    Dự án
+                  <th className={`${stickyLeft} sticky top-0 z-30 bg-slate-700 border border-slate-600 ${isMonth ? "px-1 py-1 text-[10px]" : "px-2 py-1.5 text-left"} font-semibold align-middle`}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-5 shrink-0 text-center text-slate-300 font-mono" title="Số thứ tự">STT</span>
+                      <span className="w-4 shrink-0 text-center text-amber" title="Ghim yêu thích lên đầu">★</span>
+                      <span className="truncate">Dự án</span>
+                    </div>
                   </th>
                   {days.map((d) => {
                     const [y, m, dd] = d.split("-").map(Number);
@@ -400,18 +435,59 @@ export default function TimesheetPage() {
                     </td>
                   </tr>
                 ) : (
-                  rowProjects.map((p) => {
+                  rowProjects.map((p, idx) => {
                     const total = projTotal(p.id);
+                    const isPinned = pinnedIds.includes(p.id);
                     return (
-                      <tr key={p.id} className="odd:bg-white even:bg-sky-50/60 hover:bg-sky-100/50 transition-colors">
-                        <td className={`${stickyLeft} bg-inherit ${isMonth ? "px-1.5 py-0.5" : "px-2 py-1"}`}>
-                          <span className="font-mono text-[9px] font-bold text-bad leading-none block">{p.code}</span>
-                          <span
-                            className={`block ${isMonth ? "max-w-[130px] lg:max-w-[160px] text-[10px]" : "max-w-[180px] text-[11px]"} truncate font-medium text-ink leading-tight`}
-                            title={p.name}
-                          >
-                            {p.name}
-                          </span>
+                      <tr
+                        key={p.id}
+                        className={`transition-colors ${
+                          isPinned
+                            ? "bg-amber/10 hover:bg-amber/15 font-medium"
+                            : "odd:bg-white even:bg-sky-50/60 hover:bg-sky-100/50"
+                        }`}
+                      >
+                        <td className={`${stickyLeft} bg-inherit ${isMonth ? "px-1 py-0.5" : "px-2 py-1"}`}>
+                          <div className="flex items-center gap-1.5">
+                            {/* Cột STT */}
+                            <span className="w-5 shrink-0 text-center font-mono text-[10px] font-bold text-slate-500">
+                              {idx + 1}
+                            </span>
+
+                            {/* Cột Ghim (Yêu thích) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePin(p.id);
+                              }}
+                              className="shrink-0 p-0.5 transition-transform hover:scale-125 focus:outline-none"
+                              title={isPinned ? "Bỏ ghim dự án" : "Ghim dự án lên đầu bảng"}
+                            >
+                              {isPinned ? (
+                                <StarIconSolid className="h-4 w-4 text-amber" />
+                              ) : (
+                                <StarIconOutline className="h-4 w-4 text-slate-300 hover:text-amber" />
+                              )}
+                            </button>
+
+                            {/* Mã + Tên dự án */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1">
+                                <span className="font-mono text-[9px] font-bold text-bad leading-none block truncate">{p.code}</span>
+                                {isPinned && (
+                                  <span className="rounded bg-amber/20 px-1 text-[8px] font-bold text-amber-700 leading-none shrink-0">
+                                    Ghim
+                                  </span>
+                                )}
+                              </div>
+                              <span
+                                className={`block ${isMonth ? "max-w-[95px] lg:max-w-[125px] text-[10px]" : "max-w-[160px] text-[11px]"} truncate font-medium text-ink leading-tight`}
+                                title={p.name}
+                              >
+                                {p.name}
+                              </span>
+                            </div>
+                          </div>
                         </td>
                         {days.map((d) => {
                           const hrs = cellHours.get(key(p.id, d));
