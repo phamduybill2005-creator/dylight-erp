@@ -146,11 +146,19 @@ export default function ProjectsPage() {
     const syncPinned = () => {
       try {
         const saved = localStorage.getItem("timesheet_pinned_projects");
-        if (saved) setPinnedIds(JSON.parse(saved));
+        setPinnedIds(saved ? JSON.parse(saved) : []);
       } catch {}
     };
+    syncPinned();
+
     window.addEventListener("storage", syncPinned);
-    return () => window.removeEventListener("storage", syncPinned);
+    window.addEventListener("focus", syncPinned);
+    window.addEventListener("pinned_projects_changed", syncPinned);
+    return () => {
+      window.removeEventListener("storage", syncPinned);
+      window.removeEventListener("focus", syncPinned);
+      window.removeEventListener("pinned_projects_changed", syncPinned);
+    };
   }, []);
 
   const togglePin = useCallback((pid: number) => {
@@ -159,6 +167,7 @@ export default function ProjectsPage() {
       try {
         localStorage.setItem("timesheet_pinned_projects", JSON.stringify(next));
         window.dispatchEvent(new Event("storage"));
+        window.dispatchEvent(new CustomEvent("pinned_projects_changed", { detail: next }));
       } catch {}
       return next;
     });
