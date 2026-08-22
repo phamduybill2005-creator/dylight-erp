@@ -79,6 +79,7 @@ export interface Project {
   progress_percent?: number; // % tiến độ THỰC (trung bình các mốc), do BE tính
   total_hours?: number;      // tổng số giờ làm (tính từ timesheets)
   total_days?: number;       // tổng số ngày làm (total_hours / 8)
+  contract_value?: number | string;  // DOANH THU = tổng giá trị HĐ chưa VAT (BE tính)
   is_deleted?: boolean;
   deleted_at?: string | null;
   deleted_by_id?: number | null;

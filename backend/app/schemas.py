@@ -206,6 +206,10 @@ class ProjectOut(ProjectBase):
     progress_percent: Decimal = Decimal(0)
     total_hours: float = 0.0              # tổng giờ làm từ timesheets (bơm ở router)
     total_days: float = 0.0               # tổng số ngày làm (total_hours / 8)
+    # DOANH THU dự án = tổng giá trị hợp đồng CHƯA VAT (bơm ở router).
+    # Cột này hiện cho MỌI vai trò theo yêu cầu vận hành -> KHÔNG mask như
+    # package_value/đơn giá hạng mục.
+    contract_value: Decimal = Decimal(0)
 
 
 # --------------------------- CONTRACT ---------------------------

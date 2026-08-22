@@ -19,6 +19,7 @@ import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProje
 import { resolveDoscoLead } from "@/lib/project-lead";
 import type { Project, User, ProjectStatus } from "@/lib/types";
 import { useEscapeKey } from "@/lib/use-escape-key";
+import { formatVND } from "@/lib/format";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -714,10 +715,9 @@ export default function ProjectsPage() {
               <col className="w-[50px]" />   {/* Time in */}
               <col className="w-[50px]" />   {/* Time out */}
               <col className="w-[50px]" />   {/* Time due */}
-              <col className="w-[68px]" />   {/* Total time */}
               <col className="w-[72px]" />   {/* Trạng thái */}
               <col className="w-[60px]" />   {/* Real time */}
-              <col className="w-[90px]" />   {/* Thao tác */}
+              <col className="w-[104px]" />  {/* Doanh thu */}
             </colgroup>
           ) : (
             <colgroup>
@@ -732,10 +732,9 @@ export default function ProjectsPage() {
               <col className="w-[64px]" />   {/* Time in */}
               <col className="w-[64px]" />   {/* Time out */}
               <col className="w-[64px]" />   {/* Time due */}
-              <col className="w-[88px]" />   {/* Total time */}
               <col className="w-[82px]" />   {/* Trạng thái */}
               <col className="w-[74px]" />   {/* Tiến độ */}
-              <col className="w-[112px]" />  {/* Thao tác */}
+              <col className="w-[130px]" />  {/* Doanh thu */}
             </colgroup>
           )}
           <thead>
@@ -763,10 +762,9 @@ export default function ProjectsPage() {
               <th className={TH} title="Ngày nhận">Time in</th>
               <th className={TH} title="Ngày hoàn thành">Time out</th>
               <th className={TH} title="Hạn nội bộ">Time due</th>
-              <th className={TH} title="Tổng thời gian">Total time</th>
               <th className={TH}>Trạng thái</th>
               <th className={TH} title="Thời gian làm thực tế realtime (tính từ chấm công tiến độ)">Real time</th>
-              <th className={`${TH} text-center`}>Thao tác</th>
+              <th className={`${TH} text-right`} title="Doanh thu = tổng giá trị hợp đồng (chưa VAT)">Doanh thu</th>
             </tr>
           </thead>
           <tbody>
@@ -955,7 +953,6 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.start_date || ""}>{dm(p.start_date)}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.end_date || ""}>{dm(p.end_date)}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.internal_deadline || ""}>{dm(p.internal_deadline)}</td>
-                  <td className={`${TD} text-muted whitespace-nowrap tnum`}>{calculateDuration(p.start_date, p.end_date, p.internal_deadline)}</td>
                   <td className={TD}>
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
                       {st.label}
@@ -971,31 +968,18 @@ export default function ProjectsPage() {
                       ) : null}
                     </div>
                   </td>
-                  <td className={`${TD} text-center whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-center gap-1">
-                      {canEditProject(p) ? (
-                        <button
-                          onClick={() => openEditModal(p)}
-                          title="Sửa thông tin dự án"
-                          className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 hover:text-ink"
-                        >
-                          <PencilSquareIcon className="h-3 w-3 shrink-0 text-steel" />
-                          Sửa
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-muted">—</span>
-                      )}
-                      {canDelete && (
-                        <button
-                          onClick={() => handleQuickDelete(p)}
-                          title="Xoá dự án"
-                          className="inline-flex items-center gap-0.5 rounded border border-bad/30 bg-bad/10 px-1.5 py-0.5 text-[10px] font-semibold text-bad transition-colors hover:bg-bad hover:text-white"
-                        >
-                          <TrashIcon className="h-3 w-3 shrink-0" />
-                          Xoá
-                        </button>
-                      )}
-                    </div>
+                  {/* DOANH THU = tổng giá trị hợp đồng (chưa VAT) — hiện cho MỌI vai trò. */}
+                  <td className={`${TD} text-right whitespace-nowrap`}>
+                    {Number(p.contract_value ?? 0) > 0 ? (
+                      <span
+                        className="block truncate font-semibold text-ink tnum"
+                        title={formatVND(p.contract_value)}
+                      >
+                        {formatVND(p.contract_value)}
+                      </span>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
                   </td>
                 </tr>
               );
