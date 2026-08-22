@@ -111,6 +111,28 @@ def _member_ids(db: Session, project: Project) -> set[int]:
     }
 
 
+def _resolve_dosco_lead(db: Session, company_id: int, dosco_manager: str | None) -> User | None:
+    """DOSCO担当 (phía Việt) LÀ NGƯỜI CHỦ TRÌ dự án.
+
+    Ô DOSCO担当 lưu dạng TEXT (dán từ Excel) nên phải dò ngược về tài khoản trong
+    công ty: ưu tiên trùng khít tên, sau đó mới tới trùng một phần (VD "H.K.LAM"
+    với "H.K.LAM (Lâm)"). Trả None khi không khớp ai -> giữ nguyên chủ trì cũ.
+    """
+    name = (dosco_manager or "").strip().lower()
+    if not name:
+        return None
+    users = db.query(User).filter(User.company_id == company_id).all()
+    for u in users:                                   # 1) trùng khít
+        if u.full_name and u.full_name.strip().lower() == name:
+            return u
+    partial = [                                        # 2) trùng một phần
+        u for u in users
+        if u.full_name and (name in u.full_name.strip().lower() or u.full_name.strip().lower() in name)
+    ]
+    # Nhiều người cùng khớp một phần -> mơ hồ, không đoán bừa.
+    return partial[0] if len(partial) == 1 else None
+
+
 def _user_dept_set(user: User) -> set[str]:
     if not user.department:
         return set()
@@ -379,6 +401,13 @@ def create_project(
         if not lead or lead.company_id != current.company_id:
             raise HTTPException(400, "Người chủ trì không hợp lệ.")
     
+    # DOSCO担当 (phía Việt) = NGƯỜI CHỦ TRÌ. Chọn được người trong công ty thì
+    # người đó thắng, kể cả khi payload gửi lead_id khác (một nguồn chân lý duy nhất).
+    dosco_lead = _resolve_dosco_lead(db, current.company_id, data.get("dosco_manager"))
+    if dosco_lead is not None:
+        data["lead_id"] = dosco_lead.id
+        lead_id = dosco_lead.id
+
     # Nếu chưa chỉ định lead_id, tự động gán creator làm lead_id mặc định
     if lead_id is None and _is_manager_tier(db, current):
         data["lead_id"] = current.id
@@ -491,6 +520,19 @@ def update_project(
 
     for k, v in data.items():
         setattr(p, k, v)
+
+    # DOSCO担当 (phía Việt) = NGƯỜI CHỦ TRÌ. Sau khi đã set các cột, dò lại tên vừa
+    # lưu -> đồng bộ lead_id + đảm bảo người đó nằm trong danh sách thành viên
+    # (chủ trì mà không phải thành viên thì trang dự án đếm sai và không chấm được).
+    if "dosco_manager" in data:
+        dosco_lead = _resolve_dosco_lead(db, current.company_id, p.dosco_manager)
+        if dosco_lead is not None:
+            p.lead_id = dosco_lead.id
+            if dosco_lead.id not in {u.id for u in p.members}:
+                p.members = list(p.members) + [dosco_lead]
+        elif not (p.dosco_manager or "").strip():
+            # Xoá trắng DOSCO担当 -> gỡ luôn chủ trì cho khớp.
+            p.lead_id = None
 
     db.commit()
     db.refresh(p)

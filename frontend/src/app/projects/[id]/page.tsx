@@ -21,7 +21,7 @@ import {
   PencilSquareIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
-import { CheckBadgeIcon as CheckBadgeSolid } from "@heroicons/react/24/solid";
+import { CheckBadgeIcon as CheckBadgeSolid, StarIcon as StarSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
 import ProjectItemsTab from "@/components/project-items-tab";
 import ProjectTimesheet from "@/components/project-timesheet";
@@ -34,6 +34,7 @@ import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatVND, formatDate } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, deptLabel, normalizeDept, geoDeptOf } from "@/lib/groups";
+import { resolveDoscoLead } from "@/lib/project-lead";
 import type { Project, Contract, Progress, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -220,6 +221,19 @@ export default function ProjectDetailPage() {
     }
   }, [project]);
 
+  // DOSCO担当 (phía Việt) LÀ NGƯỜI CHỦ TRÌ — chọn ai ở ô đó thì người đó thành
+  // chủ trì và được tick vào thành viên luôn. Backend chốt lại y hệt khi lưu
+  // (_resolve_dosco_lead), đây chỉ để modal hiện đúng ngay lúc đang chọn.
+  const doscoLeadUser = resolveDoscoLead(allUsers, doscoInput);
+  useEffect(() => {
+    if (!membersModal || !doscoLeadUser) return;
+    setSelectedLeadId(doscoLeadUser.id);
+    setSelectedMemberIds((prev) =>
+      prev.includes(doscoLeadUser.id) ? prev : [...prev, doscoLeadUser.id],
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [membersModal, doscoLeadUser?.id]);
+
   function handleToggleMember(userId: number) {
     setSelectedMemberIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
@@ -237,14 +251,16 @@ export default function ProjectDetailPage() {
     setSavingMembers(true);
     setError(null);
     try {
+      // Chủ trì = người đang chọn ở ô DOSCO担当 (nếu dò được tài khoản công ty).
+      const leadId = doscoLeadUser ? doscoLeadUser.id : selectedLeadId;
       // Người chủ trì phải nằm trong danh sách thành viên (nếu có) để nhất quán.
       const memberIds =
-        selectedLeadId != null && !selectedMemberIds.includes(selectedLeadId)
-          ? [...selectedMemberIds, selectedLeadId]
+        leadId != null && !selectedMemberIds.includes(leadId)
+          ? [...selectedMemberIds, leadId]
           : selectedMemberIds;
       await api.updateProject(project.id, {
         member_ids: memberIds,
-        lead_id: selectedLeadId,
+        lead_id: leadId,
         name: nameInput.trim(),
         code: codeInput.trim() || project.code,   // không để trống mã (NOT NULL)
         start_date: startInput || null,
@@ -498,6 +514,16 @@ export default function ProjectDetailPage() {
               GEO担当: <span className="font-medium text-ink">{project.geo_manager}</span>
             </p>
           )}
+          {/* DOSCO担当 (phía Việt) = NGƯỜI CHỦ TRÌ dự án. */}
+          {(project.dosco_manager || project.lead_name) && (
+            <p className="flex items-center gap-1.5">
+              <StarSolid className="h-4 w-4 text-amber" />
+              Chủ trì (DOSCO担当):{" "}
+              <span className="font-medium text-ink">
+                {project.dosco_manager || project.lead_name}
+              </span>
+            </p>
+          )}
           {project.start_date && (
             <p className="flex items-center gap-1.5 col-span-2">
               <CalendarDaysIcon className="h-4 w-4 text-muted/80" />
@@ -520,9 +546,18 @@ export default function ProjectDetailPage() {
             {(() => {
               // Hiện CẢ chủ trì để số đếm "(N)" khớp với danh sách bên dưới —
               // trước đây lọc bỏ chủ trì nên thấy "(1)" mà lại báo "Chưa phân công".
+              // Chủ trì = lead_id; dự án cũ chưa có lead_id thì dò theo tên DOSCO担当.
+              const leadId =
+                project.lead_id ??
+                resolveDoscoLead(project.members ?? [], project.dosco_manager)?.id ??
+                null;
               const otherMembers = (project.members ?? [])
                 .slice()
                 .sort((a, b) => {
+                  // Chủ trì luôn đứng đầu danh sách.
+                  const leadRankA = a.id === leadId ? 0 : 1;
+                  const leadRankB = b.id === leadId ? 0 : 1;
+                  if (leadRankA !== leadRankB) return leadRankA - leadRankB;
                   const rankA = getRoleRank(a.role, a.has_subordinates);
                   const rankB = getRoleRank(b.role, b.has_subordinates);
                   if (rankA !== rankB) return rankA - rankB;
@@ -531,17 +566,29 @@ export default function ProjectDetailPage() {
               if (otherMembers.length === 0) {
                 return <p className="text-[11px] text-muted italic">Chưa phân công thành viên thực hiện.</p>;
               }
-              return otherMembers.map((member) => (
-                <span
-                  key={member.id}
-                  className="inline-flex items-center gap-1 rounded-md border bg-paper border-line/50 px-2 py-0.5 text-[10px] font-semibold text-ink"
-                  title={`${roleTitle(member.role, member.has_subordinates)} - ${member.phone || "Không có SĐT"}`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-                  {member.full_name}
-                  <span className="text-[9px] text-muted">({roleTitle(member.role, member.has_subordinates)})</span>
-                </span>
-              ));
+              return otherMembers.map((member) => {
+                const isLead = member.id === leadId;
+                return (
+                  <span
+                    key={member.id}
+                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold text-ink ${
+                      isLead ? "border-amber bg-amber/15" : "bg-paper border-line/50"
+                    }`}
+                    title={`${isLead ? "Chủ trì (DOSCO担当) · " : ""}${roleTitle(member.role, member.has_subordinates)} - ${member.phone || "Không có SĐT"}`}
+                  >
+                    {isLead ? (
+                      <StarSolid className="h-3 w-3 text-amber" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber" />
+                    )}
+                    {member.full_name}
+                    {isLead && (
+                      <span className="rounded bg-amber px-1 text-[9px] font-bold text-white">Chủ trì</span>
+                    )}
+                    <span className="text-[9px] text-muted">({roleTitle(member.role, member.has_subordinates)})</span>
+                  </span>
+                );
+              });
             })()}
           </div>
         </div>
@@ -899,6 +946,18 @@ export default function ProjectDetailPage() {
                       placeholder="— Chọn người phía Việt —"
                       className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                     />
+                    <p className="mt-1 text-[10px] text-muted">
+                      {doscoLeadUser ? (
+                        <>
+                          <b className="text-amber-deep">{doscoLeadUser.full_name}</b> sẽ là{" "}
+                          <b className="text-ink">người chủ trì</b> dự án này.
+                        </>
+                      ) : (
+                        <>
+                          Người chọn ở đây là <b className="text-ink">người chủ trì</b> dự án.
+                        </>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div className="border-t border-line/60 pt-2.5">
@@ -995,7 +1054,14 @@ export default function ProjectDetailPage() {
                             className="h-4 w-4 rounded border-line text-steel focus:ring-steel cursor-pointer"
                           />
                           <span className="min-w-0">
-                            <span className="block text-xs font-semibold text-ink truncate">{u.full_name}</span>
+                            <span className="flex items-center gap-1 text-xs font-semibold text-ink">
+                              <span className="truncate">{u.full_name}</span>
+                              {isLead && (
+                                <span className="shrink-0 rounded bg-amber px-1 text-[9px] font-bold text-white">
+                                  Chủ trì
+                                </span>
+                              )}
+                            </span>
                             <span className="block text-[10px] text-muted">{roleTitle(u.role, u.has_subordinates)} · {u.email}</span>
                           </span>
                         </label>

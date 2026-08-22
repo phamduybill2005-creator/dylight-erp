@@ -4,7 +4,7 @@
 // có dòng tổng cộng. Cột tài chính (Giá trị HĐ / Chi phí / Lãi-lỗ) chỉ hiện cho
 // Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon, ArchiveBoxIcon, StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
@@ -16,6 +16,7 @@ import { api } from "@/lib/api";
 import { isManagerUp, isSeniorManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept } from "@/lib/groups";
+import { resolveDoscoLead } from "@/lib/project-lead";
 import type { Project, User, ProjectStatus } from "@/lib/types";
 import { useEscapeKey } from "@/lib/use-escape-key";
 
@@ -245,6 +246,10 @@ export default function ProjectsPage() {
   const [efEndDate, setEfEndDate] = useState("");
   const [efInternalDeadline, setEfInternalDeadline] = useState("");
   const [efLeadId, setEfLeadId] = useState<number | "">("");
+  // DOSCO担当 (phía Việt) LÀ NGƯỜI CHỦ TRÌ — dò tên đang chọn về tài khoản công ty
+  // để hiện nhãn ngay trong modal (backend chốt lại y hệt lúc lưu).
+  const efDoscoLead = resolveDoscoLead(users, efDosco);
+  const nfDoscoLead = resolveDoscoLead(users, nfDosco);
   const [savingEdit, setSavingEdit] = useState(false);
   const [archiveModal, setArchiveModal] = useState(false);
 
@@ -341,7 +346,8 @@ export default function ProjectsPage() {
         start_date: efStartDate || null,
         end_date: efEndDate || null,
         internal_deadline: efInternalDeadline || null,
-        lead_id: efLeadId ? Number(efLeadId) : null,
+        // DOSCO担当 (phía Việt) = NGƯỜI CHỦ TRÌ (backend cũng chốt lại như vậy).
+        lead_id: efDoscoLead ? efDoscoLead.id : efLeadId ? Number(efLeadId) : null,
       });
       setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
       setEditingProject(null);
@@ -549,7 +555,8 @@ export default function ProjectsPage() {
         group_name: nfGroup.trim() || null,
         geo_manager: nfGeo.trim() || null,
         dosco_manager: nfDosco.trim() || null,
-        lead_id: leadId === "" ? null : Number(leadId),
+        // DOSCO担当 (phía Việt) = NGƯỜI CHỦ TRÌ (backend cũng chốt lại như vậy).
+        lead_id: nfDoscoLead ? nfDoscoLead.id : leadId === "" ? null : Number(leadId),
         evaluation: nfEval.trim() || null,
         start_date: nfStartDate || null,
         end_date: nfEndDate || null,
@@ -829,7 +836,14 @@ export default function ProjectsPage() {
                     <div className="truncate" title={p.geo_manager || ""}>{p.geo_manager || "—"}</div>
                   </td>
                   <td className={`${TD} text-muted`}>
-                    <div className="truncate" title={p.dosco_manager || ""}>{p.dosco_manager || "—"}</div>
+                    {/* DOSCO担当 = người chủ trì -> gắn sao cho nhận ra ngay. */}
+                    <div
+                      className="flex items-center gap-1 truncate"
+                      title={p.dosco_manager ? `Chủ trì: ${p.dosco_manager}` : ""}
+                    >
+                      {p.dosco_manager && <StarIconSolid className="h-3 w-3 shrink-0 text-amber" />}
+                      <span className="truncate">{p.dosco_manager || "—"}</span>
+                    </div>
                   </td>
                   {isBanDoMode ? (
                     <>
@@ -1060,6 +1074,18 @@ export default function ProjectsPage() {
                         options={doscoOptsFor(nfGroup, nfDosco)}
                         placeholder="— Chọn người phía Việt —"
                       />
+                      <span className="mt-1 block text-[10px] text-muted">
+                        {nfDoscoLead ? (
+                          <>
+                            <b className="text-amber-deep">{nfDoscoLead.full_name}</b> sẽ là{" "}
+                            <b className="text-ink">người chủ trì</b>.
+                          </>
+                        ) : (
+                          <>
+                            Người chọn ở đây là <b className="text-ink">người chủ trì</b> dự án.
+                          </>
+                        )}
+                      </span>
                     </label>
                   </div>
                   <label className="block">
@@ -1201,6 +1227,18 @@ export default function ProjectsPage() {
                     options={doscoOptsFor(efGroup, efDosco)}
                     placeholder="— Chọn người phía Việt —"
                   />
+                  <p className="mt-1 text-[10px] text-muted">
+                    {efDoscoLead ? (
+                      <>
+                        <b className="text-amber-deep">{efDoscoLead.full_name}</b> sẽ là{" "}
+                        <b className="text-ink">người chủ trì</b>.
+                      </>
+                    ) : (
+                      <>
+                        Người chọn ở đây là <b className="text-ink">người chủ trì</b> dự án.
+                      </>
+                    )}
+                  </p>
                   <datalist id="dosco-list-edit" className="hidden">
                     {mgrs.dosco.map((m) => <option key={m} value={m} />)}
                   </datalist>
