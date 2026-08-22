@@ -1,7 +1,8 @@
 # Reverse proxy + HTTPS tự động cho ERP.
 # Một tên miền phục vụ cả web (Next.js) và API/ảnh (FastAPI) -> không lo CORS.
-# Đổi "erp.dosco.vn" thành tên miền phụ thật của bạn nếu khác.
-erp.dosco.vn {
+# Tên miền lấy từ biến DOMAIN trong .env (docker-compose.prod.yml truyền vào),
+# mặc định erp.dosco.vn -> đổi domain chỉ cần sửa .env, KHÔNG phải sửa file này.
+{$DOMAIN:erp.dosco.vn} {
 	encode gzip
 
 	# API và file tĩnh (ảnh hóa đơn) -> backend

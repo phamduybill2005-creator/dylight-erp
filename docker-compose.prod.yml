@@ -1,17 +1,24 @@
 # ====================================================================
 # TRIỂN KHAI SẢN XUẤT — chạy ERP sau Caddy (HTTPS tự động) trên 1 server.
 #
+# Hướng dẫn đầy đủ từng bước: xem docs/DEPLOY-VPS.md
+#
 # 1) Tạo file .env cạnh file này (xem các biến bên dưới), đổi HẾT mật khẩu/secret.
 # 2) Trỏ DNS:  erp.dosco.vn  ->  IP server này (bản ghi A).
 # 3) Chạy:     docker compose -f docker-compose.prod.yml up -d --build
-# 4) Nạp dữ liệu lần đầu:
+# 4) CHỈ KHI DB TRỐNG HOÀN TOÀN mới nạp dữ liệu mẫu:
 #              docker compose -f docker-compose.prod.yml exec backend python -m app.seed
+#    CẢNH BÁO: app.seed tạo tài khoản demo mật khẩu 123456 (giamdoc@dosco.vn ...).
+#    Chạy xong PHẢI đổi mật khẩu ngay. Đang dùng DB thật (Neon/đã có dữ liệu)
+#    thì TUYỆT ĐỐI KHÔNG chạy lệnh này.
 #
 # Biến cần đặt trong .env (ví dụ):
 #   DOMAIN=erp.dosco.vn
 #   POSTGRES_PASSWORD=<mật khẩu mạnh>
 #   SECRET_KEY=<chuỗi ngẫu nhiên dài>
 #   ATTENDANCE_API_KEY=<key mạnh cho máy chấm công>
+#   DATABASE_URL=<tùy chọn — đặt nếu dùng DB sẵn có, VD Neon; bỏ trống thì
+#                 dùng Postgres chạy trong container db bên dưới>
 # ====================================================================
 
 services:
@@ -37,9 +44,17 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg2://dylight:${POSTGRES_PASSWORD}@db:5432/dylight
+      # Bỏ trống DATABASE_URL -> dùng Postgres trong container db.
+      # Đặt DATABASE_URL trong .env -> trỏ thẳng sang DB sẵn có (VD Neon), giữ
+      # nguyên dữ liệu đang chạy, không phải chuyển đổi gì.
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://dylight:${POSTGRES_PASSWORD}@db:5432/dylight}
       SECRET_KEY: ${SECRET_KEY:?dat SECRET_KEY trong .env}
       FRONTEND_ORIGINS: https://${DOMAIN:-erp.dosco.vn}
+      # PROD: tắt debug (bắt buộc SECRET_KEY thật) + TẮT tự nạp dữ liệu mẫu.
+      # Mặc định trong config.py là True cho môi trường dev; để nguyên khi deploy
+      # ra Internet là tự tạo tài khoản demo mật khẩu 123456 -> cửa hậu.
+      DEBUG: "false"
+      AUTO_SEED: "false"
       ATTENDANCE_API_KEY: ${ATTENDANCE_API_KEY:-}
       OCR_PROVIDER: ${OCR_PROVIDER:-mock}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -70,6 +85,9 @@ services:
     depends_on:
       - frontend
       - backend
+    environment:
+      # Caddyfile đọc {$DOMAIN} -> đổi domain chỉ cần sửa .env.
+      DOMAIN: ${DOMAIN:-erp.dosco.vn}
     ports:
       - "80:80"
       - "443:443"
