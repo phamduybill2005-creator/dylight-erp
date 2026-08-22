@@ -83,6 +83,9 @@ def _ensure_schema() -> None:
                 "is_deleted": "ALTER TABLE projects ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE",
                 "deleted_at": "ALTER TABLE projects ADD COLUMN deleted_at TIMESTAMP",
                 "deleted_by_id": "ALTER TABLE projects ADD COLUMN deleted_by_id INTEGER",
+                # Manual time (giờ nhập tay) + Doanh thu nhập tay trên bảng Dự án.
+                "manual_hours": "ALTER TABLE projects ADD COLUMN manual_hours NUMERIC(10,2)",
+                "revenue": "ALTER TABLE projects ADD COLUMN revenue NUMERIC(18,2)",
             }
             pmissing = [sql for col, sql in padds.items() if col not in pcols]
             if pmissing:

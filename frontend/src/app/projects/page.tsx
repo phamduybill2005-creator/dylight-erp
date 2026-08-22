@@ -62,6 +62,41 @@ function parseTimestamp(s?: string | null): number | null {
   return isNaN(t) ? null : t;
 }
 
+/** Ô MANUAL TIME nhận SỐ GIỜ: "12,5" hoặc "12.5" -> 12.5; rỗng/không hợp lệ -> null. */
+function parseHours(s: string): number | null {
+  const t = s.replace(/,/g, ".").replace(/[^\d.]/g, "");
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Ô DOANH THU nhận SỐ TIỀN: "78.000.000" -> 78000000; rỗng -> null. */
+function parseMoney(s: string): number | null {
+  const t = s.replace(/[^\d]/g, "");
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Quy giờ ra NGÀY công: 8 giờ = 1 ngày (cùng quy ước với total_days của Real time). */
+function hoursToDays(h: number): string {
+  return (Math.round((h / 8) * 10) / 10).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+}
+
+/** Số -> chuỗi có dấu chấm ngăn nghìn để hiện trong ô nhập ("78.000.000"). */
+function groupNumber(v: number | string | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) : "";
+}
+
+/** Decimal từ backend về dạng "16.00" -> "16" cho gọn ô nhập. */
+function plainNumber(v: number | string | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? String(n) : "";
+}
+
 function calculateDuration(start?: string | null, end?: string | null, deadline?: string | null): string {
   if (!start) return "—";
   const startDate = new Date(start);
@@ -202,6 +237,8 @@ export default function ProjectsPage() {
   const [canManage, setCanManage] = useState(false);
   const [me, setMe] = useState<User | null>(null);
   const [evalEdits, setEvalEdits] = useState<Record<number, string>>({});   // ĐÁNH GIÁ đang gõ dở
+  const [manualEdits, setManualEdits] = useState<Record<number, string>>({});   // MANUAL TIME đang gõ dở
+  const [revenueEdits, setRevenueEdits] = useState<Record<number, string>>({}); // DOANH THU đang gõ dở
   // XOÁ nhanh dự án: tầng 1 (Giám đốc/Quản trị) + tầng 2 (Quản lý cấp cao = quản lý
   // KHÔNG có ai quản lý bên trên). Khớp đúng gate ở backend.
   const canDelete =
@@ -256,6 +293,58 @@ export default function ProjectsPage() {
 
   /** Lưu ĐÁNH GIÁ gõ trực tiếp trên bảng (rời ô là lưu). Đang gõ thì không bị
    *  vòng tự làm mới 20s ghi đè, vì ưu tiên giá trị trong evalEdits. */
+  /** Lưu MANUAL TIME (số giờ nhập tay) — rời ô là lưu, giống ô Ghi chú. */
+  async function saveManualHours(p: Project) {
+    const draft = manualEdits[p.id];
+    if (draft === undefined) return;
+    const clear = () =>
+      setManualEdits((s) => {
+        const n = { ...s };
+        delete n[p.id];
+        return n;
+      });
+    const next = parseHours(draft);
+    const cur = p.manual_hours == null || p.manual_hours === "" ? null : Number(p.manual_hours);
+    if (next === cur) {
+      clear();
+      return;
+    }
+    try {
+      const updated = await api.updateProject(p.id, { manual_hours: next });
+      setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err: any) {
+      alert(err?.message || "Không lưu được Manual time.");
+    } finally {
+      clear();
+    }
+  }
+
+  /** Lưu DOANH THU nhập tay — rời ô là lưu. */
+  async function saveRevenue(p: Project) {
+    const draft = revenueEdits[p.id];
+    if (draft === undefined) return;
+    const clear = () =>
+      setRevenueEdits((s) => {
+        const n = { ...s };
+        delete n[p.id];
+        return n;
+      });
+    const next = parseMoney(draft);
+    const cur = p.revenue == null || p.revenue === "" ? null : Number(p.revenue);
+    if (next === cur) {
+      clear();
+      return;
+    }
+    try {
+      const updated = await api.updateProject(p.id, { revenue: next });
+      setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err: any) {
+      alert(err?.message || "Không lưu được Doanh thu.");
+    } finally {
+      clear();
+    }
+  }
+
   async function saveEvaluation(p: Project) {
     const draft = evalEdits[p.id];
     if (draft === undefined) return;
@@ -593,7 +682,7 @@ export default function ProjectsPage() {
 
   const TH = `border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 ${isBanDoMode ? "px-1 py-1 text-[10px]" : "px-1.5 py-1.5"}`;
   const TD = `border border-line align-middle ${isBanDoMode ? "px-1 py-1 text-[10.5px]" : "px-1.5 py-1.5"}`;
-  const infoCols = isBanDoMode ? 20 : 14;
+  const infoCols = isBanDoMode ? 21 : 15;
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -715,8 +804,9 @@ export default function ProjectsPage() {
               <col className="w-[50px]" />   {/* Time in */}
               <col className="w-[50px]" />   {/* Time out */}
               <col className="w-[50px]" />   {/* Time due */}
-              <col className="w-[72px]" />   {/* Trạng thái */}
+              <col className="w-[66px]" />   {/* Manual time */}
               <col className="w-[60px]" />   {/* Real time */}
+              <col className="w-[72px]" />   {/* Trạng thái */}
               <col className="w-[104px]" />  {/* Doanh thu */}
             </colgroup>
           ) : (
@@ -732,8 +822,9 @@ export default function ProjectsPage() {
               <col className="w-[64px]" />   {/* Time in */}
               <col className="w-[64px]" />   {/* Time out */}
               <col className="w-[64px]" />   {/* Time due */}
+              <col className="w-[84px]" />   {/* Manual time */}
+              <col className="w-[74px]" />   {/* Real time */}
               <col className="w-[82px]" />   {/* Trạng thái */}
-              <col className="w-[74px]" />   {/* Tiến độ */}
               <col className="w-[130px]" />  {/* Doanh thu */}
             </colgroup>
           )}
@@ -762,9 +853,10 @@ export default function ProjectsPage() {
               <th className={TH} title="Ngày nhận">Time in</th>
               <th className={TH} title="Ngày hoàn thành">Time out</th>
               <th className={TH} title="Hạn nội bộ">Time due</th>
+              <th className={`${TH} text-center`} title="Thời gian NHẬP TAY — gõ số giờ, tự quy ra ngày (8 giờ = 1 ngày)">Manual time</th>
+              <th className={`${TH} text-center`} title="Thời gian làm thực tế realtime (tính từ chấm công tiến độ)">Real time</th>
               <th className={TH}>Trạng thái</th>
-              <th className={TH} title="Thời gian làm thực tế realtime (tính từ chấm công tiến độ)">Real time</th>
-              <th className={`${TH} text-right`} title="Doanh thu = tổng giá trị hợp đồng (chưa VAT)">Doanh thu</th>
+              <th className={`${TH} text-right`} title="Doanh thu — nhập tay (VND)">Doanh thu</th>
             </tr>
           </thead>
           <tbody>
@@ -953,10 +1045,56 @@ export default function ProjectsPage() {
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.start_date || ""}>{dm(p.start_date)}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.end_date || ""}>{dm(p.end_date)}</td>
                   <td className={`${TD} text-muted whitespace-nowrap tnum`} title={p.internal_deadline || ""}>{dm(p.internal_deadline)}</td>
-                  <td className={TD}>
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
-                      {st.label}
-                    </span>
+                  {/* MANUAL TIME — gõ SỐ GIỜ ở dòng dưới, dòng trên tự quy ra NGÀY
+                      (cùng bố cục với Real time: ngày đậm ở trên, (giờ) ở dưới). */}
+                  <td className={`${TD} text-center whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
+                    {(() => {
+                      const shown = manualEdits[p.id] ?? plainNumber(p.manual_hours);
+                      const h = parseHours(shown) ?? 0;
+                      const dayText = h > 0 ? `${hoursToDays(h)} ngày` : "0 ngày";
+                      if (!canEditProject(p)) {
+                        return (
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="font-bold text-ink tnum text-xs">{dayText}</span>
+                            {h > 0 ? (
+                              <span className="text-[10px] text-muted tnum font-mono">({h}h)</span>
+                            ) : null}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="flex flex-col items-center justify-center">
+                          <span className="font-bold text-ink tnum text-xs">{dayText}</span>
+                          <span className="flex items-center justify-center text-[10px] text-muted tnum font-mono">
+                            (
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={shown}
+                              onChange={(e) => setManualEdits((s) => ({ ...s, [p.id]: e.target.value }))}
+                              onBlur={() => saveManualHours(p)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                                if (e.key === "Escape") {
+                                  setManualEdits((s) => {
+                                    const n = { ...s };
+                                    delete n[p.id];
+                                    return n;
+                                  });
+                                }
+                              }}
+                              placeholder="0"
+                              title="Nhập SỐ GIỜ — tự quy ra ngày (8 giờ = 1 ngày)"
+                              className="w-9 rounded border border-transparent bg-transparent text-center text-[10px] text-muted tnum font-mono outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white focus:text-ink"
+                            />
+                            h)
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className={`${TD} text-center whitespace-nowrap`}>
                     <div className="flex flex-col items-center justify-center">
@@ -968,17 +1106,41 @@ export default function ProjectsPage() {
                       ) : null}
                     </div>
                   </td>
-                  {/* DOANH THU = tổng giá trị hợp đồng (chưa VAT) — hiện cho MỌI vai trò. */}
-                  <td className={`${TD} text-right whitespace-nowrap`}>
-                    {Number(p.contract_value ?? 0) > 0 ? (
-                      <span
-                        className="block truncate font-semibold text-ink tnum"
-                        title={formatVND(p.contract_value)}
-                      >
-                        {formatVND(p.contract_value)}
-                      </span>
+                  <td className={TD}>
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
+                      {st.label}
+                    </span>
+                  </td>
+                  {/* DOANH THU — nhập tay (VND). Rời ô là tự lưu, giống ô Ghi chú. */}
+                  <td className={`${TD} text-right whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
+                    {canEditProject(p) ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={revenueEdits[p.id] ?? groupNumber(p.revenue)}
+                        onChange={(e) => setRevenueEdits((s) => ({ ...s, [p.id]: e.target.value }))}
+                        onBlur={() => saveRevenue(p)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            (e.target as HTMLInputElement).blur();
+                          }
+                          if (e.key === "Escape") {
+                            setRevenueEdits((s) => {
+                              const n = { ...s };
+                              delete n[p.id];
+                              return n;
+                            });
+                          }
+                        }}
+                        placeholder="—"
+                        title={p.revenue != null && p.revenue !== "" ? formatVND(p.revenue) : "Nhập doanh thu (VND)"}
+                        className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-[11px] font-semibold text-ink tnum outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
+                      />
                     ) : (
-                      <span className="text-muted">—</span>
+                      <span className="block truncate font-semibold text-ink tnum" title={formatVND(p.revenue)}>
+                        {p.revenue != null && p.revenue !== "" ? formatVND(p.revenue) : "—"}
+                      </span>
                     )}
                   </td>
                 </tr>

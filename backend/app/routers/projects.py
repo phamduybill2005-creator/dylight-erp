@@ -312,27 +312,12 @@ def _total_timesheet_hours(db: Session, project_id: int) -> float:
     return float(val or 0)
 
 
-def _contract_value(db: Session, project_id: int) -> Decimal:
-    """DOANH THU dự án = tổng giá trị hợp đồng CHƯA VAT.
-
-    Cùng cách tính với dashboard/báo cáo (sum Contract.value_no_vat) để con số
-    trên bảng Dự án khớp với "Tổng doanh thu HĐ".
-    """
-    val = (
-        db.query(func.coalesce(func.sum(Contract.value_no_vat), 0))
-        .filter(Contract.project_id == project_id)
-        .scalar()
-    )
-    return Decimal(val or 0)
-
-
 def _to_out(db: Session, project: Project) -> ProjectOut:
     """Map ORM -> ProjectOut kèm % tiến độ thực, tổng giờ/ngày làm & trạng thái tự động."""
     out = ProjectOut.model_validate(project)
     out.progress_percent = _progress_percent(db, project.id)
     out.total_hours = round(_total_timesheet_hours(db, project.id), 1)
     out.total_days = round(out.total_hours / 8.0, 1)
-    out.contract_value = _contract_value(db, project.id)
     out.status = _compute_auto_status(project.status, out.progress_percent, project.start_date, project.end_date)
     return out
 

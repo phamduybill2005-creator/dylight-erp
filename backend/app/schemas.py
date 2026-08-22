@@ -155,6 +155,8 @@ class ProjectBase(BaseModel):
     location: str | None = None
     manager_name: str | None = None
     lead_id: int | None = None            # người chủ trì (chỉ huy trưởng)
+    manual_hours: Decimal | None = None   # MANUAL TIME — số giờ nhập tay
+    revenue: Decimal | None = None        # DOANH THU nhập tay (VND)
     status: ProjectStatus = ProjectStatus.PLANNING
     start_date: date | None = None
     end_date: date | None = None
@@ -176,6 +178,8 @@ class ProjectUpdate(BaseModel):
     location: str | None = None
     manager_name: str | None = None
     lead_id: int | None = None            # đặt/gỡ người chủ trì
+    manual_hours: Decimal | None = None   # MANUAL TIME — số giờ nhập tay (None = xoá trắng)
+    revenue: Decimal | None = None        # DOANH THU nhập tay (None = xoá trắng)
     status: ProjectStatus | None = None
     start_date: date | None = None
     end_date: date | None = None
@@ -206,10 +210,6 @@ class ProjectOut(ProjectBase):
     progress_percent: Decimal = Decimal(0)
     total_hours: float = 0.0              # tổng giờ làm từ timesheets (bơm ở router)
     total_days: float = 0.0               # tổng số ngày làm (total_hours / 8)
-    # DOANH THU dự án = tổng giá trị hợp đồng CHƯA VAT (bơm ở router).
-    # Cột này hiện cho MỌI vai trò theo yêu cầu vận hành -> KHÔNG mask như
-    # package_value/đơn giá hạng mục.
-    contract_value: Decimal = Decimal(0)
 
 
 # --------------------------- CONTRACT ---------------------------

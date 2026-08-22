@@ -230,6 +230,12 @@ class Project(Base):
     # Người CHỦ TRÌ dự án (chỉ huy trưởng) — có toàn quyền quản lý thành viên & tiến độ.
     # Cột trên bảng ĐÃ TỒN TẠI -> phải ALTER ở _ensure_schema (create_all không tự thêm).
     lead_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # MANUAL TIME — số giờ làm NHẬP TAY trên bảng Dự án. Tách hẳn khỏi total_hours
+    # (tính tự động từ chấm công) để người dùng ghi đè/bổ sung mà không đụng số liệu
+    # chấm công. NULL = chưa nhập. Cột mới -> ALTER ở _ensure_schema.
+    manual_hours: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # DOANH THU nhập tay (VND). NULL = chưa nhập. Cột mới -> ALTER ở _ensure_schema.
+    revenue: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(SAEnum(ProjectStatus), default=ProjectStatus.PLANNING)
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
