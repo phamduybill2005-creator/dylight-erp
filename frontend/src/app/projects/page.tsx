@@ -791,7 +791,7 @@ export default function ProjectsPage() {
             <colgroup>
               <col className="w-[28px]" />   {/* STT */}
               <col className="w-[24px]" />   {/* Ghim ★ */}
-              <col className="w-[80px]" />   {/* Mã QL */}
+              <col className="w-[124px]" />  {/* Mã QL + nhãn "Ghim" */}
               <col className="w-[145px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
               <col className="w-[58px]" />   {/* Nhóm */}
               <col className="w-[54px]" />   {/* GEO担当 */}
@@ -817,7 +817,10 @@ export default function ProjectsPage() {
             <colgroup>
               <col className="w-[32px]" />   {/* STT */}
               <col className="w-[26px]" />   {/* Ghim ★ */}
-              <col className="w-[96px]" />   {/* Mã QL — fit mã 9 ký tự */}
+              {/* Mã QL + nhãn "Ghim": mã 9 ký tự đo được 84px, nhãn 29px,
+                  cộng gap 4 + padding 12 = 129px -> lấy 132px cho dư.
+                  Trước để 96px nên nhãn "Ghim" bị cắt cụt. */}
+              <col className="w-[132px]" />  {/* Mã QL */}
               <col className="w-[320px]" />  {/* Tên dự án — rộng nhất */}
               <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
               <col className="w-[62px]" />   {/* GEO担当 */}
