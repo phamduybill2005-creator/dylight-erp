@@ -793,7 +793,9 @@ export default function ProjectsPage() {
               <col className="w-[145px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
               <col className="w-[58px]" />   {/* Nhóm */}
               <col className="w-[54px]" />   {/* GEO担当 */}
-              <col className="w-[64px]" />   {/* DOSCO担当 */}
+              {/* DOSCO担当: tên dài nhất (D.M.QUANG) đo được 63px ở cỡ chữ 10.5px,
+                  cộng sao 12px + gap 4px + padding 8px = 87px -> lấy 100px cho dư. */}
+              <col className="w-[100px]" />  {/* DOSCO担当 */}
               <col className="w-[48px]" />   {/* RIEGL (nhập số) */}
               <col className="w-[48px]" />   {/* QLCL (nhập số) */}
               <col className="w-[48px]" />   {/* DATA (nhập số) */}
@@ -817,7 +819,9 @@ export default function ProjectsPage() {
               <col className="w-[320px]" />  {/* Tên dự án — rộng nhất */}
               <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
               <col className="w-[62px]" />   {/* GEO担当 */}
-              <col className="w-[78px]" />   {/* DOSCO担当 */}
+              {/* DOSCO担当: tên dài nhất (D.M.QUANG) đo được 66px ở cỡ chữ 11px,
+                  cộng sao 12px + gap 4px + padding 12px = 94px -> lấy 110px cho dư. */}
+              <col className="w-[110px]" />  {/* DOSCO担当 */}
               <col className="w-[150px]" />  {/* Ghi chú */}
               <col className="w-[64px]" />   {/* Time in */}
               <col className="w-[64px]" />   {/* Time out */}
