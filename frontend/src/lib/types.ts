@@ -593,3 +593,34 @@ export interface Department {
   name: string;
   order_index: number;
 }
+
+/** Một ô nhân sự trong SƠ ĐỒ TỔ CHỨC (khớp OrgChartNode ở backend). */
+export interface OrgChartNode {
+  key: string;
+  name: string;
+  deptLabel: string;
+  jpDeptLabel: string;
+  bgClass: string;
+  textClass: string;
+  borderColor: string;
+}
+
+/** Các CỤM ô theo đúng bố cục đang vẽ (nhánh trái = 3D, nhánh phải = Cầu đường). */
+export interface OrgChartData {
+  level1: OrgChartNode[];
+  level2: OrgChartNode[];
+  level3: OrgChartNode[];
+  level4Left: OrgChartNode[];
+  level4Right: OrgChartNode[];
+  level5Left: OrgChartNode[];
+  level5Right: OrgChartNode[];
+  level6Left: OrgChartNode[];
+  level6Right: OrgChartNode[];
+}
+
+export interface OrgChartOut {
+  data: OrgChartData;
+  updated_at?: string | null;
+  updated_by_name?: string | null;
+  can_edit: boolean;
+}

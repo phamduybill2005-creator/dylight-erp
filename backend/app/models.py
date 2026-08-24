@@ -1083,3 +1083,24 @@ class Department(Base):
     name: Mapped[str] = mapped_column(String(120))
     order_index: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # thứ tự hiển thị
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# --------------------------------------------------------------------------
+# 27. ORG_CHARTS — SƠ ĐỒ TỔ CHỨC công ty (hiện ở trang chủ).
+#     Trước đây sơ đồ bị CẮM CỨNG trong frontend nên đổi người phải sửa code +
+#     deploy lại. Bảng này cho Giám đốc / Quản lý cấp cao tự thêm, sửa, xoá nhân
+#     sự trong sơ đồ.
+#     Lưu nguyên cây dưới dạng JSON (1 dòng / công ty) thay vì bảng quan hệ, vì
+#     BỐ CỤC nhánh trái/phải là cố định — thay đổi chỉ là NỘI DUNG các ô, không
+#     phải hình dạng cây. Chưa có dòng nào -> router trả sơ đồ mặc định.
+# --------------------------------------------------------------------------
+class OrgChart(Base):
+    __tablename__ = "org_charts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+    data: Mapped[dict] = mapped_column(JSON)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    updated_by: Mapped["User | None"] = relationship("User", foreign_keys=[updated_by_id])

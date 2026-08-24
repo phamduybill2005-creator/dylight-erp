@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, StarOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem } from "./types";
+import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, StarOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -449,6 +449,11 @@ export const api = {
 
   // --- Đồng nghiệp: biệt danh riêng + gom team ---
   colleagues: () => request<Colleague[]>("/colleagues"),
+
+  // SƠ ĐỒ TỔ CHỨC — ai cũng xem được; sửa thì backend chặn theo vai trò (403).
+  orgChart: () => request<OrgChartOut>("/org-chart"),
+  saveOrgChart: (data: OrgChartData) =>
+    request<OrgChartOut>("/org-chart", { method: "PUT", body: JSON.stringify(data) }),
   nicknameMap: () => request<Record<string, string>>("/colleagues/nicknames"),
   setNickname: (userId: number, nickname: string | null) =>
     request<Colleague>(`/colleagues/${userId}/nickname`, { method: "PUT", body: JSON.stringify({ nickname }) }),

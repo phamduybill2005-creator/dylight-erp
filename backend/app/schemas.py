@@ -1079,3 +1079,36 @@ class ProjectItemRatingUpsert(BaseModel):
     user_id: int
     rating: int = Field(ge=0, le=5)
 
+
+
+# ------------------------- ORG CHART (sơ đồ tổ chức) -------------------------
+class OrgChartNode(BaseModel):
+    """Một ô nhân sự trong sơ đồ. Giữ ĐÚNG tên trường camelCase như frontend."""
+    key: str
+    name: str
+    deptLabel: str = ""
+    jpDeptLabel: str = ""
+    bgClass: str = "bg-slate-100"
+    textClass: str = "text-slate-900"
+    borderColor: str = "border-slate-300"
+
+
+class OrgChartData(BaseModel):
+    """Các CỤM ô theo đúng bố cục đang vẽ (nhánh trái = 3D, nhánh phải = Cầu đường)."""
+    level1: list[OrgChartNode] = []
+    level2: list[OrgChartNode] = []
+    level3: list[OrgChartNode] = []
+    level4Left: list[OrgChartNode] = []
+    level4Right: list[OrgChartNode] = []
+    level5Left: list[OrgChartNode] = []
+    level5Right: list[OrgChartNode] = []
+    level6Left: list[OrgChartNode] = []
+    level6Right: list[OrgChartNode] = []
+
+
+class OrgChartOut(BaseModel):
+    data: OrgChartData
+    updated_at: datetime | None = None
+    updated_by_name: str | None = None
+    # Người đang xem có được sửa không -> frontend ẩn/hiện nút cho khớp backend.
+    can_edit: bool = False

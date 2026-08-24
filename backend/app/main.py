@@ -19,7 +19,7 @@ from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, project_evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-    chat, iclock, departments, timesheets, archive,
+    chat, iclock, departments, timesheets, archive, org_chart,
 )
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
@@ -489,7 +489,7 @@ P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
           project_items, attendance, evaluations, project_evaluations, partners, payroll,
           leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-          chat, departments, timesheets, archive):
+          chat, departments, timesheets, archive, org_chart):
     app.include_router(r.router, prefix=P)
 
 # Máy chấm công đẩy trực tiếp (ZKTeco PUSH/ADMS) gọi đúng /iclock/... -> KHÔNG thêm tiền tố /api/v1.
