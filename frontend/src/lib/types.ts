@@ -70,6 +70,7 @@ export interface Project {
   lead_name?: string | null;
   lead_department?: string | null;
   status: ProjectStatus;
+  status_locked?: boolean;   // true = trạng thái do lãnh đạo ÉP, không tính tự động
   start_date?: string | null;
   end_date?: string | null;
   internal_deadline?: string | null;

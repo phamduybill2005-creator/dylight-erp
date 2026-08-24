@@ -84,6 +84,7 @@ def _ensure_schema() -> None:
                 "deleted_at": "ALTER TABLE projects ADD COLUMN deleted_at TIMESTAMP",
                 "deleted_by_id": "ALTER TABLE projects ADD COLUMN deleted_by_id INTEGER",
                 # Manual time (giờ nhập tay) + Doanh thu nhập tay trên bảng Dự án.
+                "status_locked": "ALTER TABLE projects ADD COLUMN status_locked BOOLEAN DEFAULT FALSE",
                 "manual_hours": "ALTER TABLE projects ADD COLUMN manual_hours NUMERIC(10,2)",
                 "revenue": "ALTER TABLE projects ADD COLUMN revenue NUMERIC(18,2)",
             }

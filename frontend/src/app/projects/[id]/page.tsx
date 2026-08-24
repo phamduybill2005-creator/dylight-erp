@@ -29,7 +29,7 @@ import ProjectTeamTab from "@/components/project-team-tab";
 import PersonPicker from "@/components/person-picker";
 import ArchiveModal from "@/components/archive-modal";
 import { api } from "@/lib/api";
-import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
+import { canSeeMoney, roleTitle, isDirector, isSeniorManagerUp } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatVND, formatDate } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
@@ -167,6 +167,8 @@ export default function ProjectDetailPage() {
 
   // Tất cả tài khoản đã đăng nhập đều có quyền quản lý, chỉnh sửa dự án & hạng mục (giống Hình 2)
   const canManage = !!currentUser;
+  // ÉP TRẠNG THÁI thì hẹp hơn: chỉ Giám đốc / Quản trị hệ thống / Quản lý cấp cao.
+  const canForceStatus = isSeniorManagerUp(currentUser);
 
   // Load current user once.
   useEffect(() => {
@@ -294,11 +296,19 @@ export default function ProjectDetailPage() {
     window.dispatchEvent(new CustomEvent("open-project-chat", { detail: { projectId } }));
   }
 
+  /** Ép trạng thái. "AUTO" = bỏ ép, để hệ thống tự tính theo tiến độ. */
   async function handleStatusChange(status: string) {
     if (!project) return;
-    setProject({ ...project, status: status as Project["status"] });   // cập nhật ngay cho mượt
+    const payload =
+      status === "AUTO"
+        ? { status_locked: false }
+        : { status: status as Project["status"], status_locked: true };
+    if (status !== "AUTO") {
+      setProject({ ...project, status: status as Project["status"], status_locked: true });
+    }
     try {
-      await api.updateProject(project.id, { status: status as Project["status"] });
+      const updated = await api.updateProject(project.id, payload);
+      setProject(updated);   // lấy lại từ server: AUTO thì server tính lại giúp
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đổi trạng thái thất bại.");
       loadData();
@@ -469,16 +479,18 @@ export default function ProjectDetailPage() {
                 Sửa dự án
               </button>
             )}
-            {canManage ? (
+            {canForceStatus ? (
               <select
                 value={project.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                title="Đổi trạng thái dự án"
+                title="Ép trạng thái dự án (giữ nguyên, không tự tính lại theo tiến độ)"
                 className={`cursor-pointer rounded-full border-0 px-2.5 py-1 text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber ${PROJECT_STATUS[project.status]?.cls}`}
               >
                 <option value="PLANNING">Chuẩn bị</option>
                 <option value="IN_PROGRESS">Đang làm</option>
                 <option value="COMPLETED">Hoàn thành</option>
+                <option value="ON_HOLD">Tạm dừng</option>
+                <option value="AUTO">↺ Tự động theo tiến độ</option>
               </select>
             ) : (
               <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}>

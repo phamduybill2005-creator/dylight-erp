@@ -318,7 +318,10 @@ def _to_out(db: Session, project: Project) -> ProjectOut:
     out.progress_percent = _progress_percent(db, project.id)
     out.total_hours = round(_total_timesheet_hours(db, project.id), 1)
     out.total_days = round(out.total_hours / 8.0, 1)
-    out.status = _compute_auto_status(project.status, out.progress_percent, project.start_date, project.end_date)
+    # ĐÃ ÉP TAY -> giữ nguyên lựa chọn của lãnh đạo. Trước đây dòng này luôn tính
+    # đè nên đổi trạng thái xong tải lại là mất, trông như "không lưu được".
+    if not project.status_locked:
+        out.status = _compute_auto_status(project.status, out.progress_percent, project.start_date, project.end_date)
     return out
 
 
@@ -496,6 +499,19 @@ def update_project(
     touches_admin = ("member_ids" in data) or ("lead_id" in data)
     if touches_admin and not _can_manage(db, p, current):
         raise HTTPException(403, "Bạn không có quyền quản lý thành viên/chủ trì dự án này.")
+
+    # ÉP TRẠNG THÁI dự án: CHỈ Giám đốc / Quản trị hệ thống / Quản lý CẤP CAO.
+    # (Quản lý cấp trung và nhân viên vẫn sửa được các thông tin khác.)
+    if "status" in data or "status_locked" in data:
+        if not (_is_director(current) or _is_senior_manager(db, current)):
+            raise HTTPException(
+                403,
+                "Chỉ Giám đốc hoặc Quản lý cấp cao mới được đổi trạng thái dự án.",
+            )
+        # Tự chọn trạng thái = ÉP -> khoá lại để không bị tính đè theo tiến độ.
+        # Muốn trả về tự động thì gửi riêng status_locked=false (không kèm status).
+        if "status" in data and "status_locked" not in data:
+            data["status_locked"] = True
 
     if "member_ids" in data:
         member_ids = data.pop("member_ids")

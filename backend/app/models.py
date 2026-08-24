@@ -237,6 +237,10 @@ class Project(Base):
     # DOANH THU nhập tay (VND). NULL = chưa nhập. Cột mới -> ALTER ở _ensure_schema.
     revenue: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(SAEnum(ProjectStatus), default=ProjectStatus.PLANNING)
+    # ÉP TRẠNG THÁI: mặc định trạng thái được TÍNH TỰ ĐỘNG theo %tiến độ + ngày
+    # bắt đầu/kết thúc. Khi lãnh đạo tự chọn trạng thái thì bật cờ này -> giữ
+    # nguyên lựa chọn tay, không bị tính đè nữa. Cột mới -> ALTER ở _ensure_schema.
+    status_locked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
     internal_deadline: Mapped[date | None] = mapped_column(Date)

@@ -158,6 +158,8 @@ class ProjectBase(BaseModel):
     manual_hours: Decimal | None = None   # MANUAL TIME — số giờ nhập tay
     revenue: Decimal | None = None        # DOANH THU nhập tay (VND)
     status: ProjectStatus = ProjectStatus.PLANNING
+    # True = trạng thái do người dùng ÉP, không tính tự động theo tiến độ nữa.
+    status_locked: bool = False
     start_date: date | None = None
     end_date: date | None = None
     internal_deadline: date | None = None
@@ -181,6 +183,8 @@ class ProjectUpdate(BaseModel):
     manual_hours: Decimal | None = None   # MANUAL TIME — số giờ nhập tay (None = xoá trắng)
     revenue: Decimal | None = None        # DOANH THU nhập tay (None = xoá trắng)
     status: ProjectStatus | None = None
+    # Gửi status -> tự khoá. Gửi riêng status_locked=false -> trả về TỰ ĐỘNG.
+    status_locked: bool | None = None
     start_date: date | None = None
     end_date: date | None = None
     internal_deadline: date | None = None
