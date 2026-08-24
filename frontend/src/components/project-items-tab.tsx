@@ -911,8 +911,11 @@ function GroupRows({
                 disabled={!canManage}
               />
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] font-semibold text-muted">Nhóm trưởng:</span>
+            {/* min-w-0 để cụm này CO ĐƯỢC khi ô hẹp. Trước đây shrink-0 nên <select>
+                (tự rộng theo option dài nhất, VD "P.T.T.NHUNG (Phòng Bản đồ)") tràn
+                khỏi ô và bị cột Nội dung bên cạnh đè lên. */}
+            <div className="flex min-w-0 items-center gap-1">
+              <span className="shrink-0 text-[10px] font-semibold text-muted">Nhóm trưởng:</span>
               <select
                 value={group.assignee_id || ""}
                 title="Chọn nhóm trưởng — phòng ban bên dưới tự nhảy theo người này (vẫn sửa tay được)"
@@ -927,7 +930,7 @@ function GroupRows({
                     .filter(Boolean)[0];
                   onPersist(group.id, dept ? { assignee_id: id, department: dept } : { assignee_id: id });
                 }}
-                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 transition-all ${
+                className={`min-w-0 max-w-[240px] truncate rounded border px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 transition-all ${
                   group.assignee_id
                     ? "border-indigo-200 bg-indigo-50 text-indigo-800"
                     : "border-line bg-white text-muted"
@@ -1048,13 +1051,15 @@ function GroupRows({
                 disabled={!canManage}
               />
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-semibold text-muted">Người làm:</span>
+                <div className="flex min-w-0 items-center gap-1">
+                  <span className="shrink-0 text-[9px] font-semibold text-muted">Người làm:</span>
+                  {/* Cùng lý do với ô "Nhóm trưởng": chặn max-w để <select> không tự
+                      phình theo nhãn optgroup rồi tràn sang cột bên cạnh. */}
                   <select
                     value={c.assignee_id || ""}
                     onChange={(e) => onPersist(c.id, { assignee_id: e.target.value ? Number(e.target.value) : null })}
                     disabled={!canManage}
-                    className={`rounded border px-1 py-0.5 text-[9px] outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 transition-all ${
+                    className={`min-w-0 max-w-[240px] truncate rounded border px-1 py-0.5 text-[9px] outline-none focus:border-steel cursor-pointer disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 transition-all ${
                       c.assignee_id
                         ? "border-sky-200 bg-sky-50 text-sky-800 font-medium"
                         : "border-line bg-white text-muted"
