@@ -1,0 +1,5 @@
+# ERP NỘI BỘ — không dành cho công chúng.
+# Chặn mọi công cụ tìm kiếm lập chỉ mục (trang đăng nhập lọt lên Google là lộ
+# hệ thống + tạo cớ cho bot dò mật khẩu). Kèm thêm robots:noindex ở layout.tsx.
+User-agent: *
+Disallow: /

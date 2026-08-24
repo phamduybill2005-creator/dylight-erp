@@ -47,8 +47,12 @@ services:
         value: "false"
       - key: AUTO_SEED             # PROD: TẮT tự nạp dữ liệu mẫu (chống backdoor tài khoản demo 123456)
         value: "false"
-      - key: FRONTEND_ORIGINS      # origin của frontend (sửa nếu Render cấp URL khác)
-        value: https://dosco-erp-web.onrender.com
+      # Origin của frontend — DANH SÁCH ngăn bởi dấu phẩy (config.py tách theo ",").
+      # Giữ CẢ URL onrender LẪN tên miền công ty: lúc DNS chưa kịp lan truyền vẫn
+      # vào được bằng URL cũ. Thiếu erp.dosco.vn ở đây là trình duyệt CHẶN CORS
+      # -> web trắng trang dù tên miền đã trỏ đúng.
+      - key: FRONTEND_ORIGINS
+        value: https://dosco-erp-web.onrender.com,https://erp.dosco.vn
       # --- Đồng bộ chấm công Yunatt ---
       # TẮT lịch trong app: việc cào Playwright/Chromium chuyển sang GitHub Actions
       # (.github/workflows/yunatt-sync.yml, 20:00 VN) -> backend KHÔNG cần Chromium,
@@ -71,6 +75,11 @@ services:
       - key: NODE_OPTIONS
         value: --max-old-space-size=512
       # Trỏ tới backend ở trên (sửa nếu Render cấp URL khác). Next "nướng" lúc build.
+      # GIỮ NGUYÊN URL onrender kể cả khi web đã chạy ở erp.dosco.vn — web gọi
+      # thẳng API qua URL này, CORS đã được FRONTEND_ORIGINS cho phép, nên KHÔNG
+      # cần build lại. Chỉ khi nào muốn API cũng mang tên miền công ty thì mới
+      # thêm custom domain erp-api.dosco.vn cho service API, đổi 2 giá trị dưới
+      # rồi BUILD LẠI frontend (restart suông không ăn thua).
       - key: NEXT_PUBLIC_API_BASE
         value: https://dosco-erp-api.onrender.com/api/v1
       - key: NEXT_PUBLIC_ASSET_BASE

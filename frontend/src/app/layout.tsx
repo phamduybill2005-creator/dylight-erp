@@ -22,6 +22,10 @@ export const metadata: Metadata = {
   description: "Đấu thầu, hợp đồng, dự án, tiến độ và báo cáo lãi/lỗ.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "CÔNG TY DOSCO" },
+  // ERP nội bộ chạy trên tên miền công ty (erp.dosco.vn) -> CẤM lập chỉ mục.
+  // robots.txt chỉ ngăn thu thập; thẻ noindex mới ngăn trang lọt vào kết quả
+  // tìm kiếm khi bị ai đó đặt liên kết trỏ tới.
+  robots: { index: false, follow: false, nocache: true },
 };
 
 export const viewport: Viewport = {

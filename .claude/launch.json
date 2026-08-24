@@ -5,7 +5,7 @@
       "name": "dosco-frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "-p", "3001"],
-      "cwd": "F:\\DOSCO\\AI\\dylight-erp\\frontend",
+      "cwd": "frontend",
       "port": 3001
     }
   ]
