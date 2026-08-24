@@ -392,33 +392,6 @@ export default function ProjectsPage() {
     return current && !base.includes(current) ? [current, ...base] : base;
   };
 
-  /** ÉP TRẠNG THÁI dự án: chỉ Giám đốc / Quản trị hệ thống / Quản lý cấp cao. */
-  const canForceStatus = isSeniorManagerUp(me);
-
-  /** Lưu trạng thái. "AUTO" = bỏ ép, trả về tự tính theo tiến độ. */
-  async function saveStatus(p: Project, value: string) {
-    const payload =
-      value === "AUTO"
-        ? { status_locked: false }
-        : { status: value as ProjectStatus, status_locked: true };
-    // Cập nhật ngay cho mượt, lỗi thì trả lại giá trị cũ.
-    const before = projects;
-    setProjects((prev) =>
-      prev.map((x) =>
-        x.id === p.id
-          ? { ...x, ...(value === "AUTO" ? { status_locked: false } : { status: value as ProjectStatus, status_locked: true }) }
-          : x,
-      ),
-    );
-    try {
-      const updated = await api.updateProject(p.id, payload);
-      setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-    } catch (err: any) {
-      setProjects(before);
-      alert(err?.message || "Không đổi được trạng thái dự án.");
-    }
-  }
-
   /** Xoá nhanh 1 dự án ngay ở cột Thao tác (chỉ tầng 1 + 2). */
   async function handleQuickDelete(p: Project) {
     if (!canDelete) return;
@@ -1139,27 +1112,13 @@ export default function ProjectsPage() {
                       ) : null}
                     </div>
                   </td>
-                  {/* TRẠNG THÁI — ép đổi ngay trên bảng. Chỉ Giám đốc / Quản trị /
-                      Quản lý cấp cao; người khác chỉ xem (backend chặn lần nữa). */}
-                  <td className={TD} onClick={(e) => e.stopPropagation()}>
-                    {canForceStatus ? (
-                      <select
-                        value={effectiveStatus}
-                        onChange={(e) => saveStatus(p, e.target.value)}
-                        title="Ép trạng thái dự án (giữ nguyên, không tự tính lại theo tiến độ)"
-                        className={`w-full cursor-pointer rounded-full border-0 px-1.5 py-0.5 text-[10px] font-semibold outline-none focus:ring-2 focus:ring-amber ${st.cls}`}
-                      >
-                        <option value="PLANNING">Chuẩn bị</option>
-                        <option value="IN_PROGRESS">Đang làm</option>
-                        <option value="COMPLETED">Hoàn thành</option>
-                        <option value="ON_HOLD">Tạm dừng</option>
-                        <option value="AUTO">↺ Tự động theo tiến độ</option>
-                      </select>
-                    ) : (
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
-                        {st.label}
-                      </span>
-                    )}
+                  {/* TRẠNG THÁI — CHỈ XEM ở bảng ngoài. Muốn đổi thì mở dự án ra
+                      (nút trạng thái cạnh "Sửa dự án"); bảng này tự nhảy theo khi
+                      quay lại — nạp lại lúc vào trang + poll ~20s. */}
+                  <td className={TD} title="Đổi trạng thái trong trang chi tiết dự án">
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
+                      {st.label}
+                    </span>
                   </td>
                   {/* DOANH THU — nhập tay (VND). Rời ô là tự lưu, giống ô Ghi chú. */}
                   <td className={`${TD} text-right whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
