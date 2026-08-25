@@ -81,7 +81,9 @@ export interface Project {
   total_hours?: number;      // tổng số giờ làm (tính từ timesheets)
   total_days?: number;       // tổng số ngày làm (total_hours / 8)
   manual_hours?: number | string | null;  // MANUAL TIME — số giờ NHẬP TAY
-  revenue?: number | string | null;       // DOANH THU nhập tay (VND)
+  revenue?: number | string | null;       // DOANH THU nhập tay (giữ lại, không còn dùng)
+  client_hours?: number | string | null;  // TIME KHÁCH HÀNG (giờ tính tiền với khách)
+  unit_price?: number | string | null;    // ĐƠN GIÁ (VND/giờ) — doanh thu = giờ × đơn giá
   is_deleted?: boolean;
   deleted_at?: string | null;
   deleted_by_id?: number | null;

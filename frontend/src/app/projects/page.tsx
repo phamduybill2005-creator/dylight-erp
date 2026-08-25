@@ -85,6 +85,14 @@ function hoursToDays(h: number): string {
   return (Math.round((h / 8) * 10) / 10).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 }
 
+/** DOANH THU = Time khách hàng × Đơn giá (nhập ở trang Doanh thu).
+ *  KHÔNG còn nhập tay ở bảng này -> tránh hai nơi ra hai con số khác nhau. */
+function revenueOf(p: Project): number {
+  const h = Number(p.client_hours ?? 0);
+  const price = Number(p.unit_price ?? 0);
+  return h > 0 && price > 0 ? h * price : 0;
+}
+
 /** Số -> chuỗi có dấu chấm ngăn nghìn để hiện trong ô nhập ("78.000.000"). */
 function groupNumber(v: number | string | null | undefined): string {
   if (v === null || v === undefined || v === "") return "";
@@ -240,7 +248,6 @@ export default function ProjectsPage() {
   const [me, setMe] = useState<User | null>(null);
   const [evalEdits, setEvalEdits] = useState<Record<number, string>>({});   // ĐÁNH GIÁ đang gõ dở
   const [manualEdits, setManualEdits] = useState<Record<number, string>>({});   // MANUAL TIME đang gõ dở
-  const [revenueEdits, setRevenueEdits] = useState<Record<number, string>>({}); // DOANH THU đang gõ dở
   // XOÁ nhanh dự án: tầng 1 (Giám đốc/Quản trị) + tầng 2 (Quản lý cấp cao = quản lý
   // KHÔNG có ai quản lý bên trên). Khớp đúng gate ở backend.
   const canDelete =
@@ -316,32 +323,6 @@ export default function ProjectsPage() {
       setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     } catch (err: any) {
       alert(err?.message || "Không lưu được Manual time.");
-    } finally {
-      clear();
-    }
-  }
-
-  /** Lưu DOANH THU nhập tay — rời ô là lưu. */
-  async function saveRevenue(p: Project) {
-    const draft = revenueEdits[p.id];
-    if (draft === undefined) return;
-    const clear = () =>
-      setRevenueEdits((s) => {
-        const n = { ...s };
-        delete n[p.id];
-        return n;
-      });
-    const next = parseMoney(draft);
-    const cur = p.revenue == null || p.revenue === "" ? null : Number(p.revenue);
-    if (next === cur) {
-      clear();
-      return;
-    }
-    try {
-      const updated = await api.updateProject(p.id, { revenue: next });
-      setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-    } catch (err: any) {
-      alert(err?.message || "Không lưu được Doanh thu.");
     } finally {
       clear();
     }
@@ -1125,36 +1106,18 @@ export default function ProjectsPage() {
                       {st.label}
                     </span>
                   </td>
-                  {/* DOANH THU — nhập tay (VND). Rời ô là tự lưu, giống ô Ghi chú. */}
-                  <td className={`${TD} text-right whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
-                    {canEditProject(p) ? (
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={revenueEdits[p.id] ?? groupNumber(p.revenue)}
-                        onChange={(e) => setRevenueEdits((s) => ({ ...s, [p.id]: e.target.value }))}
-                        onBlur={() => saveRevenue(p)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            (e.target as HTMLInputElement).blur();
-                          }
-                          if (e.key === "Escape") {
-                            setRevenueEdits((s) => {
-                              const n = { ...s };
-                              delete n[p.id];
-                              return n;
-                            });
-                          }
-                        }}
-                        placeholder="—"
-                        title={p.revenue != null && p.revenue !== "" ? formatVND(p.revenue) : "Nhập doanh thu (VND)"}
-                        className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-[11px] font-semibold text-ink tnum outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
-                      />
-                    ) : (
-                      <span className="block truncate font-semibold text-ink tnum" title={formatVND(p.revenue)}>
-                        {p.revenue != null && p.revenue !== "" ? formatVND(p.revenue) : "—"}
+                  {/* DOANH THU — TÍNH RA từ Time khách hàng × Đơn giá (nhập ở trang
+                      Doanh thu). Để chỉ xem ở đây cho khỏi lệch số giữa hai bảng. */}
+                  <td className={`${TD} text-right whitespace-nowrap`}>
+                    {revenueOf(p) > 0 ? (
+                      <span
+                        className="block truncate font-semibold text-ink tnum"
+                        title={`${p.client_hours}h × ${groupNumber(p.unit_price)}₫ — sửa ở trang Doanh thu`}
+                      >
+                        {formatVND(revenueOf(p))}
                       </span>
+                    ) : (
+                      <span className="text-muted" title="Nhập Time khách hàng và Đơn giá ở trang Doanh thu">—</span>
                     )}
                   </td>
                 </tr>

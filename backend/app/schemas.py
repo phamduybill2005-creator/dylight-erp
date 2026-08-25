@@ -156,7 +156,9 @@ class ProjectBase(BaseModel):
     manager_name: str | None = None
     lead_id: int | None = None            # người chủ trì (chỉ huy trưởng)
     manual_hours: Decimal | None = None   # MANUAL TIME — số giờ nhập tay
-    revenue: Decimal | None = None        # DOANH THU nhập tay (VND)
+    revenue: Decimal | None = None        # DOANH THU nhập tay (giữ lại, không còn dùng)
+    client_hours: Decimal | None = None   # TIME KHÁCH HÀNG (giờ tính tiền)
+    unit_price: Decimal | None = None     # ĐƠN GIÁ (VND/giờ) — doanh thu = giờ × đơn giá
     status: ProjectStatus = ProjectStatus.PLANNING
     # True = trạng thái do người dùng ÉP, không tính tự động theo tiến độ nữa.
     status_locked: bool = False
@@ -182,6 +184,8 @@ class ProjectUpdate(BaseModel):
     lead_id: int | None = None            # đặt/gỡ người chủ trì
     manual_hours: Decimal | None = None   # MANUAL TIME — số giờ nhập tay (None = xoá trắng)
     revenue: Decimal | None = None        # DOANH THU nhập tay (None = xoá trắng)
+    client_hours: Decimal | None = None   # TIME KHÁCH HÀNG (None = xoá trắng)
+    unit_price: Decimal | None = None     # ĐƠN GIÁ (None = xoá trắng)
     status: ProjectStatus | None = None
     # Gửi status -> tự khoá. Gửi riêng status_locked=false -> trả về TỰ ĐỘNG.
     status_locked: bool | None = None

@@ -234,8 +234,14 @@ class Project(Base):
     # (tính tự động từ chấm công) để người dùng ghi đè/bổ sung mà không đụng số liệu
     # chấm công. NULL = chưa nhập. Cột mới -> ALTER ở _ensure_schema.
     manual_hours: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
-    # DOANH THU nhập tay (VND). NULL = chưa nhập. Cột mới -> ALTER ở _ensure_schema.
+    # DOANH THU nhập tay (VND) — GIỮ LẠI để không mất số đã nhập, nhưng KHÔNG
+    # còn dùng để hiển thị: doanh thu nay = client_hours * unit_price.
     revenue: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    # TIME KHÁCH HÀNG (giờ) — số giờ tính tiền với khách, tách hẳn khỏi manual_hours
+    # (giờ nội bộ) và total_hours (giờ chấm công thực tế).
+    client_hours: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # ĐƠN GIÁ (VND / giờ). Doanh thu = client_hours * unit_price.
+    unit_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(SAEnum(ProjectStatus), default=ProjectStatus.PLANNING)
     # ÉP TRẠNG THÁI: mặc định trạng thái được TÍNH TỰ ĐỘNG theo %tiến độ + ngày
     # bắt đầu/kết thúc. Khi lãnh đạo tự chọn trạng thái thì bật cờ này -> giữ

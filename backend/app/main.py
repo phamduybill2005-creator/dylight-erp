@@ -87,6 +87,9 @@ def _ensure_schema() -> None:
                 "status_locked": "ALTER TABLE projects ADD COLUMN status_locked BOOLEAN DEFAULT FALSE",
                 "manual_hours": "ALTER TABLE projects ADD COLUMN manual_hours NUMERIC(10,2)",
                 "revenue": "ALTER TABLE projects ADD COLUMN revenue NUMERIC(18,2)",
+                # Doanh thu = client_hours * unit_price (trang Doanh thu).
+                "client_hours": "ALTER TABLE projects ADD COLUMN client_hours NUMERIC(10,2)",
+                "unit_price": "ALTER TABLE projects ADD COLUMN unit_price NUMERIC(18,2)",
             }
             pmissing = [sql for col, sql in padds.items() if col not in pcols]
             if pmissing:

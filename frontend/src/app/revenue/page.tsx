@@ -12,29 +12,9 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isSeniorManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import { DEPT_JA, groupLabel, normalizeDept, getProjectDept } from "@/lib/groups";
+import { getProjectDept } from "@/lib/groups";
 import { formatVND } from "@/lib/format";
-import type { Project, ProjectStatus, User } from "@/lib/types";
-
-const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
-  PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
-  IN_PROGRESS: { label: "Đang làm", cls: "bg-steel/10 text-steel" },
-  ON_HOLD: { label: "Tạm dừng", cls: "bg-amber/20 text-amber-deep" },
-  COMPLETED: { label: "Hoàn thành", cls: "bg-ok/15 text-ok" },
-  CLOSED: { label: "Đã đóng", cls: "bg-bad/15 text-bad" },
-};
-
-/** Trạng thái hiển thị — tôn trọng cờ ép tay, giống hệt bảng Dự án. */
-function effectiveStatus(p: Project): string {
-  if (p.status_locked) return p.status;
-  const pct = Math.round(Number(p.progress_percent ?? 0));
-  if (p.status === "ON_HOLD" || p.status === "CLOSED") {
-    if (pct < 100 && !p.end_date) return p.status;
-  }
-  if (pct >= 100 || p.end_date) return "COMPLETED";
-  if (pct > 0 || p.start_date) return "IN_PROGRESS";
-  return "PLANNING";
-}
+import type { Project, User } from "@/lib/types";
 
 /** "78.000.000" -> 78000000 ; rỗng -> null. */
 function parseMoney(s: string): number | null {
@@ -51,6 +31,33 @@ function groupNumber(v: number | string | null | undefined): string {
   return Number.isFinite(n) ? n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) : "";
 }
 
+/** Số giờ -> "X,X ngày" (8 giờ = 1 ngày, cùng quy ước với Real time). */
+function hoursToDays(h: number): string {
+  return (Math.round((h / 8) * 10) / 10).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+}
+
+/** "12,5" / "12.5" -> 12.5 ; rỗng -> null. */
+function parseHours(v: string): number | null {
+  const t = v.replace(/,/g, ".").replace(/[^\d.]/g, "");
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Decimal "16.00" từ backend -> "16" cho gọn ô nhập. */
+function plainNumber(v: number | string | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? String(n) : "";
+}
+
+/** DOANH THU = Time khách hàng × Đơn giá. Không còn lấy từ ô nhập tay nữa. */
+function revenueOf(p: Project): number {
+  const h = Number(p.client_hours ?? 0);
+  const price = Number(p.unit_price ?? 0);
+  return h > 0 && price > 0 ? h * price : 0;
+}
+
 /** Đổi ngày về mốc thời gian để so sánh — copy y hệt trang Dự án. */
 function parseTimestamp(s?: string | null): number | null {
   if (!s) return null;
@@ -65,13 +72,6 @@ function parseTimestamp(s?: string | null): number | null {
   return isNaN(t) ? null : t;
 }
 
-/** "2026-08-03" -> "03/08" */
-const dm = (iso?: string | null): string => {
-  if (!iso) return "—";
-  const [, m, d] = iso.slice(0, 10).split("-");
-  return m && d ? `${d}/${m}` : "—";
-};
-
 export default function RevenuePage() {
   const router = useRouter();
 
@@ -83,7 +83,8 @@ export default function RevenuePage() {
   const [filterDept, setFilterDept] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
 
-  const [edits, setEdits] = useState<Record<number, string>>({});   // ô đang gõ dở
+  // Khoá nháp là chuỗi "<id dự án>:<tên trường>" vì mỗi hàng có 3 ô nhập.
+  const [edits, setEdits] = useState<Record<string, string>>({});
 
   // Dự án GHIM — dùng CHUNG localStorage với trang Dự án & Tiến độ, nên ghim ở
   // đâu thì cả ba trang cùng đẩy lên đầu.
@@ -169,39 +170,76 @@ export default function RevenuePage() {
     });
   }, [projects, searchQuery, filterDept, filterMonth, pinnedIds]);
 
-  const tong = useMemo(
-    () => rows.reduce((s, p) => s + Number(p.revenue ?? 0), 0),
-    [rows],
-  );
-  const soCoDoanhThu = useMemo(
-    () => rows.filter((p) => Number(p.revenue ?? 0) > 0).length,
+  const tong = useMemo(() => rows.reduce((s, p) => s + revenueOf(p), 0), [rows]);
+  const soCoDoanhThu = useMemo(() => rows.filter((p) => revenueOf(p) > 0).length, [rows]);
+  const tongGioKhach = useMemo(
+    () => rows.reduce((s, p) => s + Number(p.client_hours ?? 0), 0),
     [rows],
   );
 
-  async function saveRevenue(p: Project) {
-    const draft = edits[p.id];
+  /** Các ô nhập được trên trang này. Khoá nháp = "<id>:<trường>". */
+  type Field = "manual_hours" | "client_hours" | "unit_price";
+  const keyOf = (p: Project, f: Field) => `${p.id}:${f}`;
+
+  /** Lưu 1 ô — rời ô là gọi. Giá trị bằng cũ thì bỏ qua, không gọi mạng. */
+  async function saveField(p: Project, field: Field) {
+    const k = keyOf(p, field);
+    const draft = edits[k];
     if (draft === undefined) return;
     const clear = () =>
       setEdits((s) => {
         const n = { ...s };
-        delete n[p.id];
+        delete n[k];
         return n;
       });
-    const next = parseMoney(draft);
-    const cur = p.revenue == null || p.revenue === "" ? null : Number(p.revenue);
+    const next = field === "unit_price" ? parseMoney(draft) : parseHours(draft);
+    const raw = p[field];
+    const cur = raw == null || raw === "" ? null : Number(raw);
     if (next === cur) {
       clear();
       return;
     }
     try {
-      const updated = await api.updateProject(p.id, { revenue: next });
+      const updated = await api.updateProject(p.id, { [field]: next });
       setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     } catch (err: any) {
-      alert(err?.message || "Không lưu được doanh thu.");
+      alert(err?.message || "Không lưu được, thử lại giúp mình.");
     } finally {
       clear();
     }
   }
+
+  /** Ô nhập dùng chung cho Manual time / Time khách hàng / Đơn giá. */
+  const cellInput = (p: Project, field: Field, opts: { align: string; title: string }) => {
+    const k = keyOf(p, field);
+    const shown =
+      edits[k] ?? (field === "unit_price" ? groupNumber(p[field]) : plainNumber(p[field]));
+    return (
+      <input
+        type="text"
+        inputMode={field === "unit_price" ? "numeric" : "decimal"}
+        value={shown}
+        onChange={(e) => setEdits((st) => ({ ...st, [k]: e.target.value }))}
+        onBlur={() => saveField(p, field)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+          }
+          if (e.key === "Escape") {
+            setEdits((st) => {
+              const n = { ...st };
+              delete n[k];
+              return n;
+            });
+          }
+        }}
+        placeholder="—"
+        title={opts.title}
+        className={`w-full rounded border border-transparent bg-transparent px-1 py-0.5 ${opts.align} text-[12px] font-semibold text-ink tnum outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white`}
+      />
+    );
+  };
 
   const TH = "border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 px-1.5 py-1.5";
   const TD = "border border-line align-middle px-1.5 py-1.5";
@@ -212,7 +250,7 @@ export default function RevenuePage() {
         <div>
           <h1 className="text-xl font-bold text-ink">Doanh thu</h1>
           <p className="mt-0.5 text-xs text-muted">
-            Doanh thu từng dự án — gõ thẳng vào ô, rời ô là tự lưu.
+            Doanh thu = <b className="text-ink">Time khách hàng × Đơn giá</b>. Gõ thẳng vào ô, rời ô là tự lưu.
           </p>
         </div>
 
@@ -225,7 +263,13 @@ export default function RevenuePage() {
             <span className="block text-lg font-bold text-ink tnum">{formatVND(tong)}</span>
           </div>
           <div className="border-l border-line pl-3">
-            <span className="block text-[10px] text-muted">Đã nhập</span>
+            <span className="block text-[10px] text-muted">Giờ khách hàng</span>
+            <span className="block text-sm font-bold text-steel tnum">
+              {tongGioKhach.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h
+            </span>
+          </div>
+          <div className="border-l border-line pl-3">
+            <span className="block text-[10px] text-muted">Đã tính</span>
             <span className="block text-sm font-bold text-steel tnum">
               {soCoDoanhThu}/{rows.length}
             </span>
@@ -288,43 +332,48 @@ export default function RevenuePage() {
             <col className="w-[52px]" />    {/* STT (+ ★ nếu ghim) */}
             <col className="w-[132px]" />   {/* Mã QL */}
             <col className="w-[300px]" />   {/* Tên dự án */}
-            <col className="w-[86px]" />    {/* Nhóm */}
-            <col className="w-[110px]" />   {/* DOSCO担当 */}
-            <col className="w-[70px]" />    {/* Time in */}
-            <col className="w-[70px]" />    {/* Time out */}
-            <col className="w-[92px]" />    {/* Trạng thái */}
-            <col className="w-[150px]" />   {/* Doanh thu */}
+            <col className="w-[96px]" />    {/* Manual time */}
+            <col className="w-[96px]" />    {/* Realtime (AI) */}
+            <col className="w-[104px]" />   {/* Time khách hàng */}
+            <col className="w-[124px]" />   {/* Đơn giá */}
+            <col className="w-[156px]" />   {/* Doanh thu */}
           </colgroup>
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
               <th className={`${TH} text-center`}>STT</th>
               <th className={TH}>Mã QL</th>
               <th className={TH}>Tên dự án</th>
-              <th className={TH}>Nhóm</th>
-              <th className={TH}>DOSCO担当</th>
-              <th className={TH} title="Ngày nhận">Time in</th>
-              <th className={TH} title="Ngày hoàn thành">Time out</th>
-              <th className={TH}>Trạng thái</th>
-              <th className={`${TH} text-right`}>Doanh thu</th>
+              <th className={`${TH} text-center`} title="Giờ nhập tay — dùng chung với cột Manual time ở bảng Dự án">
+                Manual time
+              </th>
+              <th className={`${TH} text-center`} title="Giờ thực tế lấy từ chấm công tiến độ — dùng chung với cột Real time ở bảng Dự án">
+                Realtime (AI)
+              </th>
+              <th className={`${TH} text-center`} title="Số giờ tính tiền với khách hàng">
+                Time khách hàng
+              </th>
+              <th className={`${TH} text-right`} title="Đơn giá cho mỗi giờ (VND)">
+                Đơn giá <span className="normal-case text-[9px]">(₫/giờ)</span>
+              </th>
+              <th className={`${TH} text-right`} title="Time khách hàng × Đơn giá">Doanh thu</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td className={`${TD} text-center text-muted`} colSpan={9}>Đang tải…</td>
+                <td className={`${TD} text-center text-muted`} colSpan={8}>Đang tải…</td>
               </tr>
             )}
 
             {!loading && rows.length === 0 && (
               <tr>
-                <td className={`${TD} text-center text-muted`} colSpan={9}>
+                <td className={`${TD} text-center text-muted`} colSpan={8}>
                   Không tìm thấy dự án nào khớp với bộ lọc.
                 </td>
               </tr>
             )}
 
             {rows.map((p, i) => {
-              const st = PROJECT_STATUS[effectiveStatus(p)] ?? PROJECT_STATUS.PLANNING;
               return (
                 <tr
                   key={p.id}
@@ -348,57 +397,85 @@ export default function RevenuePage() {
                   <td className={`${TD} font-semibold text-ink`}>
                     <div className="truncate" title={p.name}>{p.name}</div>
                   </td>
-                  <td className={`${TD} text-muted`}>
-                    <div className="truncate" title={groupLabel(p.group_name)}>
-                      {DEPT_JA[normalizeDept(p.group_name)] || normalizeDept(p.group_name) || "—"}
+                  {/* MANUAL TIME — dùng chung trường manual_hours với bảng Dự án */}
+                  <td
+                    className={`${TD} whitespace-nowrap text-center`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {(() => {
+                      const shown = edits[keyOf(p, "manual_hours")] ?? plainNumber(p.manual_hours);
+                      const h = parseHours(shown) ?? 0;
+                      return (
+                        <div className="flex flex-col items-center">
+                          <span className="text-[11px] font-bold text-ink tnum">
+                            {h > 0 ? `${hoursToDays(h)} ngày` : "0 ngày"}
+                          </span>
+                          {canEdit(p) ? (
+                            <span className="flex items-center justify-center text-[10px] text-muted">
+                              (
+                              <span className="w-9">
+                                {cellInput(p, "manual_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 ngày)" })}
+                              </span>
+                              h)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted tnum">({h}h)</span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </td>
+
+                  {/* REALTIME (AI) — chỉ xem, lấy từ chấm công tiến độ */}
+                  <td className={`${TD} whitespace-nowrap text-center`}>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[11px] font-bold text-ink tnum">
+                        {p.total_days && p.total_days > 0 ? `${p.total_days} ngày` : "0 ngày"}
+                      </span>
+                      {p.total_hours && p.total_hours > 0 ? (
+                        <span className="text-[10px] text-muted tnum">({p.total_hours}h)</span>
+                      ) : null}
                     </div>
                   </td>
-                  <td className={`${TD} text-muted`}>
-                    <div className="flex items-center gap-1 truncate" title={p.dosco_manager || ""}>
-                      {p.dosco_manager && <StarIconSolid className="h-3 w-3 shrink-0 text-amber" />}
-                      <span className="truncate">{p.dosco_manager || "—"}</span>
-                    </div>
+
+                  {/* TIME KHÁCH HÀNG — số giờ tính tiền */}
+                  <td
+                    className={`${TD} whitespace-nowrap text-center`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {canEdit(p) ? (
+                      cellInput(p, "client_hours", { align: "text-center", title: "Số giờ tính tiền với khách" })
+                    ) : (
+                      <span className="text-[12px] font-semibold text-ink tnum">
+                        {plainNumber(p.client_hours) || "—"}
+                      </span>
+                    )}
                   </td>
-                  <td className={`${TD} whitespace-nowrap text-muted tnum`}>{dm(p.start_date)}</td>
-                  <td className={`${TD} whitespace-nowrap text-muted tnum`}>{dm(p.end_date)}</td>
-                  <td className={TD}>
-                    <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
-                      {st.label}
-                    </span>
-                  </td>
-                  {/* Ô nhập doanh thu — chung dữ liệu với cột Doanh thu ở bảng Dự án */}
+
+                  {/* ĐƠN GIÁ (₫/giờ) */}
                   <td
                     className={`${TD} whitespace-nowrap text-right`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {canEdit(p) ? (
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={edits[p.id] ?? groupNumber(p.revenue)}
-                        onChange={(e) => setEdits((s) => ({ ...s, [p.id]: e.target.value }))}
-                        onBlur={() => saveRevenue(p)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            (e.target as HTMLInputElement).blur();
-                          }
-                          if (e.key === "Escape") {
-                            setEdits((s) => {
-                              const n = { ...s };
-                              delete n[p.id];
-                              return n;
-                            });
-                          }
-                        }}
-                        placeholder="—"
-                        title={p.revenue != null && p.revenue !== "" ? formatVND(p.revenue) : "Nhập doanh thu (VND)"}
-                        className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-[12px] font-semibold text-ink tnum outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white"
-                      />
+                      cellInput(p, "unit_price", { align: "text-right", title: "Đơn giá mỗi giờ (VND)" })
                     ) : (
-                      <span className="block truncate font-semibold text-ink tnum" title={formatVND(p.revenue)}>
-                        {p.revenue != null && p.revenue !== "" ? formatVND(p.revenue) : "—"}
+                      <span className="text-[12px] font-semibold text-ink tnum">
+                        {groupNumber(p.unit_price) || "—"}
                       </span>
+                    )}
+                  </td>
+                  {/* DOANH THU — TÍNH RA, không nhập: Time khách hàng × Đơn giá */}
+                  <td className={`${TD} whitespace-nowrap text-right`}>
+                    {revenueOf(p) > 0 ? (
+                      <span
+                        className="block truncate font-bold text-ink tnum"
+                        title={`${plainNumber(p.client_hours)}h × ${groupNumber(p.unit_price)}₫ = ${formatVND(revenueOf(p))}`}
+                      >
+                        {formatVND(revenueOf(p))}
+                      </span>
+                    ) : (
+                      <span className="text-muted" title="Cần nhập cả Time khách hàng và Đơn giá">—</span>
                     )}
                   </td>
                 </tr>
@@ -409,7 +486,7 @@ export default function RevenuePage() {
           {rows.length > 0 && (
             <tfoot>
               <tr className="sticky bottom-0 bg-paper font-bold">
-                <td className={`${TD} text-right text-[11px] uppercase tracking-wide text-muted`} colSpan={8}>
+                <td className={`${TD} text-right text-[11px] uppercase tracking-wide text-muted`} colSpan={7}>
                   Tổng cộng ({rows.length} dự án)
                 </td>
                 <td className={`${TD} whitespace-nowrap text-right text-[13px] text-ink tnum`}>
@@ -422,7 +499,8 @@ export default function RevenuePage() {
       </div>
 
       <p className="mt-2 text-[11px] text-muted">
-        Bấm vào một hàng để xem chi tiết dự án. Số liệu dùng chung với cột Doanh thu ở bảng Dự án.
+        Bấm vào một hàng để xem chi tiết dự án. <b className="text-ink">Manual time</b> và{" "}
+        <b className="text-ink">Realtime (AI)</b> dùng chung số liệu với bảng Dự án.
       </p>
     </AppShell>
   );
