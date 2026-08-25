@@ -22,6 +22,7 @@ import {
   StarIcon,
   CalendarDaysIcon,
   TableCellsIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import { api, tokenStore } from "@/lib/api";
 import { roleTitle, roleTier, type Tier } from "@/lib/roles";
@@ -41,6 +42,7 @@ function deskNav(tier: Tier): NavLink[] {
     return [
       { href: "/", label: "Trang chủ", icon: HomeIcon },
       { href: "/projects", label: "Dự án", icon: FolderIcon },
+      { href: "/revenue", label: "Doanh thu", icon: BanknotesIcon },
       { href: "/timesheet", label: "Tiến độ", icon: TableCellsIcon },
       { href: "/attendance", label: "Tổng hợp", icon: ClockIcon },
       { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
@@ -52,6 +54,7 @@ function deskNav(tier: Tier): NavLink[] {
   const items: NavLink[] = [
     { href: "/", label: "Tổng quan", icon: HomeIcon },
     { href: "/projects", label: "Dự án", icon: FolderIcon },
+    { href: "/revenue", label: "Doanh thu", icon: BanknotesIcon },
     { href: "/timesheet", label: "Tiến độ", icon: TableCellsIcon },
     { href: "/attendance", label: "Tổng hợp", icon: ClockIcon },
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },

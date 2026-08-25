@@ -104,7 +104,9 @@ export default function CompanyOrgChart() {
 
     api.orgChart()
       .then((res) => {
-        setChart(res.data);
+        // Backend lỗi/trả thiếu `data` -> KHÔNG được setChart(undefined), vì
+        // view[group] sẽ ném lỗi và làm TRẮNG CẢ TRANG CHỦ.
+        setChart(res?.data ?? DEFAULT_CHART);
         setCanEdit(res.can_edit);
         setUpdatedBy(res.updated_by_name || null);
       })
@@ -265,7 +267,7 @@ export default function CompanyOrgChart() {
 
   const renderGroup = (group: GroupKey) => (
     <>
-      {view[group].map((n, i) => renderNode(n, group, i))}
+      {(view?.[group] ?? []).map((n, i) => renderNode(n, group, i))}
       {addButton(group)}
     </>
   );
