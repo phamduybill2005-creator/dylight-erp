@@ -51,6 +51,20 @@ function groupNumber(v: number | string | null | undefined): string {
   return Number.isFinite(n) ? n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) : "";
 }
 
+/** Đổi ngày về mốc thời gian để so sánh — copy y hệt trang Dự án. */
+function parseTimestamp(s?: string | null): number | null {
+  if (!s) return null;
+  const str = s.trim();
+  if (!str) return null;
+  const v = str.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const [y, m, d] = v.split("-").map(Number);
+    return new Date(y, m - 1, d).getTime();
+  }
+  const t = new Date(str).getTime();
+  return isNaN(t) ? null : t;
+}
+
 /** "2026-08-03" -> "03/08" */
 const dm = (iso?: string | null): string => {
   if (!iso) return "—";
@@ -70,6 +84,36 @@ export default function RevenuePage() {
   const [filterMonth, setFilterMonth] = useState("");
 
   const [edits, setEdits] = useState<Record<number, string>>({});   // ô đang gõ dở
+
+  // Dự án GHIM — dùng CHUNG localStorage với trang Dự án & Tiến độ, nên ghim ở
+  // đâu thì cả ba trang cùng đẩy lên đầu.
+  const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("timesheet_pinned_projects");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const syncPinned = () => {
+      try {
+        const saved = localStorage.getItem("timesheet_pinned_projects");
+        setPinnedIds(saved ? JSON.parse(saved) : []);
+      } catch {}
+    };
+    syncPinned();
+    window.addEventListener("storage", syncPinned);
+    window.addEventListener("focus", syncPinned);
+    window.addEventListener("pinned_projects_changed", syncPinned);
+    return () => {
+      window.removeEventListener("storage", syncPinned);
+      window.removeEventListener("focus", syncPinned);
+      window.removeEventListener("pinned_projects_changed", syncPinned);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -105,14 +149,25 @@ export default function RevenuePage() {
       if (filterMonth && (p.start_date || "").slice(0, 7) !== filterMonth) return false;
       return true;
     });
-    // Có doanh thu lên trước (cao -> thấp), còn lại theo ngày nhận cũ -> mới.
-    return list.sort((a, b) => {
-      const ra = Number(a.revenue ?? 0);
-      const rb = Number(b.revenue ?? 0);
-      if (ra !== rb) return rb - ra;
-      return (a.start_date || "").localeCompare(b.start_date || "");
+    // Sắp xếp GIỐNG HỆT trang Dự án: 1) dự án GHIM lên đầu -> 2) TIME IN
+    // (ngày nhận) từ CŨ đến MỚI -> 3) thiếu ngày nhận xuống cuối -> 4) theo Mã QL.
+    const pinnedSet = new Set(pinnedIds);
+    return [...list].sort((a, b) => {
+      const aPin = pinnedSet.has(a.id) ? 1 : 0;
+      const bPin = pinnedSet.has(b.id) ? 1 : 0;
+      if (aPin !== bPin) return bPin - aPin;
+
+      const ta = parseTimestamp(a.start_date);
+      const tb = parseTimestamp(b.start_date);
+      if (ta !== null && tb !== null) {
+        if (ta !== tb) return ta - tb;
+        return (a.code || "").localeCompare(b.code || "", "vi");
+      }
+      if (ta !== null && tb === null) return -1;
+      if (ta === null && tb !== null) return 1;
+      return (a.code || "").localeCompare(b.code || "", "vi");
     });
-  }, [projects, searchQuery, filterDept, filterMonth]);
+  }, [projects, searchQuery, filterDept, filterMonth, pinnedIds]);
 
   const tong = useMemo(
     () => rows.reduce((s, p) => s + Number(p.revenue ?? 0), 0),
@@ -230,7 +285,7 @@ export default function RevenuePage() {
       <div className="mt-3 max-h-[calc(100vh-300px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card">
         <table className="w-full min-w-[1000px] table-fixed border-collapse text-[11px]">
           <colgroup>
-            <col className="w-[40px]" />    {/* STT */}
+            <col className="w-[52px]" />    {/* STT (+ ★ nếu ghim) */}
             <col className="w-[132px]" />   {/* Mã QL */}
             <col className="w-[300px]" />   {/* Tên dự án */}
             <col className="w-[86px]" />    {/* Nhóm */}
@@ -276,7 +331,17 @@ export default function RevenuePage() {
                   onClick={() => router.push(`/projects/${p.id}`)}
                   className={`cursor-pointer transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-sky-50/50`}
                 >
-                  <td className={`${TD} text-center text-[10px] text-slate-500`}>{i + 1}</td>
+                  {/* Dự án GHIM nhảy lên đầu — gắn ★ để biết vì sao nó ở trên. */}
+                  <td className={`${TD} text-center text-[10px] text-slate-500`}>
+                    {pinnedIds.includes(p.id) ? (
+                      <span className="inline-flex items-center gap-0.5" title="Dự án đã ghim (ghim/bỏ ghim ở trang Dự án)">
+                        <StarIconSolid className="h-3 w-3 text-amber" />
+                        {i + 1}
+                      </span>
+                    ) : (
+                      i + 1
+                    )}
+                  </td>
                   <td className={`${TD} whitespace-nowrap font-mono text-[13px] font-bold text-bad`}>
                     {p.code}
                   </td>
