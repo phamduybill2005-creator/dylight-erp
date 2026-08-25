@@ -792,7 +792,7 @@ export default function ProjectsPage() {
               <col className="w-[28px]" />   {/* STT */}
               <col className="w-[24px]" />   {/* Ghim ★ */}
               <col className="w-[124px]" />  {/* Mã QL + nhãn "Ghim" */}
-              <col className="w-[145px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
+              <col className="w-[138px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
               <col className="w-[58px]" />   {/* Nhóm */}
               <col className="w-[54px]" />   {/* GEO担当 */}
               {/* DOSCO担当: tên dài nhất (D.M.QUANG) đo được 63px ở cỡ chữ 10.5px,
@@ -810,7 +810,7 @@ export default function ProjectsPage() {
               <col className="w-[50px]" />   {/* Time due */}
               <col className="w-[66px]" />   {/* Manual time */}
               <col className="w-[60px]" />   {/* Real time */}
-              <col className="w-[72px]" />   {/* Trạng thái */}
+              <col className="w-[88px]" />   {/* Trạng thái — đủ chứa "Hoàn thành" 1 dòng */}
               <col className="w-[104px]" />  {/* Doanh thu */}
             </colgroup>
           ) : (
@@ -821,7 +821,7 @@ export default function ProjectsPage() {
                   cộng gap 4 + padding 12 = 129px -> lấy 132px cho dư.
                   Trước để 96px nên nhãn "Ghim" bị cắt cụt. */}
               <col className="w-[132px]" />  {/* Mã QL */}
-              <col className="w-[320px]" />  {/* Tên dự án — rộng nhất */}
+              <col className="w-[296px]" />  {/* Tên dự án — thu bớt nhường cho Trạng thái */}
               <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
               <col className="w-[62px]" />   {/* GEO担当 */}
               {/* DOSCO担当: tên dài nhất (D.M.QUANG) đo được 66px ở cỡ chữ 11px,
@@ -833,7 +833,9 @@ export default function ProjectsPage() {
               <col className="w-[64px]" />   {/* Time due */}
               <col className="w-[84px]" />   {/* Manual time */}
               <col className="w-[74px]" />   {/* Real time */}
-              <col className="w-[82px]" />   {/* Trạng thái */}
+              {/* Trạng thái: nhãn "Hoàn thành" đo được 74px + padding 12 = 86px
+                  -> lấy 92px, trước để 82px nên bị xuống dòng. */}
+              <col className="w-[92px]" />   {/* Trạng thái */}
               <col className="w-[130px]" />  {/* Doanh thu */}
             </colgroup>
           )}
@@ -1119,7 +1121,7 @@ export default function ProjectsPage() {
                       (nút trạng thái cạnh "Sửa dự án"); bảng này tự nhảy theo khi
                       quay lại — nạp lại lúc vào trang + poll ~20s. */}
                   <td className={TD} title="Đổi trạng thái trong trang chi tiết dự án">
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
+                    <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
                       {st.label}
                     </span>
                   </td>
