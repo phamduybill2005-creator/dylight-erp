@@ -5,8 +5,9 @@
 // dự án + ô nhập Doanh thu, và cộng TỔNG ở cuối bảng.
 // Số liệu dùng chung trường `revenue` với bảng Dự án -> sửa bên nào cũng khớp.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
@@ -115,6 +116,25 @@ export default function RevenuePage() {
       window.removeEventListener("pinned_projects_changed", syncPinned);
     };
   }, []);
+
+  /** Ghim / bỏ ghim — ghi vào CÙNG chỗ lưu với trang Dự án & Tiến độ và bắn
+   *  sự kiện để các trang đang mở cùng đổi thứ tự ngay, không phải tải lại. */
+  const togglePin = useCallback(
+    (pid: number) => {
+      // Tính TRƯỚC rồi mới setState — không đặt ghi localStorage / bắn sự kiện vào
+      // trong hàm cập nhật state, vì React gọi hàm đó nhiều lần và listener đồng bộ
+      // sẽ ghi đè ngược lại làm cú bấm đầu tiên mất tác dụng.
+      const next = pinnedIds.includes(pid)
+        ? pinnedIds.filter((id) => id !== pid)
+        : [...pinnedIds, pid];
+      setPinnedIds(next);
+      try {
+        localStorage.setItem("timesheet_pinned_projects", JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent("pinned_projects_changed", { detail: next }));
+      } catch {}
+    },
+    [pinnedIds],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -327,10 +347,11 @@ export default function RevenuePage() {
       </p>
 
       <div className="mt-3 max-h-[calc(100vh-300px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card">
-        <table className="w-full min-w-[1000px] table-fixed border-collapse text-[11px]">
+        <table className="w-full min-w-[1030px] table-fixed border-collapse text-[11px]">
           <colgroup>
-            <col className="w-[52px]" />    {/* STT (+ ★ nếu ghim) */}
-            <col className="w-[132px]" />   {/* Mã QL */}
+            <col className="w-[40px]" />    {/* STT */}
+            <col className="w-[26px]" />    {/* Ghim ★ */}
+            <col className="w-[132px]" />   {/* Mã QL + nhãn "Ghim" */}
             <col className="w-[300px]" />   {/* Tên dự án */}
             <col className="w-[96px]" />    {/* Manual time */}
             <col className="w-[96px]" />    {/* Realtime (AI) */}
@@ -341,6 +362,7 @@ export default function RevenuePage() {
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
               <th className={`${TH} text-center`}>STT</th>
+              <th className={`${TH} text-center text-amber`} title="Ghim yêu thích lên đầu">★</th>
               <th className={TH}>Mã QL</th>
               <th className={TH}>Tên dự án</th>
               <th className={`${TH} text-center`} title="Giờ nhập tay — dùng chung với cột Manual time ở bảng Dự án">
@@ -361,38 +383,59 @@ export default function RevenuePage() {
           <tbody>
             {loading && (
               <tr>
-                <td className={`${TD} text-center text-muted`} colSpan={8}>Đang tải…</td>
+                <td className={`${TD} text-center text-muted`} colSpan={9}>Đang tải…</td>
               </tr>
             )}
 
             {!loading && rows.length === 0 && (
               <tr>
-                <td className={`${TD} text-center text-muted`} colSpan={8}>
+                <td className={`${TD} text-center text-muted`} colSpan={9}>
                   Không tìm thấy dự án nào khớp với bộ lọc.
                 </td>
               </tr>
             )}
 
             {rows.map((p, i) => {
+              const isPinned = pinnedIds.includes(p.id);
               return (
                 <tr
                   key={p.id}
                   onClick={() => router.push(`/projects/${p.id}`)}
                   className={`cursor-pointer transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-sky-50/50`}
                 >
-                  {/* Dự án GHIM nhảy lên đầu — gắn ★ để biết vì sao nó ở trên. */}
-                  <td className={`${TD} text-center text-[10px] text-slate-500`}>
-                    {pinnedIds.includes(p.id) ? (
-                      <span className="inline-flex items-center gap-0.5" title="Dự án đã ghim (ghim/bỏ ghim ở trang Dự án)">
-                        <StarIconSolid className="h-3 w-3 text-amber" />
-                        {i + 1}
-                      </span>
-                    ) : (
-                      i + 1
-                    )}
+                  <td className={`${TD} text-center text-[10px] text-slate-500`}>{i + 1}</td>
+
+                  {/* GHIM — bấm để ghim/bỏ ghim, giống hệt bảng Dự án. Dùng chung
+                      danh sách ghim nên ghim ở đây thì bên Dự án cũng lên đầu. */}
+                  <td
+                    className={`${TD} text-center`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePin(p.id);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="cursor-pointer p-0.5 transition-transform hover:scale-125 focus:outline-none"
+                      title={isPinned ? "Bỏ ghim dự án" : "Ghim dự án lên đầu bảng"}
+                    >
+                      {isPinned ? (
+                        <StarIconSolid className="h-4 w-4 text-amber" />
+                      ) : (
+                        <StarIconOutline className="h-4 w-4 text-slate-300 hover:text-amber" />
+                      )}
+                    </button>
                   </td>
+
                   <td className={`${TD} whitespace-nowrap font-mono text-[13px] font-bold text-bad`}>
-                    {p.code}
+                    <div className="flex items-center gap-1">
+                      <span>{p.code}</span>
+                      {isPinned && (
+                        <span className="shrink-0 rounded bg-amber/20 px-1 text-[8px] font-bold leading-none text-amber-700">
+                          Ghim
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className={`${TD} font-semibold text-ink`}>
                     <div className="truncate" title={p.name}>{p.name}</div>
@@ -486,7 +529,7 @@ export default function RevenuePage() {
           {rows.length > 0 && (
             <tfoot>
               <tr className="sticky bottom-0 bg-paper font-bold">
-                <td className={`${TD} text-right text-[11px] uppercase tracking-wide text-muted`} colSpan={7}>
+                <td className={`${TD} text-right text-[11px] uppercase tracking-wide text-muted`} colSpan={8}>
                   Tổng cộng ({rows.length} dự án)
                 </td>
                 <td className={`${TD} whitespace-nowrap text-right text-[13px] text-ink tnum`}>
