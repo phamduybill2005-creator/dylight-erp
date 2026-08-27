@@ -897,14 +897,7 @@ export default function ProjectsPage() {
                     </button>
                   </td>
                   <td className={`${TD} font-mono text-[13px] font-bold text-bad whitespace-nowrap`}>
-                    <div className="flex items-center gap-1">
-                      <span>{p.code}</span>
-                      {isPinned && (
-                        <span className="rounded bg-amber/20 px-1 text-[8px] font-bold text-amber-700 leading-none shrink-0">
-                          Ghim
-                        </span>
-                      )}
-                    </div>
+                    <span>{p.code}</span>
                   </td>
                   <td className={`${TD} font-semibold text-ink`}>
                     <div className="truncate" title={p.name}>{p.name}</div>

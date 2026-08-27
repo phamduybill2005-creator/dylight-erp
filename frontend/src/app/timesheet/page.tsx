@@ -499,14 +499,7 @@ export default function TimesheetPage() {
 
                             {/* Mã + Tên dự án */}
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1">
-                                <span className="font-mono text-[9px] font-bold text-bad leading-none block truncate">{p.code}</span>
-                                {isPinned && (
-                                  <span className="rounded bg-amber/20 px-1 text-[8px] font-bold text-amber-700 leading-none shrink-0">
-                                    Ghim
-                                  </span>
-                                )}
-                              </div>
+                              <span className="font-mono text-[9px] font-bold text-bad leading-none block truncate">{p.code}</span>
                               <span
                                 className={`block ${isMonth ? "max-w-[95px] lg:max-w-[125px] text-[10px]" : "max-w-[160px] text-[11px]"} truncate font-medium text-ink leading-tight`}
                                 title={p.name}
