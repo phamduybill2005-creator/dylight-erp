@@ -101,7 +101,6 @@ export default function AppShell({
     href === "/" ? pathname === "/" : pathname.startsWith(href.split("?")[0]);
 
   return (
-  return (
     <div className="min-h-screen bg-paper flex flex-col">
       {/* ====================== TOP NAVBAR (DESKTOP & MOBILE) ====================== */}
       <header className="sticky top-0 z-40 bg-ink text-white shadow-md border-b border-white/10">
