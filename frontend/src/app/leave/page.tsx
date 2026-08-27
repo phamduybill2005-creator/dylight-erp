@@ -55,6 +55,7 @@ export default function LeavePage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [leaveType, setLeaveType] = useState("FULL");
+  const [leaveCategory, setLeaveCategory] = useState<"LEAVE" | "LATE">("LEAVE");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [deciding, setDeciding] = useState<number | null>(null);
@@ -80,8 +81,9 @@ export default function LeavePage() {
     if (!fromDate || !toDate || !reason) return;   // bắt buộc chọn 1 lý do
     setSaving(true);
     try {
-      await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: leaveType, reason: reason || null });
-      setFromDate(""); setToDate(""); setLeaveType("FULL"); setReason("");
+      const finalType = leaveCategory === "LATE" ? "LATE" : leaveType;
+      await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: finalType, reason: reason || null });
+      setFromDate(""); setToDate(""); setLeaveType("FULL"); setLeaveCategory("LEAVE"); setReason("");
       const list = await api.myLeaves();
       setMine(list);
     } catch { /* noop */ } finally { setSaving(false); }
@@ -129,8 +131,8 @@ export default function LeavePage() {
 
       {/* Form xin nghỉ / báo đi muộn */}
       <form onSubmit={submit} className="mt-4 rounded-xl2 border border-line bg-white p-4 shadow-card">
-        <h2 className="text-sm font-bold text-ink">Gửi đơn xin nghỉ / báo đi muộn</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <h2 className="text-sm font-bold text-ink">Gửi đơn xin nghỉ</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div>
             <label className="block text-[11px] font-semibold text-muted">Từ ngày *</label>
             <input type="date" required value={fromDate} onChange={(e) => {
@@ -143,6 +145,15 @@ export default function LeavePage() {
             <label className="block text-[11px] font-semibold text-muted">Đến ngày *</label>
             <input type="date" required value={toDate} onChange={(e) => setToDate(e.target.value)}
               className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-muted">Ngày nghỉ *</label>
+            <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
+              <option value="MORNING">Buổi sáng</option>
+              <option value="AFTERNOON">Buổi chiều</option>
+              <option value="FULL">Cả ngày</option>
+            </select>
           </div>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -157,13 +168,11 @@ export default function LeavePage() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-muted">2. Lịch làm việc *</label>
-            <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
+            <label className="block text-[11px] font-semibold text-muted">2. Nghỉ phép *</label>
+            <select value={leaveCategory} onChange={(e) => setLeaveCategory(e.target.value as "LEAVE" | "LATE")}
               className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
               <option value="LATE">Đi muộn</option>
-              <option value="FULL">Nghỉ</option>
-              <option value="MORNING">Nghỉ (Buổi sáng)</option>
-              <option value="AFTERNOON">Nghỉ (Buổi chiều)</option>
+              <option value="LEAVE">Nghỉ</option>
             </select>
           </div>
         </div>
