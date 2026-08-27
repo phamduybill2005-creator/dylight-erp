@@ -5,13 +5,12 @@
 // Nhập số Yên ở thanh trên → chỉ cập nhật doanh thu của dự án đang chọn. Rời ô là tự lưu.
 // Doanh thu (VNĐ) = Time khách hàng (h) × Đơn giá Yên (¥/h) × Tỷ giá Vietcombank Realtime.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   StarIcon as StarIconOutline,
   ArrowPathIcon,
   ArrowRightIcon,
-  CursorArrowRippleIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
@@ -87,13 +86,10 @@ export default function RevenuePage() {
     catch { return "transfer"; }
   });
 
-  // Dự án đang được chọn để nhập đơn giá Yên trên thanh converter
-  const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
-  // Nháp đơn giá Yên đang nhập trên thanh converter (chuỗi để hiện trong ô)
-  const [jpyDraft, setJpyDraft] = useState<string>("");
-  const jpyInputRef = useRef<HTMLInputElement>(null);
+  // Đơn giá Yên chung cho TẤT CẢ dự án (dùng trong widget nhỏ)
+  const [globalJpyDraft, setGlobalJpyDraft] = useState<string>("");
 
-  // Khoá nháp cho ô Time khách hàng / Manual time trong bảng
+  // Khóa nháp cho ô Time khách hàng / Manual time trong bảng
   const [edits, setEdits] = useState<Record<string, string>>({});
 
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
@@ -176,46 +172,14 @@ export default function RevenuePage() {
     return vcbData.jpy[rateType] || vcbData.jpy.transfer || 159.90;
   }, [vcbData, rateType]);
 
-  const handleRateTypeChange = (t: "transfer" | "buy" | "sell") => {
-    setRateType(t);
-    try { localStorage.setItem("revenue_vcb_rate_type", t); } catch {}
-  };
-
-  /** Chọn dự án để nhập đơn giá trên thanh converter */
-  const selectProject = useCallback((p: Project) => {
-    setActiveProjectId(p.id);
-    // Hiển thị đơn giá hiện tại của dự án đó (nếu có) vào ô nhập
-    const cur = Number(p.unit_price ?? 0);
-    setJpyDraft(cur > 0 ? groupNumber(cur) : "");
-    // Focus vào ô nhập JPY
-    setTimeout(() => jpyInputRef.current?.focus(), 80);
-  }, []);
-
-  /** Lưu đơn giá Yên của dự án đang chọn */
-  const saveJpyForActive = useCallback(async () => {
-    if (activeProjectId === null) return;
-    const p = projects.find((x) => x.id === activeProjectId);
-    if (!p) return;
-
-    const rawNum = jpyDraft.replace(/\./g, "").replace(/,/g, "").replace(/[^\d]/g, "");
-    const next = rawNum ? Number(rawNum) : null;
-    const cur = p.unit_price != null && p.unit_price !== "" ? Number(p.unit_price) : null;
-    if (next === cur) return;
-
-    try {
-      const updated = await api.updateProject(p.id, { unit_price: next });
-      setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-    } catch (err: any) {
-      alert(err?.message || "Không lưu được, thử lại giúp mình.");
-    }
-  }, [activeProjectId, jpyDraft, projects]);
-
   /** Doanh thu từng dự án (VNĐ) = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank */
   const revenueOf = useCallback((p: Project): number => {
     const h = Number(p.client_hours ?? 0);
-    const jpy = Number(p.unit_price ?? 0);
+    // Ưu tiên globalJpy nếu có, không thì dùng unit_price của dự án
+    const globalJpy = Number(globalJpyDraft.replace(/\./g, "").replace(/,/g, "").replace(/[^\d]/g, "")) || 0;
+    const jpy = globalJpy > 0 ? globalJpy : Number(p.unit_price ?? 0);
     return h > 0 && jpy > 0 ? Math.round(h * jpy * currentVcbRate) : 0;
-  }, [currentVcbRate]);
+  }, [currentVcbRate, globalJpyDraft]);
 
   const rows = useMemo(() => {
     const list = projects.filter((p) => {
@@ -245,12 +209,9 @@ export default function RevenuePage() {
   const soCoDoanhThu = useMemo(() => rows.filter((p) => revenueOf(p) > 0).length, [rows, revenueOf]);
   const tongGioKhach = useMemo(() => rows.reduce((s, p) => s + Number(p.client_hours ?? 0), 0), [rows]);
 
-  // Dự án đang active trên thanh converter
-  const activeProject = useMemo(() => projects.find((p) => p.id === activeProjectId) ?? null, [projects, activeProjectId]);
-
-  // Số Yên đang nhập (parse) và VNĐ quy đổi tương ứng
-  const parsedJpy = Number(jpyDraft.replace(/\./g, "").replace(/,/g, "").replace(/[^\d]/g, "")) || 0;
-  const calcVnd = Math.round(parsedJpy * currentVcbRate);
+  // Số Yên global và VNĐ quy đổi tương ứng (cho widget nhỏ)
+  const parsedGlobalJpy = Number(globalJpyDraft.replace(/\./g, "").replace(/,/g, "").replace(/[^\d]/g, "")) || 0;
+  const calcGlobalVnd = Math.round(parsedGlobalJpy * currentVcbRate);
 
   type RowField = "manual_hours" | "client_hours";
   const keyOf = (p: Project, f: RowField) => `${p.id}:${f}`;
@@ -300,146 +261,74 @@ export default function RevenuePage() {
         <div>
           <h1 className="text-xl font-bold text-ink">Doanh thu</h1>
           <p className="mt-0.5 text-xs text-muted">
-            Doanh thu = <b className="text-ink">Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime</b>.{" "}
-            <span className="text-amber-700 font-semibold">Click vào hàng dự án</span> → nhập số Yên trên thanh chuyển đổi.
+            Doanh thu = <b className="text-ink">Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime</b>.
           </p>
         </div>
-        <div className="flex items-center gap-4 rounded-xl2 border border-line bg-white px-5 py-3 shadow-card">
-          <div>
-            <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted">Tổng doanh thu (VNĐ)</span>
-            <span className="block text-xl font-extrabold text-emerald-700 tnum">{formatVND(tong)}</span>
-          </div>
-          <div className="border-l border-line pl-3.5">
-            <span className="block text-[10px] text-muted">Giờ khách hàng</span>
-            <span className="block text-sm font-bold text-steel tnum">{tongGioKhach.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h</span>
-          </div>
-          <div className="border-l border-line pl-3.5">
-            <span className="block text-[10px] text-muted">Đã tính</span>
-            <span className="block text-sm font-bold text-steel tnum">{soCoDoanhThu}/{rows.length}</span>
-          </div>
-        </div>
-      </div>
 
-      {/* THANH CHUYỂN ĐỔI VIETCOMBANK — kích hoạt khi click vào 1 hàng */}
-      <div className={`mt-4 rounded-2xl border p-4 shadow-sm transition-all duration-200 ${
-        activeProject
-          ? "border-emerald-400 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 ring-2 ring-emerald-200"
-          : "border-slate-200/80 bg-gradient-to-r from-slate-50/50 via-white to-slate-50/50"
-      }`}>
-        {/* Header thanh */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100/80 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white font-bold text-xs shadow-sm">VCB</div>
+        {/* Cột phải: Thẻ tổng + Widget converter nhỏ bên dưới */}
+        <div className="flex flex-col gap-1.5" style={{ minWidth: 320 }}>
+          {/* Thẻ tổng doanh thu */}
+          <div className="flex items-center gap-4 rounded-xl2 border border-line bg-white px-5 py-3 shadow-card">
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm font-bold text-slate-800">Chuyển đổi ngoại tệ Vietcombank (Realtime)</h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  1 JPY = {currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ₫
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted">Tổng doanh thu (VNĐ)</span>
+              <span className="block text-xl font-extrabold text-emerald-700 tnum">{formatVND(tong)}</span>
+            </div>
+            <div className="border-l border-line pl-3.5">
+              <span className="block text-[10px] text-muted">Giờ khách hàng</span>
+              <span className="block text-sm font-bold text-steel tnum">{tongGioKhach.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h</span>
+            </div>
+            <div className="border-l border-line pl-3.5">
+              <span className="block text-[10px] text-muted">Đã tính</span>
+              <span className="block text-sm font-bold text-steel tnum">{soCoDoanhThu}/{rows.length}</span>
+            </div>
+          </div>
+
+          {/* Widget converter nhỏ gọn — chiều ngang = thẻ trên, rộng ~1/2 */}
+          <div className="self-end w-1/2" style={{ minWidth: 220 }}>
+            <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shadow-sm transition-all ${
+              parsedGlobalJpy > 0
+                ? "border-emerald-300 bg-emerald-50/80"
+                : "border-slate-200 bg-white"
+            }`}>
+              {/* VCB badge + tỷ giá */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex h-5 w-5 items-center justify-center rounded bg-emerald-600 text-white font-bold text-[9px]">VCB</div>
+                <span className="text-[9px] font-bold text-emerald-700 whitespace-nowrap">
+                  {currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ₫/¥
                 </span>
               </div>
-              {activeProject ? (
-                <p className="text-[11px] font-semibold text-emerald-800">
-                  🎯 Đang nhập cho:{" "}
-                  <span className="font-mono text-bad">{activeProject.code}</span>{" "}
-                  <span className="text-ink">{activeProject.name}</span>
-                  {Number(activeProject.unit_price ?? 0) > 0 && (
-                    <span className="ml-1 text-slate-500">(hiện: {groupNumber(activeProject.unit_price)} ¥/h)</span>
-                  )}
-                </p>
-              ) : (
-                <p className="flex items-center gap-1 text-[11px] text-slate-500">
-                  <CursorArrowRippleIcon className="h-3.5 w-3.5" />
-                  Click vào một dự án trong bảng bên dưới để nhập đơn giá Yên cho dự án đó
-                </p>
+
+              {/* Ô nhập JPY */}
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <span className="text-[9px] font-bold text-slate-500 shrink-0">¥</span>
+                <input
+                  type="text" inputMode="numeric"
+                  value={globalJpyDraft}
+                  onChange={(e) => setGlobalJpyDraft(e.target.value)}
+                  placeholder="Đơn giá ¥/h"
+                  title="Nhập đơn giá Yên/giờ chung cho tất cả dự án"
+                  className="w-full text-xs font-bold text-slate-800 outline-none tnum bg-transparent placeholder:text-slate-400 placeholder:font-normal"
+                />
+              </div>
+
+              {/* Kết quả VNĐ */}
+              {parsedGlobalJpy > 0 && (
+                <>
+                  <ArrowRightIcon className="h-3 w-3 text-emerald-500 shrink-0" />
+                  <span className="text-[10px] font-extrabold text-emerald-800 tnum shrink-0 whitespace-nowrap">
+                    {formatVND(calcGlobalVnd)}
+                  </span>
+                </>
               )}
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-xl bg-slate-200/70 p-0.5 text-xs font-semibold">
-              {(["buy", "transfer", "sell"] as const).map((t) => {
-                const labels = { buy: "Mua TM", transfer: "Chuyển khoản", sell: "Bán" };
-                return (
-                  <button key={t} type="button" onClick={() => handleRateTypeChange(t)}
-                    className={`rounded-lg px-2.5 py-1 transition-all cursor-pointer ${
-                      rateType === t ? "bg-emerald-600 text-white shadow-sm font-bold" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    {labels[t]} ({vcbData?.jpy?.[t]?.toLocaleString("vi-VN", { maximumFractionDigits: 2 }) ?? "—"}₫)
-                  </button>
-                );
-              })}
+              {/* Nút refresh */}
+              <button type="button" onClick={() => fetchVcb(true)} disabled={vcbLoading}
+                title={vcbData?.updated_at || "Cập nhật tỷ giá"}
+                className="shrink-0 text-emerald-600 hover:text-emerald-800 disabled:opacity-40 cursor-pointer"
+              >
+                <ArrowPathIcon className={`h-3 w-3 ${vcbLoading ? "animate-spin" : ""}`} />
+              </button>
             </div>
-            <button type="button" onClick={() => fetchVcb(true)} disabled={vcbLoading}
-              className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <ArrowPathIcon className={`h-3.5 w-3.5 ${vcbLoading ? "animate-spin" : ""}`} />
-              <span className="text-[11px]">{vcbLoading ? "Đang cập nhật…" : `${vcbData?.updated_at || "—"}`}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Khu nhập Yên → VNĐ */}
-        <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 items-center gap-3">
-          {/* Ô nhập JPY */}
-          <div className={`lg:col-span-5 rounded-xl border p-3 shadow-2xs transition-all ${
-            activeProject ? "border-emerald-400 bg-white ring-2 ring-emerald-100" : "border-slate-200 bg-slate-50"
-          }`}>
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              ĐƠN GIÁ YÊN NHẬT (JPY/H){activeProject ? ` — ${activeProject.code}` : ""}
-            </span>
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="shrink-0 inline-flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded text-xs font-bold text-slate-700">🇯🇵 JPY</span>
-              <input
-                ref={jpyInputRef}
-                type="text" inputMode="numeric"
-                value={jpyDraft}
-                disabled={!activeProject}
-                onChange={(e) => setJpyDraft(e.target.value)}
-                onBlur={saveJpyForActive}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
-                  if (e.key === "Escape") { setJpyDraft(groupNumber(activeProject?.unit_price)); }
-                }}
-                placeholder={activeProject ? "Nhập số Yên/giờ..." : "← Click chọn dự án trước"}
-                className="w-full text-base font-extrabold text-slate-800 outline-none tnum bg-transparent disabled:text-slate-400 disabled:cursor-not-allowed"
-              />
-              <span className="text-xs font-medium text-slate-400 shrink-0">¥ / h</span>
-            </div>
-          </div>
-
-          {/* Mũi tên */}
-          <div className="lg:col-span-2 flex flex-col items-center justify-center gap-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <ArrowRightIcon className="h-4 w-4 stroke-2" />
-            </div>
-            {parsedJpy > 0 && (
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                ×{currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
-              </span>
-            )}
-          </div>
-
-          {/* Kết quả VNĐ */}
-          <div className={`lg:col-span-5 rounded-xl border p-3 shadow-2xs transition-all ${
-            calcVnd > 0 ? "border-emerald-300 bg-emerald-50/80" : "border-slate-200 bg-slate-50/60"
-          }`}>
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-800">
-              ĐƠN GIÁ QUY ĐỔI VNĐ (VNĐ/H)
-            </span>
-            <div className="mt-1.5 flex items-center justify-between gap-2">
-              <span className="shrink-0 inline-flex items-center gap-1 bg-emerald-200/80 px-2 py-0.5 rounded text-xs font-bold text-emerald-900">🇻🇳 VND</span>
-              <span className="text-lg font-black text-emerald-800 tnum truncate">
-                {calcVnd > 0 ? formatVND(calcVnd) : "—"}
-              </span>
-              <span className="text-xs font-bold text-emerald-700 shrink-0">₫ / h</span>
-            </div>
-            {activeProject && calcVnd > 0 && Number(activeProject.client_hours ?? 0) > 0 && (
-              <p className="mt-1 text-[10px] text-emerald-700 font-medium">
-                → Doanh thu dự án: {formatVND(Math.round(Number(activeProject.client_hours) * parsedJpy * currentVcbRate))}
-              </p>
-            )}
           </div>
         </div>
       </div>
@@ -512,27 +401,17 @@ export default function RevenuePage() {
             {rows.map((p, i) => {
               const isPinned = pinnedIds.includes(p.id);
               const rev = revenueOf(p);
-              const isActive = p.id === activeProjectId;
 
               return (
                 <tr
                   key={p.id}
                   className={`cursor-pointer transition-all duration-150 ${
-                    isActive
-                      ? "bg-emerald-50 ring-1 ring-inset ring-emerald-300"
-                      : i % 2 === 0 ? "bg-white hover:bg-emerald-50/30" : "bg-slate-50/30 hover:bg-emerald-50/30"
+                    i % 2 === 0 ? "bg-white hover:bg-emerald-50/30" : "bg-slate-50/30 hover:bg-emerald-50/30"
                   }`}
                   onClick={(e) => {
                     // Nếu click vào ô đang edit (input) thì không chuyển trang
                     if ((e.target as HTMLElement).tagName === "INPUT") return;
-                    // Nếu đang active và bấm lần nữa → điều hướng vào chi tiết
-                    if (isActive) {
-                      router.push(`/projects/${p.id}`);
-                    } else {
-                      // Lần đầu click → chỉ kích hoạt lên thanh converter
-                      if (canEdit(p)) selectProject(p);
-                      else router.push(`/projects/${p.id}`);
-                    }
+                    router.push(`/projects/${p.id}`);
                   }}
                 >
                   <td className={`${TD} text-center text-[10px] text-slate-500`}>{i + 1}</td>
@@ -546,10 +425,7 @@ export default function RevenuePage() {
                   </td>
 
                   <td className={`${TD} whitespace-nowrap font-mono text-[13px] font-bold text-bad`}>
-                    <div className="flex items-center gap-1">
-                      {isActive && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />}
-                      <span>{p.code}</span>
-                    </div>
+                    <span>{p.code}</span>
                   </td>
                   <td className={`${TD} font-semibold text-ink`}>
                     <div className="truncate" title={p.name}>{p.name}</div>
@@ -599,18 +475,15 @@ export default function RevenuePage() {
                         <>
                           <span
                             className="font-extrabold text-emerald-800 text-[12px] tnum"
-                            title={`${Number(p.client_hours)}h × ${groupNumber(p.unit_price)}¥ × ${currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}₫/¥ = ${formatVND(rev)}`}
+                            title={`${Number(p.client_hours)}h × ${parsedGlobalJpy > 0 ? parsedGlobalJpy : groupNumber(p.unit_price)}¥ × ${currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}₫/¥ = ${formatVND(rev)}`}
                           >
                             {formatVND(rev)}
                           </span>
-                          <span className="text-[9px] text-slate-400 tnum">{groupNumber(p.unit_price)} ¥/h</span>
+                          <span className="text-[9px] text-slate-400 tnum">{parsedGlobalJpy > 0 ? parsedGlobalJpy : groupNumber(p.unit_price)} ¥/h</span>
                         </>
                       ) : (
-                        <span
-                          className={`text-[11px] ${isActive ? "text-emerald-600 font-semibold animate-pulse" : "text-muted"}`}
-                          title={isActive ? "Đang chờ nhập đơn giá Yên trên thanh chuyển đổi bên trên" : "Click hàng này để nhập đơn giá Yên"}
-                        >
-                          {isActive ? "← Nhập ¥ ở trên" : "—"}
+                        <span className="text-[11px] text-muted" title="Nhập đơn giá Yên chung ở ô bên phải hoặc vào trang dự án">
+                          —
                         </span>
                       )}
                     </div>
@@ -636,8 +509,8 @@ export default function RevenuePage() {
       </div>
 
       <p className="mt-2 text-[11px] text-muted">
-        <b className="text-ink">Click 1 lần</b> vào hàng dự án → nhập đơn giá Yên trên thanh chuyển đổi.{" "}
-        <b className="text-ink">Click thêm lần nữa</b> → vào trang chi tiết dự án. Doanh thu = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime.
+        <b className="text-ink">Nhập đơn giá ¥/h</b> vào ô nhỏ bên góc phải để tính doanh thu cho toàn bộ dự án.{" "}
+        Hoặc vào trang chi tiết từng dự án để đặt đơn giá riêng. Doanh thu = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime.
       </p>
     </AppShell>
   );
