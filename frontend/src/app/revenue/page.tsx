@@ -283,50 +283,58 @@ export default function RevenuePage() {
             </div>
           </div>
 
-          {/* Widget converter nhỏ gọn — chiều ngang = thẻ trên, rộng ~1/2 */}
-          <div className="self-end w-1/2" style={{ minWidth: 220 }}>
-            <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shadow-sm transition-all ${
+          {/* Widget converter — chiều ngang bằng thẻ Tổng doanh thu */}
+          <div className="w-full">
+            <div className={`flex flex-wrap items-center justify-between gap-2.5 rounded-xl2 border px-3.5 py-2 shadow-sm transition-all ${
               parsedGlobalJpy > 0
-                ? "border-emerald-300 bg-emerald-50/80"
-                : "border-slate-200 bg-white"
+                ? "border-emerald-300 bg-emerald-50/80 ring-1 ring-emerald-200"
+                : "border-line bg-white hover:border-slate-300"
             }`}>
-              {/* VCB badge + tỷ giá */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="flex h-5 w-5 items-center justify-center rounded bg-emerald-600 text-white font-bold text-[9px]">VCB</div>
-                <span className="text-[9px] font-bold text-emerald-700 whitespace-nowrap">
-                  {currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ₫/¥
-                </span>
+              {/* VCB badge + Tỷ giá */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-600 text-white font-black text-[10px] shadow-2xs">VCB</div>
+                <div>
+                  <span className="block text-[9px] font-semibold text-muted uppercase leading-none">Tỷ giá JPY</span>
+                  <span className="block text-xs font-bold text-emerald-700 tnum mt-0.5">
+                    1 ¥ = {currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ₫
+                  </span>
+                </div>
               </div>
 
-              {/* Ô nhập JPY */}
-              <div className="flex items-center gap-1 flex-1 min-w-0">
-                <span className="text-[9px] font-bold text-slate-500 shrink-0">¥</span>
+              {/* Ô nhập JPY chung */}
+              <div className="flex items-center gap-1.5 rounded-lg border border-line bg-slate-50/70 px-2.5 py-1 focus-within:border-emerald-500 focus-within:bg-white transition-all flex-1 min-w-[130px]">
+                <span className="text-[11px] font-bold text-slate-500 shrink-0">🇯🇵</span>
                 <input
                   type="text" inputMode="numeric"
                   value={globalJpyDraft}
                   onChange={(e) => setGlobalJpyDraft(e.target.value)}
-                  placeholder="Đơn giá ¥/h"
+                  placeholder="Đơn giá chung (¥/h)..."
                   title="Nhập đơn giá Yên/giờ chung cho tất cả dự án"
                   className="w-full text-xs font-bold text-slate-800 outline-none tnum bg-transparent placeholder:text-slate-400 placeholder:font-normal"
                 />
+                <span className="text-[10px] font-medium text-slate-400 shrink-0">¥/h</span>
               </div>
 
-              {/* Kết quả VNĐ */}
-              {parsedGlobalJpy > 0 && (
-                <>
-                  <ArrowRightIcon className="h-3 w-3 text-emerald-500 shrink-0" />
-                  <span className="text-[10px] font-extrabold text-emerald-800 tnum shrink-0 whitespace-nowrap">
-                    {formatVND(calcGlobalVnd)}
+              {/* Kết quả quy đổi VNĐ */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <ArrowRightIcon className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                <div className="text-right">
+                  <span className="block text-[9px] font-semibold text-muted uppercase leading-none">Quy đổi</span>
+                  <span className="block text-xs font-extrabold text-emerald-800 tnum mt-0.5 whitespace-nowrap">
+                    {parsedGlobalJpy > 0 ? `${formatVND(calcGlobalVnd)}/h` : "— ₫/h"}
                   </span>
-                </>
-              )}
+                </div>
+              </div>
 
-              {/* Nút refresh */}
-              <button type="button" onClick={() => fetchVcb(true)} disabled={vcbLoading}
-                title={vcbData?.updated_at || "Cập nhật tỷ giá"}
-                className="shrink-0 text-emerald-600 hover:text-emerald-800 disabled:opacity-40 cursor-pointer"
+              {/* Nút refresh tỷ giá */}
+              <button
+                type="button"
+                onClick={() => fetchVcb(true)}
+                disabled={vcbLoading}
+                title={vcbData?.updated_at ? `Cập nhật lúc: ${vcbData.updated_at}` : "Cập nhật tỷ giá"}
+                className="shrink-0 rounded-lg p-1 text-emerald-600 hover:bg-emerald-100/60 hover:text-emerald-800 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                <ArrowPathIcon className={`h-3 w-3 ${vcbLoading ? "animate-spin" : ""}`} />
+                <ArrowPathIcon className={`h-3.5 w-3.5 ${vcbLoading ? "animate-spin" : ""}`} />
               </button>
             </div>
           </div>
