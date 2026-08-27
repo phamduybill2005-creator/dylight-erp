@@ -112,9 +112,12 @@ export default function LeavePage() {
   );
 
   const formatDaysDisplay = (l: LeaveRequest) => {
+    if (l.leave_type === "LATE") {
+      return <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200">Đi muộn</span>;
+    }
     if (l.leave_type === "MORNING") return `${l.days} (Sáng)`;
     if (l.leave_type === "AFTERNOON") return `${l.days} (Chiều)`;
-    return l.days;
+    return `${l.days} ngày`;
   };
 
   return (
@@ -124,10 +127,10 @@ export default function LeavePage() {
         <h1 className="text-base lg:text-xl font-bold">Nghỉ phép</h1>
       </header>
 
-      {/* Form xin nghỉ */}
+      {/* Form xin nghỉ / báo đi muộn */}
       <form onSubmit={submit} className="mt-4 rounded-xl2 border border-line bg-white p-4 shadow-card">
-        <h2 className="text-sm font-bold text-ink">Gửi đơn xin nghỉ</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <h2 className="text-sm font-bold text-ink">Gửi đơn xin nghỉ / báo đi muộn</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-[11px] font-semibold text-muted">Từ ngày *</label>
             <input type="date" required value={fromDate} onChange={(e) => {
@@ -141,25 +144,28 @@ export default function LeavePage() {
             <input type="date" required value={toDate} onChange={(e) => setToDate(e.target.value)}
               className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
           </div>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-[11px] font-semibold text-muted">Ngày nghỉ *</label>
-            <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
-              <option value="MORNING">Buổi sáng</option>
-              <option value="AFTERNOON">Buổi chiều</option>
-              <option value="FULL">Cả ngày</option>
+            <label className="block text-[11px] font-semibold text-muted">1. Lý do * <span className="font-normal text-muted/70">(chọn 1)</span></label>
+            <select required value={reason} onChange={(e) => setReason(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
+              <option value="">— Chọn lý do —</option>
+              {LEAVE_REASONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
             </select>
           </div>
-        </div>
-        <div className="mt-3">
-          <label className="block text-[11px] font-semibold text-muted">Lý do * <span className="font-normal text-muted/70">(chọn 1)</span></label>
-          <select required value={reason} onChange={(e) => setReason(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
-            <option value="">— Chọn lý do —</option>
-            {LEAVE_REASONS.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
+          <div>
+            <label className="block text-[11px] font-semibold text-muted">2. Lịch làm việc *</label>
+            <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
+              <option value="LATE">Đi muộn</option>
+              <option value="FULL">Nghỉ</option>
+              <option value="MORNING">Nghỉ (Buổi sáng)</option>
+              <option value="AFTERNOON">Nghỉ (Buổi chiều)</option>
+            </select>
+          </div>
         </div>
         <div className="mt-3 flex justify-end">
           <button type="submit" disabled={saving || !fromDate || !toDate || !reason}
@@ -177,14 +183,14 @@ export default function LeavePage() {
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
               <th className="border border-line px-3 py-2">Từ ngày</th>
               <th className="border border-line px-3 py-2">Đến ngày</th>
-              <th className="border border-line px-3 py-2 text-right">Số ngày</th>
+              <th className="border border-line px-3 py-2 text-right">Lịch làm / Số ngày</th>
               <th className="border border-line px-3 py-2">Lý do</th>
               <th className="border border-line px-3 py-2">Trạng thái</th>
             </tr>
           </thead>
           <tbody>
             {mine.length === 0 && (
-              <tr><td colSpan={5} className="border border-line px-3 py-6 text-center text-muted">Chưa có đơn nghỉ nào.</td></tr>
+              <tr><td colSpan={5} className="border border-line px-3 py-6 text-center text-muted">Chưa có đơn nào.</td></tr>
             )}
             {mine.map((l) => (
               <tr key={l.id} className="odd:bg-white even:bg-paper/40 hover:bg-amber/10">
@@ -213,7 +219,7 @@ export default function LeavePage() {
                   <th className="border border-line px-3 py-2">Nhân viên</th>
                   <th className="border border-line px-3 py-2">Từ ngày</th>
                   <th className="border border-line px-3 py-2">Đến ngày</th>
-                  <th className="border border-line px-3 py-2 text-right">Số ngày</th>
+                  <th className="border border-line px-3 py-2 text-right">Lịch làm / Số ngày</th>
                   <th className="border border-line px-3 py-2">Lý do</th>
                   <th className="border border-line px-3 py-2 text-center w-32">Thao tác</th>
                 </tr>
