@@ -88,8 +88,22 @@ export default function RevenuePage() {
     catch { return "transfer"; }
   });
 
-  // Đơn giá Yên chung cho TẤT CẢ dự án (dùng trong widget nhỏ)
-  const [globalJpyDraft, setGlobalJpyDraft] = useState<string>("");
+  // Đơn giá Yên chung cho TẤT CẢ dự án (lưu localStorage để không mất khi F5)
+  const [globalJpyDraft, setGlobalJpyDraft] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      return localStorage.getItem("revenue_global_jpy") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const handleGlobalJpyChange = (val: string) => {
+    setGlobalJpyDraft(val);
+    try {
+      localStorage.setItem("revenue_global_jpy", val);
+    } catch {}
+  };
 
   // Khóa nháp cho ô Time khách hàng / Manual time trong bảng
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -335,7 +349,7 @@ export default function RevenuePage() {
                   inputMode="numeric"
                   value={globalJpyDraft}
                   disabled={!isDirectorUser}
-                  onChange={(e) => setGlobalJpyDraft(e.target.value)}
+                  onChange={(e) => handleGlobalJpyChange(e.target.value)}
                   placeholder={isDirectorUser ? "Đơn giá chung (¥/h)..." : "Chỉ Giám đốc được nhập"}
                   title={
                     isDirectorUser
