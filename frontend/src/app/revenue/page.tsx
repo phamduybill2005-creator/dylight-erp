@@ -1,8 +1,8 @@
 "use client";
 
-// Trang DOANH THU — tính doanh thu tự động theo Time khách hàng × Tỷ giá Vietcombank Realtime:
-// Nhập số Yên Nhật (JPY) ở thanh chuyển đổi ngoại tệ Vietcombank, hệ thống tự động quy đổi ra VNĐ
-// theo tỷ giá ngân hàng mới nhất và nhân với số giờ khách hàng của từng dự án.
+// Trang DOANH THU — mỗi dự án có Đơn giá Yên (¥/giờ) và Time khách hàng (giờ) riêng biệt.
+// Doanh thu (VNĐ) của từng dự án = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime.
+// Tỷ giá được đồng bộ và cập nhật liên tục từ ngân hàng Vietcombank.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,21 @@ import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept } from "@/lib/groups";
 import { formatVND } from "@/lib/format";
 import type { Project, User } from "@/lib/types";
+
+/** "78.000" -> 78000 ; rỗng -> null. */
+function parseMoney(s: string): number | null {
+  const t = s.replace(/[^\d]/g, "");
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Số -> "1.000" để hiện trong ô nhập đơn giá Yên. */
+function groupNumber(v: number | string | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) : "";
+}
 
 /** Số giờ -> "X,X ngày" (8 giờ = 1 ngày, cùng quy ước với Real time). */
 function hoursToDays(h: number): string {
@@ -83,15 +98,8 @@ export default function RevenuePage() {
     }
   });
 
-  // Số Yên Nhật (JPY/giờ) nhập ở thanh quy đổi
-  const [jpyHourlyRate, setJpyHourlyRate] = useState<string>(() => {
-    if (typeof window === "undefined") return "1000";
-    try {
-      return localStorage.getItem("revenue_jpy_hourly_rate") ?? "1000";
-    } catch {
-      return "1000";
-    }
-  });
+  // Công cụ quy đổi nhanh ngoại tệ ở thanh tiêu đề (Test Calculator)
+  const [calcJpy, setCalcJpy] = useState<string>("1000");
 
   // Khoá nháp là chuỗi "<id dự án>:<tên trường>".
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -183,28 +191,12 @@ export default function RevenuePage() {
     return vcbData.jpy[rateType] || vcbData.jpy.transfer || 159.90;
   }, [vcbData, rateType]);
 
-  const parsedJpy = useMemo(() => {
-    const num = Number(jpyHourlyRate.replace(/,/g, "").replace(/[^\d.]/g, ""));
-    return Number.isFinite(num) && num > 0 ? num : 0;
-  }, [jpyHourlyRate]);
-
-  // Đơn giá VNĐ đã quy đổi từ Yên Nhật = Số Yên × Tỷ giá Vietcombank
-  const convertedVndRate = useMemo(() => {
-    return Math.round(parsedJpy * currentVcbRate);
-  }, [parsedJpy, currentVcbRate]);
-
-  /** Doanh thu từng dự án (VNĐ) = Time khách hàng (giờ) × Đơn giá quy đổi VNĐ */
+  /** Doanh thu từng dự án (VNĐ) = Time khách hàng (giờ) × Đơn giá Yên của dự án × Tỷ giá Vietcombank */
   const revenueOf = useCallback((p: Project): number => {
     const h = Number(p.client_hours ?? 0);
-    return h > 0 && convertedVndRate > 0 ? Math.round(h * convertedVndRate) : 0;
-  }, [convertedVndRate]);
-
-  const handleJpyChange = (val: string) => {
-    setJpyHourlyRate(val);
-    try {
-      localStorage.setItem("revenue_jpy_hourly_rate", val);
-    } catch {}
-  };
+    const jpy = Number(p.unit_price ?? 0);
+    return h > 0 && jpy > 0 && currentVcbRate > 0 ? Math.round(h * jpy * currentVcbRate) : 0;
+  }, [currentVcbRate]);
 
   const handleRateTypeChange = (t: "transfer" | "buy" | "sell") => {
     setRateType(t);
@@ -251,7 +243,7 @@ export default function RevenuePage() {
     [rows],
   );
 
-  type Field = "manual_hours" | "client_hours";
+  type Field = "manual_hours" | "client_hours" | "unit_price";
   const keyOf = (p: Project, f: Field) => `${p.id}:${f}`;
 
   async function saveField(p: Project, field: Field) {
@@ -264,7 +256,7 @@ export default function RevenuePage() {
         delete n[k];
         return n;
       });
-    const next = parseHours(draft);
+    const next = field === "unit_price" ? parseMoney(draft) : parseHours(draft);
     const raw = p[field];
     const cur = raw == null || raw === "" ? null : Number(raw);
     if (next === cur) {
@@ -283,11 +275,11 @@ export default function RevenuePage() {
 
   const cellInput = (p: Project, field: Field, opts: { align: string; title: string }) => {
     const k = keyOf(p, field);
-    const shown = edits[k] ?? plainNumber(p[field]);
+    const shown = edits[k] ?? (field === "unit_price" ? groupNumber(p[field]) : plainNumber(p[field]));
     return (
       <input
         type="text"
-        inputMode="decimal"
+        inputMode={field === "unit_price" ? "numeric" : "decimal"}
         value={shown}
         onChange={(e) => setEdits((st) => ({ ...st, [k]: e.target.value }))}
         onBlur={() => saveField(p, field)}
@@ -314,6 +306,10 @@ export default function RevenuePage() {
   const TH = "border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 px-2 py-2";
   const TD = "border border-line align-middle px-2 py-2";
 
+  // Số tiền tính nhanh trên thanh công cụ
+  const parsedCalcJpy = Number(calcJpy.replace(/[^\d.]/g, "")) || 0;
+  const calcVndResult = Math.round(parsedCalcJpy * currentVcbRate);
+
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none">
       {/* Header & Thẻ Tổng */}
@@ -321,7 +317,7 @@ export default function RevenuePage() {
         <div>
           <h1 className="text-xl font-bold text-ink">Doanh thu</h1>
           <p className="mt-0.5 text-xs text-muted">
-            Doanh thu = <b className="text-ink">Time khách hàng × Tỷ giá Vietcombank Realtime</b>. Nhập số giờ khách hàng, rời ô là tự lưu.
+            Doanh thu = <b className="text-ink">Time khách hàng × Đơn giá Yên (¥/h) × Tỷ giá Vietcombank Realtime</b>. Gõ thẳng vào ô, rời ô là tự lưu.
           </p>
         </div>
 
@@ -348,7 +344,7 @@ export default function RevenuePage() {
         </div>
       </div>
 
-      {/* THANH CHUYỂN ĐỔI NGOẠI TỆ VIETCOMBANK REALTIME (THEO YÊU CẦU) */}
+      {/* THANH THÔNG TIN TỶ GIÁ VIETCOMBANK REALTIME & QUY ĐỔI NHANH */}
       <div className="mt-4 rounded-2xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50/50 via-white to-slate-50 p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 pb-3">
           <div className="flex items-center gap-2">
@@ -356,20 +352,26 @@ export default function RevenuePage() {
               VCB
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-800">Chuyển đổi ngoại tệ Vietcombank</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-800">Tỷ giá ngoại tệ Vietcombank (Realtime)</h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  1 JPY = {currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ₫
+                </span>
+              </div>
               <p className="text-[11px] text-slate-500">
-                Tỷ giá JPY/VND tự động cập nhật liên tục từ ngân hàng Vietcombank
+                Tỷ giá JPY/VND tự động cập nhật liên tục từ ngân hàng Vietcombank để tính Doanh thu cho từng dự án
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Các tab chọn hình thức tỷ giá: Mua tiền mặt, Mua chuyển khoản, Bán */}
+            {/* Các tab chọn hình thức tỷ giá: Mua chuyển khoản, Mua tiền mặt, Bán */}
             <div className="inline-flex rounded-xl bg-slate-200/70 p-0.5 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => handleRateTypeChange("buy")}
-                className={`rounded-lg px-2.5 py-1 transition-all ${
+                className={`rounded-lg px-2.5 py-1 transition-all cursor-pointer ${
                   rateType === "buy"
                     ? "bg-emerald-600 text-white shadow-sm font-bold"
                     : "text-slate-600 hover:text-slate-900"
@@ -380,7 +382,7 @@ export default function RevenuePage() {
               <button
                 type="button"
                 onClick={() => handleRateTypeChange("transfer")}
-                className={`rounded-lg px-2.5 py-1 transition-all ${
+                className={`rounded-lg px-2.5 py-1 transition-all cursor-pointer ${
                   rateType === "transfer"
                     ? "bg-emerald-600 text-white shadow-sm font-bold"
                     : "text-slate-600 hover:text-slate-900"
@@ -391,7 +393,7 @@ export default function RevenuePage() {
               <button
                 type="button"
                 onClick={() => handleRateTypeChange("sell")}
-                className={`rounded-lg px-2.5 py-1 transition-all ${
+                className={`rounded-lg px-2.5 py-1 transition-all cursor-pointer ${
                   rateType === "sell"
                     ? "bg-emerald-600 text-white shadow-sm font-bold"
                     : "text-slate-600 hover:text-slate-900"
@@ -417,51 +419,47 @@ export default function RevenuePage() {
           </div>
         </div>
 
-        {/* Khu vực nhập tiền Yên và hiển thị tiền VNĐ nhận được */}
-        <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 items-center gap-3">
+        {/* Thanh công cụ quy đổi nhanh ngoại tệ (Quick Converter) */}
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 items-center gap-3">
           {/* Ô nhập JPY */}
-          <div className="lg:col-span-5 rounded-xl border border-slate-200 bg-white p-3 shadow-2xs focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+          <div className="lg:col-span-5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs focus-within:border-emerald-500 transition-all">
             <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              SỐ TIỀN QUÝ KHÁCH CẦN BÁN (YÊN/GIỜ)
+              QUY ĐỔI NHANH: SỐ TIỀN YÊN NHẬT (JPY)
             </span>
             <div className="mt-1 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 font-bold text-xs text-slate-700 bg-slate-100 px-2 py-1 rounded-md shrink-0">
+              <span className="inline-flex items-center gap-1 font-bold text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded shrink-0">
                 🇯🇵 JPY
               </span>
               <input
                 type="text"
-                value={jpyHourlyRate}
-                onChange={(e) => handleJpyChange(e.target.value)}
-                placeholder="Nhập số Yên Nhật..."
-                className="w-full text-base font-extrabold text-slate-800 outline-none tnum"
+                value={calcJpy}
+                onChange={(e) => setCalcJpy(e.target.value)}
+                placeholder="Nhập số Yên thử nghiệm..."
+                className="w-full text-sm font-extrabold text-slate-800 outline-none tnum"
               />
-              <span className="text-xs font-medium text-slate-400">¥ / giờ</span>
+              <span className="text-xs font-medium text-slate-400">¥</span>
             </div>
           </div>
 
           {/* Mũi tên chuyển đổi */}
           <div className="lg:col-span-2 flex flex-col items-center justify-center">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 shadow-2xs">
-              <ArrowRightIcon className="h-4 w-4 stroke-2" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 shadow-2xs">
+              <ArrowRightIcon className="h-3.5 w-3.5 stroke-2" />
             </div>
-            <span className="mt-1 text-[10px] font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full">
-              1 JPY = {currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ₫
-            </span>
           </div>
 
           {/* Ô kết quả VNĐ */}
-          <div className="lg:col-span-5 rounded-xl border border-emerald-300 bg-emerald-50/70 p-3 shadow-2xs">
+          <div className="lg:col-span-5 rounded-xl border border-emerald-300 bg-emerald-50/70 p-2.5 shadow-2xs">
             <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-800">
-              SỐ TIỀN QUÝ KHÁCH SẼ NHẬN (VNĐ/GIỜ)
+              SỐ TIỀN VNĐ TƯƠNG ĐƯƠNG (VCB)
             </span>
             <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1 font-bold text-xs text-emerald-900 bg-emerald-200/80 px-2 py-1 rounded-md shrink-0">
+              <span className="inline-flex items-center gap-1 font-bold text-xs text-emerald-900 bg-emerald-200/80 px-2 py-0.5 rounded shrink-0">
                 🇻🇳 VND
               </span>
-              <span className="text-lg font-black text-emerald-800 tnum truncate" title={`${formatVND(convertedVndRate)}/giờ`}>
-                {formatVND(convertedVndRate)}
+              <span className="text-base font-black text-emerald-800 tnum truncate">
+                {formatVND(calcVndResult)}
               </span>
-              <span className="text-xs font-bold text-emerald-700">₫ / giờ</span>
             </div>
           </div>
         </div>
@@ -516,18 +514,19 @@ export default function RevenuePage() {
         Tìm thấy: <b className="text-ink">{rows.length}</b> dự án
       </p>
 
-      {/* Bảng Doanh thu (ĐÃ XÓA CỘT ĐƠN GIÁ THEO YÊU CẦU) */}
+      {/* Bảng Doanh thu — MỖI DỰ ÁN CÓ ĐƠN GIÁ YÊN RIÊNG BIỆT */}
       <div className="mt-3 max-h-[calc(100vh-340px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card">
-        <table className="w-full min-w-[960px] table-fixed border-collapse text-[11px]">
+        <table className="w-full min-w-[1020px] table-fixed border-collapse text-[11px]">
           <colgroup>
-            <col className="w-[44px]" />    {/* STT */}
-            <col className="w-[28px]" />    {/* Ghim ★ */}
-            <col className="w-[136px]" />   {/* Mã QL */}
-            <col className="w-[320px]" />   {/* Tên dự án */}
-            <col className="w-[100px]" />   {/* Manual time */}
-            <col className="w-[100px]" />   {/* Realtime (AI) */}
-            <col className="w-[120px]" />   {/* Time khách hàng */}
-            <col className="w-[160px]" />   {/* Doanh thu */}
+            <col className="w-[40px]" />    {/* STT */}
+            <col className="w-[26px]" />    {/* Ghim ★ */}
+            <col className="w-[130px]" />   {/* Mã QL */}
+            <col className="w-[300px]" />   {/* Tên dự án */}
+            <col className="w-[96px]" />    {/* Manual time */}
+            <col className="w-[96px]" />    {/* Realtime (AI) */}
+            <col className="w-[110px]" />   {/* Time khách hàng */}
+            <col className="w-[110px]" />   {/* Đơn giá Yên (¥/h) */}
+            <col className="w-[150px]" />   {/* Doanh thu (VNĐ) */}
           </colgroup>
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
@@ -544,7 +543,10 @@ export default function RevenuePage() {
               <th className={`${TH} text-center`} title="Số giờ tính tiền với khách hàng">
                 Time khách hàng (h)
               </th>
-              <th className={`${TH} text-right`} title="Time khách hàng × Tỷ giá Vietcombank">
+              <th className={`${TH} text-right`} title="Đơn giá Yên Nhật riêng cho từng dự án (JPY/giờ)">
+                Đơn giá <span className="normal-case text-[9px] text-slate-500">(¥/h)</span>
+              </th>
+              <th className={`${TH} text-right`} title="Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank">
                 Doanh thu (VNĐ)
               </th>
             </tr>
@@ -552,13 +554,13 @@ export default function RevenuePage() {
           <tbody>
             {loading && (
               <tr>
-                <td className={`${TD} text-center text-muted`} colSpan={8}>Đang tải…</td>
+                <td className={`${TD} text-center text-muted`} colSpan={9}>Đang tải…</td>
               </tr>
             )}
 
             {!loading && rows.length === 0 && (
               <tr>
-                <td className={`${TD} text-center text-muted`} colSpan={8}>
+                <td className={`${TD} text-center text-muted`} colSpan={9}>
                   Không tìm thấy dự án nào khớp với bộ lọc.
                 </td>
               </tr>
@@ -567,6 +569,9 @@ export default function RevenuePage() {
             {rows.map((p, i) => {
               const isPinned = pinnedIds.includes(p.id);
               const rev = revenueOf(p);
+              const jpy = Number(p.unit_price ?? 0);
+              const hours = Number(p.client_hours ?? 0);
+
               return (
                 <tr
                   key={p.id}
@@ -644,13 +649,13 @@ export default function RevenuePage() {
                     </div>
                   </td>
 
-                  {/* TIME KHÁCH HÀNG — số giờ tính tiền */}
+                  {/* TIME KHÁCH HÀNG — số giờ tính tiền riêng của dự án */}
                   <td
                     className={`${TD} whitespace-nowrap text-center`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {canEdit(p) ? (
-                      cellInput(p, "client_hours", { align: "text-center", title: "Số giờ tính tiền với khách" })
+                      cellInput(p, "client_hours", { align: "text-center", title: "Số giờ tính tiền với khách hàng" })
                     ) : (
                       <span className="text-[12px] font-semibold text-ink tnum">
                         {plainNumber(p.client_hours) || "—"}
@@ -658,17 +663,31 @@ export default function RevenuePage() {
                     )}
                   </td>
 
-                  {/* DOANH THU = Time khách hàng × Tỷ giá Vietcombank */}
+                  {/* ĐƠN GIÁ YÊN (¥/h) — NHẬP RIÊNG CHO TỪNG DỰ ÁN */}
+                  <td
+                    className={`${TD} whitespace-nowrap text-right`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {canEdit(p) ? (
+                      cellInput(p, "unit_price", { align: "text-right", title: "Nhập Đơn giá Yên Nhật cho dự án này (¥/giờ)" })
+                    ) : (
+                      <span className="text-[12px] font-semibold text-ink tnum">
+                        {groupNumber(p.unit_price) ? `${groupNumber(p.unit_price)} ¥` : "—"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* DOANH THU (VNĐ) = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank */}
                   <td className={`${TD} whitespace-nowrap text-right`}>
                     {rev > 0 ? (
                       <span
                         className="block truncate font-extrabold text-emerald-800 text-[12px] tnum"
-                        title={`${plainNumber(p.client_hours)}h × ${formatVND(convertedVndRate)}/h = ${formatVND(rev)}`}
+                        title={`${hours}h × ${groupNumber(jpy)}¥ × ${currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}₫/¥ = ${formatVND(rev)}`}
                       >
                         {formatVND(rev)}
                       </span>
                     ) : (
-                      <span className="text-muted" title="Nhập Time khách hàng để tính doanh thu">—</span>
+                      <span className="text-muted" title="Cần nhập cả Time khách hàng và Đơn giá Yên">—</span>
                     )}
                   </td>
                 </tr>
@@ -679,7 +698,7 @@ export default function RevenuePage() {
           {rows.length > 0 && (
             <tfoot>
               <tr className="sticky bottom-0 bg-paper font-bold border-t-2 border-slate-300">
-                <td className={`${TD} text-right text-[11px] uppercase tracking-wide text-muted`} colSpan={7}>
+                <td className={`${TD} text-right text-[11px] uppercase tracking-wide text-muted`} colSpan={8}>
                   Tổng cộng ({rows.length} dự án)
                 </td>
                 <td className={`${TD} whitespace-nowrap text-right text-[14px] font-black text-emerald-800 tnum`}>
@@ -692,7 +711,7 @@ export default function RevenuePage() {
       </div>
 
       <p className="mt-2 text-[11px] text-muted">
-        Bấm vào một hàng để xem chi tiết dự án. Doanh thu được tính tự động từ <b className="text-ink">Time khách hàng</b> theo tỷ giá Vietcombank mới nhất.
+        Bấm vào một hàng để xem chi tiết dự án. Doanh thu từng dự án = <b className="text-ink">Time khách hàng (h)</b> × <b className="text-ink">Đơn giá Yên (¥/h)</b> × <b className="text-ink">Tỷ giá Vietcombank Realtime</b>.
       </p>
     </AppShell>
   );
