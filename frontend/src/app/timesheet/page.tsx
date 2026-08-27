@@ -197,12 +197,13 @@ export default function TimesheetPage() {
       .reduce((s, e) => s + Number(e.hours), 0);
   }, [filteredEntries, days]);
 
-  // Hàng = dự án. Nếu chọn Phòng ban, chỉ hiển thị dự án thuộc phòng ban đó.
+  // Hàng = dự án. Nếu chọn Phòng ban, hiển thị dự án thuộc phòng ban + dự án nhân sự phòng có ghi nhận giờ làm.
   // Thứ tự sắp xếp: 1. Dự án GHIM (Pinned) -> 2. Dự án có giờ -> 3. Tên A-Z.
   const rowProjects = useMemo(() => {
     let list = projects;
     if (selectedDept !== "") {
-      list = projects.filter((p) => getProjectDept(p) === selectedDept);
+      const pIdsInFiltered = new Set(filteredEntries.map((e) => e.project_id));
+      list = projects.filter((p) => getProjectDept(p) === selectedDept || pIdsInFiltered.has(p.id));
     }
     const has = new Set(filteredEntries.map((e) => e.project_id));
     const pinnedSet = new Set(pinnedIds);

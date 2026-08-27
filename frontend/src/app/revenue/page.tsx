@@ -88,7 +88,7 @@ export default function RevenuePage() {
     catch { return "transfer"; }
   });
 
-  // Đơn giá Yên chung cho TẤT CẢ dự án (lưu localStorage để không mất khi F5)
+  // Đơn giá Yên chung cho TẤT CẢ dự án (lưu localStorage & đồng bộ backend giữa mọi tài khoản)
   const [globalJpyDraft, setGlobalJpyDraft] = useState<string>(() => {
     if (typeof window === "undefined") return "";
     try {
@@ -98,12 +98,31 @@ export default function RevenuePage() {
     }
   });
 
+  // Tải đơn giá chung từ backend khi vào trang để đồng bộ với Giám đốc
+  useEffect(() => {
+    api.getGlobalUnitPrice()
+      .then((res) => {
+        if (res.unit_price != null && Number(res.unit_price) > 0) {
+          const str = String(res.unit_price);
+          setGlobalJpyDraft(str);
+          try { localStorage.setItem("revenue_global_jpy", str); } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleGlobalJpyChange = (val: string) => {
     setGlobalJpyDraft(val);
     try {
       localStorage.setItem("revenue_global_jpy", val);
     } catch {}
   };
+
+  const saveGlobalJpyToBackend = useCallback((val: string) => {
+    const rawNum = val.replace(/\./g, "").replace(/,/g, "").replace(/[^\d]/g, "");
+    const num = rawNum ? Number(rawNum) : null;
+    api.setGlobalUnitPrice(num).catch(() => {});
+  }, []);
 
   // Khóa nháp cho ô Time khách hàng / Manual time trong bảng
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -350,6 +369,13 @@ export default function RevenuePage() {
                   value={globalJpyDraft}
                   disabled={!isDirectorUser}
                   onChange={(e) => handleGlobalJpyChange(e.target.value)}
+                  onBlur={(e) => isDirectorUser && saveGlobalJpyToBackend(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && isDirectorUser) {
+                      saveGlobalJpyToBackend((e.target as HTMLInputElement).value);
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                   placeholder={isDirectorUser ? "Đơn giá chung (¥/h)..." : "Chỉ Giám đốc được nhập"}
                   title={
                     isDirectorUser

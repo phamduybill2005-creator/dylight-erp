@@ -717,3 +717,39 @@ def get_vcb_exchange_rate(force: bool = False):
             "rates": {},
         }
 
+
+# Đơn giá Yên chung cho toàn bộ dự án (lưu theo công ty)
+_company_global_unit_price: dict[int, float | None] = {}
+
+
+@router.get("/revenue/global-unit-price")
+def get_global_unit_price(
+    current_user: User = Depends(get_current_user),
+):
+    """Lấy đơn giá JPY/h chung cho toàn bộ dự án của công ty."""
+    cid = current_user.company_id
+    val = _company_global_unit_price.get(cid)
+    return {"unit_price": val}
+
+
+@router.put("/revenue/global-unit-price")
+def set_global_unit_price(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Giám đốc đặt đơn giá JPY/h chung cho toàn bộ dự án."""
+    if current_user.role != UserRole.DIRECTOR and not _is_director(current_user):
+        raise HTTPException(403, "Chỉ Giám đốc mới có quyền thay đổi đơn giá chung.")
+    cid = current_user.company_id
+    raw = payload.get("unit_price")
+    val: float | None = None
+    if raw is not None and str(raw).strip() != "":
+        try:
+            parsed = float(str(raw).replace(",", ".").replace(" ", ""))
+            if parsed > 0:
+                val = parsed
+        except:
+            val = None
+    _company_global_unit_price[cid] = val
+    return {"unit_price": val}
+

@@ -169,6 +169,13 @@ export const api = {
       jpy: { currency_code: string; currency_name: string; buy: number; transfer: number; sell: number };
       rates: Record<string, { currency_code: string; currency_name: string; buy: number; transfer: number; sell: number }>;
     }>(`/projects/exchange-rate/vcb${force ? "?force=true" : ""}`),
+  getGlobalUnitPrice: () =>
+    request<{ unit_price: number | null }>("/projects/revenue/global-unit-price"),
+  setGlobalUnitPrice: (unitPrice: number | null) =>
+    request<{ unit_price: number | null }>("/projects/revenue/global-unit-price", {
+      method: "PUT",
+      body: JSON.stringify({ unit_price: unitPrice }),
+    }),
 
   // --- Contracts ---
   contracts: (projectId?: number) =>
