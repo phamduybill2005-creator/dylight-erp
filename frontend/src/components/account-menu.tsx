@@ -49,7 +49,7 @@ export default function AccountMenu({
 }: {
   user: User | null;
   onLogout: () => void;
-  variant: "sidebar" | "header";
+  variant: "sidebar" | "header" | "topbar";
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -119,7 +119,7 @@ export default function AccountMenu({
 
   const panel = (
     <div
-      className={`absolute z-50 flex max-h-[85vh] w-72 flex-col overflow-hidden rounded-xl2 bg-white text-ink shadow-card ${
+      className={`absolute z-50 flex max-h-[85vh] w-72 flex-col overflow-hidden rounded-xl2 bg-white text-ink shadow-card border border-line ${
         variant === "sidebar" ? "bottom-full left-0 mb-2" : "right-0 top-full mt-2"
       }`}
     >
@@ -221,6 +221,27 @@ export default function AccountMenu({
       </div>
     </div>
   );
+
+  if (variant === "topbar") {
+    return (
+      <div ref={ref} className="relative">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-2 rounded-lg bg-white/10 hover:bg-white/15 px-2.5 py-1 text-left transition-colors cursor-pointer border border-white/10"
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber text-ink font-bold text-xs">
+            {user?.full_name ? user.full_name.trim().charAt(0).toUpperCase() : <UserCircleIcon className="h-5 w-5" />}
+          </span>
+          <div className="hidden sm:block min-w-0 max-w-[120px] text-left">
+            <p className="truncate text-xs font-semibold text-white leading-tight">{user?.full_name ?? "—"}</p>
+            <p className="truncate text-[9px] text-amber font-medium leading-none">{role}</p>
+          </div>
+          <ChevronDownIcon className="h-3 w-3 shrink-0 text-white/60" />
+        </button>
+        {open && panel}
+      </div>
+    );
+  }
 
   if (variant === "header") {
     return (

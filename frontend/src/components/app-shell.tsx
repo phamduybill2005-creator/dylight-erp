@@ -101,143 +101,108 @@ export default function AppShell({
     href === "/" ? pathname === "/" : pathname.startsWith(href.split("?")[0]);
 
   return (
-    <div className="min-h-screen bg-paper lg:flex">
-      {/* ====================== SIDEBAR (DESKTOP) ====================== */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-ink text-white lg:flex">
-        <div className="flex items-center justify-center px-5 py-5">
-          <img src="/logo.png" alt="DOSCO" className="h-12 w-auto rounded-lg bg-white/95 px-3 py-1.5 object-contain" />
-        </div>
+  return (
+    <div className="min-h-screen bg-paper flex flex-col">
+      {/* ====================== TOP NAVBAR (DESKTOP & MOBILE) ====================== */}
+      <header className="sticky top-0 z-40 bg-ink text-white shadow-md border-b border-white/10">
+        <div className="flex h-14 items-center justify-between px-3 lg:px-6 gap-2 lg:gap-4">
+          
+          {/* LEFT: Logo & Company Switcher */}
+          <div className="flex items-center gap-3 shrink-0">
+            <Link href="/" className="flex items-center">
+              <img src="/logo.png" alt="DOSCO" className="h-9 w-auto rounded-lg bg-white/95 px-2.5 py-1 object-contain" />
+            </Link>
 
-        {/* Chọn công ty / chi nhánh */}
-        <div className="relative px-3">
-          <button
-            onClick={() => companies.length > 1 && setPickerOpen((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-xl2 bg-white/10 px-3 py-2 text-xs hover:bg-white/15"
-          >
-            <BuildingOffice2Icon className="h-4 w-4 shrink-0 text-amber" />
-            <span className="truncate text-left">{activeCompany?.name ?? "Đang tải…"}</span>
-            {companies.length > 1 && <ChevronDownIcon className="ml-auto h-3.5 w-3.5 shrink-0" />}
-          </button>
-          {pickerOpen && companies.length > 1 && (
-            <div className="absolute left-3 right-3 z-40 mt-2 overflow-hidden rounded-xl2 bg-white text-ink shadow-card">
-              {companies.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setPickerOpen(false)}
-                  className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-paper ${
-                    c.id === activeCompany?.id ? "font-semibold" : ""
+            {/* Chọn công ty / chi nhánh */}
+            <div className="relative">
+              <button
+                onClick={() => companies.length > 1 && setPickerOpen((v) => !v)}
+                className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs hover:bg-white/15 transition-colors"
+              >
+                <BuildingOffice2Icon className="h-3.5 w-3.5 shrink-0 text-amber" />
+                <span className="max-w-[130px] lg:max-w-[170px] truncate text-left font-medium">{activeCompany?.name ?? "Đang tải…"}</span>
+                {companies.length > 1 && <ChevronDownIcon className="h-3 w-3 shrink-0 text-white/70" />}
+              </button>
+              {pickerOpen && companies.length > 1 && (
+                <div className="absolute left-0 top-full mt-2 w-64 z-50 overflow-hidden rounded-xl2 bg-white text-ink shadow-card border border-line">
+                  {companies.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setPickerOpen(false)}
+                      className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-paper ${
+                        c.id === activeCompany?.id ? "font-semibold text-amber-700 bg-amber-50" : ""
+                      }`}
+                    >
+                      <span className="truncate">{c.name}</span>
+                      <span className="ml-2 font-mono text-[11px] text-muted">{c.code}</span>
+                    </button>
+                  ))}
+                  <div className="border-t border-line px-4 py-2 text-[11px] text-muted font-normal text-slate-700">
+                    Đăng nhập: {user?.full_name} · {roleTitle(user?.role, user?.has_subordinates, !user?.manager_id && !user?.manager_ids)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* MIDDLE: Horizontal Nav Items (DESKTOP) */}
+          <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center overflow-x-auto no-scrollbar py-1">
+            {deskNav(tier).map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
+                    active
+                      ? "bg-gradient-to-r from-amber to-amber-deep text-white shadow-sm shadow-amber/30 scale-105"
+                      : "text-white/75 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  <span className="truncate">{c.name}</span>
-                  <span className="ml-2 font-mono text-[11px] text-muted">{c.code}</span>
-                </button>
-              ))}
-            </div>
+                  <item.icon className={`h-4 w-4 shrink-0 ${active ? "text-white" : "text-white/70"}`} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* RIGHT: User Account Menu & Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            <AccountMenu user={user} onLogout={logout} variant="topbar" />
+          </div>
+        </div>
+      </header>
+
+      {/* ====================== MAIN CONTENT AREA ====================== */}
+      <motion.main
+        key={pathname}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="flex-1 w-full px-3 sm:px-4 lg:px-6 pb-24 lg:pb-8 pt-4"
+      >
+        <div className={`mx-auto w-full ${maxWidthClass}`}>{children}</div>
+      </motion.main>
+
+      {/* ====================== MOBILE BOTTOM NAV ====================== */}
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md lg:hidden">
+        <div className="relative mx-3 mb-3 flex items-center justify-around rounded-xl2 bg-white px-6 py-2 shadow-card border border-line">
+          {tier === "STAFF" ? (
+            <>
+              <NavItem href="/" label="Trang chủ" icon={HomeIcon} active={pathname === "/"} />
+              <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
+              <NavItem href="/attendance" label="Tổng hợp" icon={ClockIcon} active={pathname.startsWith("/attendance")} />
+              <NavItem href="/profile" label="Cá nhân" icon={UserCircleIcon} active={pathname === "/profile"} />
+            </>
+          ) : (
+            <>
+              <NavItem href="/" label="Tổng quan" icon={HomeIcon} active={pathname === "/"} />
+              <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
+              <NavItem href="/employees" label="Profile" icon={UsersIcon} active={pathname.startsWith("/employees")} />
+            </>
           )}
         </div>
-
-        {/* Menu dọc */}
-        <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-          {deskNav(tier).map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`flex items-center gap-3 rounded-xl2 px-3 py-2.5 text-sm transition-all duration-200 hover:translate-x-1.5 ${
-                  active
-                    ? "bg-gradient-to-r from-amber/95 to-amber-deep font-semibold text-white shadow-md shadow-amber/20"
-                    : "text-white/70 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <item.icon className={`h-5 w-5 shrink-0 transition-transform duration-200 ${active ? "scale-110" : ""}`} />
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Tài khoản — bấm vào ảnh + tên để xem thông tin cá nhân / đổi mật khẩu / đăng xuất */}
-        <div className="border-t border-white/10 px-3 py-3">
-          <AccountMenu user={user} onLogout={logout} variant="sidebar" />
-        </div>
-      </aside>
-
-      {/* ====================== CỘT NỘI DUNG ====================== */}
-      <div className="flex min-h-screen flex-1 flex-col lg:pl-64">
-        {/* ---- Thanh tiêu đề (chỉ MOBILE) ---- */}
-        <header className="sticky top-0 z-30 bg-ink text-white lg:hidden">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="DOSCO" className="h-10 w-auto rounded-lg bg-white/95 px-3 py-1.5 object-contain" />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => companies.length > 1 && setPickerOpen((v) => !v)}
-                  className="flex max-w-[150px] items-center gap-1 rounded-xl2 bg-white/10 px-3 py-1.5 text-xs"
-                >
-                  <BuildingOffice2Icon className="h-4 w-4 shrink-0 text-amber" />
-                  <span className="truncate">{activeCompany?.name ?? "Đang tải…"}</span>
-                  {companies.length > 1 && <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />}
-                </button>
-                {pickerOpen && companies.length > 1 && (
-                  <div className="absolute right-0 mt-2 w-60 overflow-hidden rounded-xl2 bg-white text-ink shadow-card">
-                    {companies.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => setPickerOpen(false)}
-                        className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-paper ${
-                          c.id === activeCompany?.id ? "font-semibold" : ""
-                        }`}
-                      >
-                        <span className="truncate">{c.name}</span>
-                        <span className="ml-2 font-mono text-[11px] text-muted">{c.code}</span>
-                      </button>
-                    ))}
-                    <div className="border-t border-line px-4 py-2 text-[11px] text-muted font-normal text-slate-700">
-                      Đăng nhập: {user?.full_name} · {roleTitle(user?.role, user?.has_subordinates, !user?.manager_id && !user?.manager_ids)}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <AccountMenu user={user} onLogout={logout} variant="header" />
-            </div>
-          </div>
-        </header>
-
-        {/* ---- Nội dung trang ---- */}
-        <motion.main
-          key={pathname}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
-          className="flex-1 px-4 pb-28 pt-4 lg:px-8 lg:pb-12 lg:pt-8"
-        >
-          <div className={`mx-auto w-full ${maxWidthClass}`}>{children}</div>
-        </motion.main>
-
-        {/* ---- Thanh điều hướng dưới + FAB (chỉ MOBILE) ---- */}
-        <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md lg:hidden">
-          <div className="relative mx-3 mb-3 flex items-center justify-around rounded-xl2 bg-white px-6 py-2 shadow-card">
-            {tier === "STAFF" ? (
-              <>
-                <NavItem href="/" label="Trang chủ" icon={HomeIcon} active={pathname === "/"} />
-                <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
-                <NavItem href="/attendance" label="Tổng hợp" icon={ClockIcon} active={pathname.startsWith("/attendance")} />
-                <NavItem href="/profile" label="Cá nhân" icon={UserCircleIcon} active={pathname === "/profile"} />
-              </>
-            ) : (
-              <>
-                <NavItem href="/" label="Tổng quan" icon={HomeIcon} active={pathname === "/"} />
-                <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
-                <NavItem href="/employees" label="Profile" icon={UsersIcon} active={pathname.startsWith("/employees")} />
-              </>
-            )}
-          </div>
-        </nav>
-      </div>
+      </nav>
 
       <NotificationsBell />
       <ChatWidget />

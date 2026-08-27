@@ -265,7 +265,7 @@ export default function RevenuePage() {
   const TD = "border border-line align-middle px-1.5 py-1.5";
 
   return (
-    <AppShell maxWidthClass="max-w-md lg:max-w-[1600px]">
+    <AppShell maxWidthClass="max-w-md lg:max-w-none">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-ink">Doanh thu</h1>
