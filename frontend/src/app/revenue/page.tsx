@@ -98,12 +98,14 @@ export default function RevenuePage() {
     }
   });
 
+  const isDirectorUser = me?.role === "DIRECTOR";
+
   // Tải đơn giá chung từ backend khi vào trang để đồng bộ với Giám đốc
   useEffect(() => {
     api.getGlobalUnitPrice()
       .then((res) => {
         if (res.unit_price != null && Number(res.unit_price) > 0) {
-          const str = String(res.unit_price);
+          const str = String(Math.round(Number(res.unit_price)));
           setGlobalJpyDraft(str);
           try { localStorage.setItem("revenue_global_jpy", str); } catch {}
         }
@@ -111,18 +113,21 @@ export default function RevenuePage() {
       .catch(() => {});
   }, []);
 
-  const handleGlobalJpyChange = (val: string) => {
-    setGlobalJpyDraft(val);
-    try {
-      localStorage.setItem("revenue_global_jpy", val);
-    } catch {}
-  };
-
   const saveGlobalJpyToBackend = useCallback((val: string) => {
     const rawNum = val.replace(/\./g, "").replace(/,/g, "").replace(/[^\d]/g, "");
     const num = rawNum ? Number(rawNum) : null;
     api.setGlobalUnitPrice(num).catch(() => {});
   }, []);
+
+  const handleGlobalJpyChange = (val: string) => {
+    setGlobalJpyDraft(val);
+    try {
+      localStorage.setItem("revenue_global_jpy", val);
+    } catch {}
+    if (isDirectorUser) {
+      saveGlobalJpyToBackend(val);
+    }
+  };
 
   // Khóa nháp cho ô Time khách hàng / Manual time trong bảng
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -288,8 +293,6 @@ export default function RevenuePage() {
 
   const TH = "border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 px-2 py-2";
   const TD = "border border-line align-middle px-2 py-2";
-
-  const isDirectorUser = me?.role === "DIRECTOR";
 
   if (!loading && !isSeniorManagerUp(me)) {
     return (

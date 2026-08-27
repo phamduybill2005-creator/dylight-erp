@@ -128,6 +128,8 @@ class Company(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Giám đốc bật để chia sẻ phiếu lương — mỗi nhân viên xem được lương CỦA MÌNH.
     payroll_shared: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Đơn giá Yên chung (JPY/h) áp dụng cho doanh thu toàn công ty
+    default_unit_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     users: Mapped[list["User"]] = relationship(back_populates="company")

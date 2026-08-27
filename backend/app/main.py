@@ -34,6 +34,12 @@ def _ensure_schema() -> None:
     """
     try:
         insp = inspect(engine)
+        if "companies" in insp.get_table_names():
+            ccols = {c["name"] for c in insp.get_columns("companies")}
+            if "default_unit_price" not in ccols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE companies ADD COLUMN default_unit_price NUMERIC(18, 2)"))
+
         if "users" not in insp.get_table_names():
             return
         cols = {c["name"] for c in insp.get_columns("users")}

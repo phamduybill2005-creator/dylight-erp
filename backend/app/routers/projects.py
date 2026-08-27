@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db, vn_now
 from app.deps import get_current_user
 from app.models import (
-    Assignment, ChatMessage, Contract, Conversation, ConversationMember, DesignDocument,
+    Assignment, ChatMessage, Company, Contract, Conversation, ConversationMember, DesignDocument,
     Invoice, MessageReaction, Payment, Progress, Project, ProjectEvaluation, ProjectItem,
     ProgressSnapshot, ProjectStatus, Timesheet, User, UserRole, project_members,
 )
@@ -718,29 +718,30 @@ def get_vcb_exchange_rate(force: bool = False):
         }
 
 
-# Đơn giá Yên chung cho toàn bộ dự án (lưu theo công ty)
-_company_global_unit_price: dict[int, float | None] = {}
-
-
 @router.get("/revenue/global-unit-price")
 def get_global_unit_price(
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Lấy đơn giá JPY/h chung cho toàn bộ dự án của công ty."""
-    cid = current_user.company_id
-    val = _company_global_unit_price.get(cid)
+    """Lấy đơn giá JPY/h chung cho toàn bộ dự án của công ty từ Database."""
+    c = db.query(Company).filter(Company.id == current_user.company_id).first()
+    val = float(c.default_unit_price) if (c and c.default_unit_price is not None) else None
     return {"unit_price": val}
 
 
 @router.put("/revenue/global-unit-price")
 def set_global_unit_price(
     payload: dict,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Giám đốc đặt đơn giá JPY/h chung cho toàn bộ dự án."""
+    """Giám đốc đặt đơn giá JPY/h chung cho toàn bộ dự án, lưu vĩnh viễn vào Database."""
     if current_user.role != UserRole.DIRECTOR and not _is_director(current_user):
         raise HTTPException(403, "Chỉ Giám đốc mới có quyền thay đổi đơn giá chung.")
-    cid = current_user.company_id
+    c = db.query(Company).filter(Company.id == current_user.company_id).first()
+    if not c:
+        raise HTTPException(404, "Không tìm thấy công ty.")
+
     raw = payload.get("unit_price")
     val: float | None = None
     if raw is not None and str(raw).strip() != "":
@@ -750,6 +751,7 @@ def set_global_unit_price(
                 val = parsed
         except:
             val = None
-    _company_global_unit_price[cid] = val
+    c.default_unit_price = Decimal(str(val)) if val is not None else None
+    db.commit()
     return {"unit_price": val}
 
