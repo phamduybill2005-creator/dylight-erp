@@ -150,27 +150,20 @@ export default function TimesheetPage() {
     return map;
   }, [allUsers]);
 
-  // Lọc entries theo Scope (Toàn đội / Cá nhân) & Phòng ban
+  // Lọc entries theo Scope (Toàn đội / Cá nhân) & Phòng ban (chỉ tính dự án thuộc phòng ban được chọn)
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => {
       if (viewScope === "personal" && e.user_id !== me?.id) {
         return false;
       }
       if (selectedDept !== "") {
-        const uDept = userDeptMap.get(e.user_id) || "";
-        const isUserMatch = uDept
-          .split(",")
-          .map((s) => s.trim().toLowerCase())
-          .some((p) => p === selectedDept.toLowerCase() || p.includes(selectedDept.toLowerCase()));
-        
         const proj = projects.find((p) => p.id === e.project_id);
         const isProjMatch = proj ? getProjectDept(proj) === selectedDept : false;
-        
-        if (!isUserMatch && !isProjMatch) return false;
+        if (!isProjMatch) return false;
       }
       return true;
     });
-  }, [entries, viewScope, me?.id, selectedDept, userDeptMap, projects]);
+  }, [entries, viewScope, me?.id, selectedDept, projects]);
 
   const key = (pid: number, d: string) => `${pid}:${d}`;
 
@@ -197,13 +190,12 @@ export default function TimesheetPage() {
       .reduce((s, e) => s + Number(e.hours), 0);
   }, [filteredEntries, days]);
 
-  // Hàng = dự án. Nếu chọn Phòng ban, hiển thị dự án thuộc phòng ban + dự án nhân sự phòng có ghi nhận giờ làm.
+  // Hàng = dự án. Khi chọn Phòng ban, chỉ hiển thị đúng các dự án thuộc phòng ban đó.
   // Thứ tự sắp xếp: 1. Dự án GHIM (Pinned) -> 2. Dự án có giờ -> 3. Tên A-Z.
   const rowProjects = useMemo(() => {
     let list = projects;
     if (selectedDept !== "") {
-      const pIdsInFiltered = new Set(filteredEntries.map((e) => e.project_id));
-      list = projects.filter((p) => getProjectDept(p) === selectedDept || pIdsInFiltered.has(p.id));
+      list = projects.filter((p) => getProjectDept(p) === selectedDept);
     }
     const has = new Set(filteredEntries.map((e) => e.project_id));
     const pinnedSet = new Set(pinnedIds);
