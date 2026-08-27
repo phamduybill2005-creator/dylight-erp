@@ -162,6 +162,13 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ lead_id: leadId }),
     }),
+  getVcbRate: (force: boolean = false) =>
+    request<{
+      source: string;
+      updated_at: string;
+      jpy: { currency_code: string; currency_name: string; buy: number; transfer: number; sell: number };
+      rates: Record<string, { currency_code: string; currency_name: string; buy: number; transfer: number; sell: number }>;
+    }>(`/projects/exchange-rate/vcb${force ? "?force=true" : ""}`),
 
   // --- Contracts ---
   contracts: (projectId?: number) =>
