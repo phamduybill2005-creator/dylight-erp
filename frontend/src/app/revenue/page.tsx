@@ -11,6 +11,8 @@ import {
   StarIcon as StarIconOutline,
   ArrowPathIcon,
   ArrowRightIcon,
+  LockClosedIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
@@ -254,6 +256,24 @@ export default function RevenuePage() {
   const TH = "border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 px-2 py-2";
   const TD = "border border-line align-middle px-2 py-2";
 
+  const isDirectorUser = me?.role === "DIRECTOR";
+
+  if (!loading && !isSeniorManagerUp(me)) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-md text-center py-16">
+          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 mb-4 shadow-sm">
+            <LockClosedIcon className="h-7 w-7" />
+          </div>
+          <h2 className="text-lg font-bold text-ink">Không có quyền truy cập</h2>
+          <p className="mt-1 text-xs text-muted">
+            Trang Doanh thu chỉ hiển thị cho Quản lý cấp cao, Quản trị hệ thống và Ban Giám đốc.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none">
       {/* Header & Thẻ Tổng */}
@@ -301,16 +321,28 @@ export default function RevenuePage() {
                 </div>
               </div>
 
-              {/* Ô nhập JPY chung */}
-              <div className="flex items-center gap-1.5 rounded-lg border border-line bg-slate-50/70 px-2.5 py-1 focus-within:border-emerald-500 focus-within:bg-white transition-all flex-1 min-w-[130px]">
+              {/* Ô nhập JPY chung (CHỈ GIÁM ĐỐC ĐƯỢC NHẬP) */}
+              <div
+                className={`flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 transition-all flex-1 min-w-[130px] ${
+                  isDirectorUser
+                    ? "bg-slate-50/70 focus-within:border-emerald-500 focus-within:bg-white"
+                    : "bg-slate-100/70 opacity-80 cursor-not-allowed"
+                }`}
+              >
                 <span className="text-[11px] font-bold text-slate-500 shrink-0">🇯🇵</span>
                 <input
-                  type="text" inputMode="numeric"
+                  type="text"
+                  inputMode="numeric"
                   value={globalJpyDraft}
+                  disabled={!isDirectorUser}
                   onChange={(e) => setGlobalJpyDraft(e.target.value)}
-                  placeholder="Đơn giá chung (¥/h)..."
-                  title="Nhập đơn giá Yên/giờ chung cho tất cả dự án"
-                  className="w-full text-xs font-bold text-slate-800 outline-none tnum bg-transparent placeholder:text-slate-400 placeholder:font-normal"
+                  placeholder={isDirectorUser ? "Đơn giá chung (¥/h)..." : "Chỉ Giám đốc được nhập"}
+                  title={
+                    isDirectorUser
+                      ? "Nhập đơn giá Yên/giờ chung cho tất cả dự án"
+                      : "Chỉ tài khoản Giám đốc mới có quyền nhập đơn giá chung"
+                  }
+                  className="w-full text-xs font-bold text-slate-800 outline-none tnum bg-transparent placeholder:text-slate-400 placeholder:font-normal disabled:cursor-not-allowed"
                 />
                 <span className="text-[10px] font-medium text-slate-400 shrink-0">¥/h</span>
               </div>
