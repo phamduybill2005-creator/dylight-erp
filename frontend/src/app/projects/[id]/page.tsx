@@ -323,7 +323,8 @@ export default function ProjectDetailPage() {
     try {
       await api.deleteProject(projectId);
       router.push("/projects");
-    } catch (err) {
+    } catch (err: any) {
+      alert(err?.message || "Xoá dự án thất bại.");
       setError(err instanceof Error ? err.message : "Xoá dự án thất bại.");
     }
   }
