@@ -598,7 +598,11 @@ export default function ProjectTimesheet({
                               <td className="px-1 py-1.5 text-center">
                                 {(() => {
                                   const done = !!c.done_date;
-                                  const canTick = c.assignee_id != null && c.assignee_id === currentUserId;
+                                  const canTick =
+                                    canManage ||
+                                    !c.assignee_id ||
+                                    c.assignee_id === currentUserId ||
+                                    (currentUserId != null && members.some((m) => m.id === currentUserId));
                                   return (
                                     <button
                                       type="button"
@@ -609,7 +613,7 @@ export default function ProjectTimesheet({
                                           ? "Đã xong — bấm để bỏ"
                                           : canTick
                                           ? "Đánh dấu đã xong"
-                                          : "Chỉ người làm mới tích được"
+                                          : "Chưa xong"
                                       }
                                       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
                                         done ? "bg-ok/15 text-ok" : "bg-line/50 text-muted"
@@ -626,24 +630,58 @@ export default function ProjectTimesheet({
                                 })()}
                               </td>
                               {days.map((d) => {
-                                const v = workers.reduce(
-                                  (sum, w) => sum + (hoursMap.get(hkey(w.id, c.id, d)) ?? 0),
-                                  0
-                                );
+                                const targetUid = c.assignee_id || currentUserId || (members[0]?.id ?? 0);
+                                const v = targetUid ? (hoursMap.get(hkey(targetUid, c.id, d)) ?? 0) : 0;
+                                const displayVal = targetUid ? hoursValue(targetUid, c.id, d) : "";
+
                                 return (
                                   <td
                                     key={d}
-                                    className={`border-l border-line/40 px-1 py-1.5 text-center tnum font-semibold text-steel ${
-                                      d === today ? "bg-amber/10" : ""
+                                    className={`border border-line/40 p-0 text-center ${
+                                      v > 0
+                                        ? "bg-emerald-100/60"
+                                        : d === today
+                                        ? "bg-amber/15"
+                                        : d > today
+                                        ? "bg-slate-100/40"
+                                        : ""
                                     }`}
                                   >
-                                    {v > 0 ? num1(v) : ""}
+                                    {d <= today ? (
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={displayVal}
+                                        onChange={(e) =>
+                                          targetUid &&
+                                          setHourEdits((x) => ({
+                                            ...x,
+                                            [hkey(targetUid, c.id, d)]: e.target.value,
+                                          }))
+                                        }
+                                        onBlur={() => targetUid && commitHours(targetUid, c.id, d)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                        }}
+                                        placeholder="–"
+                                        className="h-8 w-full min-w-[36px] bg-transparent text-center text-xs font-bold text-ink outline-none placeholder:text-line/60 focus:bg-white focus:ring-1 focus:ring-amber-500"
+                                      />
+                                    ) : (
+                                      <span className="block px-1 py-0.5 tnum text-line">
+                                        –
+                                      </span>
+                                    )}
                                   </td>
                                 );
                               })}
-                              <td className="border-l border-line/40 px-2 py-1.5 text-center tnum text-amber-deep font-bold">
+                              <td className="border-l border-line/40 px-2 py-1.5 text-center tnum text-amber-deep font-bold text-xs">
                                 {(() => {
+                                  const targetUid = c.assignee_id || currentUserId || (members[0]?.id ?? 0);
                                   const tot = days.reduce(
+                                    (sum, d) => sum + (targetUid ? (hoursMap.get(hkey(targetUid, c.id, d)) ?? 0) : 0),
+                                    0
+                                  );
+                                  const fullTot = days.reduce(
                                     (sum, d) =>
                                       sum +
                                       workers.reduce(
@@ -652,117 +690,11 @@ export default function ProjectTimesheet({
                                       ),
                                     0
                                   );
-                                  return tot > 0 ? num1(tot) : "–";
+                                  const shown = Math.max(tot, fullTot);
+                                  return shown > 0 ? num1(shown) : "–";
                                 })()}
                               </td>
                             </tr>
-
-                            {/* CHI TIẾT NGƯỜI LÀM VÀ Ô NHẬP GIỜ CHO TỪNG NGƯỜI */}
-                            {workers.map((w) => {
-                              const wTotal = days.reduce(
-                                (sum, d) => sum + (hoursMap.get(hkey(w.id, c.id, d)) ?? 0),
-                                0
-                              );
-                              const isMainAssignee = c.assignee_id === w.id;
-                              return (
-                                <tr key={w.id} className="odd:bg-white even:bg-paper/40 text-[11px]">
-                                  <td />
-                                  <td className="sticky left-0 z-10 px-2 py-1 pl-8 bg-inherit">
-                                    <div className="flex items-center gap-1.5 text-ink/90">
-                                      <UserCircleIcon className="h-3.5 w-3.5 shrink-0 text-steel" />
-                                      <span className="truncate">{w.full_name}</span>
-                                      {isMainAssignee && (
-                                        <StarIcon
-                                          className="h-3 w-3 text-amber fill-amber"
-                                          title="Người phụ trách chính"
-                                        />
-                                      )}
-                                      {w.id === currentUserId && <span className="text-[9px] text-muted">(tôi)</span>}
-                                    </div>
-                                  </td>
-                                  <td className="px-1 py-1 text-center">
-                                    {(() => {
-                                      const wDone =
-                                        (workerRatings.find(
-                                          (r) => r.project_item_id === c.id && r.user_id === w.id
-                                        )?.rating ?? 0) > 0;
-                                      const canTick = w.id === currentUserId;
-                                      return (
-                                        <button
-                                          type="button"
-                                          disabled={!canTick}
-                                          onClick={() => rateWorker(c.id, w.id, wDone ? 0 : 1)}
-                                          title={
-                                            wDone
-                                              ? "Đã xong — bấm để bỏ"
-                                              : canTick
-                                              ? "Đánh dấu phần của bạn đã xong"
-                                              : "Chưa xong"
-                                          }
-                                          className={`inline-flex items-center justify-center transition-colors ${
-                                            wDone ? "text-ok" : "text-line"
-                                          } ${canTick ? "cursor-pointer hover:text-ok" : "cursor-default"}`}
-                                        >
-                                          {wDone ? (
-                                            <CheckCircleIcon className="h-4 w-4" />
-                                          ) : (
-                                            <span className="h-3.5 w-3.5 rounded-full border-2 border-current" />
-                                          )}
-                                        </button>
-                                      );
-                                    })()}
-                                  </td>
-                                  {days.map((d) => {
-                                    const v = hoursMap.get(hkey(w.id, c.id, d)) ?? 0;
-                                    return (
-                                      <td
-                                        key={d}
-                                        className={`border border-line/40 p-0 text-center ${
-                                          v > 0
-                                            ? "bg-ok/15"
-                                            : d === today
-                                            ? "bg-amber/10"
-                                            : d > today
-                                            ? "bg-line/20"
-                                            : ""
-                                        }`}
-                                      >
-                                        {canEditHours(w.id) && d <= today ? (
-                                          <input
-                                            type="text"
-                                            inputMode="decimal"
-                                            value={hoursValue(w.id, c.id, d)}
-                                            onChange={(e) =>
-                                              setHourEdits((x) => ({
-                                                ...x,
-                                                [hkey(w.id, c.id, d)]: e.target.value,
-                                              }))
-                                            }
-                                            onBlur={() => commitHours(w.id, c.id, d)}
-                                            onKeyDown={(e) => {
-                                              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                                            }}
-                                            placeholder="–"
-                                            className="h-6 w-full min-w-[36px] bg-transparent text-center text-xs text-ink outline-none placeholder:text-line focus:bg-steel/5"
-                                          />
-                                        ) : (
-                                          <span
-                                            className={`block px-1 py-0.5 tnum ${
-                                              v > 0 ? "font-semibold text-ink" : "text-line"
-                                            }`}
-                                          >
-                                            {v > 0 ? num1(v) : "–"}
-                                          </span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-                                  <td className="border border-line/40 px-2 py-1 text-center font-bold tnum text-steel">
-                                    {wTotal > 0 ? num1(wTotal) : "–"}
-                                  </td>
-                                </tr>
-                              );
-                            })}
                           </React.Fragment>
                         );
                       })}
