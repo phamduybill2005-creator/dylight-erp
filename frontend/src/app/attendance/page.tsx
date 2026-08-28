@@ -11,9 +11,11 @@ import {
   CalendarDaysIcon,
   UsersIcon,
   ArrowUpTrayIcon,
+  ArrowDownTrayIcon,
   XMarkIcon,
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
+import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
@@ -136,6 +138,85 @@ export default function AttendancePage() {
   const [dateOrder, setDateOrder] = useState<DateOrder>("dmy");
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  // Xuất file Excel tổng hợp chấm công (Cột: STT | Họ và tên | Phòng ban | Project time | Office time | Đi muộn)
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      let usersList = allUsers;
+      if (!usersList || usersList.length === 0) {
+        usersList = await api.users();
+        setAllUsers(usersList);
+      }
+
+      const [y, m] = summaryPeriod.split("-").map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      const fromDate = `${summaryPeriod}-01`;
+      const toDate = `${summaryPeriod}-${String(lastDay).padStart(2, "0")}`;
+
+      const [tsList, sumList] = await Promise.all([
+        api.timesheets({ from: fromDate, to: toDate }).catch(() => []),
+        api.attendanceSummary(summaryPeriod).catch(() => summary),
+      ]);
+
+      // Gom project time (tổng thời gian làm các dự án từ bảng tiến độ) theo user_id
+      const projectTimeByUser: Record<number, number> = {};
+      for (const t of tsList) {
+        if (t.user_id) {
+          projectTimeByUser[t.user_id] = (projectTimeByUser[t.user_id] || 0) + Number(t.hours || 0);
+        }
+      }
+
+      // Gom attendance summary (giờ máy chấm công và số buổi đi muộn) theo user_id
+      const summaryByUser: Record<number, AttendanceSummary> = {};
+      for (const s of sumList) {
+        summaryByUser[s.user_id] = s;
+      }
+
+      // Lọc danh sách nhân viên theo phòng ban nếu đang chọn bộ lọc
+      const filteredUsers = usersList.filter(
+        (u) => !filters.dept || splitDepts(u.department).includes(filters.dept)
+      );
+
+      // Chuẩn bị dữ liệu theo đúng định dạng
+      const rows = filteredUsers.map((u, idx) => {
+        const pTime = Math.round((projectTimeByUser[u.id] || 0) * 10) / 10;
+        const s = summaryByUser[u.id];
+        const oTime = s ? Math.round(Number(s.total_hours || 0) * 10) / 10 : 0;
+        const late = s ? Number(s.late_days || 0) : 0;
+
+        return [
+          idx + 1,
+          u.full_name || "",
+          u.department || "",
+          pTime,
+          oTime,
+          late,
+        ];
+      });
+
+      const headers = ["STT", "Họ và tên", "Phòng ban", "Project time", "Office time", "Đi muộn"];
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+      ws["!cols"] = [
+        { wch: 6 },   // STT
+        { wch: 25 },  // Họ và tên
+        { wch: 20 },  // Phòng ban
+        { wch: 16 },  // Project time
+        { wch: 16 },  // Office time
+        { wch: 12 },  // Đi muộn
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `Tổng hợp ${summaryPeriod}`);
+      XLSX.writeFile(wb, `Tong_hop_cham_cong_${summaryPeriod}.xlsx`);
+    } catch (err: any) {
+      alert(err?.message || "Không thể xuất file Excel. Vui lòng thử lại.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function resetImport() {
     setShowImport(false);
@@ -419,12 +500,23 @@ export default function AttendancePage() {
           <UsersIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
           <h1 className="text-base font-bold lg:text-xl">Bảng chấm công</h1>
         </div>
-        <button
-          onClick={() => { setShowImport(true); setImportMsg(""); }}
-          className="flex items-center gap-1.5 rounded-xl2 bg-amber px-3 py-2 text-xs font-semibold text-ink"
-        >
-          <ArrowUpTrayIcon className="h-4 w-4" /> Nhập từ file
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportExcel}
+            disabled={exporting}
+            className="flex items-center gap-1.5 rounded-xl2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-3 py-2 text-xs font-semibold text-white transition-colors cursor-pointer"
+            title="Xuất bảng tổng hợp chấm công & thời gian dự án ra file Excel"
+          >
+            <ArrowDownTrayIcon className={`h-4 w-4 ${exporting ? "animate-bounce" : ""}`} />
+            {exporting ? "Đang xuất..." : "Xuất file Excel"}
+          </button>
+          <button
+            onClick={() => { setShowImport(true); setImportMsg(""); }}
+            className="flex items-center gap-1.5 rounded-xl2 bg-amber hover:bg-amber-400 px-3 py-2 text-xs font-semibold text-ink transition-colors cursor-pointer"
+          >
+            <ArrowUpTrayIcon className="h-4 w-4" /> Nhập từ file
+          </button>
+        </div>
       </header>
 
       {/* Bảng theo ngày */}
@@ -473,14 +565,25 @@ export default function AttendancePage() {
       <section className="mt-5">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink lg:text-base">Tổng hợp chấm công</h2>
-          <div className="flex items-center gap-1.5 rounded-xl2 bg-white px-2 py-1 shadow-card">
-            <CalendarDaysIcon className="h-4 w-4 text-muted" />
-            <input
-              type="month"
-              value={summaryPeriod}
-              onChange={(e) => setSummaryPeriod(e.target.value || monthStr())}
-              className="bg-transparent text-xs text-ink outline-none"
-            />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportExcel}
+              disabled={exporting}
+              className="flex items-center gap-1.5 rounded-xl2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer"
+              title={`Xuất file Excel tháng ${summaryPeriod}`}
+            >
+              <ArrowDownTrayIcon className={`h-3.5 w-3.5 ${exporting ? "animate-bounce" : ""}`} />
+              {exporting ? "Đang xuất..." : "Xuất Excel"}
+            </button>
+            <div className="flex items-center gap-1.5 rounded-xl2 bg-white px-2 py-1 shadow-card">
+              <CalendarDaysIcon className="h-4 w-4 text-muted" />
+              <input
+                type="month"
+                value={summaryPeriod}
+                onChange={(e) => setSummaryPeriod(e.target.value || monthStr())}
+                className="bg-transparent text-xs text-ink outline-none"
+              />
+            </div>
           </div>
         </div>
 
