@@ -330,8 +330,10 @@ export default function RevenuePage() {
               <span className="block text-xl font-extrabold text-emerald-700 tnum">{formatVND(tong)}</span>
             </div>
             <div className="border-l border-line pl-3.5">
-              <span className="block text-[10px] text-muted">Giờ khách hàng</span>
-              <span className="block text-sm font-bold text-steel tnum">{tongGioKhach.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h</span>
+              <span className="block text-[10px] text-muted">Công khách hàng</span>
+              <span className="block text-sm font-bold text-steel tnum">
+                {hoursToDays(tongGioKhach)} công <span className="text-[10px] font-normal text-muted">({tongGioKhach.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h)</span>
+              </span>
             </div>
             <div className="border-l border-line pl-3.5">
               <span className="block text-[10px] text-muted">Đã tính</span>
@@ -468,7 +470,7 @@ export default function RevenuePage() {
               <th className={TH}>Tên dự án</th>
               <th className={`${TH} text-center`}>Manual time</th>
               <th className={`${TH} text-center`}>Realtime (AI)</th>
-              <th className={`${TH} text-center`}>Time khách hàng (h)</th>
+              <th className={`${TH} text-center`}>Time khách hàng (công)</th>
               <th className={`${TH} text-right`} title="Click hàng dự án để nhập đơn giá Yên trên thanh bên trên">
                 Doanh thu (VNĐ)
               </th>
@@ -545,10 +547,23 @@ export default function RevenuePage() {
 
                   {/* TIME KHÁCH HÀNG */}
                   <td className={`${TD} whitespace-nowrap text-center`} onClick={(e) => e.stopPropagation()}>
-                    {canEdit(p)
-                      ? cellInput(p, "client_hours", { align: "text-center", title: "Số giờ tính tiền với khách hàng" })
-                      : <span className="text-[12px] font-semibold text-ink tnum">{plainNumber(p.client_hours) || "—"}</span>
-                    }
+                    {(() => {
+                      const shown = edits[keyOf(p, "client_hours")] ?? plainNumber(p.client_hours);
+                      const h = parseHours(shown) ?? 0;
+                      return (
+                        <div className="flex flex-col items-center">
+                          <span className="text-[11px] font-bold text-ink tnum">{h > 0 ? `${hoursToDays(h)} công` : "0 công"}</span>
+                          {canEdit(p) ? (
+                            <span className="flex items-center justify-center text-[10px] text-muted">(
+                              <span className="w-9">{cellInput(p, "client_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 công)" })}</span>
+                              h)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted tnum">({h}h)</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   {/* DOANH THU */}
