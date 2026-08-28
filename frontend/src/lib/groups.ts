@@ -1,10 +1,10 @@
-// NHÓM (グループ) của dự án — theo Excel "Sheet Quản Lý" bên Nhật: CHỈ CÓ 3 NHÓM.
-// Lưu vào DB bằng TÊN TIẾNG NHẬT (khớp Excel + dữ liệu dự án đã nhập trước đây),
-// nhưng hiển thị dạng "Tiếng Nhật (Tiếng Việt)" cho cả 2 bên cùng đọc được.
+// NHÓM (グループ) của dự án — lưu vào DB bằng tên tiếng Nhật hoặc tiếng Việt,
+// và hiển thị dạng "Tiếng Nhật (Tiếng Việt)" cho cả 2 bên cùng đọc được.
 export const PROJECT_GROUPS: { ja: string; vi: string }[] = [
   { ja: "測量解析", vi: "Phòng Bản đồ" },
   { ja: "3次元設計", vi: "Phòng BIM" },
   { ja: "土木設計", vi: "Phòng Thiết kế đường 2D" },
+  { ja: "AI開発", vi: "Phòng AI" },
 ];
 
 /** Nhãn hiển thị: "測量解析 (Phòng Bản đồ)". Giá trị lạ (dữ liệu cũ) thì giữ nguyên. */
