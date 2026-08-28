@@ -363,16 +363,7 @@ def create_project(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    # Từ QUẢN LÝ CẤP TRUNG trở lên được tạo dự án. "Leader dự án" (đang chủ trì ít nhất
-    # 1 dự án) cũng được coi là quản lý cấp trung dù vai trò hệ thống còn là Nhân viên.
-    is_project_leader = (
-        db.query(Project.id)
-        .filter(Project.lead_id == current.id, Project.company_id == current.company_id)
-        .first()
-        is not None
-    )
-    if not _is_manager_tier(db, current) and not is_project_leader:
-        raise HTTPException(403, "Chỉ quản lý (hoặc chủ trì dự án) trở lên mới được tạo dự án.")
+    # Cho phép TẤT CẢ nhân viên trong công ty được tạo dự án
     data = payload.model_dump()
 
     # Kiểm tra trùng ĐỒNG THỜI cả 3 mục: Mã + Tên + Nhóm/Phòng ban

@@ -126,12 +126,20 @@ export default function ProjectDetailPage() {
   };
   const doscoOptsFor = (group: string, current: string) => {
     const dept = normalizeDept(group);
-    const all = [...allUsers.map((u) => u.full_name), ...mgrs.dosco];
-    const inDept = allUsers
-      .filter((u) => splitDepts(u.department).map(normalizeDept).includes(dept))
-      .map((u) => u.full_name);
-    const base = dept ? (inDept.length ? inDept : all) : all;
-    return current && !base.includes(current) ? [current, ...base] : base;
+    const all = Array.from(
+      new Set([...allUsers.map((u) => u.full_name).filter(Boolean), ...mgrs.dosco])
+    ).sort((a, b) => a.localeCompare(b, "vi"));
+
+    if (dept) {
+      const inDept = allUsers
+        .filter((u) => splitDepts(u.department).map(normalizeDept).includes(dept))
+        .map((u) => u.full_name)
+        .filter(Boolean);
+      const other = all.filter((n) => !inDept.includes(n));
+      const combined = [...inDept, ...other];
+      return current && !combined.includes(current) ? [current, ...combined] : (combined.length ? combined : all);
+    }
+    return current && !all.includes(current) ? [current, ...all] : all;
   };
 
   // Sửa mốc tiến độ (null = đang tạo mới, khác null = đang sửa mốc này).

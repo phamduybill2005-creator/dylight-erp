@@ -365,12 +365,20 @@ export default function ProjectsPage() {
   };
   const doscoOptsFor = (group: string, current: string) => {
     const dept = normalizeDept(group);
-    const all = [...users.map((u) => u.full_name), ...mgrs.dosco];
-    const inDept = users
-      .filter((u) => splitDepts(u.department).map(normalizeDept).includes(dept))
-      .map((u) => u.full_name);
-    const base = dept ? (inDept.length ? inDept : all) : all;
-    return current && !base.includes(current) ? [current, ...base] : base;
+    const all = Array.from(
+      new Set([...users.map((u) => u.full_name).filter(Boolean), ...mgrs.dosco])
+    ).sort((a, b) => a.localeCompare(b, "vi"));
+
+    if (dept) {
+      const inDept = users
+        .filter((u) => splitDepts(u.department).map(normalizeDept).includes(dept))
+        .map((u) => u.full_name)
+        .filter(Boolean);
+      const other = all.filter((n) => !inDept.includes(n));
+      const combined = [...inDept, ...other];
+      return current && !combined.includes(current) ? [current, ...combined] : (combined.length ? combined : all);
+    }
+    return current && !all.includes(current) ? [current, ...all] : all;
   };
 
   /** Xoá nhanh 1 dự án ngay ở cột Thao tác (chỉ tầng 1 + 2). */
@@ -505,11 +513,12 @@ export default function ProjectsPage() {
         setMe(me);
         if (isManagerUp(me.role)) {
           setCanManage(true);
-          // Danh sách nhân sự để chọn người chủ trì khi tạo dự án.
-          api.users().then((d) => alive && setUsers(d)).catch(() => {});
-          // Danh sách GEO担当/DOSCO担当 đã dùng để chọn nhanh.
-          api.projectManagers().then((d) => alive && setMgrs(d)).catch(() => {});
         }
+        // Luôn nạp danh sách nhân sự và quản lý cho TẤT CẢ mọi người (kể cả nhân viên)
+        // để ai cũng chọn được người phụ trách / chủ trì khi tạo hoặc sửa dự án.
+        api.users().then((d) => alive && setUsers(d)).catch(() => {});
+        api.projectManagers().then((d) => alive && setMgrs(d)).catch(() => {});
+
         loadProjects();
         // Cập nhật gần thời gian thực (~20s) — theo dõi trạng thái/tiến độ dự án.
         timer = setInterval(() => {
