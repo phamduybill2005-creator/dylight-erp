@@ -1,10 +1,16 @@
 "use client";
 
-// Trang Lịch làm việc (Work Schedule) - Giao diện mới tinh gọn, trực quan, dễ hiểu
-// Thiết kế "Bảng trắng" (Clean Grid): các ô ngày trắng sạch sẽ, không bị rối mắt
-// Chế độ xem theo Tháng: hiển thị FULL cả tháng vừa khít màn hình, KHÔNG CẦN KÉO NGANG
-// Chế độ xem theo Tuần: 7 ngày rộng rãi, thoáng đãng
-// Tương tác: bấm vào ô bất kỳ để xem chi tiết hoặc đặt lịch làm việc/trực
+// Trang Lịch làm việc (Work Schedule)
+// - Hiển thị 5 kiểu trạng thái nghỉ/đi muộn theo đơn nghỉ phép ĐÃ ĐƯỢC DUYỆT:
+//   1. Đi muộn sáng (Xanh lá đậm: #16a34a)
+//   2. Đi muộn chiều (Xanh lá nhạt: #84cc16)
+//   3. Nghỉ sáng (Vàng: #eab308)
+//   4. Nghỉ chiều (Cam: #f97316)
+//   5. Nghỉ cả ngày (Đỏ: #ef4444)
+// - Ngày không có đơn: bảng trắng sạch sẽ.
+// - Chế độ Tháng: hiển thị FULL cả tháng vừa khít màn hình (không cần thanh cuộn ngang).
+// - Chế độ Tuần: 7 ngày rộng rãi, thoáng đãng.
+// - Chỉ hiển thị nhân viên đang làm việc.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -14,7 +20,6 @@ import {
   ChevronRightIcon,
   MagnifyingGlassIcon,
   ArrowDownTrayIcon,
-  PlusIcon,
   XMarkIcon,
   FunnelIcon,
   CheckCircleIcon,
@@ -23,7 +28,71 @@ import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
-import type { User } from "@/lib/types";
+import type { LeaveRequest, User } from "@/lib/types";
+
+// 5 kiểu hiển thị chuẩn theo yêu cầu và hình ảnh chú thích
+export interface ScheduleType {
+  key: string;
+  label: string;
+  bgClass: string;
+  textClass: string;
+  borderClass: string;
+  hexColor: string;
+}
+
+const SCHEDULE_TYPES: ScheduleType[] = [
+  {
+    key: "LATE_MORNING",
+    label: "Đi muộn sáng",
+    bgClass: "bg-[#16a34a]", // Xanh lá đậm
+    textClass: "text-white",
+    borderClass: "border-[#15803d]",
+    hexColor: "#16a34a",
+  },
+  {
+    key: "LATE_AFTERNOON",
+    label: "Đi muộn chiều",
+    bgClass: "bg-[#84cc16]", // Xanh lá nhạt / nõn chuối
+    textClass: "text-slate-900",
+    borderClass: "border-[#65a30d]",
+    hexColor: "#84cc16",
+  },
+  {
+    key: "MORNING",
+    label: "Nghỉ sáng",
+    bgClass: "bg-[#eab308]", // Vàng
+    textClass: "text-slate-900",
+    borderClass: "border-[#ca8a04]",
+    hexColor: "#eab308",
+  },
+  {
+    key: "AFTERNOON",
+    label: "Nghỉ chiều",
+    bgClass: "bg-[#f97316]", // Cam
+    textClass: "text-white",
+    borderClass: "border-[#ea580c]",
+    hexColor: "#f97316",
+  },
+  {
+    key: "FULL",
+    label: "Nghỉ cả ngày",
+    bgClass: "bg-[#ef4444]", // Đỏ
+    textClass: "text-white",
+    borderClass: "border-[#dc2626]",
+    hexColor: "#ef4444",
+  },
+];
+
+// Ánh xạ phân loại đơn nghỉ phép sang 1 trong 5 kiểu
+function getScheduleType(leaveType?: string | null): ScheduleType {
+  if (!leaveType) return SCHEDULE_TYPES[4]; // Mặc định FULL (Nghỉ cả ngày)
+  const t = leaveType.toUpperCase();
+  if (t === "LATE_MORNING" || t === "LATE") return SCHEDULE_TYPES[0]; // Đi muộn sáng
+  if (t === "LATE_AFTERNOON") return SCHEDULE_TYPES[1]; // Đi muộn chiều
+  if (t === "MORNING") return SCHEDULE_TYPES[2]; // Nghỉ sáng
+  if (t === "AFTERNOON") return SCHEDULE_TYPES[3]; // Nghỉ chiều
+  return SCHEDULE_TYPES[4]; // Nghỉ cả ngày
+}
 
 // Tên các thứ trong tuần tiếng Việt
 const DAY_NAMES_VI = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -57,7 +126,6 @@ function formatShortName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length <= 1) return fullName.toUpperCase();
   if (parts.length === 2) return `${parts[0][0]}.${parts[1]}`.toUpperCase();
-  // Ví dụ: HOÀNG KIM LÂM -> H.K.LÂM, NGUYỄN CÔNG BÌNH -> N.C.BÌNH
   const initials = parts.slice(0, -1).map((p) => p[0].toUpperCase()).join(".");
   return `${initials}.${parts[parts.length - 1].toUpperCase()}`;
 }
@@ -66,6 +134,7 @@ export default function WorkSchedulePage() {
   const router = useRouter();
   const [me, setMe] = useState<User | null>(api.cachedUser());
   const [users, setUsers] = useState<User[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Chế độ xem: "MONTH" (Theo tháng - full màn hình không scroll ngang) hoặc "WEEK" (Theo tuần)
@@ -85,13 +154,14 @@ export default function WorkSchedulePage() {
     dateStr: string;
     dayNum: number;
     dayOfWeek: number;
+    leave?: LeaveRequest;
   } | null>(null);
 
-  // Ghi chú tạm thời cho các ô (lưu trong phiên làm việc)
+  // Ghi chú tạm thời cho các ô
   const [cellNotes, setCellNotes] = useState<Record<string, string>>({});
   const [noteInput, setNoteInput] = useState("");
 
-  // Nạp danh sách nhân sự
+  // Nạp danh sách nhân sự (CHỈ NHÂN VIÊN ĐANG LÀM VIỆC)
   useEffect(() => {
     api.me()
       .then((u) => {
@@ -99,7 +169,9 @@ export default function WorkSchedulePage() {
         return api.users();
       })
       .then((userList) => {
-        const sorted = [...userList].sort((a, b) => {
+        // Lọc bỏ nhân viên cũ: chỉ lấy người đang hoạt động và đã duyệt
+        const activeUsers = userList.filter((u) => u.is_active !== false && u.is_approved !== false);
+        const sorted = [...activeUsers].sort((a, b) => {
           const roleOrder: Record<string, number> = {
             DIRECTOR: 1,
             MANAGER: 2,
@@ -119,7 +191,7 @@ export default function WorkSchedulePage() {
   }, [router]);
 
   // Tính toán danh sách ngày theo chế độ xem
-  const { daysList, periodLabel } = useMemo(() => {
+  const { dateRange, daysList, periodLabel } = useMemo(() => {
     if (viewMode === "MONTH") {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -136,8 +208,16 @@ export default function WorkSchedulePage() {
         });
       }
 
-      const label = `Tháng ${month + 1}/${year} (${lastDay} ngày)`;
-      return { daysList: list, periodLabel: label };
+      const mStr = `${year}-${String(month + 1).padStart(2, "0")}`;
+      const fDate = `${mStr}-01`;
+      const tDate = `${mStr}-${String(lastDay).padStart(2, "0")}`;
+      const label = `Tháng ${month + 1}/${year}`;
+
+      return {
+        dateRange: { from_date: fDate, to_date: tDate, month: mStr },
+        daysList: list,
+        periodLabel: label,
+      };
     } else {
       // Chế độ Tuần: 7 ngày Thứ 2 -> Chủ nhật
       const monday = getMonday(currentDate);
@@ -159,9 +239,30 @@ export default function WorkSchedulePage() {
       const weekNum = getWeekNumber(monday);
       const label = `Tuần ${weekNum} (${formatDate(fDate)} - ${formatDate(tDate)})`;
 
-      return { daysList: list, periodLabel: label };
+      return {
+        dateRange: { from_date: fDate, to_date: tDate },
+        daysList: list,
+        periodLabel: label,
+      };
     }
   }, [viewMode, currentDate]);
+
+  // Nạp danh sách đơn nghỉ phép trong kỳ: CHỈ LẤY ĐƠN ĐÃ ĐƯỢC DUYỆT (APPROVED)
+  useEffect(() => {
+    api.leaveSchedule({
+      from_date: dateRange.from_date,
+      to_date: dateRange.to_date,
+      month: dateRange.month,
+      status: "APPROVED",
+    })
+      .then((data) => {
+        // Lọc chắc chắn chỉ lấy đơn APPROVED
+        setLeaves(data.filter((l) => l.status === "APPROVED"));
+      })
+      .catch((err) => {
+        console.error("Lỗi khi tải lịch nghỉ:", err);
+      });
+  }, [dateRange]);
 
   // Điều hướng thời gian
   const prevPeriod = () => {
@@ -188,24 +289,27 @@ export default function WorkSchedulePage() {
     setCurrentDate(new Date());
   };
 
-  // Danh sách phòng ban (chỉ lấy từ nhân sự đang làm việc)
+  // Tra cứu đơn nghỉ ĐÃ DUYỆT của 1 nhân viên trong 1 ngày cụ thể
+  const getApprovedLeave = (userId: number, dateStr: string): LeaveRequest | undefined => {
+    return leaves.find((l) => {
+      if (l.user_id !== userId) return false;
+      if (l.status !== "APPROVED") return false;
+      return l.from_date <= dateStr && l.to_date >= dateStr;
+    });
+  };
+
+  // Danh sách phòng ban (chỉ từ nhân sự đang làm việc)
   const departments = useMemo(() => {
     const set = new Set<string>();
     users.forEach((u) => {
-      const isActive = u.is_active !== false && u.is_approved !== false;
-      if (isActive && u.department) {
-        set.add(u.department.trim());
-      }
+      if (u.department) set.add(u.department.trim());
     });
     return Array.from(set).sort();
   }, [users]);
 
-  // Lọc danh sách nhân viên: CHỈ LẤY NHÂN VIÊN ĐANG LÀM VIỆC (loại bỏ hoàn toàn nhân viên cũ đã nghỉ hoặc chưa duyệt)
+  // Lọc danh sách nhân viên: CHỈ LẤY NHÂN VIÊN ĐANG LÀM VIỆC
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      const isActive = u.is_active !== false && u.is_approved !== false;
-      if (!isActive) return false;
-
       if (deptFilter && u.department !== deptFilter) return false;
       if (searchTerm) {
         const query = searchTerm.toLowerCase();
@@ -229,7 +333,7 @@ export default function WorkSchedulePage() {
     setNoteInput("");
   };
 
-  // Xuất file Excel bảng trắng lịch làm việc
+  // Xuất file Excel bảng lịch làm việc
   const exportToExcel = () => {
     try {
       const headerRow = ["STT", "Họ và tên", "Phòng ban"];
@@ -241,8 +345,14 @@ export default function WorkSchedulePage() {
       const dataRows = filteredUsers.map((u, idx) => {
         const row: (string | number)[] = [idx + 1, u.full_name, u.department || "—"];
         daysList.forEach((d) => {
-          const key = `${u.id}_${d.dateStr}`;
-          row.push(cellNotes[key] || "");
+          const l = getApprovedLeave(u.id, d.dateStr);
+          if (l) {
+            const type = getScheduleType(l.leave_type);
+            row.push(l.reason ? `${l.reason.toUpperCase()} (${type.label})` : type.label);
+          } else {
+            const key = `${u.id}_${d.dateStr}`;
+            row.push(cellNotes[key] || "");
+          }
         });
         return row;
       });
@@ -252,7 +362,7 @@ export default function WorkSchedulePage() {
         { wch: 6 },
         { wch: 26 },
         { wch: 18 },
-        ...daysList.map(() => ({ wch: 7 })),
+        ...daysList.map(() => ({ wch: 10 })),
       ];
 
       const wb = XLSX.utils.book_new();
@@ -277,7 +387,7 @@ export default function WorkSchedulePage() {
             </div>
             <div>
               <h1 className="text-base font-bold tracking-tight lg:text-lg">Lịch làm việc</h1>
-              <p className="text-[11px] text-white/70">Bảng theo dõi và phân ca làm việc</p>
+              <p className="text-[11px] text-white/70">Theo dõi nghỉ phép & đi muộn đã duyệt</p>
             </div>
           </div>
 
@@ -345,9 +455,43 @@ export default function WorkSchedulePage() {
         </div>
       </div>
 
+      {/* ==================== PHÀM LỆ 5 KIỂU (Y HỆT ẢNH MẪU) ==================== */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted mr-1">
+            Phàm lệ:
+          </span>
+          {/* 5 kiểu trạng thái nghỉ / đi muộn */}
+          {SCHEDULE_TYPES.map((item) => (
+            <div
+              key={item.key}
+              className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-1"
+            >
+              <span className={`h-3.5 w-5 rounded-xs border ${item.bgClass} ${item.borderClass} shadow-2xs`} />
+              <span className="text-[11px] font-semibold text-slate-800">{item.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Thứ 7 & Chủ nhật & Hôm nay */}
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted border-t sm:border-t-0 pt-1 sm:pt-0">
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-3 w-3 rounded-xs border border-pink-300 bg-pink-50" />
+            <span>Thứ 7</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-3 w-3 rounded-xs border border-rose-300 bg-rose-100" />
+            <span>Chủ nhật</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-3 w-3 rounded-xs border border-blue-400 bg-blue-100" />
+            <span>Hôm nay</span>
+          </div>
+        </div>
+      </div>
+
       {/* ==================== BỘ LỌC & TÌM KIẾM NHANH ==================== */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs shadow-xs">
-        {/* Bộ lọc phòng ban & ô tìm kiếm */}
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs shadow-xs">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-md border border-line bg-paper px-2 py-1">
             <FunnelIcon className="h-3.5 w-3.5 text-muted" />
@@ -382,33 +526,18 @@ export default function WorkSchedulePage() {
           </div>
         </div>
 
-        {/* Chú giải nhanh gọn */}
-        <div className="flex items-center gap-3 text-[11px] text-muted">
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-xs border border-pink-300 bg-pink-50" />
-            <span>Thứ 7</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-xs border border-rose-300 bg-rose-100" />
-            <span>Chủ nhật</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-xs border border-blue-400 bg-blue-100" />
-            <span>Hôm nay</span>
-          </div>
-          <span>
-            Nhân sự: <strong className="text-ink">{filteredUsers.length}</strong>
-          </span>
+        <div className="text-[11px] text-muted">
+          Nhân sự: <strong className="text-ink">{filteredUsers.length}</strong> người
         </div>
       </div>
 
-      {/* ==================== BẢNG TRẮNG LỊCH LÀM VIỆC ==================== */}
-      {/* Quan trọng: w-full table-fixed và KHÔNG CẦN KÉO NGANG ở chế độ tháng */}
-      <div className="mt-3 rounded-xl border border-slate-300 bg-white shadow-card overflow-hidden">
+      {/* ==================== BẢNG LỊCH LÀM VIỆC ==================== */}
+      {/* w-full table-fixed: Hiển thị full cả tháng KHÔNG CẦN KÉO NGANG */}
+      <div className="mt-2.5 rounded-xl border border-slate-300 bg-white shadow-card overflow-hidden">
         {loading ? (
           <div className="flex min-h-[350px] flex-col items-center justify-center gap-2">
             <div className="h-7 w-7 animate-spin rounded-full border-3 border-steel border-t-amber" />
-            <p className="text-xs text-muted">Đang chuẩn bị bảng lịch làm việc…</p>
+            <p className="text-xs text-muted">Đang tải lịch làm việc…</p>
           </div>
         ) : (
           <div className="w-full overflow-hidden">
@@ -417,12 +546,12 @@ export default function WorkSchedulePage() {
               <thead>
                 <tr className="bg-slate-100/90 text-slate-700">
                   {/* Cột STT: rất gọn */}
-                  <th className="border border-slate-300 px-1 py-1.5 text-center text-[10px] font-bold text-slate-800 w-[30px] sm:w-[34px]">
+                  <th className="border border-slate-300 px-1 py-1.5 text-center text-[10px] font-bold text-slate-800 w-[28px] sm:w-[32px]">
                     #
                   </th>
 
                   {/* Cột Họ tên: độ rộng tối ưu */}
-                  <th className="border border-slate-300 px-2 py-1.5 text-left text-[11px] font-bold text-slate-800 w-[110px] sm:w-[135px] lg:w-[155px]">
+                  <th className="border border-slate-300 px-2 py-1.5 text-left text-[11px] font-bold text-slate-800 w-[105px] sm:w-[130px] lg:w-[150px]">
                     Họ và tên
                   </th>
 
@@ -468,7 +597,7 @@ export default function WorkSchedulePage() {
                 </tr>
               </thead>
 
-              {/* Danh sách nhân viên & các ô trắng */}
+              {/* Danh sách nhân viên & các ô lịch */}
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
@@ -490,7 +619,7 @@ export default function WorkSchedulePage() {
                         {uIdx + 1}
                       </td>
 
-                      {/* Cột Họ tên: hiển thị gọn gàng, có tooltip đầy đủ tên */}
+                      {/* Cột Họ tên: hiển thị gọn gàng */}
                       <td
                         className="border border-slate-300 bg-white px-1.5 py-1.5 text-left"
                         title={`${user.full_name} (${user.department || "Chưa phân phòng ban"})`}
@@ -506,15 +635,46 @@ export default function WorkSchedulePage() {
                         )}
                       </td>
 
-                      {/* Các ô ngày: BẢNG TRẮNG SẠCH SẼ */}
+                      {/* Các ô ngày: HIỂN THỊ ĐƠN ĐÃ DUYỆT (5 KIỂU MÀU) HOẶC BẢNG TRẮNG */}
                       {daysList.map((d) => {
                         const isSaturday = d.dayOfWeek === 6;
                         const isSunday = d.dayOfWeek === 0;
                         const isToday = d.dateStr === today;
+                        const leave = getApprovedLeave(user.id, d.dateStr);
+
+                        // TRƯỜNG HỢP 1: Có đơn nghỉ phép ĐÃ ĐƯỢC DUYỆT -> Tô đúng 1 trong 5 màu
+                        if (leave) {
+                          const schedType = getScheduleType(leave.leave_type);
+                          const reasonText = (leave.reason || schedType.label).toUpperCase();
+
+                          return (
+                            <td
+                              key={d.dateStr}
+                              onClick={() => {
+                                setSelectedCell({
+                                  user,
+                                  dateStr: d.dateStr,
+                                  dayNum: d.dayNum,
+                                  dayOfWeek: d.dayOfWeek,
+                                  leave,
+                                });
+                              }}
+                              className={`border border-slate-300 p-0 text-center cursor-pointer transition-all hover:brightness-95 ${schedType.bgClass} ${schedType.textClass}`}
+                              title={`${user.full_name} - ${formatDate(d.dateStr)}\n${schedType.label}: ${leave.reason || "Không ghi lý do"}\n(Đơn đã được duyệt)`}
+                            >
+                              <div className="h-7 sm:h-8 w-full flex items-center justify-center p-0.5 overflow-hidden">
+                                <span className="text-[9px] font-bold uppercase tracking-tight truncate max-w-[98%] leading-tight">
+                                  {reasonText}
+                                </span>
+                              </div>
+                            </td>
+                          );
+                        }
+
+                        // TRƯỜNG HỢP 2: Không có đơn nghỉ -> BẢNG TRẮNG SẠCH SẼ
                         const key = `${user.id}_${d.dateStr}`;
                         const note = cellNotes[key];
 
-                        // Màu nền tinh tế cho ngày cuối tuần hoặc hôm nay
                         let cellBg = "bg-white";
                         if (isToday) cellBg = "bg-blue-50/40";
                         else if (isSunday) cellBg = "bg-rose-50/40";
@@ -558,7 +718,7 @@ export default function WorkSchedulePage() {
         )}
       </div>
 
-      {/* ==================== POPUP CHI TIẾT Ô LỊCH (BẢNG TRẮNG) ==================== */}
+      {/* ==================== POPUP XEM CHI TIẾT Ô LỊCH ==================== */}
       {selectedCell && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs animate-in fade-in duration-100">
           <div className="w-full max-w-sm rounded-xl border border-line bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-150">
@@ -579,58 +739,100 @@ export default function WorkSchedulePage() {
               </button>
             </div>
 
-            <div className="mt-4 space-y-3 text-xs">
-              <div>
-                <label className="block text-[11px] font-semibold text-muted mb-1">
-                  Ghi chú lịch trực / phân công:
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Trực ca, Đi dự án, Họp KH, Làm online..."
-                  value={noteInput}
-                  onChange={(e) => setNoteInput(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
-                  autoFocus
-                />
-              </div>
+            {/* Nếu ô này có đơn nghỉ phép ĐÃ ĐƯỢC DUYỆT */}
+            {selectedCell.leave ? (
+              <div className="mt-4 space-y-3 text-xs">
+                <div className="rounded-lg border border-line bg-paper p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted">Phân loại:</span>
+                    <span className="font-bold text-ink">
+                      {getScheduleType(selectedCell.leave.leave_type).label}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between">
+                    <span className="text-muted">Lý do nghỉ:</span>
+                    <span className="font-bold text-ink text-right">
+                      {selectedCell.leave.reason || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted">Trạng thái:</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-ok/10 px-2 py-0.5 text-[10px] font-bold text-ok">
+                      <CheckCircleIcon className="h-3 w-3" /> Đã được duyệt
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted">Thời gian:</span>
+                    <span className="text-ink">
+                      {formatDate(selectedCell.leave.from_date)} → {formatDate(selectedCell.leave.to_date)}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="rounded-lg bg-paper p-2.5 text-[11px] text-muted">
-                💡 Bảng đang ở chế độ <strong>Bảng trắng</strong> sạch sẽ. Mọi ghi chú bạn lưu sẽ hiển thị nhẹ nhàng trên ô tương ứng.
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => setSelectedCell(null)}
+                    className="rounded-lg bg-ink px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* Nếu là ngày bình thường (bảng trắng) -> cho phép ghi chú lịch trực */
+              <div className="mt-4 space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted mb-1">
+                    Ghi chú lịch trực / phân công:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: Trực ca, Đi dự án, Họp KH, Làm online..."
+                    value={noteInput}
+                    onChange={(e) => setNoteInput(e.target.value)}
+                    className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
+                    autoFocus
+                  />
+                </div>
 
-            <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-3">
-              <button
-                onClick={() => setSelectedCell(null)}
-                className="rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:bg-line transition"
-              >
-                Đóng
-              </button>
-              {noteInput && (
-                <button
-                  onClick={() => {
-                    setNoteInput("");
-                    const key = `${selectedCell.user.id}_${selectedCell.dateStr}`;
-                    setCellNotes((prev) => {
-                      const copy = { ...prev };
-                      delete copy[key];
-                      return copy;
-                    });
-                    setSelectedCell(null);
-                  }}
-                  className="rounded-lg border border-bad/30 bg-bad/5 px-2.5 py-1.5 text-xs font-semibold text-bad hover:bg-bad/10 transition"
-                >
-                  Xóa ghi chú
-                </button>
-              )}
-              <button
-                onClick={handleSaveNote}
-                className="flex items-center gap-1 rounded-lg bg-ink px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition"
-              >
-                <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
-                <span>Lưu lại</span>
-              </button>
-            </div>
+                <div className="rounded-lg bg-paper p-2.5 text-[11px] text-muted">
+                  💡 Ngày làm việc bình thường (bảng trắng). Bạn có thể ghi chú ca trực hoặc công việc riêng cho nhân sự này.
+                </div>
+
+                <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-3">
+                  <button
+                    onClick={() => setSelectedCell(null)}
+                    className="rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:bg-line transition"
+                  >
+                    Đóng
+                  </button>
+                  {noteInput && (
+                    <button
+                      onClick={() => {
+                        setNoteInput("");
+                        const key = `${selectedCell.user.id}_${selectedCell.dateStr}`;
+                        setCellNotes((prev) => {
+                          const copy = { ...prev };
+                          delete copy[key];
+                          return copy;
+                        });
+                        setSelectedCell(null);
+                      }}
+                      className="rounded-lg border border-bad/30 bg-bad/5 px-2.5 py-1.5 text-xs font-semibold text-bad hover:bg-bad/10 transition"
+                    >
+                      Xóa ghi chú
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSaveNote}
+                    className="flex items-center gap-1 rounded-lg bg-ink px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition"
+                  >
+                    <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
+                    <span>Lưu lại</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

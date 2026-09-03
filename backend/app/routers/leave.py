@@ -66,8 +66,8 @@ def get_schedule_leaves(
     if status:
         q = q.filter(LeaveRequest.status == status)
     else:
-        # Lấy các đơn đã duyệt và chờ duyệt để hiển thị lên lịch
-        q = q.filter(LeaveRequest.status.in_([LeaveStatus.APPROVED, LeaveStatus.PENDING]))
+        # Chỉ hiển thị các đơn ĐÃ ĐƯỢC DUYỆT (APPROVED) lên bảng lịch làm việc
+        q = q.filter(LeaveRequest.status == LeaveStatus.APPROVED)
 
     if month:
         try:
