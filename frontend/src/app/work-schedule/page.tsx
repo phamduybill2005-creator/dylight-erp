@@ -1,9 +1,10 @@
 "use client";
 
-// Trang Lịch làm việc (Work Schedule)
-// Giao diện ma trận theo dõi lịch trực, đi muộn, nghỉ phép của toàn thể nhân sự.
-// Hỗ trợ 2 chế độ: Theo Tuần và Theo Tháng.
-// Tô màu và hiển thị lý do nổi bật theo đúng quy chuẩn phàm lệ như bảng tính.
+// Trang Lịch làm việc (Work Schedule) - Giao diện mới tinh gọn, trực quan, dễ hiểu
+// Thiết kế "Bảng trắng" (Clean Grid): các ô ngày trắng sạch sẽ, không bị rối mắt
+// Chế độ xem theo Tháng: hiển thị FULL cả tháng vừa khít màn hình, KHÔNG CẦN KÉO NGANG
+// Chế độ xem theo Tuần: 7 ngày rộng rãi, thoáng đãng
+// Tương tác: bấm vào ô bất kỳ để xem chi tiết hoặc đặt lịch làm việc/trực
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,103 +16,20 @@ import {
   ArrowDownTrayIcon,
   PlusIcon,
   XMarkIcon,
-  PaperAirplaneIcon,
   FunnelIcon,
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
-import type { LeaveRequest, LeaveType, User } from "@/lib/types";
+import type { User } from "@/lib/types";
 
-// Danh sách LÝ DO nghỉ phép cố định
-const LEAVE_REASONS = [
-  "GIỖ TẾT", "HIẾU SỰ", "HỶ SỰ", "ỐM ĐAU", "NGỦ QUÊN", "TẮC ĐƯỜNG",
-  "HỎNG XE", "SINH NHẬT", "THIÊN TAI", "BIA RƯỢU", "HỌC HÀNH", "YÊU ĐƯƠNG",
-  "GIA ĐÌNH",
-];
-
-// Định nghĩa màu sắc theo Phàm lệ từ bảng tính mẫu
-export interface LegendItem {
-  key: string;
-  label: string;
-  bgClass: string;
-  textClass: string;
-  borderClass: string;
-  hexColor: string;
-}
-
-const LEGEND_ITEMS: LegendItem[] = [
-  {
-    key: "LATE_MORNING",
-    label: "Đi muộn sáng",
-    bgClass: "bg-[#16a34a]",
-    textClass: "text-white",
-    borderClass: "border-[#15803d]",
-    hexColor: "#16a34a",
-  },
-  {
-    key: "LATE_AFTERNOON",
-    label: "Đi muộn chiều",
-    bgClass: "bg-[#84cc16]",
-    textClass: "text-slate-900",
-    borderClass: "border-[#65a30d]",
-    hexColor: "#84cc16",
-  },
-  {
-    key: "MORNING",
-    label: "Nghỉ sáng",
-    bgClass: "bg-[#eab308]",
-    textClass: "text-slate-900",
-    borderClass: "border-[#ca8a04]",
-    hexColor: "#eab308",
-  },
-  {
-    key: "AFTERNOON",
-    label: "Nghỉ chiều",
-    bgClass: "bg-[#f97316]",
-    textClass: "text-white",
-    borderClass: "border-[#ea580c]",
-    hexColor: "#f97316",
-  },
-  {
-    key: "FULL",
-    label: "Nghỉ cả ngày",
-    bgClass: "bg-[#ef4444]",
-    textClass: "text-white",
-    borderClass: "border-[#dc2626]",
-    hexColor: "#ef4444",
-  },
-  {
-    key: "SATURDAY",
-    label: "Thứ 7",
-    bgClass: "bg-[#fbcfe8]",
-    textClass: "text-[#9d174d]",
-    borderClass: "border-[#f472b6]",
-    hexColor: "#fbcfe8",
-  },
-  {
-    key: "SUNDAY",
-    label: "Chủ nhật",
-    bgClass: "bg-[#ec4899]",
-    textClass: "text-white",
-    borderClass: "border-[#db2777]",
-    hexColor: "#ec4899",
-  },
-];
-
-// Helper phân loại đơn nghỉ theo màu
-function getLeaveStyle(leaveType?: string | null): LegendItem {
-  if (!leaveType) return LEGEND_ITEMS[4]; // mặc định FULL
-  if (leaveType === "LATE_MORNING" || leaveType === "LATE") return LEGEND_ITEMS[0];
-  if (leaveType === "LATE_AFTERNOON") return LEGEND_ITEMS[1];
-  if (leaveType === "MORNING") return LEGEND_ITEMS[2];
-  if (leaveType === "AFTERNOON") return LEGEND_ITEMS[3];
-  return LEGEND_ITEMS[4]; // FULL
-}
-
-// Lấy thứ trong tuần tiếng Việt
+// Tên các thứ trong tuần tiếng Việt
 const DAY_NAMES_VI = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const FULL_DAY_NAMES_VI = [
+  "Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"
+];
 
 // Helper tính ngày đầu tuần (Thứ 2)
 function getMonday(d: Date): Date {
@@ -134,17 +52,26 @@ function getWeekNumber(d: Date): number {
   return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
 }
 
+// Rút gọn tên nhân viên để hiển thị vừa vặn trong cột không bị vỡ layout
+function formatShortName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length <= 1) return fullName.toUpperCase();
+  if (parts.length === 2) return `${parts[0][0]}.${parts[1]}`.toUpperCase();
+  // Ví dụ: HOÀNG KIM LÂM -> H.K.LÂM, NGUYỄN CÔNG BÌNH -> N.C.BÌNH
+  const initials = parts.slice(0, -1).map((p) => p[0].toUpperCase()).join(".");
+  return `${initials}.${parts[parts.length - 1].toUpperCase()}`;
+}
+
 export default function WorkSchedulePage() {
   const router = useRouter();
   const [me, setMe] = useState<User | null>(api.cachedUser());
   const [users, setUsers] = useState<User[]>([]);
-  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Chế độ xem: "WEEK" (Theo tuần) hoặc "MONTH" (Theo tháng)
-  const [viewMode, setViewMode] = useState<"WEEK" | "MONTH">("MONTH");
+  // Chế độ xem: "MONTH" (Theo tháng - full màn hình không scroll ngang) hoặc "WEEK" (Theo tuần)
+  const [viewMode, setViewMode] = useState<"MONTH" | "WEEK">("MONTH");
 
-  // Thời gian chọn
+  // Thời gian đang chọn
   const today = todayLocal();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
@@ -152,22 +79,19 @@ export default function WorkSchedulePage() {
   const [deptFilter, setDeptFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Modal xem chi tiết ô nghỉ
+  // Modal chi tiết khi click vào ô bất kỳ
   const [selectedCell, setSelectedCell] = useState<{
     user: User;
     dateStr: string;
-    leave?: LeaveRequest;
+    dayNum: number;
+    dayOfWeek: number;
   } | null>(null);
 
-  // Modal gửi đơn nhanh
-  const [showQuickLeave, setShowQuickLeave] = useState(false);
-  const [quickFromDate, setQuickFromDate] = useState(today);
-  const [quickToDate, setQuickToDate] = useState(today);
-  const [quickLeaveType, setQuickLeaveType] = useState<LeaveType>("FULL");
-  const [quickReason, setQuickReason] = useState("");
-  const [quickSaving, setQuickSaving] = useState(false);
+  // Ghi chú tạm thời cho các ô (lưu trong phiên làm việc)
+  const [cellNotes, setCellNotes] = useState<Record<string, string>>({});
+  const [noteInput, setNoteInput] = useState("");
 
-  // Load danh sách người dùng & thông tin người đăng nhập
+  // Nạp danh sách nhân sự
   useEffect(() => {
     api.me()
       .then((u) => {
@@ -175,7 +99,6 @@ export default function WorkSchedulePage() {
         return api.users();
       })
       .then((userList) => {
-        // Sắp xếp người dùng theo thứ tự ưu tiên: Giám đốc -> Quản lý -> Nhân viên
         const sorted = [...userList].sort((a, b) => {
           const roleOrder: Record<string, number> = {
             DIRECTOR: 1,
@@ -191,11 +114,12 @@ export default function WorkSchedulePage() {
         });
         setUsers(sorted);
       })
-      .catch(() => router.push("/login"));
+      .catch(() => router.push("/login"))
+      .finally(() => setLoading(false));
   }, [router]);
 
-  // Tính danh sách các ngày hiển thị theo viewMode
-  const { dateRange, daysList, periodLabel } = useMemo(() => {
+  // Tính toán danh sách ngày theo chế độ xem
+  const { daysList, periodLabel } = useMemo(() => {
     if (viewMode === "MONTH") {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -212,18 +136,10 @@ export default function WorkSchedulePage() {
         });
       }
 
-      const mStr = `${year}-${String(month + 1).padStart(2, "0")}`;
-      const fDate = `${mStr}-01`;
-      const tDate = `${mStr}-${String(lastDay).padStart(2, "0")}`;
-      const label = `Tháng ${month + 1}/${year}`;
-
-      return {
-        dateRange: { from_date: fDate, to_date: tDate, month: mStr },
-        daysList: list,
-        periodLabel: label,
-      };
+      const label = `Tháng ${month + 1}/${year} (${lastDay} ngày)`;
+      return { daysList: list, periodLabel: label };
     } else {
-      // Chế độ Tuần: 7 ngày từ Thứ 2 đến Chủ nhật
+      // Chế độ Tuần: 7 ngày Thứ 2 -> Chủ nhật
       const monday = getMonday(currentDate);
       const list: { date: Date; dateStr: string; dayNum: number; dayOfWeek: number }[] = [];
 
@@ -243,34 +159,9 @@ export default function WorkSchedulePage() {
       const weekNum = getWeekNumber(monday);
       const label = `Tuần ${weekNum} (${formatDate(fDate)} - ${formatDate(tDate)})`;
 
-      return {
-        dateRange: { from_date: fDate, to_date: tDate },
-        daysList: list,
-        periodLabel: label,
-      };
+      return { daysList: list, periodLabel: label };
     }
   }, [viewMode, currentDate]);
-
-  // Tải danh sách đơn nghỉ phép trong kỳ
-  const loadScheduleData = () => {
-    setLoading(true);
-    api.leaveSchedule({
-      from_date: dateRange.from_date,
-      to_date: dateRange.to_date,
-      month: dateRange.month,
-    })
-      .then((data) => {
-        setLeaves(data);
-      })
-      .catch((err) => {
-        console.error("Lỗi khi tải lịch làm việc:", err);
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadScheduleData();
-  }, [dateRange]);
 
   // Điều hướng thời gian
   const prevPeriod = () => {
@@ -297,15 +188,7 @@ export default function WorkSchedulePage() {
     setCurrentDate(new Date());
   };
 
-  // Tra cứu đơn nghỉ của 1 nhân viên trong 1 ngày cụ thể
-  const getLeaveForUserAndDate = (userId: number, dateStr: string): LeaveRequest | undefined => {
-    return leaves.find((l) => {
-      if (l.user_id !== userId) return false;
-      return l.from_date <= dateStr && l.to_date >= dateStr;
-    });
-  };
-
-  // Danh sách các phòng ban để lọc
+  // Danh sách phòng ban
   const departments = useMemo(() => {
     const set = new Set<string>();
     users.forEach((u) => {
@@ -328,48 +211,42 @@ export default function WorkSchedulePage() {
     });
   }, [users, deptFilter, searchTerm]);
 
-  // Thống kê nhanh trong kỳ
-  const stats = useMemo(() => {
-    let leaveCount = 0;
-    let lateCount = 0;
-    leaves.forEach((l) => {
-      if (l.leave_type && l.leave_type.includes("LATE")) {
-        lateCount++;
-      } else {
-        leaveCount++;
-      }
-    });
-    return { leaveCount, lateCount };
-  }, [leaves]);
+  // Lưu ghi chú ô
+  const handleSaveNote = () => {
+    if (!selectedCell) return;
+    const key = `${selectedCell.user.id}_${selectedCell.dateStr}`;
+    setCellNotes((prev) => ({
+      ...prev,
+      [key]: noteInput.trim(),
+    }));
+    setSelectedCell(null);
+    setNoteInput("");
+  };
 
-  // Xuất file Excel bảng Lịch làm việc
+  // Xuất file Excel bảng trắng lịch làm việc
   const exportToExcel = () => {
     try {
-      const headerRow1 = ["STT", "Họ và tên", "Phòng ban"];
+      const headerRow = ["STT", "Họ và tên", "Phòng ban"];
       daysList.forEach((d) => {
         const dName = DAY_NAMES_VI[d.dayOfWeek];
-        headerRow1.push(`${d.dayNum} (${dName})`);
+        headerRow.push(`${d.dayNum} (${dName})`);
       });
 
       const dataRows = filteredUsers.map((u, idx) => {
         const row: (string | number)[] = [idx + 1, u.full_name, u.department || "—"];
         daysList.forEach((d) => {
-          const l = getLeaveForUserAndDate(u.id, d.dateStr);
-          if (l) {
-            row.push(l.reason ? l.reason.toUpperCase() : "NGHỈ");
-          } else {
-            row.push("");
-          }
+          const key = `${u.id}_${d.dateStr}`;
+          row.push(cellNotes[key] || "");
         });
         return row;
       });
 
-      const ws = XLSX.utils.aoa_to_sheet([headerRow1, ...dataRows]);
+      const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
       ws["!cols"] = [
         { wch: 6 },
         { wch: 26 },
         { wch: 18 },
-        ...daysList.map(() => ({ wch: 12 })),
+        ...daysList.map(() => ({ wch: 7 })),
       ];
 
       const wb = XLSX.utils.book_new();
@@ -382,139 +259,91 @@ export default function WorkSchedulePage() {
     }
   };
 
-  // Gửi đơn xin nghỉ / báo đi muộn nhanh
-  const handleQuickSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickFromDate || !quickToDate || !quickReason) return;
-    setQuickSaving(true);
-    try {
-      await api.createLeave({
-        from_date: quickFromDate,
-        to_date: quickToDate,
-        leave_type: quickLeaveType,
-        reason: quickReason,
-      });
-      setShowQuickLeave(false);
-      setQuickReason("");
-      loadScheduleData();
-    } catch (err) {
-      console.error(err);
-      alert("Có lỗi xảy ra khi gửi đơn. Vui lòng thử lại!");
-    } finally {
-      setQuickSaving(false);
-    }
-  };
-
   return (
-    <AppShell maxWidthClass="w-full max-w-[98%] lg:max-w-[96%] xl:max-w-[1750px]">
-      {/* ==================== HEADER ==================== */}
-      <header className="flex flex-col gap-4 rounded-xl2 bg-ink p-4 text-white shadow-card md:flex-row md:items-center md:justify-between lg:p-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber/20 text-amber">
-            <CalendarDaysIcon className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold tracking-tight lg:text-2xl">Lịch làm việc</h1>
-              <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-amber">
-                Chấm công & Đi muộn
-              </span>
+    <AppShell maxWidthClass="w-full max-w-[100%] px-1 sm:px-3 lg:px-4">
+      {/* ==================== HEADER ĐIỀU KHIỂN ==================== */}
+      <div className="flex flex-col gap-3 rounded-xl bg-ink p-3.5 text-white shadow-card md:flex-row md:items-center md:justify-between">
+        {/* Tiêu đề & Chọn chế độ Tuần / Tháng */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber/20 text-amber">
+              <CalendarDaysIcon className="h-5 w-5" />
             </div>
-            <p className="text-xs text-white/70">
-              Ma trận theo dõi nghỉ phép, đi muộn của toàn bộ nhân sự công ty
-            </p>
+            <div>
+              <h1 className="text-base font-bold tracking-tight lg:text-lg">Lịch làm việc</h1>
+              <p className="text-[11px] text-white/70">Bảng theo dõi và phân ca làm việc</p>
+            </div>
           </div>
-        </div>
 
-        {/* Nút hành động nhanh */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Nút Xuất Excel */}
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20"
-            title="Xuất bảng lịch làm việc ra file Excel"
-          >
-            <ArrowDownTrayIcon className="h-4 w-4 text-emerald-400" />
-            <span>Xuất Excel</span>
-          </button>
-
-          {/* Nút gửi đơn xin nghỉ nhanh */}
-          <button
-            onClick={() => {
-              setQuickFromDate(today);
-              setQuickToDate(today);
-              setQuickLeaveType("FULL");
-              setQuickReason("");
-              setShowQuickLeave(true);
-            }}
-            className="flex items-center gap-1.5 rounded-lg bg-amber px-3.5 py-2 text-xs font-bold text-ink shadow-sm transition hover:bg-amber-deep"
-          >
-            <PlusIcon className="h-4 w-4" />
-            <span>Báo nghỉ / Đi muộn</span>
-          </button>
-        </div>
-      </header>
-
-      {/* ==================== ĐIỀU KHIỂN & BỘ LỌC ==================== */}
-      <div className="mt-4 flex flex-col gap-3 rounded-xl2 border border-line bg-white p-3.5 shadow-card md:flex-row md:items-center md:justify-between">
-        {/* Toggle Chế độ xem: Tuần / Tháng */}
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-line bg-paper p-0.5">
-            <button
-              onClick={() => setViewMode("WEEK")}
-              className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${
-                viewMode === "WEEK"
-                  ? "bg-ink text-white shadow-sm"
-                  : "text-muted hover:text-ink"
-              }`}
-            >
-              Theo tuần
-            </button>
+          {/* Nút chuyển đổi Theo Tuần / Theo Tháng */}
+          <div className="inline-flex rounded-lg border border-white/20 bg-white/10 p-0.5 ml-0 sm:ml-4">
             <button
               onClick={() => setViewMode("MONTH")}
-              className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${
+              className={`rounded-md px-3 py-1 text-xs font-bold transition ${
                 viewMode === "MONTH"
-                  ? "bg-ink text-white shadow-sm"
-                  : "text-muted hover:text-ink"
+                  ? "bg-amber text-ink shadow-sm"
+                  : "text-white/80 hover:text-white"
               }`}
             >
-              Theo tháng
+              Theo tháng (Toàn màn hình)
+            </button>
+            <button
+              onClick={() => setViewMode("WEEK")}
+              className={`rounded-md px-3 py-1 text-xs font-bold transition ${
+                viewMode === "WEEK"
+                  ? "bg-amber text-ink shadow-sm"
+                  : "text-white/80 hover:text-white"
+              }`}
+            >
+              Theo tuần (7 ngày)
             </button>
           </div>
+        </div>
 
-          {/* Điều hướng thời gian */}
-          <div className="flex items-center gap-1">
+        {/* Nút điều hướng thời gian & Xuất Excel */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Bộ chuyển thời gian */}
+          <div className="flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2 py-1">
             <button
               onClick={prevPeriod}
-              className="rounded-lg border border-line bg-paper p-1.5 text-ink hover:bg-line transition"
+              className="rounded p-1 text-white/80 hover:bg-white/20 hover:text-white transition"
               title={viewMode === "MONTH" ? "Tháng trước" : "Tuần trước"}
             >
               <ChevronLeftIcon className="h-4 w-4" />
             </button>
             <button
               onClick={goToToday}
-              className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs font-semibold text-ink hover:bg-line transition"
+              className="px-2 py-0.5 text-xs font-semibold text-white hover:underline"
             >
               Hôm nay
             </button>
             <button
               onClick={nextPeriod}
-              className="rounded-lg border border-line bg-paper p-1.5 text-ink hover:bg-line transition"
+              className="rounded p-1 text-white/80 hover:bg-white/20 hover:text-white transition"
               title={viewMode === "MONTH" ? "Tháng sau" : "Tuần sau"}
             >
               <ChevronRightIcon className="h-4 w-4" />
             </button>
+            <span className="ml-1 text-xs font-bold text-amber">{periodLabel}</span>
           </div>
 
-          <span className="text-xs lg:text-sm font-bold text-ink ml-1">
-            {periodLabel}
-          </span>
+          {/* Nút Xuất Excel */}
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+            title="Xuất bảng Excel"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4 text-emerald-400" />
+            <span>Xuất Excel</span>
+          </button>
         </div>
+      </div>
 
-        {/* Lọc theo Phòng ban & Tìm kiếm */}
+      {/* ==================== BỘ LỌC & TÌM KIẾM NHANH ==================== */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs shadow-xs">
+        {/* Bộ lọc phòng ban & ô tìm kiếm */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Bộ lọc phòng ban */}
-          <div className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2 py-1">
+          <div className="flex items-center gap-1.5 rounded-md border border-line bg-paper px-2 py-1">
             <FunnelIcon className="h-3.5 w-3.5 text-muted" />
             <select
               value={deptFilter}
@@ -530,8 +359,7 @@ export default function WorkSchedulePage() {
             </select>
           </div>
 
-          {/* Ô tìm kiếm theo tên */}
-          <div className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1 text-xs">
             <MagnifyingGlassIcon className="h-3.5 w-3.5 text-muted" />
             <input
               type="text"
@@ -547,71 +375,52 @@ export default function WorkSchedulePage() {
             )}
           </div>
         </div>
-      </div>
 
-      {/* ==================== PHÀM LỆ (LEGEND) ==================== */}
-      <div className="mt-3 rounded-xl2 border border-line bg-white p-3 shadow-card">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted">
-              Phàm lệ / Chú thích:
-            </span>
+        {/* Chú giải nhanh gọn */}
+        <div className="flex items-center gap-3 text-[11px] text-muted">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-xs border border-pink-300 bg-pink-50" />
+            <span>Thứ 7</span>
           </div>
-          <div className="flex items-center gap-4 text-[11px] text-muted">
-            <span>
-              Tổng nhân sự: <strong className="text-ink">{filteredUsers.length}</strong>
-            </span>
-            <span>
-              Lượt nghỉ: <strong className="text-bad">{stats.leaveCount}</strong>
-            </span>
-            <span>
-              Lượt đi muộn: <strong className="text-amber-700">{stats.lateCount}</strong>
-            </span>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-xs border border-rose-300 bg-rose-100" />
+            <span>Chủ nhật</span>
           </div>
-        </div>
-
-        {/* Các ô màu đại diện y hệt ảnh */}
-        <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          {LEGEND_ITEMS.map((item) => (
-            <div
-              key={item.key}
-              className="flex items-center gap-2 rounded-lg border border-line/80 bg-paper/60 p-1.5 transition hover:bg-paper"
-            >
-              <div
-                className={`h-6 w-8 shrink-0 rounded border ${item.bgClass} ${item.borderClass} flex items-center justify-center shadow-xs`}
-              />
-              <span className="text-xs font-semibold text-ink leading-tight">
-                {item.label}
-              </span>
-            </div>
-          ))}
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-xs border border-blue-400 bg-blue-100" />
+            <span>Hôm nay</span>
+          </div>
+          <span>
+            Nhân sự: <strong className="text-ink">{filteredUsers.length}</strong>
+          </span>
         </div>
       </div>
 
-      {/* ==================== BẢNG MA TRẬN LỊCH LÀM VIỆC ==================== */}
-      <div className="mt-3 overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
+      {/* ==================== BẢNG TRẮNG LỊCH LÀM VIỆC ==================== */}
+      {/* Quan trọng: w-full table-fixed và KHÔNG CẦN KÉO NGANG ở chế độ tháng */}
+      <div className="mt-3 rounded-xl border border-slate-300 bg-white shadow-card overflow-hidden">
         {loading ? (
-          <div className="flex min-h-[400px] flex-col items-center justify-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" />
-            <p className="text-xs font-medium text-muted">Đang tải dữ liệu lịch làm việc…</p>
+          <div className="flex min-h-[350px] flex-col items-center justify-center gap-2">
+            <div className="h-7 w-7 animate-spin rounded-full border-3 border-steel border-t-amber" />
+            <p className="text-xs text-muted">Đang chuẩn bị bảng lịch làm việc…</p>
           </div>
         ) : (
-          <div className="overflow-x-auto max-h-[75vh]">
-            <table className="w-full border-collapse text-xs">
-              {/* Tiêu đề cột */}
-              <thead className="sticky top-0 z-20 bg-[#f8fafc] text-ink shadow-xs">
-                <tr>
-                  {/* Cột STT (Sticky) */}
-                  <th className="sticky left-0 z-30 border border-slate-300 bg-[#e2e8f0] px-2 py-2.5 text-center text-[11px] font-bold text-slate-800 min-w-[44px] w-[44px]">
-                    STT
+          <div className="w-full overflow-hidden">
+            <table className="w-full table-fixed border-collapse text-xs select-none">
+              {/* Tiêu đề các cột */}
+              <thead>
+                <tr className="bg-slate-100/90 text-slate-700">
+                  {/* Cột STT: rất gọn */}
+                  <th className="border border-slate-300 px-1 py-1.5 text-center text-[10px] font-bold text-slate-800 w-[30px] sm:w-[34px]">
+                    #
                   </th>
 
-                  {/* Cột Họ tên (Sticky) */}
-                  <th className="sticky left-[44px] z-30 border border-slate-300 bg-[#e2e8f0] px-3 py-2.5 text-left text-[11px] font-bold text-slate-800 min-w-[180px] w-[180px] lg:min-w-[210px] lg:w-[210px]">
-                    Họ tên
+                  {/* Cột Họ tên: độ rộng tối ưu */}
+                  <th className="border border-slate-300 px-2 py-1.5 text-left text-[11px] font-bold text-slate-800 w-[110px] sm:w-[135px] lg:w-[155px]">
+                    Họ và tên
                   </th>
 
-                  {/* Các cột Ngày */}
+                  {/* Các cột Ngày: tự động chia đều chiều rộng màn hình (Full tháng không kéo ngang) */}
                   {daysList.map((d) => {
                     const isSaturday = d.dayOfWeek === 6;
                     const isSunday = d.dayOfWeek === 0;
@@ -619,25 +428,29 @@ export default function WorkSchedulePage() {
                     const dayVi = DAY_NAMES_VI[d.dayOfWeek];
 
                     let headerBg = "bg-white text-slate-700";
-                    if (isSaturday) headerBg = "bg-[#fbcfe8] text-[#831843]"; // Hồng nhạt cho Thứ 7
-                    if (isSunday) headerBg = "bg-[#ec4899] text-white"; // Hồng đậm cho Chủ nhật
+                    if (isToday) headerBg = "bg-blue-600 text-white font-black";
+                    else if (isSunday) headerBg = "bg-rose-100 text-rose-800";
+                    else if (isSaturday) headerBg = "bg-pink-50 text-pink-800";
 
                     return (
                       <th
                         key={d.dateStr}
-                        className={`border border-slate-300 px-1 py-1.5 text-center font-bold min-w-[56px] ${
-                          viewMode === "WEEK" ? "w-[14%]" : "w-[3%]"
-                        } ${headerBg} ${isToday ? "ring-2 ring-blue-500 ring-inset" : ""}`}
+                        className={`border border-slate-300 p-0 text-center font-semibold transition-colors ${headerBg}`}
+                        title={`${FULL_DAY_NAMES_VI[d.dayOfWeek]}, ${formatDate(d.dateStr)}`}
                       >
-                        <div className="flex flex-col items-center">
-                          <span className="text-[12px] leading-none">{d.dayNum}</span>
+                        <div className="flex flex-col items-center justify-center py-1">
+                          <span className={`text-[11px] leading-tight ${isToday ? "font-bold text-white" : ""}`}>
+                            {d.dayNum}
+                          </span>
                           <span
-                            className={`text-[10px] font-semibold mt-0.5 ${
-                              isSunday
-                                ? "text-pink-100"
+                            className={`text-[9px] uppercase leading-none mt-0.5 ${
+                              isToday
+                                ? "text-blue-100 font-bold"
+                                : isSunday
+                                ? "text-rose-600 font-semibold"
                                 : isSaturday
-                                ? "text-pink-900"
-                                : "text-muted"
+                                ? "text-pink-600 font-semibold"
+                                : "text-slate-400"
                             }`}
                           >
                             {dayVi}
@@ -649,94 +462,84 @@ export default function WorkSchedulePage() {
                 </tr>
               </thead>
 
-              {/* Thân bảng */}
-              <tbody className="divide-y divide-slate-200">
+              {/* Danh sách nhân viên & các ô trắng */}
+              <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
                     <td
                       colSpan={daysList.length + 2}
                       className="py-12 text-center text-xs text-muted"
                     >
-                      Không tìm thấy nhân viên nào phù hợp với bộ lọc.
+                      Không tìm thấy nhân viên nào phù hợp.
                     </td>
                   </tr>
                 ) : (
                   filteredUsers.map((user, uIdx) => (
                     <tr
                       key={user.id}
-                      className="transition-colors hover:bg-slate-50/60"
+                      className="transition-colors hover:bg-slate-50/70 group"
                     >
                       {/* Cột STT */}
-                      <td className="sticky left-0 z-10 border border-slate-300 bg-white px-2 py-2 text-center font-bold text-slate-700">
+                      <td className="border border-slate-300 bg-slate-50/50 px-1 py-1.5 text-center text-[10px] font-semibold text-slate-600">
                         {uIdx + 1}
                       </td>
 
-                      {/* Cột Họ tên */}
-                      <td className="sticky left-[44px] z-10 border border-slate-300 bg-white px-3 py-2 text-left">
-                        <div className="font-bold text-ink uppercase tracking-wide text-[11px] truncate" title={user.full_name}>
-                          {user.full_name}
+                      {/* Cột Họ tên: hiển thị gọn gàng, có tooltip đầy đủ tên */}
+                      <td
+                        className="border border-slate-300 bg-white px-1.5 py-1.5 text-left"
+                        title={`${user.full_name} (${user.department || "Chưa phân phòng ban"})`}
+                      >
+                        <div className="font-bold text-slate-800 text-[11px] truncate leading-tight">
+                          <span className="hidden sm:inline">{user.full_name}</span>
+                          <span className="sm:hidden">{formatShortName(user.full_name)}</span>
                         </div>
                         {user.department && (
-                          <div className="text-[9px] font-medium text-muted truncate">
+                          <div className="text-[9px] text-muted truncate leading-tight mt-0.5">
                             {user.department}
                           </div>
                         )}
                       </td>
 
-                      {/* Các ô Ngày */}
+                      {/* Các ô ngày: BẢNG TRẮNG SẠCH SẼ */}
                       {daysList.map((d) => {
-                        const leave = getLeaveForUserAndDate(user.id, d.dateStr);
                         const isSaturday = d.dayOfWeek === 6;
                         const isSunday = d.dayOfWeek === 0;
                         const isToday = d.dateStr === today;
+                        const key = `${user.id}_${d.dateStr}`;
+                        const note = cellNotes[key];
 
-                        if (leave) {
-                          const style = getLeaveStyle(leave.leave_type);
-                          const reasonText = (leave.reason || style.label).toUpperCase();
-                          const isPending = leave.status === "PENDING";
-
-                          return (
-                            <td
-                              key={d.dateStr}
-                              onClick={() => setSelectedCell({ user, dateStr: d.dateStr, leave })}
-                              className={`border border-slate-300 p-0 text-center cursor-pointer select-none transition-all hover:brightness-95 ${
-                                style.bgClass
-                              } ${style.textClass} ${
-                                isPending ? "opacity-85 border-dashed" : ""
-                              } ${isToday ? "ring-2 ring-blue-500 ring-inset" : ""}`}
-                              title={`${user.full_name} - ${d.dateStr}\n${style.label}: ${leave.reason || "Không ghi"}\nTrạng thái: ${
-                                leave.status === "APPROVED" ? "Đã duyệt" : "Chờ duyệt"
-                              }`}
-                            >
-                              <div className="flex h-full min-h-[36px] w-full flex-col items-center justify-center px-1 py-1 text-center font-bold leading-tight">
-                                <span className="text-[10px] uppercase tracking-tighter truncate max-w-[95%]">
-                                  {reasonText}
-                                </span>
-                                {isPending && (
-                                  <span className="text-[8px] opacity-80 font-normal">
-                                    (chờ)
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        }
-
-                        // Ô không có lịch nghỉ
+                        // Màu nền tinh tế cho ngày cuối tuần hoặc hôm nay
                         let cellBg = "bg-white";
-                        if (isSaturday) cellBg = "bg-pink-50/40"; // Thứ 7 nhạt
-                        if (isSunday) cellBg = "bg-pink-100/30"; // CN nhạt
+                        if (isToday) cellBg = "bg-blue-50/40";
+                        else if (isSunday) cellBg = "bg-rose-50/40";
+                        else if (isSaturday) cellBg = "bg-pink-50/30";
 
                         return (
                           <td
                             key={d.dateStr}
-                            onClick={() => setSelectedCell({ user, dateStr: d.dateStr })}
-                            className={`border border-slate-300 p-0 text-center cursor-pointer transition hover:bg-slate-100/70 ${cellBg} ${
-                              isToday ? "ring-2 ring-blue-500 ring-inset" : ""
-                            }`}
-                            title={`Bấm để xem hoặc đăng ký nghỉ ngày ${formatDate(d.dateStr)}`}
+                            onClick={() => {
+                              setSelectedCell({
+                                user,
+                                dateStr: d.dateStr,
+                                dayNum: d.dayNum,
+                                dayOfWeek: d.dayOfWeek,
+                              });
+                              setNoteInput(note || "");
+                            }}
+                            className={`border border-slate-300 p-0 text-center cursor-pointer transition-all hover:bg-amber/15 ${cellBg}`}
+                            title={`Bấm để xem/ghi chú ngày ${formatDate(d.dateStr)} của ${user.full_name}`}
                           >
-                            <div className="h-full min-h-[36px] w-full" />
+                            <div className="h-7 sm:h-8 w-full flex items-center justify-center p-0.5">
+                              {note ? (
+                                <span className="inline-block max-w-[95%] truncate rounded bg-slate-800 px-1 py-0.5 text-[9px] font-medium text-white shadow-xs">
+                                  {note}
+                                </span>
+                              ) : (
+                                <span className="text-transparent group-hover:text-slate-300 text-[10px] leading-none">
+                                  +
+                                </span>
+                              )}
+                            </div>
                           </td>
                         );
                       })}
@@ -749,14 +552,19 @@ export default function WorkSchedulePage() {
         )}
       </div>
 
-      {/* ==================== MODAL XEM CHI TIẾT Ô LỊCH ==================== */}
+      {/* ==================== POPUP CHI TIẾT Ô LỊCH (BẢNG TRẮNG) ==================== */}
       {selectedCell && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-xl2 border border-line bg-white p-5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 className="text-sm font-bold text-ink">
-                Chi tiết ngày {formatDate(selectedCell.dateStr)}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs animate-in fade-in duration-100">
+          <div className="w-full max-w-sm rounded-xl border border-line bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-line pb-2.5">
+              <div>
+                <h3 className="text-sm font-bold text-ink">
+                  {FULL_DAY_NAMES_VI[selectedCell.dayOfWeek]}, {formatDate(selectedCell.dateStr)}
+                </h3>
+                <p className="text-xs text-muted mt-0.5">
+                  Nhân sự: <strong className="text-ink">{selectedCell.user.full_name}</strong>
+                </p>
+              </div>
               <button
                 onClick={() => setSelectedCell(null)}
                 className="rounded-lg p-1 text-muted hover:bg-paper hover:text-ink transition"
@@ -765,182 +573,58 @@ export default function WorkSchedulePage() {
               </button>
             </div>
 
-            <div className="mt-4 space-y-2.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Nhân viên:</span>
-                <span className="font-bold text-ink">{selectedCell.user.full_name}</span>
+            <div className="mt-4 space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-semibold text-muted mb-1">
+                  Ghi chú lịch trực / phân công:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Trực ca, Đi dự án, Họp KH, Làm online..."
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
+                  autoFocus
+                />
               </div>
-              {selectedCell.user.department && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted">Phòng ban:</span>
-                  <span className="font-medium text-ink">{selectedCell.user.department}</span>
-                </div>
-              )}
 
-              {selectedCell.leave ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted">Phân loại:</span>
-                    <span className="font-semibold text-ink">
-                      {getLeaveStyle(selectedCell.leave.leave_type).label}
-                    </span>
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <span className="text-muted">Lý do:</span>
-                    <span className="font-bold text-ink text-right">
-                      {selectedCell.leave.reason || "—"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted">Trạng thái:</span>
-                    <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        selectedCell.leave.status === "APPROVED"
-                          ? "bg-ok/10 text-ok"
-                          : "bg-amber/15 text-amber-deep"
-                      }`}
-                    >
-                      {selectedCell.leave.status === "APPROVED" ? "Đã duyệt" : "Chờ duyệt"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted">Thời gian:</span>
-                    <span className="text-ink">
-                      {formatDate(selectedCell.leave.from_date)} → {formatDate(selectedCell.leave.to_date)}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-lg bg-paper p-3 text-center text-muted">
-                  Chưa có lịch nghỉ hoặc đi muộn vào ngày này.
-                </div>
-              )}
+              <div className="rounded-lg bg-paper p-2.5 text-[11px] text-muted">
+                💡 Bảng đang ở chế độ <strong>Bảng trắng</strong> sạch sẽ. Mọi ghi chú bạn lưu sẽ hiển thị nhẹ nhàng trên ô tương ứng.
+              </div>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-3">
               <button
                 onClick={() => setSelectedCell(null)}
                 className="rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:bg-line transition"
               >
                 Đóng
               </button>
-              {/* Nút gửi đơn nhanh cho ngày này */}
+              {noteInput && (
+                <button
+                  onClick={() => {
+                    setNoteInput("");
+                    const key = `${selectedCell.user.id}_${selectedCell.dateStr}`;
+                    setCellNotes((prev) => {
+                      const copy = { ...prev };
+                      delete copy[key];
+                      return copy;
+                    });
+                    setSelectedCell(null);
+                  }}
+                  className="rounded-lg border border-bad/30 bg-bad/5 px-2.5 py-1.5 text-xs font-semibold text-bad hover:bg-bad/10 transition"
+                >
+                  Xóa ghi chú
+                </button>
+              )}
               <button
-                onClick={() => {
-                  setQuickFromDate(selectedCell.dateStr);
-                  setQuickToDate(selectedCell.dateStr);
-                  setQuickLeaveType("FULL");
-                  setQuickReason("");
-                  setSelectedCell(null);
-                  setShowQuickLeave(true);
-                }}
-                className="rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+                onClick={handleSaveNote}
+                className="flex items-center gap-1 rounded-lg bg-ink px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition"
               >
-                + Báo nghỉ ngày này
+                <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
+                <span>Lưu lại</span>
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== MODAL GỬI ĐƠN NHANH ==================== */}
-      {showQuickLeave && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl2 border border-line bg-white p-5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-line pb-3">
-              <div className="flex items-center gap-2">
-                <CalendarDaysIcon className="h-5 w-5 text-amber" />
-                <h3 className="text-sm font-bold text-ink">Báo nghỉ phép / Đi muộn</h3>
-              </div>
-              <button
-                onClick={() => setShowQuickLeave(false)}
-                className="rounded-lg p-1 text-muted hover:bg-paper hover:text-ink transition"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleQuickSubmit} className="mt-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-muted">Từ ngày *</label>
-                  <input
-                    type="date"
-                    required
-                    value={quickFromDate}
-                    onChange={(e) => {
-                      setQuickFromDate(e.target.value);
-                      if (!quickToDate || quickToDate < e.target.value) {
-                        setQuickToDate(e.target.value);
-                      }
-                    }}
-                    className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-muted">Đến ngày *</label>
-                  <input
-                    type="date"
-                    required
-                    value={quickToDate}
-                    onChange={(e) => setQuickToDate(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-muted">Hình thức *</label>
-                <select
-                  value={quickLeaveType}
-                  onChange={(e) => setQuickLeaveType(e.target.value as LeaveType)}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs font-medium outline-none focus:border-steel"
-                >
-                  <option value="FULL">Nghỉ cả ngày (Đỏ)</option>
-                  <option value="MORNING">Nghỉ sáng (Vàng)</option>
-                  <option value="AFTERNOON">Nghỉ chiều (Cam)</option>
-                  <option value="LATE_MORNING">Đi muộn sáng (Xanh lá đậm)</option>
-                  <option value="LATE_AFTERNOON">Đi muộn chiều (Xanh lá nhạt)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-muted">
-                  Lý do * <span className="font-normal text-muted/70">(chọn theo danh mục)</span>
-                </label>
-                <select
-                  required
-                  value={quickReason}
-                  onChange={(e) => setQuickReason(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs font-medium outline-none focus:border-steel"
-                >
-                  <option value="">— Chọn lý do —</option>
-                  {LEAVE_REASONS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mt-5 flex justify-end gap-2 border-t border-line pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowQuickLeave(false)}
-                  className="rounded-lg border border-line bg-paper px-3.5 py-2 text-xs font-semibold text-ink hover:bg-line transition"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={quickSaving || !quickFromDate || !quickToDate || !quickReason}
-                  className="flex items-center gap-1.5 rounded-lg bg-ink px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
-                >
-                  <PaperAirplaneIcon className="h-3.5 w-3.5" />
-                  {quickSaving ? "Đang gửi…" : "Gửi đơn"}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
