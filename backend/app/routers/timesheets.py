@@ -10,6 +10,7 @@ Router Timesheet — GIỜ LÀM THỰC TẾ mỗi người khai cho từng dự 
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
@@ -56,21 +57,19 @@ def upsert_timesheet(
     # Không cho khai giờ cho NGÀY TƯƠNG LAI (chỉ hôm nay & các ngày đã qua).
     if payload.work_date > vn_now().date():
         raise HTTPException(400, "Không thể khai giờ cho ngày trong tương lai.")
+    proj = db.get(Project, payload.project_id)
+    if not proj or proj.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy dự án.")
+    # Chỉ thành viên/chủ trì/giám đốc của dự án mới khai/điều chỉnh được giờ
+    if not _can_view(db, proj, current):
+        raise HTTPException(404, "Không tìm thấy dự án.")
+
     target_uid = current.id
     if payload.user_id is not None and payload.user_id != current.id:
-        if is_staff_tier(current):
-            raise HTTPException(403, "Bạn chỉ được khai giờ của chính mình.")
         target = db.get(User, payload.user_id)
         if not target or target.company_id != current.company_id:
             raise HTTPException(404, "Không tìm thấy nhân sự.")
         target_uid = payload.user_id
-
-    proj = db.get(Project, payload.project_id)
-    if not proj or proj.company_id != current.company_id:
-        raise HTTPException(404, "Không tìm thấy dự án.")
-    # Chỉ thành viên/chủ trì/giám đốc của dự án mới khai được giờ (chặn khai lên dự án lạ).
-    if not _can_view(db, proj, current):
-        raise HTTPException(404, "Không tìm thấy dự án.")
 
     # Đầu việc (hạng mục) — nếu có, phải thuộc đúng dự án này.
     item_id = payload.project_item_id
@@ -121,8 +120,36 @@ def delete_timesheet(
     rec = db.get(Timesheet, ts_id)
     if not rec or rec.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy dòng giờ làm.")
-    if rec.user_id != current.id and is_staff_tier(current):
-        raise HTTPException(403, "Bạn chỉ được xóa giờ của chính mình.")
+    proj = db.get(Project, rec.project_id)
+    if not proj or not _can_view(db, proj, current):
+        raise HTTPException(403, "Không có quyền xóa giờ trên dự án này.")
     db.delete(rec)
     db.commit()
     return Response(status_code=204)
+
+
+class ClearWorkerPayload(BaseModel):
+    project_id: int
+    user_id: int
+    project_item_id: int | None = None
+
+
+@router.post("/clear-worker")
+def clear_worker_hours(
+    payload: ClearWorkerPayload,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Xóa toàn bộ giờ của 1 nhân sự trên 1 đầu việc hoặc trên cả dự án."""
+    proj = db.get(Project, payload.project_id)
+    if not proj or proj.company_id != current.company_id or not _can_view(db, proj, current):
+        raise HTTPException(404, "Không tìm thấy dự án.")
+    q = db.query(Timesheet).filter(
+        Timesheet.project_id == payload.project_id,
+        Timesheet.user_id == payload.user_id,
+    )
+    if payload.project_item_id is not None:
+        q = q.filter(Timesheet.project_item_id == payload.project_item_id)
+    deleted = q.delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": deleted}

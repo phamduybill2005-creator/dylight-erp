@@ -267,6 +267,14 @@ def _ensure_schema() -> None:
         if "leave_requests" in insp.get_table_names():
             with engine.begin() as conn:
                 conn.execute(text("DELETE FROM leave_requests WHERE from_date < '2026-09-01'"))
+
+        # Dọn sạch toàn bộ timesheet gắn với các hạng mục đã bị xóa (is_deleted = True)
+        if "timesheets" in insp.get_table_names() and "project_items" in insp.get_table_names():
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    DELETE FROM timesheets 
+                    WHERE project_item_id IN (SELECT id FROM project_items WHERE is_deleted = TRUE)
+                """))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] bo qua: {_e}")
 

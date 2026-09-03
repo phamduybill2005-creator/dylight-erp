@@ -661,6 +661,7 @@ export default function ProjectDetailPage() {
               canManage={canManage}
               startDate={project.start_date ?? null}
               endDate={project.end_date ?? null}
+              onHoursChange={() => loadData(true)}
             />
 
             <div className="flex items-center justify-between">

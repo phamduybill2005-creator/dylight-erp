@@ -299,17 +299,35 @@ def _compute_auto_status(status: ProjectStatus, progress_percent: Decimal, start
 
 
 def _total_timesheet_hours(db: Session, project_id: int) -> float:
-    # Lấy ID của các NHÓM HẠNG MỤC LỚN (parent_id IS NULL) để tránh cộng trùng khi có cả giờ ở nhóm và giờ ở đầu việc con
-    parent_ids = [
-        r[0] for r in db.query(ProjectItem.id)
-        .filter(ProjectItem.project_id == project_id, ProjectItem.parent_id.is_(None))
-        .all()
-    ]
-    q = db.query(func.coalesce(func.sum(Timesheet.hours), 0)).filter(Timesheet.project_id == project_id)
-    if parent_ids:
-        q = q.filter(Timesheet.project_item_id.not_in(parent_ids))
-    val = q.scalar()
-    return float(val or 0)
+    # 1. Lấy tất cả hạng mục đang HOẠT ĐỘNG (chưa bị xóa) của dự án
+    active_items = db.query(ProjectItem.id, ProjectItem.parent_id).filter(
+        ProjectItem.project_id == project_id,
+        func.coalesce(ProjectItem.is_deleted, False) == False,
+    ).all()
+
+    active_item_ids = {it[0] for it in active_items}
+    # Nhóm cha đang có đầu việc con
+    parents_with_children = {it[1] for it in active_items if it[1] is not None}
+
+    # Hạng mục hợp lệ để tính giờ:
+    # - Các đầu việc con đang hoạt động (active_item_ids - parents_with_children)
+    # - Hoặc nhóm cha đang hoạt động nhưng KHÔNG CÓ đầu việc con nào
+    allowed_item_ids = active_item_ids - parents_with_children
+
+    # Query toàn bộ timesheet của dự án
+    sheets = db.query(Timesheet.hours, Timesheet.project_item_id).filter(
+        Timesheet.project_id == project_id
+    ).all()
+
+    total = 0.0
+    for h, item_id in sheets:
+        # Giờ được tính nếu:
+        # - Không gắn hạng mục nào (cấp dự án) VÀ dự án chưa có hạng mục con
+        # - Hoặc gắn đúng vào hạng mục con / hạng mục hợp lệ chưa bị xóa
+        if item_id is None or item_id in allowed_item_ids:
+            total += float(h or 0)
+
+    return total
 
 
 def _to_out(db: Session, project: Project) -> ProjectOut:

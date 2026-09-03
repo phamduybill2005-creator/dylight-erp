@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
 from app.deps import get_current_user, can_see_money
-from app.models import ProjectItem, Project, User, ProjectItemRating, project_members
+from app.models import ProjectItem, Project, User, ProjectItemRating, project_members, Timesheet
 from app.routers.projects import _can_view, _can_manage
 from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut, ProjectItemRatingOut, ProjectItemRatingUpsert
 
@@ -195,7 +195,15 @@ def delete_item(
     item.deleted_at = vn_now()
     item.deleted_by_id = current.id
 
+    del_item_ids = [item.id]
     if item.parent_id is None:
+        child_ids = [
+            r[0] for r in db.query(ProjectItem.id).filter(
+                ProjectItem.parent_id == item.id,
+                ProjectItem.company_id == current.company_id,
+            ).all()
+        ]
+        del_item_ids.extend(child_ids)
         db.query(ProjectItem).filter(
             ProjectItem.parent_id == item.id,
             ProjectItem.company_id == current.company_id,
@@ -203,6 +211,9 @@ def delete_item(
             {"is_deleted": True, "deleted_at": vn_now(), "deleted_by_id": current.id},
             synchronize_session=False,
         )
+
+    # Xoá toàn bộ giờ timesheet gắn với các hạng mục bị xóa để không bị cộng dồn ma ở bảng ngoài
+    db.query(Timesheet).filter(Timesheet.project_item_id.in_(del_item_ids)).delete(synchronize_session=False)
 
     db.commit()
     return None
