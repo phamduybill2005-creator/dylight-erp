@@ -6,8 +6,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  CalendarDaysIcon, PaperAirplaneIcon, CheckIcon, XMarkIcon,
+  CalendarDaysIcon, PaperAirplaneIcon, CheckIcon, XMarkIcon, TableCellsIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
@@ -56,6 +57,7 @@ export default function LeavePage() {
   const [toDate, setToDate] = useState("");
   const [leaveType, setLeaveType] = useState("FULL");
   const [leaveCategory, setLeaveCategory] = useState<"LEAVE" | "LATE">("LEAVE");
+  const [lateSlot, setLateSlot] = useState<"MORNING" | "AFTERNOON">("MORNING");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [deciding, setDeciding] = useState<number | null>(null);
@@ -81,9 +83,11 @@ export default function LeavePage() {
     if (!fromDate || !toDate || !reason) return;   // bắt buộc chọn 1 lý do
     setSaving(true);
     try {
-      const finalType = leaveCategory === "LATE" ? "LATE" : leaveType;
+      const finalType = leaveCategory === "LATE"
+        ? (lateSlot === "AFTERNOON" ? "LATE_AFTERNOON" : "LATE_MORNING")
+        : leaveType;
       await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: finalType, reason: reason || null });
-      setFromDate(""); setToDate(""); setLeaveType("FULL"); setLeaveCategory("LEAVE"); setReason("");
+      setFromDate(""); setToDate(""); setLeaveType("FULL"); setLeaveCategory("LEAVE"); setLateSlot("MORNING"); setReason("");
       const list = await api.myLeaves();
       setMine(list);
     } catch { /* noop */ } finally { setSaving(false); }
@@ -114,8 +118,11 @@ export default function LeavePage() {
   );
 
   const formatDaysDisplay = (l: LeaveRequest) => {
-    if (l.leave_type === "LATE") {
-      return <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200">Đi muộn</span>;
+    if (l.leave_type === "LATE_MORNING" || l.leave_type === "LATE") {
+      return <span className="inline-flex items-center rounded-md bg-[#16a34a]/15 px-2 py-0.5 text-[11px] font-semibold text-[#16a34a] border border-[#16a34a]/30">Đi muộn sáng</span>;
+    }
+    if (l.leave_type === "LATE_AFTERNOON") {
+      return <span className="inline-flex items-center rounded-md bg-[#84cc16]/25 px-2 py-0.5 text-[11px] font-semibold text-[#4d7c0f] border border-[#84cc16]/40">Đi muộn chiều</span>;
     }
     if (l.leave_type === "MORNING") return `${l.days} (Sáng)`;
     if (l.leave_type === "AFTERNOON") return `${l.days} (Chiều)`;
@@ -124,9 +131,18 @@ export default function LeavePage() {
 
   return (
     <AppShell>
-      <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card">
-        <CalendarDaysIcon className="h-5 w-5 text-amber" />
-        <h1 className="text-base lg:text-xl font-bold">Nghỉ phép</h1>
+      <header className="flex flex-col gap-3 rounded-xl2 bg-ink p-4 lg:p-6 text-white shadow-card sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <CalendarDaysIcon className="h-5 w-5 text-amber" />
+          <h1 className="text-base lg:text-xl font-bold">Nghỉ phép</h1>
+        </div>
+        <Link
+          href="/work-schedule"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+        >
+          <TableCellsIcon className="h-4 w-4 text-amber" />
+          <span>Xem Lịch làm việc</span>
+        </Link>
       </header>
 
       {/* Form xin nghỉ / báo đi muộn */}
@@ -147,13 +163,23 @@ export default function LeavePage() {
               className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel" />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-muted">Ngày nghỉ *</label>
-            <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
-              <option value="MORNING">Buổi sáng</option>
-              <option value="AFTERNOON">Buổi chiều</option>
-              <option value="FULL">Cả ngày</option>
-            </select>
+            <label className="block text-[11px] font-semibold text-muted">
+              {leaveCategory === "LATE" ? "Buổi đi muộn *" : "Thời gian nghỉ *"}
+            </label>
+            {leaveCategory === "LATE" ? (
+              <select value={lateSlot} onChange={(e) => setLateSlot(e.target.value as "MORNING" | "AFTERNOON")}
+                className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
+                <option value="MORNING">Đi muộn sáng (Xanh đậm)</option>
+                <option value="AFTERNOON">Đi muộn chiều (Xanh nhạt)</option>
+              </select>
+            ) : (
+              <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
+                <option value="FULL">Cả ngày (Đỏ)</option>
+                <option value="MORNING">Buổi sáng (Vàng)</option>
+                <option value="AFTERNOON">Buổi chiều (Cam)</option>
+              </select>
+            )}
           </div>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">

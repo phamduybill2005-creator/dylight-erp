@@ -19,6 +19,7 @@ import {
   UserGroupIcon,
   StarIcon,
   CalendarDaysIcon,
+  CalendarIcon,
   TableCellsIcon,
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
@@ -49,6 +50,7 @@ function deskNav(user: User | null): NavLink[] {
       items.push({ href: "/revenue", label: "Doanh thu", icon: BanknotesIcon });
     }
     items.push(
+      { href: "/work-schedule", label: "Lịch làm việc", icon: CalendarIcon },
       { href: "/attendance", label: "Tổng hợp", icon: ClockIcon },
       { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
       { href: "/evaluations", label: "Đánh giá", icon: StarIcon },
@@ -67,6 +69,7 @@ function deskNav(user: User | null): NavLink[] {
     items.push({ href: "/revenue", label: "Doanh thu", icon: BanknotesIcon });
   }
   items.push(
+    { href: "/work-schedule", label: "Lịch làm việc", icon: CalendarIcon },
     { href: "/attendance", label: "Tổng hợp", icon: ClockIcon },
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },

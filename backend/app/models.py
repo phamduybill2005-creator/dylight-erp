@@ -773,7 +773,7 @@ class LeaveRequest(Base):
     def days(self) -> float:
         if not (self.from_date and self.to_date):
             return 0
-        if self.leave_type == "LATE":
+        if self.leave_type and "LATE" in self.leave_type:
             return 0
         diff = (self.to_date - self.from_date).days + 1
         if diff == 1 and self.leave_type in ("MORNING", "AFTERNOON"):

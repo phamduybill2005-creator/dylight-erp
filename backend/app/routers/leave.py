@@ -1,7 +1,8 @@
 """
 Router Nghỉ phép (Leave) — nhân viên xin nghỉ, quản lý trực tiếp / Giám đốc duyệt.
 """
-from datetime import datetime
+import calendar
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -49,6 +50,39 @@ def list_leaves(
     if status:
         q = q.filter(LeaveRequest.status == status)
     return q.order_by(LeaveRequest.status, LeaveRequest.from_date.desc()).all()
+
+
+@router.get("/schedule", response_model=list[LeaveOut])
+def get_schedule_leaves(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    month: str | None = None,  # Định dạng YYYY-MM
+    status: LeaveStatus | None = None,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Lấy danh sách nghỉ phép / đi muộn toàn công ty cho bảng Lịch làm việc."""
+    q = db.query(LeaveRequest).filter(LeaveRequest.company_id == current.company_id)
+    if status:
+        q = q.filter(LeaveRequest.status == status)
+    else:
+        # Lấy các đơn đã duyệt và chờ duyệt để hiển thị lên lịch
+        q = q.filter(LeaveRequest.status.in_([LeaveStatus.APPROVED, LeaveStatus.PENDING]))
+
+    if month:
+        try:
+            parts = month.split("-")
+            y, m = int(parts[0]), int(parts[1])
+            _, last_day = calendar.monthrange(y, m)
+            m_start = date(y, m, 1)
+            m_end = date(y, m, last_day)
+            q = q.filter(LeaveRequest.from_date <= m_end, LeaveRequest.to_date >= m_start)
+        except Exception:
+            pass
+    elif from_date and to_date:
+        q = q.filter(LeaveRequest.from_date <= to_date, LeaveRequest.to_date >= from_date)
+
+    return q.order_by(LeaveRequest.from_date.asc()).all()
 
 
 @router.post("/{leave_id}/decide", response_model=LeaveOut)

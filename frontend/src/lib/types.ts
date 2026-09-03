@@ -392,6 +392,7 @@ export interface Payroll {
 
 // Nghỉ phép
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type LeaveType = "FULL" | "MORNING" | "AFTERNOON" | "LATE" | "LATE_MORNING" | "LATE_AFTERNOON";
 export interface LeaveRequest {
   id: number; company_id: number; user_id: number;
   from_date: string; to_date: string; leave_type?: string | null; reason?: string | null;

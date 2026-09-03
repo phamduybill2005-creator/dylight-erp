@@ -344,6 +344,15 @@ export const api = {
   leaveList: (status?: string) => request<LeaveRequest[]>(`/leave${status ? `?status=${status}` : ""}`),
   decideLeave: (id: number, status: "APPROVED" | "REJECTED") =>
     request<LeaveRequest>(`/leave/${id}/decide`, { method: "POST", body: JSON.stringify({ status }) }),
+  leaveSchedule: (params?: { from_date?: string; to_date?: string; month?: string; status?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.from_date) sp.set("from_date", params.from_date);
+    if (params?.to_date) sp.set("to_date", params.to_date);
+    if (params?.month) sp.set("month", params.month);
+    if (params?.status) sp.set("status", params.status);
+    const qs = sp.toString();
+    return request<LeaveRequest[]>(`/leave/schedule${qs ? `?${qs}` : ""}`);
+  },
 
   // --- Thiết bị (Quản lý+) ---
   equipment: () => request<Equipment[]>("/equipment"),

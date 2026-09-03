@@ -15,6 +15,7 @@ out/
 .turbo/
 npm-debug.log*
 frontend/.env.local
+*.tsbuildinfo
 
 # --- Môi trường & hệ thống ---
 .env

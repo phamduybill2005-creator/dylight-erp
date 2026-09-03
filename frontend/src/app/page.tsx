@@ -100,6 +100,7 @@ type ModuleDef = {
 // Lưới chức năng — mỗi mục khai báo tầng được phép thấy.
 // "Đối soát quyết toán" & "Báo cáo lãi/lỗ" lộ doanh thu nên chỉ Giám đốc thấy.
 const MODULES: ModuleDef[] = [
+  { href: "/work-schedule", label: "Lịch làm việc", icon: CalendarDaysIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/projects", label: "Dự án", icon: FolderOpenIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/attendance", label: "Chấm công", icon: ClockIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
