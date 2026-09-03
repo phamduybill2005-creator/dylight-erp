@@ -78,6 +78,7 @@ export default function WorkSchedulePage() {
   // Bộ lọc
   const [deptFilter, setDeptFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showInactive, setShowInactive] = useState(false); // Mặc định FALSE: chỉ hiển thị nhân viên đang làm việc
 
   // Modal chi tiết khi click vào ô bất kỳ
   const [selectedCell, setSelectedCell] = useState<{
@@ -188,18 +189,24 @@ export default function WorkSchedulePage() {
     setCurrentDate(new Date());
   };
 
-  // Danh sách phòng ban
+  // Danh sách phòng ban (chỉ lấy từ nhân sự đang làm việc nếu không bật showInactive)
   const departments = useMemo(() => {
     const set = new Set<string>();
     users.forEach((u) => {
-      if (u.department) set.add(u.department.trim());
+      const isActive = u.is_active !== false && u.is_approved !== false;
+      if ((showInactive || isActive) && u.department) {
+        set.add(u.department.trim());
+      }
     });
     return Array.from(set).sort();
-  }, [users]);
+  }, [users, showInactive]);
 
-  // Lọc danh sách nhân viên
+  // Lọc danh sách nhân viên: MẶC ĐỊNH LOẠI BỎ NHÂN VIÊN CŨ ĐÃ NGHỈ HOẶC CHƯA DUYỆT
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
+      const isActive = u.is_active !== false && u.is_approved !== false;
+      if (!showInactive && !isActive) return false;
+
       if (deptFilter && u.department !== deptFilter) return false;
       if (searchTerm) {
         const query = searchTerm.toLowerCase();
@@ -209,7 +216,7 @@ export default function WorkSchedulePage() {
       }
       return true;
     });
-  }, [users, deptFilter, searchTerm]);
+  }, [users, showInactive, deptFilter, searchTerm]);
 
   // Lưu ghi chú ô
   const handleSaveNote = () => {
@@ -374,6 +381,15 @@ export default function WorkSchedulePage() {
               </button>
             )}
           </div>
+          <label className="flex items-center gap-1.5 cursor-pointer text-muted hover:text-ink select-none pl-1">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              className="rounded border-line text-ink focus:ring-0 h-3.5 w-3.5"
+            />
+            <span className="text-[11px]">Hiện cả nhân viên cũ</span>
+          </label>
         </div>
 
         {/* Chú giải nhanh gọn */}
@@ -391,7 +407,12 @@ export default function WorkSchedulePage() {
             <span>Hôm nay</span>
           </div>
           <span>
-            Nhân sự: <strong className="text-ink">{filteredUsers.length}</strong>
+            Đang làm: <strong className="text-ink">{filteredUsers.filter((u) => u.is_active !== false && u.is_approved !== false).length}</strong>
+            {showInactive && (
+              <span className="text-bad ml-1">
+                (+{filteredUsers.filter((u) => u.is_active === false || u.is_approved === false).length} đã nghỉ)
+              </span>
+            )}
           </span>
         </div>
       </div>
@@ -486,12 +507,21 @@ export default function WorkSchedulePage() {
 
                       {/* Cột Họ tên: hiển thị gọn gàng, có tooltip đầy đủ tên */}
                       <td
-                        className="border border-slate-300 bg-white px-1.5 py-1.5 text-left"
-                        title={`${user.full_name} (${user.department || "Chưa phân phòng ban"})`}
+                        className={`border border-slate-300 bg-white px-1.5 py-1.5 text-left ${
+                          user.is_active === false || user.is_approved === false ? "opacity-60 bg-slate-50" : ""
+                        }`}
+                        title={`${user.full_name} (${user.department || "Chưa phân phòng ban"}) ${
+                          user.is_active === false ? "- Đã nghỉ việc / Đã khóa" : ""
+                        }`}
                       >
-                        <div className="font-bold text-slate-800 text-[11px] truncate leading-tight">
-                          <span className="hidden sm:inline">{user.full_name}</span>
-                          <span className="sm:hidden">{formatShortName(user.full_name)}</span>
+                        <div className="font-bold text-slate-800 text-[11px] truncate leading-tight flex items-center gap-1">
+                          <span className="hidden sm:inline truncate">{user.full_name}</span>
+                          <span className="sm:hidden truncate">{formatShortName(user.full_name)}</span>
+                          {(user.is_active === false || user.is_approved === false) && (
+                            <span className="shrink-0 rounded bg-bad/10 px-1 py-0.2 text-[8px] font-semibold text-bad">
+                              Đã nghỉ
+                            </span>
+                          )}
                         </div>
                         {user.department && (
                           <div className="text-[9px] text-muted truncate leading-tight mt-0.5">
