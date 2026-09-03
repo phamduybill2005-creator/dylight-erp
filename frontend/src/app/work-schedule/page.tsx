@@ -249,17 +249,25 @@ export default function WorkSchedulePage() {
     }
   }, [viewMode, currentDate]);
 
-  // Nạp danh sách đơn nghỉ phép trong kỳ: CHỈ LẤY ĐƠN ĐÃ ĐƯỢC DUYỆT (APPROVED)
+  // Nạp danh sách đơn nghỉ phép trong kỳ: CHỈ LẤY ĐƠN ĐÃ ĐƯỢC DUYỆT (APPROVED) TỪ THÁNG 9/2026 TRỞ ĐI
   useEffect(() => {
+    // Toàn bộ các tháng trước tháng 9/2026 coi như dữ liệu test, không hiển thị
+    if (dateRange.to_date < "2026-09-01") {
+      setLeaves([]);
+      return;
+    }
+
+    const effectiveFrom = dateRange.from_date < "2026-09-01" ? "2026-09-01" : dateRange.from_date;
+
     api.leaveSchedule({
-      from_date: dateRange.from_date,
+      from_date: effectiveFrom,
       to_date: dateRange.to_date,
       month: dateRange.month,
       status: "APPROVED",
     })
       .then((data) => {
-        // Lọc chắc chắn chỉ lấy đơn APPROVED
-        setLeaves(data.filter((l) => l.status === "APPROVED"));
+        // Chỉ lấy đơn APPROVED từ tháng 9/2026 trở đi (loại bỏ dữ liệu test các tháng trước)
+        setLeaves(data.filter((l) => l.status === "APPROVED" && l.from_date >= "2026-09-01"));
       })
       .catch((err) => {
         console.error("Lỗi khi tải lịch nghỉ:", err);
@@ -291,11 +299,13 @@ export default function WorkSchedulePage() {
     setCurrentDate(new Date());
   };
 
-  // Tra cứu đơn nghỉ ĐÃ DUYỆT của 1 nhân viên trong 1 ngày cụ thể
+  // Tra cứu đơn nghỉ ĐÃ DUYỆT của 1 nhân viên trong 1 ngày cụ thể (chỉ từ tháng 9/2026)
   const getApprovedLeave = (userId: number, dateStr: string): LeaveRequest | undefined => {
+    if (dateStr < "2026-09-01") return undefined;
     return leaves.find((l) => {
       if (l.user_id !== userId) return false;
       if (l.status !== "APPROVED") return false;
+      if (l.from_date < "2026-09-01") return false;
       return l.from_date <= dateStr && l.to_date >= dateStr;
     });
   };

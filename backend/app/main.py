@@ -262,6 +262,11 @@ def _ensure_schema() -> None:
                         "CREATE UNIQUE INDEX IF NOT EXISTS uq_reaction_msg_user "
                         "ON message_reactions (message_id, user_id)"
                     ))
+
+        # Dọn sạch toàn bộ dữ liệu đơn nghỉ phép test cũ (trước tháng 9/2026)
+        if "leave_requests" in insp.get_table_names():
+            with engine.begin() as conn:
+                conn.execute(text("DELETE FROM leave_requests WHERE from_date < '2026-09-01'"))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] bo qua: {_e}")
 

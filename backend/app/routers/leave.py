@@ -33,7 +33,7 @@ def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: U
 def my_leaves(db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     return (
         db.query(LeaveRequest)
-        .filter(LeaveRequest.user_id == current.id)
+        .filter(LeaveRequest.user_id == current.id, LeaveRequest.from_date >= date(2026, 9, 1))
         .order_by(LeaveRequest.from_date.desc())
         .all()
     )
@@ -45,8 +45,11 @@ def list_leaves(
     db: Session = Depends(get_db),
     current: User = Depends(require_roles(*_MANAGER_ROLES)),
 ):
-    """Quản lý/Giám đốc xem đơn nghỉ (mặc định toàn công ty)."""
-    q = db.query(LeaveRequest).filter(LeaveRequest.company_id == current.company_id)
+    """Quản lý/Giám đốc xem đơn nghỉ (mặc định toàn công ty). Chỉ lấy từ T9/2026 trở đi."""
+    q = db.query(LeaveRequest).filter(
+        LeaveRequest.company_id == current.company_id,
+        LeaveRequest.from_date >= date(2026, 9, 1),
+    )
     if status:
         q = q.filter(LeaveRequest.status == status)
     return q.order_by(LeaveRequest.status, LeaveRequest.from_date.desc()).all()
@@ -61,8 +64,14 @@ def get_schedule_leaves(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    """Lấy danh sách nghỉ phép / đi muộn toàn công ty cho bảng Lịch làm việc."""
-    q = db.query(LeaveRequest).filter(LeaveRequest.company_id == current.company_id)
+    """Lấy danh sách nghỉ phép / đi muộn toàn công ty cho bảng Lịch làm việc.
+    Chỉ lấy các đơn từ tháng 9/2026 trở đi (loại bỏ hoàn toàn dữ liệu test cũ).
+    """
+    MIN_DATE = date(2026, 9, 1)
+    q = db.query(LeaveRequest).filter(
+        LeaveRequest.company_id == current.company_id,
+        LeaveRequest.from_date >= MIN_DATE,
+    )
     if status:
         q = q.filter(LeaveRequest.status == status)
     else:
