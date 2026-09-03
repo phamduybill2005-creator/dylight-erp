@@ -23,10 +23,12 @@ import {
   XMarkIcon,
   FunnelIcon,
   CheckCircleIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
+import { isManagerUp } from "@/lib/roles";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, User } from "@/lib/types";
 
@@ -333,6 +335,22 @@ export default function WorkSchedulePage() {
     setNoteInput("");
   };
 
+  // Xóa đơn nghỉ phép (nếu tạo nhầm hoặc test)
+  const [deletingLeave, setDeletingLeave] = useState(false);
+  const handleDeleteLeave = async (leaveId: number) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa đơn nghỉ phép này không?")) return;
+    setDeletingLeave(true);
+    try {
+      await api.deleteLeave(leaveId);
+      setLeaves((prev) => prev.filter((l) => l.id !== leaveId));
+      setSelectedCell(null);
+    } catch (e: any) {
+      alert(e?.message || "Không thể xóa đơn nghỉ này.");
+    } finally {
+      setDeletingLeave(false);
+    }
+  };
+
   // Xuất file Excel bảng lịch làm việc
   const exportToExcel = () => {
     try {
@@ -455,11 +473,11 @@ export default function WorkSchedulePage() {
         </div>
       </div>
 
-      {/* ==================== PHÀM LỆ 5 KIỂU (Y HỆT ẢNH MẪU) ==================== */}
+      {/* ==================== CHÚ THÍCH 5 KIỂU (Y HỆT ẢNH MẪU) ==================== */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-bold uppercase tracking-wider text-muted mr-1">
-            Phàm lệ:
+            Chú thích:
           </span>
           {/* 5 kiểu trạng thái nghỉ / đi muộn */}
           {SCHEDULE_TYPES.map((item) => (
@@ -769,7 +787,20 @@ export default function WorkSchedulePage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-2">
+                <div className="flex items-center justify-between pt-2 border-t border-line">
+                  {me && (isManagerUp(me.role) || me.role === "ADMIN" || me.id === selectedCell.leave.user_id) ? (
+                    <button
+                      onClick={() => selectedCell.leave && handleDeleteLeave(selectedCell.leave.id)}
+                      disabled={deletingLeave}
+                      className="flex items-center gap-1 rounded-lg border border-bad/30 bg-bad/10 px-2.5 py-1.5 text-xs font-semibold text-bad hover:bg-bad/20 transition disabled:opacity-50"
+                      title="Xóa đơn nghỉ phép này khỏi hệ thống"
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                      <span>{deletingLeave ? "Đang xóa…" : "Xóa đơn này"}</span>
+                    </button>
+                  ) : (
+                    <div />
+                  )}
                   <button
                     onClick={() => setSelectedCell(null)}
                     className="rounded-lg bg-ink px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"

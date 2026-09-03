@@ -105,3 +105,23 @@ def decide_leave(
     log_activity(db, current, f"leave.{payload.status.value.lower()}", "leave_request", rec.id,
                  f"{rec.user_name}: {rec.from_date}→{rec.to_date}")
     return rec
+
+
+@router.delete("/{leave_id}")
+def delete_leave(
+    leave_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Xóa đơn xin nghỉ phép (Dành cho Quản lý/Giám đốc hoặc chính người làm đơn)."""
+    rec = db.get(LeaveRequest, leave_id)
+    if not rec or rec.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy đơn nghỉ.")
+    is_admin = current.role in _MANAGER_ROLES or current.role == UserRole.ADMIN
+    if not is_admin and rec.user_id != current.id:
+        raise HTTPException(403, "Không có quyền xóa đơn nghỉ này.")
+    info = f"{rec.user_name}: {rec.from_date}→{rec.to_date} ({rec.reason})"
+    db.delete(rec)
+    db.commit()
+    log_activity(db, current, "leave.delete", "leave_request", leave_id, info)
+    return {"message": "Đã xóa đơn nghỉ thành công."}

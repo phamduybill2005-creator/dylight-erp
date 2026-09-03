@@ -344,6 +344,7 @@ export const api = {
   leaveList: (status?: string) => request<LeaveRequest[]>(`/leave${status ? `?status=${status}` : ""}`),
   decideLeave: (id: number, status: "APPROVED" | "REJECTED") =>
     request<LeaveRequest>(`/leave/${id}/decide`, { method: "POST", body: JSON.stringify({ status }) }),
+  deleteLeave: (id: number) => request<{ message: string }>(`/leave/${id}`, { method: "DELETE" }),
   leaveSchedule: (params?: { from_date?: string; to_date?: string; month?: string; status?: string }) => {
     const sp = new URLSearchParams();
     if (params?.from_date) sp.set("from_date", params.from_date);
