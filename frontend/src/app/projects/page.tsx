@@ -781,9 +781,8 @@ export default function ProjectsPage() {
             <colgroup>
               <col className="w-[28px]" />   {/* STT */}
               <col className="w-[24px]" />   {/* Ghim ★ */}
-              {/* Mã QL: đủ chỗ cho mã có tiếng Nhật như 2738-0759(北側) trên mọi tỉ lệ màn hình */}
-              <col className="w-[112px]" />  {/* Mã QL */}
-              <col className="min-w-[140px]" />  {/* Tên dự án — co giãn theo tỉ lệ màn hình */}
+              <col className="w-[88px]" />   {/* Mã QL — thu nhỏ khít theo chữ */}
+              <col className="w-[138px]" />  {/* Tên dự án — thu nhỏ khít theo chữ */}
               <col className="w-[58px]" />   {/* Nhóm */}
               <col className="w-[54px]" />   {/* GEO担当 */}
               {/* DOSCO担当: tên dài nhất (D.M.QUANG) đo được 63px ở cỡ chữ 10.5px,
@@ -808,25 +807,25 @@ export default function ProjectsPage() {
             <colgroup>
               <col className="w-[32px]" />   {/* STT */}
               <col className="w-[26px]" />   {/* Ghim ★ */}
-              {/* Mã QL: đủ chỗ an toàn cho cả mã thông thường và mã tiếng Nhật như 2738-0759(北側) */}
-              <col className="w-[116px]" />  {/* Mã QL */}
-              {/* Tên dự án: tự co giãn theo tỉ lệ màn hình, không bị ép cứng */}
-              <col className="min-w-[200px]" />  {/* Tên dự án */}
-              <col className="w-[74px]" />   {/* Nhóm — fit tên tiếng Nhật */}
+              {/* Mã QL: thu nhỏ khít theo chữ */}
+              <col className="w-[90px]" />   {/* Mã QL */}
+              {/* Tên dự án: thu nhỏ khít theo tên như trước */}
+              <col className="w-[220px]" />  {/* Tên dự án */}
+              <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
               <col className="w-[62px]" />   {/* GEO担当 */}
               {/* DOSCO担当: tên dài nhất (D.M.QUANG) đo được 66px ở cỡ chữ 11px,
-                  cộng sao 12px + gap 4px + padding 12px = 94px -> lấy 108px cho dư. */}
-              <col className="w-[108px]" />  {/* DOSCO担当 */}
-              <col className="w-[140px]" />  {/* Ghi chú */}
-              <col className="w-[62px]" />   {/* Time in */}
-              <col className="w-[62px]" />   {/* Time out */}
-              <col className="w-[62px]" />   {/* Time due */}
-              <col className="w-[82px]" />   {/* Manual time */}
-              <col className="w-[72px]" />   {/* Real time */}
+                  cộng sao 12px + gap 4px + padding 12px = 94px -> lấy 110px cho dư. */}
+              <col className="w-[110px]" />  {/* DOSCO担当 */}
+              <col className="w-[150px]" />  {/* Ghi chú */}
+              <col className="w-[64px]" />   {/* Time in */}
+              <col className="w-[64px]" />   {/* Time out */}
+              <col className="w-[64px]" />   {/* Time due */}
+              <col className="w-[84px]" />   {/* Manual time */}
+              <col className="w-[74px]" />   {/* Real time */}
               {/* Trạng thái: nhãn "Hoàn thành" đo được 74px + padding 12 = 86px
                   -> lấy 92px, trước để 82px nên bị xuống dòng. */}
               <col className="w-[92px]" />   {/* Trạng thái */}
-              <col className="w-[125px]" />  {/* Doanh thu */}
+              <col className="w-[130px]" />  {/* Doanh thu */}
             </colgroup>
           )}
           <thead>

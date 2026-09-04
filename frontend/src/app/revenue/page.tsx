@@ -455,18 +455,18 @@ export default function RevenuePage() {
 
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
       <div className="mt-3 max-h-[calc(100vh-360px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card">
-        <table className="w-full min-w-[940px] table-fixed border-collapse text-[11px]">
+        <table className="w-full min-w-[920px] table-fixed border-collapse text-[11px]">
           <colgroup>
-            <col className="w-[36px]" />   {/* STT */}
+            <col className="w-[40px]" />   {/* STT */}
             <col className="w-[26px]" />   {/* Ghim ★ */}
-            {/* Mã QL: đủ chỗ cho cả mã có tiếng Nhật (北側) trên mọi tỉ lệ màn hình */}
-            <col className="w-[116px]" />  {/* Mã QL */}
-            {/* Tên dự án: tự co giãn linh hoạt theo tỉ lệ màn hình */}
-            <col className="min-w-[200px]" />  {/* Tên dự án */}
+            {/* Mã QL: thu nhỏ khít theo chữ */}
+            <col className="w-[90px]" />   {/* Mã QL */}
+            {/* Tên dự án: thu nhỏ khít theo tên */}
+            <col className="w-[220px]" />  {/* Tên dự án */}
             <col className="w-[96px]" />   {/* Manual time */}
             <col className="w-[96px]" />   {/* Realtime (AI) */}
             <col className="w-[120px]" />  {/* Time khách hàng */}
-            <col className="w-[160px]" />  {/* Doanh thu (VNĐ) */}
+            <col className="w-[170px]" />  {/* Doanh thu (VNĐ) */}
           </colgroup>
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
