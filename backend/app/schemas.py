@@ -850,6 +850,17 @@ class LeaveOut(BaseModel):
     days: float = 0
 
 
+class StudentDaySchedule(BaseModel):
+    date: date
+    shift: str  # "ALL_DAY" | "MORNING_ONLY" (làm sáng, nghỉ chiều) | "AFTERNOON_ONLY" (làm chiều, nghỉ sáng) | "OFF" (nghỉ cả ngày)
+    reason: str | None = None
+
+
+class StudentWeekSchedulePayload(BaseModel):
+    user_id: int | None = None  # None = chính user đang đăng nhập
+    days: list[StudentDaySchedule]
+
+
 # ------------------------- EQUIPMENT (thiết bị) -------------------------
 class EquipmentBase(BaseModel):
     code: str | None = None

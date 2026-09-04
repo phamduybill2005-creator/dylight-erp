@@ -400,6 +400,19 @@ export interface LeaveRequest {
   created_at: string; user_name?: string | null; days: number;
 }
 
+export type StudentShift = "ALL_DAY" | "MORNING_ONLY" | "AFTERNOON_ONLY" | "OFF";
+
+export interface StudentDaySchedule {
+  date: string;       // "YYYY-MM-DD"
+  shift: StudentShift;
+  reason?: string | null;
+}
+
+export interface StudentWeekSchedulePayload {
+  user_id?: number | null;
+  days: StudentDaySchedule[];
+}
+
 // Thiết bị
 export interface Equipment {
   id: number; company_id: number; code?: string | null; name: string;

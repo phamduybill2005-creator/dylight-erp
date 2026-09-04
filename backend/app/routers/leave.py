@@ -11,7 +11,7 @@ from app.audit import log_activity
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.models import LeaveRequest, LeaveStatus, User, UserRole
-from app.schemas import LeaveCreate, LeaveDecision, LeaveOut
+from app.schemas import LeaveCreate, LeaveDecision, LeaveOut, StudentWeekSchedulePayload
 
 router = APIRouter(prefix="/leave", tags=["Nghỉ phép"])
 
@@ -134,3 +134,110 @@ def delete_leave(
     db.commit()
     log_activity(db, current, "leave.delete", "leave_request", leave_id, info)
     return {"message": "Đã xóa đơn nghỉ thành công."}
+
+
+@router.post("/student-week-schedule", response_model=list[LeaveOut])
+def save_student_week_schedule(
+    payload: StudentWeekSchedulePayload,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Đăng ký lịch làm việc theo tuần cho sinh viên (hoặc nhân viên).
+    - Sinh viên có thể tự đăng ký lịch cho mình.
+    - Quản lý/Giám đốc/Admin có thể đăng ký/chỉnh sửa cho bất kỳ ai trong công ty.
+    - Ca làm:
+      + ALL_DAY: Đi làm cả ngày (xóa đơn nghỉ nếu có)
+      + MORNING_ONLY: Làm sáng - Nghỉ chiều -> leave_type="AFTERNOON"
+      + AFTERNOON_ONLY: Làm chiều - Nghỉ sáng -> leave_type="MORNING"
+      + OFF: Nghỉ cả ngày -> leave_type="FULL"
+    - Tự động duyệt (APPROVED) để hiện ngay lập tức lên bảng Lịch làm việc tổng.
+    """
+    target_user_id = current.id
+    is_admin = current.role in _MANAGER_ROLES or current.role == UserRole.ADMIN
+    if payload.user_id is not None and payload.user_id != current.id:
+        if not is_admin:
+            raise HTTPException(403, "Chỉ Quản lý hoặc Giám đốc mới có thể đăng ký lịch cho người khác.")
+        target_user = db.get(User, payload.user_id)
+        if not target_user or target_user.company_id != current.company_id:
+            raise HTTPException(404, "Không tìm thấy nhân sự.")
+        target_user_id = target_user.id
+
+    if not payload.days:
+        return []
+
+    dates = [d.date for d in payload.days]
+    min_d = min(dates)
+    max_d = max(dates)
+
+    # Tìm các đơn nghỉ hiện có của user trong khoảng ngày này (tính theo đơn ngày)
+    existing_leaves = (
+        db.query(LeaveRequest)
+        .filter(
+            LeaveRequest.company_id == current.company_id,
+            LeaveRequest.user_id == target_user_id,
+            LeaveRequest.from_date <= max_d,
+            LeaveRequest.to_date >= min_d,
+        )
+        .all()
+    )
+    existing_map = {l.from_date: l for l in existing_leaves if l.from_date == l.to_date}
+
+    results: list[LeaveRequest] = []
+
+    for item in payload.days:
+        curr_leave = existing_map.get(item.date)
+        if item.shift == "ALL_DAY":
+            # Đi làm cả ngày -> xóa đơn nghỉ nếu có
+            if curr_leave:
+                db.delete(curr_leave)
+        elif item.shift in ("MORNING_ONLY", "AFTERNOON_ONLY", "OFF"):
+            # MORNING_ONLY = Làm sáng, nghỉ chiều -> leave_type="AFTERNOON"
+            # AFTERNOON_ONLY = Làm chiều, nghỉ sáng -> leave_type="MORNING"
+            # OFF = Nghỉ cả ngày -> leave_type="FULL"
+            l_type = (
+                "AFTERNOON"
+                if item.shift == "MORNING_ONLY"
+                else ("MORNING" if item.shift == "AFTERNOON_ONLY" else "FULL")
+            )
+            default_reason = (
+                "Đi học (Nghỉ chiều)"
+                if l_type == "AFTERNOON"
+                else ("Đi học (Nghỉ sáng)" if l_type == "MORNING" else "Đi học (Nghỉ cả ngày)")
+            )
+            reason = item.reason.strip() if item.reason and item.reason.strip() else default_reason
+
+            if curr_leave:
+                curr_leave.leave_type = l_type
+                curr_leave.reason = reason
+                curr_leave.status = LeaveStatus.APPROVED
+                curr_leave.decided_by_id = current.id
+                curr_leave.decided_at = vn_now()
+                results.append(curr_leave)
+            else:
+                new_leave = LeaveRequest(
+                    company_id=current.company_id,
+                    user_id=target_user_id,
+                    from_date=item.date,
+                    to_date=item.date,
+                    leave_type=l_type,
+                    reason=reason,
+                    status=LeaveStatus.APPROVED,
+                    decided_by_id=current.id,
+                    decided_at=vn_now(),
+                )
+                db.add(new_leave)
+                results.append(new_leave)
+
+    db.commit()
+    for r in results:
+        db.refresh(r)
+
+    log_activity(
+        db,
+        current,
+        "leave.student_schedule",
+        "user",
+        target_user_id,
+        f"Đăng ký lịch sinh viên tuần ({min_d} - {max_d}): {len(results)} ngày nghỉ/nửa ngày",
+    )
+    return results

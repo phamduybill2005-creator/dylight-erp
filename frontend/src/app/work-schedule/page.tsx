@@ -24,9 +24,11 @@ import {
   FunnelIcon,
   CheckCircleIcon,
   TrashIcon,
+  AcademicCapIcon,
 } from "@heroicons/react/24/outline";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
+import StudentScheduleModal from "@/components/student-schedule-modal";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
@@ -163,6 +165,11 @@ export default function WorkSchedulePage() {
   const [cellNotes, setCellNotes] = useState<Record<string, string>>({});
   const [noteInput, setNoteInput] = useState("");
 
+  // Modal Đăng ký lịch sinh viên
+  const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [modalStudentUserId, setModalStudentUserId] = useState<number | undefined>();
+  const [modalStudentDate, setModalStudentDate] = useState<Date | undefined>();
+
   // Nạp danh sách nhân sự (CHỈ NHÂN VIÊN ĐANG LÀM VIỆC)
   useEffect(() => {
     api.me()
@@ -250,8 +257,7 @@ export default function WorkSchedulePage() {
   }, [viewMode, currentDate]);
 
   // Nạp danh sách đơn nghỉ phép trong kỳ: CHỈ LẤY ĐƠN ĐÃ ĐƯỢC DUYỆT (APPROVED) TỪ THÁNG 9/2026 TRỞ ĐI
-  useEffect(() => {
-    // Toàn bộ các tháng trước tháng 9/2026 coi như dữ liệu test, không hiển thị
+  const loadLeaves = () => {
     if (dateRange.to_date < "2026-09-01") {
       setLeaves([]);
       return;
@@ -266,12 +272,15 @@ export default function WorkSchedulePage() {
       status: "APPROVED",
     })
       .then((data) => {
-        // Chỉ lấy đơn APPROVED từ tháng 9/2026 trở đi (loại bỏ dữ liệu test các tháng trước)
         setLeaves(data.filter((l) => l.status === "APPROVED" && l.from_date >= "2026-09-01"));
       })
       .catch((err) => {
         console.error("Lỗi khi tải lịch nghỉ:", err);
       });
+  };
+
+  useEffect(() => {
+    loadLeaves();
   }, [dateRange]);
 
   // Điều hướng thời gian
@@ -470,6 +479,20 @@ export default function WorkSchedulePage() {
             </button>
             <span className="ml-1 text-xs font-bold text-amber">{periodLabel}</span>
           </div>
+
+          {/* Nút Đăng ký lịch sinh viên */}
+          <button
+            onClick={() => {
+              setModalStudentUserId(me?.id);
+              setModalStudentDate(currentDate);
+              setStudentModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-amber px-3 py-1.5 text-xs font-bold text-ink shadow-sm transition hover:bg-amber-deep hover:text-white"
+            title="Đăng ký lịch làm việc linh hoạt theo tuần cho sinh viên"
+          >
+            <AcademicCapIcon className="h-4 w-4" />
+            <span>Đăng ký lịch sinh viên</span>
+          </button>
 
           {/* Nút Xuất Excel */}
           <button
@@ -811,12 +834,29 @@ export default function WorkSchedulePage() {
                   ) : (
                     <div />
                   )}
-                  <button
-                    onClick={() => setSelectedCell(null)}
-                    className="rounded-lg bg-ink px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
-                  >
-                    Đóng
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const targetUser = selectedCell.user;
+                        const targetDate = new Date(selectedCell.dateStr);
+                        setSelectedCell(null);
+                        setModalStudentUserId(targetUser.id);
+                        setModalStudentDate(targetDate);
+                        setStudentModalOpen(true);
+                      }}
+                      className="flex items-center gap-1 rounded-lg border border-amber/40 bg-amber/10 px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber/20 transition"
+                      title="Đăng ký hoặc sửa lịch tuần cho sinh viên này"
+                    >
+                      <AcademicCapIcon className="h-3.5 w-3.5" />
+                      <span>Đăng ký lịch tuần</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedCell(null)}
+                      className="rounded-lg bg-ink px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+                    >
+                      Đóng
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -840,43 +880,75 @@ export default function WorkSchedulePage() {
                   💡 Ngày làm việc bình thường (bảng trắng). Bạn có thể ghi chú ca trực hoặc công việc riêng cho nhân sự này.
                 </div>
 
-                <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-3">
+                <div className="mt-2 flex items-center justify-between border-t border-line pt-3">
                   <button
-                    onClick={() => setSelectedCell(null)}
-                    className="rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:bg-line transition"
+                    onClick={() => {
+                      const targetUser = selectedCell.user;
+                      const targetDate = new Date(selectedCell.dateStr);
+                      setSelectedCell(null);
+                      setModalStudentUserId(targetUser.id);
+                      setModalStudentDate(targetDate);
+                      setStudentModalOpen(true);
+                    }}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:underline"
+                    title="Đăng ký hoặc sửa lịch tuần cho sinh viên này"
                   >
-                    Đóng
+                    <AcademicCapIcon className="h-3.5 w-3.5" />
+                    <span>Đăng ký lịch tuần SV</span>
                   </button>
-                  {noteInput && (
+
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        setNoteInput("");
-                        const key = `${selectedCell.user.id}_${selectedCell.dateStr}`;
-                        setCellNotes((prev) => {
-                          const copy = { ...prev };
-                          delete copy[key];
-                          return copy;
-                        });
-                        setSelectedCell(null);
-                      }}
-                      className="rounded-lg border border-bad/30 bg-bad/5 px-2.5 py-1.5 text-xs font-semibold text-bad hover:bg-bad/10 transition"
+                      onClick={() => setSelectedCell(null)}
+                      className="rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:bg-line transition"
                     >
-                      Xóa ghi chú
+                      Đóng
                     </button>
-                  )}
-                  <button
-                    onClick={handleSaveNote}
-                    className="flex items-center gap-1 rounded-lg bg-ink px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition"
-                  >
-                    <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
-                    <span>Lưu lại</span>
-                  </button>
+                    {noteInput && (
+                      <button
+                        onClick={() => {
+                          setNoteInput("");
+                          const key = `${selectedCell.user.id}_${selectedCell.dateStr}`;
+                          setCellNotes((prev) => {
+                            const copy = { ...prev };
+                            delete copy[key];
+                            return copy;
+                          });
+                          setSelectedCell(null);
+                        }}
+                        className="rounded-lg border border-bad/30 bg-bad/5 px-2.5 py-1.5 text-xs font-semibold text-bad hover:bg-bad/10 transition"
+                      >
+                        Xóa ghi chú
+                      </button>
+                    )}
+                    <button
+                      onClick={handleSaveNote}
+                      className="flex items-center gap-1 rounded-lg bg-ink px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition"
+                    >
+                      <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
+                      <span>Lưu lại</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* ==================== MODAL ĐĂNG KÝ LỊCH TUẦN CHO SINH VIÊN ==================== */}
+      <StudentScheduleModal
+        isOpen={studentModalOpen}
+        onClose={() => setStudentModalOpen(false)}
+        users={users}
+        currentUser={me}
+        initialUserId={modalStudentUserId}
+        initialDate={modalStudentDate}
+        existingLeaves={leaves}
+        onSaved={(_updated) => {
+          loadLeaves();
+        }}
+      />
     </AppShell>
   );
 }
