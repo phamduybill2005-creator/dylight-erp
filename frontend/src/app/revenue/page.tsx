@@ -17,7 +17,7 @@ import {
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { isSeniorManagerUp } from "@/lib/roles";
+import { isDirector, isSeniorManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept } from "@/lib/groups";
 import { formatVND } from "@/lib/format";
@@ -98,7 +98,7 @@ export default function RevenuePage() {
     }
   });
 
-  const isDirectorUser = me?.role === "DIRECTOR";
+  const isDirectorUser = isDirector(me?.role);
 
   // Tải đơn giá chung từ backend khi vào trang để đồng bộ với Giám đốc
   useEffect(() => {
@@ -257,6 +257,10 @@ export default function RevenuePage() {
   const keyOf = (p: Project, f: RowField) => `${p.id}:${f}`;
 
   async function saveRowField(p: Project, field: RowField) {
+    if (field === "client_hours" && !isDirector(me?.role)) {
+      alert("Chỉ Giám đốc mới có quyền nhập Time khách hàng.");
+      return;
+    }
     const k = keyOf(p, field);
     const draft = edits[k];
     if (draft === undefined) return;
@@ -526,11 +530,11 @@ export default function RevenuePage() {
                           <span className="text-[11px] font-bold text-ink tnum">{h > 0 ? `${hoursToDays(h)} ngày` : "0 ngày"}</span>
                           {canEdit(p) ? (
                             <span className="flex items-center justify-center text-[10px] text-muted">(
-                              <span className="w-9">{cellInput(p, "manual_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 ngày)" })}</span>
+                              <span className="w-14">{cellInput(p, "manual_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 ngày)" })}</span>
                               h)
                             </span>
                           ) : (
-                            <span className="text-[10px] text-muted tnum">({h}h)</span>
+                            <span className="text-[10px] text-muted tnum font-mono">({h > 0 ? `${h}h` : "— h"})</span>
                           )}
                         </div>
                       );
@@ -545,7 +549,7 @@ export default function RevenuePage() {
                     </div>
                   </td>
 
-                  {/* TIME KHÁCH HÀNG */}
+                  {/* TIME KHÁCH HÀNG — CHỈ GIÁM ĐỐC NHẬP */}
                   <td className={`${TD} whitespace-nowrap text-center`} onClick={(e) => e.stopPropagation()}>
                     {(() => {
                       const shown = edits[keyOf(p, "client_hours")] ?? plainNumber(p.client_hours);
@@ -553,13 +557,15 @@ export default function RevenuePage() {
                       return (
                         <div className="flex flex-col items-center">
                           <span className="text-[11px] font-bold text-ink tnum">{h > 0 ? `${hoursToDays(h)} công` : "0 công"}</span>
-                          {canEdit(p) ? (
+                          {isDirector(me?.role) ? (
                             <span className="flex items-center justify-center text-[10px] text-muted">(
-                              <span className="w-9">{cellInput(p, "client_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 công)" })}</span>
+                              <span className="w-14">{cellInput(p, "client_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 công)" })}</span>
                               h)
                             </span>
                           ) : (
-                            <span className="text-[10px] text-muted tnum">({h}h)</span>
+                            <span className="text-[10px] text-muted tnum font-mono" title="Chỉ Giám đốc mới có quyền nhập Time khách hàng">
+                              ({h > 0 ? `${h}h` : "— h"})
+                            </span>
                           )}
                         </div>
                       );

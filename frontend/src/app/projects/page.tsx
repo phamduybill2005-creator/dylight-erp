@@ -1049,9 +1049,7 @@ export default function ProjectsPage() {
                         return (
                           <div className="flex flex-col items-center justify-center">
                             <span className="font-bold text-ink tnum text-xs">{dayText}</span>
-                            {h > 0 ? (
-                              <span className="text-[10px] text-muted tnum font-mono">({h}h)</span>
-                            ) : null}
+                            <span className="text-[10px] text-muted tnum font-mono">({h > 0 ? `${h}h` : "— h"})</span>
                           </div>
                         );
                       }
@@ -1081,7 +1079,7 @@ export default function ProjectsPage() {
                               }}
                               placeholder="0"
                               title="Nhập SỐ GIỜ — tự quy ra ngày (8 giờ = 1 ngày)"
-                              className="w-9 rounded border border-transparent bg-transparent text-center text-[10px] text-muted tnum font-mono outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white focus:text-ink"
+                              className={`${isBanDoMode ? "w-11" : "w-14"} rounded border border-transparent bg-transparent text-center text-[10px] text-muted tnum font-mono outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white focus:text-ink`}
                             />
                             h)
                           </span>

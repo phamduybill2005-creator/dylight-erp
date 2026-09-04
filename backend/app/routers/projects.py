@@ -522,6 +522,14 @@ def update_project(
         if "status" in data and "status_locked" not in data:
             data["status_locked"] = True
 
+    # TIME KHÁCH HÀNG: CHỈ Giám đốc (hoặc Quản trị hệ thống).
+    if "client_hours" in data:
+        if not _is_director(current):
+            raise HTTPException(
+                403,
+                "Chỉ Giám đốc mới có quyền nhập Time khách hàng.",
+            )
+
     if "member_ids" in data:
         member_ids = data.pop("member_ids")
         if member_ids is not None:
