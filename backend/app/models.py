@@ -538,10 +538,27 @@ class Attendance(Base):
 
     @property
     def worked_minutes(self) -> int:
-        """Số phút đã làm = giờ ra − giờ vào (0 nếu thiếu mốc)."""
-        if self.check_in and self.check_out and self.check_out > self.check_in:
-            return int((self.check_out - self.check_in).total_seconds() // 60)
-        return 0
+        """Số phút đã làm = giờ ra − giờ vào, TỰ ĐỘNG TRỪ GIỜ NGHỈ TRƯA (11:45–13:30 = 105 phút)."""
+        if not (self.check_in and self.check_out and self.check_out > self.check_in):
+            return 0
+        from app.config import settings
+        lunch_start = getattr(settings, "MORNING_END_MIN", 11 * 60 + 45)       # 11:45
+        lunch_end = getattr(settings, "AFTERNOON_START_MIN", 13 * 60 + 30)      # 13:30
+
+        ci = self.check_in
+        co = self.check_out
+
+        if co.date() == ci.date():
+            ci_min = ci.hour * 60 + ci.minute
+            co_min = co.hour * 60 + co.minute
+            total_mins = co_min - ci_min
+            overlap_start = max(ci_min, lunch_start)
+            overlap_end = min(co_min, lunch_end)
+            lunch_overlap = max(0, overlap_end - overlap_start)
+            return max(0, total_mins - lunch_overlap)
+        else:
+            total_mins = int((co - ci).total_seconds() // 60)
+            return max(0, total_mins - (lunch_end - lunch_start))
 
     @property
     def is_late(self) -> bool:
