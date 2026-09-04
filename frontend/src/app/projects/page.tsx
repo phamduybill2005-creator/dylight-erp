@@ -17,7 +17,7 @@ import { isManagerUp, isSeniorManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept } from "@/lib/groups";
 import { resolveDoscoLead } from "@/lib/project-lead";
-import type { Project, User, ProjectStatus } from "@/lib/types";
+import type { Project, User, ProjectStatus, Timesheet } from "@/lib/types";
 import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatVND } from "@/lib/format";
 
@@ -279,6 +279,34 @@ export default function ProjectsPage() {
   const [filterDept, setFilterDept] = useState("");
   // Lọc theo THÁNG NHẬN dự án, dạng "YYYY-MM" (khớp tiền tố của start_date "YYYY-MM-DD").
   const [filterMonth, setFilterMonth] = useState("");
+  const [monthTimesheets, setMonthTimesheets] = useState<Timesheet[]>([]);
+
+  // Tải danh sách timesheets của tháng khi filterMonth thay đổi
+  useEffect(() => {
+    if (!filterMonth) {
+      setMonthTimesheets([]);
+      return;
+    }
+    const [yStr, mStr] = filterMonth.split("-");
+    const y = parseInt(yStr, 10);
+    const m = parseInt(mStr, 10);
+    const lastDay = new Date(y, m, 0).getDate();
+    const fromDate = `${filterMonth}-01`;
+    const toDate = `${filterMonth}-${String(lastDay).padStart(2, "0")}`;
+    api.timesheets({ from: fromDate, to: toDate })
+      .then(setMonthTimesheets)
+      .catch(() => setMonthTimesheets([]));
+  }, [filterMonth]);
+
+  // Tổng số giờ được nhập trong tháng theo từng dự án
+  const monthHoursByProject = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const ts of monthTimesheets) {
+      const h = Number(ts.hours || 0);
+      map[ts.project_id] = (map[ts.project_id] || 0) + h;
+    }
+    return map;
+  }, [monthTimesheets]);
 
   // State Sửa dự án
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -468,9 +496,13 @@ export default function ProjectsPage() {
       const projDept = getProjectDept(p);
       if (projDept !== filterDept) return false;
     }
-    // Tháng nhận: so tiền tố "YYYY-MM" của Ngày nhận. Dự án chưa có ngày nhận -> loại.
+    // Lọc theo tháng:
+    // - Dự án có ngày nhận trong tháng đó
+    // - HOẶC có số giờ nhập trong tháng đó (timesheets)
     if (filterMonth) {
-      if ((p.start_date || "").slice(0, 7) !== filterMonth) return false;
+      const startMonth = (p.start_date || "").slice(0, 7);
+      const hasHoursInMonth = (monthHoursByProject[p.id] || 0) > 0;
+      if (startMonth !== filterMonth && !hasHoursInMonth) return false;
     }
     return true;
   });
@@ -854,7 +886,7 @@ export default function ProjectsPage() {
               <th className={TH} title="Ngày hoàn thành">Time out</th>
               <th className={TH} title="Hạn nội bộ">Time due</th>
               <th className={`${TH} text-center`} title="Thời gian NHẬP TAY — gõ số giờ, tự quy ra ngày (8 giờ = 1 ngày)">Manual time</th>
-              <th className={`${TH} text-center`} title="Thời gian làm thực tế realtime (tính từ chấm công tiến độ)">Real time</th>
+              <th className={`${TH} text-center`} title={filterMonth ? `Thời gian làm thực tế nhập trong tháng ${filterMonth}` : "Thời gian làm thực tế realtime (tính từ chấm công tiến độ)"}>Real time</th>
               <th className={TH}>Trạng thái</th>
               <th className={`${TH} text-right`} title="Doanh thu — nhập tay (VND)">Doanh thu</th>
             </tr>
@@ -1088,14 +1120,43 @@ export default function ProjectsPage() {
                     })()}
                   </td>
                   <td className={`${TD} text-center whitespace-nowrap`}>
-                    <div className="flex flex-col items-center justify-center">
-                      <span className="font-bold text-ink tnum text-xs">
-                        {p.total_days && p.total_days > 0 ? `${p.total_days} ngày` : "0 ngày"}
-                      </span>
-                      {p.total_hours && p.total_hours > 0 ? (
-                        <span className="text-[10px] text-muted tnum font-mono">({p.total_hours}h)</span>
-                      ) : null}
-                    </div>
+                    {(() => {
+                      const isDoing = effectiveStatus === "IN_PROGRESS";
+                      if (filterMonth && isDoing) {
+                        const mHours = Math.round((monthHoursByProject[p.id] || 0) * 10) / 10;
+                        const mDays = Math.round((mHours / 8) * 10) / 10;
+                        return (
+                          <div className="flex flex-col items-center justify-center" title={`Giờ làm thực tế nhập trong tháng ${filterMonth}: ${mHours}h (${mDays} ngày)`}>
+                            <span className="font-bold text-emerald-700 tnum text-xs">
+                              {mDays > 0 ? `${mDays} ngày` : "0 ngày"}
+                            </span>
+                            <span className="text-[10px] text-emerald-600 font-mono tnum">({mHours}h)</span>
+                          </div>
+                        );
+                      }
+                      if (filterMonth && !isDoing && (monthHoursByProject[p.id] || 0) > 0) {
+                        const mHours = Math.round((monthHoursByProject[p.id] || 0) * 10) / 10;
+                        const mDays = Math.round((mHours / 8) * 10) / 10;
+                        return (
+                          <div className="flex flex-col items-center justify-center" title={`Giờ làm thực tế nhập trong tháng ${filterMonth}: ${mHours}h (${mDays} ngày). Tổng: ${p.total_hours || 0}h`}>
+                            <span className="font-bold text-ink tnum text-xs">
+                              {mDays > 0 ? `${mDays} ngày` : "0 ngày"}
+                            </span>
+                            <span className="text-[10px] text-muted font-mono tnum">({mHours}h)</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="flex flex-col items-center justify-center" title={`Tổng thời gian thực tế: ${p.total_hours || 0}h (${p.total_days || 0} ngày)`}>
+                          <span className="font-bold text-ink tnum text-xs">
+                            {p.total_days && p.total_days > 0 ? `${p.total_days} ngày` : "0 ngày"}
+                          </span>
+                          {p.total_hours && p.total_hours > 0 ? (
+                            <span className="text-[10px] text-muted tnum font-mono">({p.total_hours}h)</span>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
                   </td>
                   {/* TRẠNG THÁI — CHỈ XEM ở bảng ngoài. Muốn đổi thì mở dự án ra
                       (nút trạng thái cạnh "Sửa dự án"); bảng này tự nhảy theo khi

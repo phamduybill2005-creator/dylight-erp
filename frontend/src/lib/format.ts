@@ -83,3 +83,26 @@ export function assignmentDays(
   const days = Math.round((b.getTime() - a.getTime()) / 86_400_000);
   return days < 0 ? 0 : days;
 }
+
+/** Tính trạng thái tự động của dự án dựa trên tiến độ, ngày bắt đầu/kết thúc */
+export function computeAutoStatus(p: {
+  status: string;
+  status_locked?: boolean;
+  progress_percent?: number | string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+}): string {
+  if (p.status_locked) return p.status;
+  const pct = Math.round(Number(p.progress_percent ?? 0));
+  const hasStart = !!p.start_date;
+  const hasEnd = !!p.end_date;
+
+  if (p.status === "ON_HOLD" || p.status === "CLOSED") {
+    if (pct < 100 && !hasEnd) return p.status;
+  }
+
+  if (pct >= 100 || hasEnd) return "COMPLETED";
+  if (pct > 0 || hasStart) return "IN_PROGRESS";
+  return "PLANNING";
+}
+

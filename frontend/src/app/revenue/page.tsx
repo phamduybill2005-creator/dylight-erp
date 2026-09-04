@@ -20,8 +20,8 @@ import { api } from "@/lib/api";
 import { isDirector, isSeniorManagerUp } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept } from "@/lib/groups";
-import { formatVND } from "@/lib/format";
-import type { Project, User } from "@/lib/types";
+import { formatVND, computeAutoStatus } from "@/lib/format";
+import type { Project, User, Timesheet } from "@/lib/types";
 
 /** Số giờ -> "X,X ngày" (8 giờ = 1 ngày). */
 function hoursToDays(h: number): string {
@@ -73,6 +73,34 @@ export default function RevenuePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDept, setFilterDept] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
+  const [monthTimesheets, setMonthTimesheets] = useState<Timesheet[]>([]);
+
+  // Tải danh sách timesheets của tháng khi filterMonth thay đổi
+  useEffect(() => {
+    if (!filterMonth) {
+      setMonthTimesheets([]);
+      return;
+    }
+    const [yStr, mStr] = filterMonth.split("-");
+    const y = parseInt(yStr, 10);
+    const m = parseInt(mStr, 10);
+    const lastDay = new Date(y, m, 0).getDate();
+    const fromDate = `${filterMonth}-01`;
+    const toDate = `${filterMonth}-${String(lastDay).padStart(2, "0")}`;
+    api.timesheets({ from: fromDate, to: toDate })
+      .then(setMonthTimesheets)
+      .catch(() => setMonthTimesheets([]));
+  }, [filterMonth]);
+
+  // Tổng số giờ được nhập trong tháng theo từng dự án
+  const monthHoursByProject = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const ts of monthTimesheets) {
+      const h = Number(ts.hours || 0);
+      map[ts.project_id] = (map[ts.project_id] || 0) + h;
+    }
+    return map;
+  }, [monthTimesheets]);
 
   // Tỷ giá Vietcombank Realtime
   const [vcbData, setVcbData] = useState<{
@@ -228,7 +256,11 @@ export default function RevenuePage() {
         if (!(p.name || "").toLowerCase().includes(q) && !(p.code || "").toLowerCase().includes(q)) return false;
       }
       if (filterDept && getProjectDept(p) !== filterDept) return false;
-      if (filterMonth && (p.start_date || "").slice(0, 7) !== filterMonth) return false;
+      if (filterMonth) {
+        const startMonth = (p.start_date || "").slice(0, 7);
+        const hasHoursInMonth = (monthHoursByProject[p.id] || 0) > 0;
+        if (startMonth !== filterMonth && !hasHoursInMonth) return false;
+      }
       return true;
     });
     const pinnedSet = new Set(pinnedIds);
@@ -243,7 +275,7 @@ export default function RevenuePage() {
       if (tb !== null) return 1;
       return (a.code || "").localeCompare(b.code || "", "vi");
     });
-  }, [projects, searchQuery, filterDept, filterMonth, pinnedIds]);
+  }, [projects, searchQuery, filterDept, filterMonth, pinnedIds, monthHoursByProject]);
 
   const tong = useMemo(() => rows.reduce((s, p) => s + revenueOf(p), 0), [rows, revenueOf]);
   const soCoDoanhThu = useMemo(() => rows.filter((p) => revenueOf(p) > 0).length, [rows, revenueOf]);
@@ -475,7 +507,9 @@ export default function RevenuePage() {
               <th className={`${TH} whitespace-nowrap`}>Mã QL</th>
               <th className={`${TH} whitespace-nowrap`}>Tên dự án</th>
               <th className={`${TH} text-center whitespace-nowrap`}>Manual time</th>
-              <th className={`${TH} text-center whitespace-nowrap`}>Realtime (AI)</th>
+              <th className={`${TH} text-center whitespace-nowrap`} title={filterMonth ? `Thời gian làm thực tế nhập trong tháng ${filterMonth}` : "Thời gian làm thực tế realtime (AI)"}>
+                Realtime (AI)
+              </th>
               <th className={`${TH} text-center whitespace-nowrap`}>Time khách hàng (công)</th>
               <th className={`${TH} text-right whitespace-nowrap`} title="Click hàng dự án để nhập đơn giá Yên trên thanh bên trên">
                 Doanh thu (VNĐ)
@@ -545,10 +579,35 @@ export default function RevenuePage() {
 
                   {/* REALTIME (AI) */}
                   <td className={`${TD} whitespace-nowrap text-center`}>
-                    <div className="flex flex-col items-center">
-                      <span className="text-[11px] font-bold text-ink tnum">{p.total_days && p.total_days > 0 ? `${p.total_days} ngày` : "0 ngày"}</span>
-                      {p.total_hours && p.total_hours > 0 ? <span className="text-[10px] text-muted tnum">({p.total_hours}h)</span> : null}
-                    </div>
+                    {(() => {
+                      const isDoing = computeAutoStatus(p) === "IN_PROGRESS";
+                      if (filterMonth && isDoing) {
+                        const mHours = Math.round((monthHoursByProject[p.id] || 0) * 10) / 10;
+                        const mDays = Math.round((mHours / 8) * 10) / 10;
+                        return (
+                          <div className="flex flex-col items-center" title={`Giờ làm thực tế nhập trong tháng ${filterMonth}: ${mHours}h (${mDays} ngày)`}>
+                            <span className="text-[11px] font-bold text-emerald-700 tnum">{mDays > 0 ? `${mDays} ngày` : "0 ngày"}</span>
+                            <span className="text-[10px] text-emerald-600 font-mono tnum">({mHours}h)</span>
+                          </div>
+                        );
+                      }
+                      if (filterMonth && !isDoing && (monthHoursByProject[p.id] || 0) > 0) {
+                        const mHours = Math.round((monthHoursByProject[p.id] || 0) * 10) / 10;
+                        const mDays = Math.round((mHours / 8) * 10) / 10;
+                        return (
+                          <div className="flex flex-col items-center" title={`Giờ làm thực tế nhập trong tháng ${filterMonth}: ${mHours}h (${mDays} ngày). Tổng: ${p.total_hours || 0}h`}>
+                            <span className="text-[11px] font-bold text-ink tnum">{mDays > 0 ? `${mDays} ngày` : "0 ngày"}</span>
+                            <span className="text-[10px] text-muted font-mono tnum">({mHours}h)</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="flex flex-col items-center" title={`Tổng thời gian thực tế: ${p.total_hours || 0}h (${p.total_days || 0} ngày)`}>
+                          <span className="text-[11px] font-bold text-ink tnum">{p.total_days && p.total_days > 0 ? `${p.total_days} ngày` : "0 ngày"}</span>
+                          {p.total_hours && p.total_hours > 0 ? <span className="text-[10px] text-muted tnum font-mono">({p.total_hours}h)</span> : null}
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   {/* TIME KHÁCH HÀNG — CHỈ GIÁM ĐỐC NHẬP */}
