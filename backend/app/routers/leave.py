@@ -22,7 +22,7 @@ _MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
 def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     if payload.to_date < payload.from_date:
         raise HTTPException(400, "Ngày kết thúc phải sau ngày bắt đầu.")
-    rec = LeaveRequest(company_id=current.company_id, user_id=current.id, **payload.model_dump())
+    rec = LeaveRequest(company_id=current.company_id, user_id=current.id, source="LEAVE", **payload.model_dump())
     db.add(rec)
     db.commit()
     db.refresh(rec)
@@ -31,9 +31,16 @@ def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: U
 
 @router.get("/me", response_model=list[LeaveOut])
 def my_leaves(db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    """Chỉ lấy các đơn xin nghỉ phép được tạo trong mục Nghỉ phép (loại bỏ đơn đăng ký lịch làm việc)."""
+    from sqlalchemy import or_
     return (
         db.query(LeaveRequest)
-        .filter(LeaveRequest.user_id == current.id, LeaveRequest.from_date >= date(2026, 9, 1))
+        .filter(
+            LeaveRequest.user_id == current.id,
+            LeaveRequest.from_date >= date(2026, 9, 1),
+            or_(LeaveRequest.source == "LEAVE", LeaveRequest.source.is_(None)),
+            LeaveRequest.source != "SCHEDULE",
+        )
         .order_by(LeaveRequest.from_date.desc())
         .all()
     )
@@ -45,10 +52,13 @@ def list_leaves(
     db: Session = Depends(get_db),
     current: User = Depends(require_roles(*_MANAGER_ROLES)),
 ):
-    """Quản lý/Giám đốc xem đơn nghỉ (mặc định toàn công ty). Chỉ lấy từ T9/2026 trở đi."""
+    """Quản lý/Giám đốc xem đơn nghỉ (mặc định toàn công ty). Chỉ lấy đơn tạo trong mục Nghỉ phép từ T9/2026 trở đi."""
+    from sqlalchemy import or_
     q = db.query(LeaveRequest).filter(
         LeaveRequest.company_id == current.company_id,
         LeaveRequest.from_date >= date(2026, 9, 1),
+        or_(LeaveRequest.source == "LEAVE", LeaveRequest.source.is_(None)),
+        LeaveRequest.source != "SCHEDULE",
     )
     if status:
         q = q.filter(LeaveRequest.status == status)
@@ -210,6 +220,7 @@ def save_student_week_schedule(
                 curr_leave.leave_type = l_type
                 curr_leave.reason = reason
                 curr_leave.status = LeaveStatus.APPROVED
+                curr_leave.source = "SCHEDULE"
                 curr_leave.decided_by_id = current.id
                 curr_leave.decided_at = vn_now()
                 results.append(curr_leave)
@@ -222,6 +233,7 @@ def save_student_week_schedule(
                     leave_type=l_type,
                     reason=reason,
                     status=LeaveStatus.APPROVED,
+                    source="SCHEDULE",
                     decided_by_id=current.id,
                     decided_at=vn_now(),
                 )

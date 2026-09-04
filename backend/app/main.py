@@ -298,9 +298,14 @@ def _ensure_schema() -> None:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE timesheets ADD COLUMN project_item_id INTEGER"))
         if "leave_requests" in tn2:
-            if "leave_type" not in {c["name"] for c in insp2.get_columns("leave_requests")}:
-                with engine.begin() as conn:
+            cols_leave = {c["name"] for c in insp2.get_columns("leave_requests")}
+            with engine.begin() as conn:
+                if "leave_type" not in cols_leave:
                     conn.execute(text("ALTER TABLE leave_requests ADD COLUMN leave_type VARCHAR(50) DEFAULT 'FULL'"))
+                if "source" not in cols_leave:
+                    conn.execute(text("ALTER TABLE leave_requests ADD COLUMN source VARCHAR(30) DEFAULT 'LEAVE'"))
+                # Cap nhat tat ca don dang ky lich sinh vien da tao thanh source = 'SCHEDULE' de khong bi hien o Don cua toi
+                conn.execute(text("UPDATE leave_requests SET source = 'SCHEDULE' WHERE reason LIKE 'Đi học%' AND from_date = to_date"))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] cot quan trong bo qua: {_e}")
 

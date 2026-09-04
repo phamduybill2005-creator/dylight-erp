@@ -776,15 +776,21 @@ class LeaveRequest(Base):
     leave_type: Mapped[str | None] = mapped_column(String(50), default="FULL")
     reason: Mapped[str | None] = mapped_column(Text)
     status: Mapped[LeaveStatus] = mapped_column(SAEnum(LeaveStatus), default=LeaveStatus.PENDING)
+    source: Mapped[str | None] = mapped_column(String(30), default="LEAVE")  # "LEAVE" (đơn tạo từ mục nghỉ phép) | "SCHEDULE" (đăng ký từ lịch làm việc)
     decided_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    decided_by: Mapped["User | None"] = relationship("User", foreign_keys=[decided_by_id])
 
     @property
     def user_name(self) -> str | None:
         return self.user.full_name if self.user else None
+
+    @property
+    def decided_by_name(self) -> str | None:
+        return self.decided_by.full_name if self.decided_by else None
 
     @property
     def days(self) -> float:

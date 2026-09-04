@@ -114,7 +114,13 @@ export default function LeavePage() {
   // Lọc đơn chờ duyệt theo PHÒNG BAN của người xin nghỉ (ánh xạ qua danh sách nhân sự).
   const deptOfUser = (uid: number) => users.find((u) => u.id === uid)?.department;
   const shownPending = pending.filter(
-    (l) => !filters.dept || splitDepts(deptOfUser(l.user_id)).includes(filters.dept)
+    (l) => (!filters.dept || splitDepts(deptOfUser(l.user_id)).includes(filters.dept)) &&
+      l.source !== "SCHEDULE" && !l.reason?.startsWith("Đi học")
+  );
+
+  // Chỉ hiển thị đơn được tạo và gửi trong mục Nghỉ phép (loại bỏ đơn đăng ký lịch làm việc theo tuần của sinh viên)
+  const shownMine = mine.filter(
+    (l) => l.source !== "SCHEDULE" && !l.reason?.startsWith("Đi học")
   );
 
   const formatDaysDisplay = (l: LeaveRequest) => {
@@ -213,29 +219,50 @@ export default function LeavePage() {
       {/* Đơn của tôi */}
       <h2 className="mt-6 mb-2 text-sm font-bold text-ink">Đơn của tôi</h2>
       <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
-        <table className="w-full min-w-[640px] border-collapse text-sm">
+        <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
               <th className="border border-line px-3 py-2">Từ ngày</th>
               <th className="border border-line px-3 py-2">Đến ngày</th>
               <th className="border border-line px-3 py-2 text-right">Lịch làm / Số ngày</th>
               <th className="border border-line px-3 py-2">Lý do</th>
-              <th className="border border-line px-3 py-2">Trạng thái</th>
+              <th className="border border-line px-3 py-2 text-center">Trạng thái</th>
+              <th className="border border-line px-3 py-2">Người duyệt</th>
             </tr>
           </thead>
           <tbody>
-            {mine.length === 0 && (
-              <tr><td colSpan={5} className="border border-line px-3 py-6 text-center text-muted">Chưa có đơn nào.</td></tr>
+            {shownMine.length === 0 && (
+              <tr><td colSpan={6} className="border border-line px-3 py-6 text-center text-muted">Chưa có đơn nào.</td></tr>
             )}
-            {mine.map((l) => (
-              <tr key={l.id} className="odd:bg-white even:bg-paper/40 hover:bg-amber/10">
-                <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.from_date)}</td>
-                <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.to_date)}</td>
-                <td className="border border-line px-3 py-2 text-right tnum">{formatDaysDisplay(l)}</td>
-                <td className="border border-line px-3 py-2 text-muted">{l.reason || "—"}</td>
-                <td className="border border-line px-3 py-2"><StatusBadge s={l.status} /></td>
-              </tr>
-            ))}
+            {shownMine.map((l) => {
+              const approverName = l.decided_by_name || (l.decided_by_id ? users.find((u) => u.id === l.decided_by_id)?.full_name : null);
+              return (
+                <tr key={l.id} className="odd:bg-white even:bg-paper/40 hover:bg-amber/10">
+                  <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.from_date)}</td>
+                  <td className="border border-line px-3 py-2 whitespace-nowrap">{formatDate(l.to_date)}</td>
+                  <td className="border border-line px-3 py-2 text-right tnum">{formatDaysDisplay(l)}</td>
+                  <td className="border border-line px-3 py-2 text-muted">{l.reason || "—"}</td>
+                  <td className="border border-line px-3 py-2 text-center"><StatusBadge s={l.status} /></td>
+                  <td className="border border-line px-3 py-2">
+                    {l.status === "APPROVED" ? (
+                      approverName ? (
+                        <span className="font-semibold text-slate-800 text-xs">{approverName}</span>
+                      ) : (
+                        <span className="text-xs text-muted italic">Đã duyệt</span>
+                      )
+                    ) : l.status === "REJECTED" ? (
+                      approverName ? (
+                        <span className="text-xs text-rose-600 font-semibold">{approverName} (Từ chối)</span>
+                      ) : (
+                        <span className="text-xs text-rose-500 italic">Từ chối</span>
+                      )
+                    ) : (
+                      <span className="text-xs text-muted italic">Đang chờ duyệt</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -843,7 +843,9 @@ class LeaveOut(BaseModel):
     leave_type: str | None = "FULL"
     reason: str | None = None
     status: LeaveStatus
+    source: str | None = "LEAVE"
     decided_by_id: int | None = None
+    decided_by_name: str | None = None
     decided_at: datetime | None = None
     created_at: datetime
     user_name: str | None = None
