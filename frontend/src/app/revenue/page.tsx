@@ -455,8 +455,8 @@ export default function RevenuePage() {
           <colgroup>
             <col className="w-[40px]" />
             <col className="w-[26px]" />
-            <col className="w-[132px]" />
-            <col className="w-[300px]" />
+            <col className="w-[88px]" />
+            <col className="w-[220px]" />
             <col className="w-[96px]" />
             <col className="w-[96px]" />
             <col className="w-[120px]" />

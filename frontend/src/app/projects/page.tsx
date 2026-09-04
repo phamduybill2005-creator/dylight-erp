@@ -781,7 +781,7 @@ export default function ProjectsPage() {
             <colgroup>
               <col className="w-[28px]" />   {/* STT */}
               <col className="w-[24px]" />   {/* Ghim ★ */}
-              <col className="w-[124px]" />  {/* Mã QL + nhãn "Ghim" */}
+              <col className="w-[84px]" />   {/* Mã QL */}
               <col className="w-[138px]" />  {/* Tên dự án — co 1/2 so với 320px, có ... cuối */}
               <col className="w-[58px]" />   {/* Nhóm */}
               <col className="w-[54px]" />   {/* GEO担当 */}
@@ -807,11 +807,10 @@ export default function ProjectsPage() {
             <colgroup>
               <col className="w-[32px]" />   {/* STT */}
               <col className="w-[26px]" />   {/* Ghim ★ */}
-              {/* Mã QL + nhãn "Ghim": mã 9 ký tự đo được 84px, nhãn 29px,
-                  cộng gap 4 + padding 12 = 129px -> lấy 132px cho dư.
-                  Trước để 96px nên nhãn "Ghim" bị cắt cụt. */}
-              <col className="w-[132px]" />  {/* Mã QL */}
-              <col className="w-[296px]" />  {/* Tên dự án — thu bớt nhường cho Trạng thái */}
+              {/* Mã QL: vừa khít mã 9 ký tự (đo ~72px + padding 12px = 84px -> 88px cho thoải mái) */}
+              <col className="w-[88px]" />   {/* Mã QL */}
+              {/* Tên dự án: thu hẹp vừa khít với tên dự án */}
+              <col className="w-[220px]" />  {/* Tên dự án */}
               <col className="w-[76px]" />   {/* Nhóm — fit tên tiếng Nhật */}
               <col className="w-[62px]" />   {/* GEO担当 */}
               {/* DOSCO担当: tên dài nhất (D.M.QUANG) đo được 66px ở cỡ chữ 11px,
