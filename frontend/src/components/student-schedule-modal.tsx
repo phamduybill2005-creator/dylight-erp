@@ -44,22 +44,22 @@ const SHIFT_OPTIONS: {
     key: "MORNING_ONLY",
     label: "Làm sáng",
     subLabel: "Nghỉ chiều",
-    badgeClass: "bg-orange-50 text-orange-700 border-orange-200",
-    activeClass: "bg-[#f97316] text-white border-[#ea580c] shadow-sm",
+    badgeClass: "bg-purple-50 text-purple-700 border-purple-200",
+    activeClass: "bg-[#7c3aed] text-white border-[#6d28d9] shadow-sm",
   },
   {
     key: "AFTERNOON_ONLY",
     label: "Làm chiều",
     subLabel: "Nghỉ sáng",
     badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
-    activeClass: "bg-[#eab308] text-slate-900 border-[#ca8a04] shadow-sm",
+    activeClass: "bg-[#d97706] text-white border-[#b45309] shadow-sm",
   },
   {
     key: "OFF",
     label: "Nghỉ cả ngày",
     subLabel: "Nghỉ trọn vẹn",
     badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
-    activeClass: "bg-[#ef4444] text-white border-[#dc2626] shadow-sm",
+    activeClass: "bg-[#e11d48] text-white border-[#be123c] shadow-sm",
   },
 ];
 

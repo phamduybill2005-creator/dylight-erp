@@ -119,10 +119,10 @@ export default function LeavePage() {
 
   const formatDaysDisplay = (l: LeaveRequest) => {
     if (l.leave_type === "LATE_MORNING" || l.leave_type === "LATE") {
-      return <span className="inline-flex items-center rounded-md bg-[#16a34a]/15 px-2 py-0.5 text-[11px] font-semibold text-[#16a34a] border border-[#16a34a]/30">Đi muộn sáng</span>;
+      return <span className="inline-flex items-center rounded-md bg-[#0284c7]/15 px-2 py-0.5 text-[11px] font-semibold text-[#0284c7] border border-[#0284c7]/30">Đi muộn sáng</span>;
     }
     if (l.leave_type === "LATE_AFTERNOON") {
-      return <span className="inline-flex items-center rounded-md bg-[#84cc16]/25 px-2 py-0.5 text-[11px] font-semibold text-[#4d7c0f] border border-[#84cc16]/40">Đi muộn chiều</span>;
+      return <span className="inline-flex items-center rounded-md bg-[#0d9488]/15 px-2 py-0.5 text-[11px] font-semibold text-[#0d9488] border border-[#0d9488]/30">Đi muộn chiều</span>;
     }
     if (l.leave_type === "MORNING") return `${l.days} (Sáng)`;
     if (l.leave_type === "AFTERNOON") return `${l.days} (Chiều)`;
@@ -169,15 +169,15 @@ export default function LeavePage() {
             {leaveCategory === "LATE" ? (
               <select value={lateSlot} onChange={(e) => setLateSlot(e.target.value as "MORNING" | "AFTERNOON")}
                 className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
-                <option value="MORNING">Đi muộn sáng (Xanh đậm)</option>
-                <option value="AFTERNOON">Đi muộn chiều (Xanh nhạt)</option>
+                <option value="MORNING">Đi muộn sáng (Xanh biển)</option>
+                <option value="AFTERNOON">Đi muộn chiều (Xanh ngọc)</option>
               </select>
             ) : (
               <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
-                <option value="FULL">Cả ngày (Đỏ)</option>
-                <option value="MORNING">Buổi sáng (Vàng)</option>
-                <option value="AFTERNOON">Buổi chiều (Cam)</option>
+                <option value="FULL">Cả ngày (Đỏ trầm)</option>
+                <option value="MORNING">Buổi sáng (Vàng hổ phách)</option>
+                <option value="AFTERNOON">Buổi chiều (Tím)</option>
               </select>
             )}
           </div>

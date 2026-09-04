@@ -2,11 +2,11 @@
 
 // Trang Lịch làm việc (Work Schedule)
 // - Hiển thị 5 kiểu trạng thái nghỉ/đi muộn theo đơn nghỉ phép ĐÃ ĐƯỢC DUYỆT:
-//   1. Đi muộn sáng (Xanh lá đậm: #16a34a)
-//   2. Đi muộn chiều (Xanh lá nhạt: #84cc16)
-//   3. Nghỉ sáng (Vàng: #eab308)
-//   4. Nghỉ chiều (Cam: #f97316)
-//   5. Nghỉ cả ngày (Đỏ: #ef4444)
+//   1. Đi muộn sáng (Xanh biển: #0284c7)
+//   2. Đi muộn chiều (Xanh ngọc: #0d9488)
+//   3. Nghỉ sáng (Vàng hổ phách ấm: #d97706)
+//   4. Nghỉ chiều (Tím thạch anh: #7c3aed)
+//   5. Nghỉ cả ngày (Đỏ hoa hồng trầm: #e11d48)
 // - Ngày không có đơn: bảng trắng sạch sẽ.
 // - Chế độ Tháng: hiển thị FULL cả tháng vừa khít màn hình (không cần thanh cuộn ngang).
 // - Chế độ Tuần: 7 ngày rộng rãi, thoáng đãng.
@@ -34,7 +34,7 @@ import { isManagerUp } from "@/lib/roles";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, User } from "@/lib/types";
 
-// 5 kiểu hiển thị chuẩn theo yêu cầu và hình ảnh chú thích
+// 5 kiểu hiển thị chuẩn theo yêu cầu: 5 họ màu riêng biệt, không chói mắt, độ tương phản cao dễ nhìn chữ
 export interface ScheduleType {
   key: string;
   label: string;
@@ -48,42 +48,42 @@ const SCHEDULE_TYPES: ScheduleType[] = [
   {
     key: "LATE_MORNING",
     label: "Đi muộn sáng",
-    bgClass: "bg-[#16a34a]", // Xanh lá đậm
-    textClass: "text-white",
-    borderClass: "border-[#15803d]",
-    hexColor: "#16a34a",
+    bgClass: "bg-[#0284c7]", // Xanh biển dịu mát
+    textClass: "text-white font-bold",
+    borderClass: "border-[#0369a1]",
+    hexColor: "#0284c7",
   },
   {
     key: "LATE_AFTERNOON",
     label: "Đi muộn chiều",
-    bgClass: "bg-[#84cc16]", // Xanh lá nhạt / nõn chuối
-    textClass: "text-slate-900",
-    borderClass: "border-[#65a30d]",
-    hexColor: "#84cc16",
+    bgClass: "bg-[#0d9488]", // Xanh ngọc lục bảo sâu
+    textClass: "text-white font-bold",
+    borderClass: "border-[#0f766e]",
+    hexColor: "#0d9488",
   },
   {
     key: "MORNING",
     label: "Nghỉ sáng",
-    bgClass: "bg-[#eab308]", // Vàng
-    textClass: "text-slate-900",
-    borderClass: "border-[#ca8a04]",
-    hexColor: "#eab308",
+    bgClass: "bg-[#d97706]", // Vàng hổ phách mật ong ấm (không chói lóa)
+    textClass: "text-white font-bold",
+    borderClass: "border-[#b45309]",
+    hexColor: "#d97706",
   },
   {
     key: "AFTERNOON",
     label: "Nghỉ chiều",
-    bgClass: "bg-[#f97316]", // Cam
-    textClass: "text-white",
-    borderClass: "border-[#ea580c]",
-    hexColor: "#f97316",
+    bgClass: "bg-[#7c3aed]", // Tím thạch anh hoàng hôn sang trọng
+    textClass: "text-white font-bold",
+    borderClass: "border-[#6d28d9]",
+    hexColor: "#7c3aed",
   },
   {
     key: "FULL",
     label: "Nghỉ cả ngày",
-    bgClass: "bg-[#ef4444]", // Đỏ
-    textClass: "text-white",
-    borderClass: "border-[#dc2626]",
-    hexColor: "#ef4444",
+    bgClass: "bg-[#e11d48]", // Đỏ hoa hồng trầm thanh lịch
+    textClass: "text-white font-bold",
+    borderClass: "border-[#be123c]",
+    hexColor: "#e11d48",
   },
 ];
 
@@ -714,7 +714,7 @@ export default function WorkSchedulePage() {
                               title={`${user.full_name} - ${formatDate(d.dateStr)}\n${schedType.label}: ${leave.reason || "Không ghi lý do"}\n(Đơn đã được duyệt)`}
                             >
                               <div className="h-7 sm:h-8 w-full flex items-center justify-center p-0.5 overflow-hidden">
-                                <span className="text-[9px] font-bold uppercase tracking-tight truncate max-w-[98%] leading-tight">
+                                <span className="text-[9px] font-bold uppercase tracking-tight truncate max-w-[98%] leading-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]">
                                   {reasonText}
                                 </span>
                               </div>
