@@ -522,12 +522,12 @@ def update_project(
         if "status" in data and "status_locked" not in data:
             data["status_locked"] = True
 
-    # TIME KHÁCH HÀNG: CHỈ Giám đốc (hoặc Quản trị hệ thống).
-    if "client_hours" in data:
-        if not _is_director(current):
+    # TIME KHÁCH HÀNG & ĐƠN GIÁ: CHỈ tài khoản Giám đốc (UserRole.DIRECTOR).
+    if "client_hours" in data or "unit_price" in data:
+        if current.role != UserRole.DIRECTOR:
             raise HTTPException(
                 403,
-                "Chỉ Giám đốc mới có quyền nhập Time khách hàng.",
+                "Chỉ tài khoản Giám đốc mới có quyền nhập Time khách hàng và Đơn giá.",
             )
 
     if "member_ids" in data:
@@ -753,8 +753,8 @@ def set_global_unit_price(
     current_user: User = Depends(get_current_user),
 ):
     """Giám đốc đặt đơn giá JPY/h chung cho toàn bộ dự án, lưu vĩnh viễn vào Database."""
-    if current_user.role != UserRole.DIRECTOR and not _is_director(current_user):
-        raise HTTPException(403, "Chỉ Giám đốc mới có quyền thay đổi đơn giá chung.")
+    if current_user.role != UserRole.DIRECTOR:
+        raise HTTPException(403, "Chỉ tài khoản Giám đốc mới có quyền thay đổi đơn giá chung.")
     c = db.query(Company).filter(Company.id == current_user.company_id).first()
     if not c:
         raise HTTPException(404, "Không tìm thấy công ty.")

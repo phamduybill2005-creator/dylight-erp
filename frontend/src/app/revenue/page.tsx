@@ -98,7 +98,7 @@ export default function RevenuePage() {
     }
   });
 
-  const isDirectorUser = isDirector(me?.role);
+  const isDirectorUser = me?.role === "DIRECTOR";
 
   // Tải đơn giá chung từ backend khi vào trang để đồng bộ với Giám đốc
   useEffect(() => {
@@ -257,8 +257,8 @@ export default function RevenuePage() {
   const keyOf = (p: Project, f: RowField) => `${p.id}:${f}`;
 
   async function saveRowField(p: Project, field: RowField) {
-    if (field === "client_hours" && !isDirector(me?.role)) {
-      alert("Chỉ Giám đốc mới có quyền nhập Time khách hàng.");
+    if (field === "client_hours" && me?.role !== "DIRECTOR") {
+      alert("Chỉ tài khoản Giám đốc mới có quyền nhập Time khách hàng.");
       return;
     }
     const k = keyOf(p, field);
@@ -557,13 +557,13 @@ export default function RevenuePage() {
                       return (
                         <div className="flex flex-col items-center">
                           <span className="text-[11px] font-bold text-ink tnum">{h > 0 ? `${hoursToDays(h)} công` : "0 công"}</span>
-                          {isDirector(me?.role) ? (
+                          {isDirectorUser ? (
                             <span className="flex items-center justify-center text-[10px] text-muted">(
                               <span className="w-14">{cellInput(p, "client_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 công)" })}</span>
                               h)
                             </span>
                           ) : (
-                            <span className="text-[10px] text-muted tnum font-mono" title="Chỉ Giám đốc mới có quyền nhập Time khách hàng">
+                            <span className="text-[10px] text-muted tnum font-mono" title="Chỉ tài khoản Giám đốc mới có quyền nhập Time khách hàng">
                               ({h > 0 ? `${h}h` : "— h"})
                             </span>
                           )}
