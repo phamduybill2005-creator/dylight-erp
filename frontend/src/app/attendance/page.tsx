@@ -126,6 +126,7 @@ export default function AttendancePage() {
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
   const [detailRecs, setDetailRecs] = useState<Attendance[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
 
   // Nhập chấm công từ file CSV
@@ -312,22 +313,35 @@ export default function AttendancePage() {
   }, [user]);
 
   // Bấm vào 1 người trong bảng tổng hợp -> mở/đóng chi tiết từng ngày trong tháng.
+  /** Khoảng ngày của tháng "YYYY-MM" — ngày cuối TÍNH THEO THÁNG THẬT.
+   *  Trước đây chỗ xem chi tiết cắm cứng "-31" nên tháng 30 ngày (hoặc tháng 2)
+   *  gửi lên ngày không tồn tại -> backend từ chối -> danh sách rỗng. */
+  function monthRange(period: string) {
+    const [y, m] = period.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    return {
+      from: `${period}-01`,
+      to: `${period}-${String(lastDay).padStart(2, "0")}`,
+    };
+  }
+
   async function toggleDetail(userId: number) {
     if (expandedUser === userId) { setExpandedUser(null); return; }
     setExpandedUser(userId);
     setDetailLoading(true);
+    setDetailError(null);
     try {
-      const recs = await api.attendanceList({
-        user_id: userId,
-        from_date: `${summaryPeriod}-01`,
-        to_date: `${summaryPeriod}-31`,
-      });
+      const { from, to } = monthRange(summaryPeriod);
+      const recs = await api.attendanceList({ user_id: userId, from_date: from, to_date: to });
       setDetailRecs(recs);
       const initialNotes: Record<number, string> = {};
       recs.forEach((r) => { if (r.note) initialNotes[r.id] = r.note; });
       setEditingNotes(initialNotes);
-    } catch {
+    } catch (err) {
+      // Trước đây nuốt lỗi rồi hiện "không có ngày công" -> gọi API hỏng mà
+      // trông y như tháng không có dữ liệu. Nay tách bạch hai trường hợp.
       setDetailRecs([]);
+      setDetailError(err instanceof Error ? err.message : "Không tải được chi tiết, thử lại giúp mình.");
     } finally {
       setDetailLoading(false);
     }
@@ -637,6 +651,8 @@ export default function AttendancePage() {
                     </p>
                     {detailLoading ? (
                       <p className="py-3 text-center text-xs text-muted">Đang tải…</p>
+                    ) : detailError ? (
+                      <p className="py-3 text-center text-xs font-semibold text-bad">{detailError}</p>
                     ) : detailRecs.length === 0 ? (
                       <p className="py-3 text-center text-xs text-muted">Không có ngày công nào trong tháng này.</p>
                     ) : (
