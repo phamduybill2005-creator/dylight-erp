@@ -6,7 +6,7 @@ Router Chấm công (Attendance).
 - Máy chấm công gọi /attendance/punch (xác thực bằng X-API-Key, KHÔNG dùng JWT).
 """
 import hmac
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
-from app.models import Attendance, AttendanceSource, PaymentDirection, User, UserRole
+from app.models import Attendance, AttendanceSource, PaymentDirection, User, UserRole, LeaveRequest, LeaveStatus
 from app.schemas import (
     AttendanceOut, AttendanceUpdate, AttendanceSummary, MachinePunch,
     AttendanceImportRequest, AttendanceImportResult,
@@ -103,6 +103,50 @@ def check_out(db: Session = Depends(get_db), current: User = Depends(get_current
     return rec
 
 
+# Các loại đơn "đi muộn" (xin phép tới muộn buổi sáng / buổi chiều).
+_LATE_LEAVE_TYPES = ("LATE_MORNING", "LATE_AFTERNOON", "LATE")
+
+
+def _apply_late_exemption(db: Session, company_id: int, records: list[Attendance]) -> None:
+    """MIỄN TRỄ khi có đơn ĐI MUỘN được DUYỆT cho đúng ngày đó.
+
+    Đơn đi muộn chỉ tạo được khi gửi trước 19h hôm trước (đã chặn ở create_leave),
+    nên "được duyệt" đồng nghĩa hợp lệ giờ giấc -> ngày đó không tính đi trễ.
+    Chỉ ÁP KHI is_late_override đang None (tức đang tự tính là trễ) — nếu cấp cao
+    đã đè tay (True/False) thì tôn trọng, không ghi đè. Set IN-MEMORY, KHÔNG commit,
+    nên chỉ đổi kết quả trả về của các GET, không sửa dữ liệu gốc.
+    """
+    if not records:
+        return
+    uids = {r.user_id for r in records}
+    dmin = min(r.work_date for r in records)
+    dmax = max(r.work_date for r in records)
+    leaves = (
+        db.query(LeaveRequest)
+        .filter(
+            LeaveRequest.company_id == company_id,
+            LeaveRequest.user_id.in_(uids),
+            LeaveRequest.status == LeaveStatus.APPROVED,
+            LeaveRequest.leave_type.in_(_LATE_LEAVE_TYPES),
+            LeaveRequest.from_date <= dmax,
+            LeaveRequest.to_date >= dmin,
+        )
+        .all()
+    )
+    if not leaves:
+        return
+    # Tập (user_id, ngày) được miễn — đơn đi muộn có thể trải nhiều ngày.
+    exempt: set[tuple[int, date]] = set()
+    for lv in leaves:
+        d = lv.from_date
+        while d <= lv.to_date:
+            exempt.add((lv.user_id, d))
+            d += timedelta(days=1)
+    for r in records:
+        if r.is_late_override is None and (r.user_id, r.work_date) in exempt:
+            r.is_late_override = False
+
+
 @router.get("/me", response_model=list[AttendanceOut])
 def my_attendance(
     from_date: date | None = None,
@@ -116,7 +160,9 @@ def my_attendance(
         q = q.filter(Attendance.work_date >= from_date)
     if to_date:
         q = q.filter(Attendance.work_date <= to_date)
-    return q.order_by(Attendance.work_date.desc()).all()
+    recs = q.order_by(Attendance.work_date.desc()).all()
+    _apply_late_exemption(db, current.company_id, recs)
+    return recs
 
 
 @router.get("", response_model=list[AttendanceOut])
@@ -144,7 +190,9 @@ def list_attendance(
         q = q.filter(Attendance.work_date >= from_date)
     if to_date:
         q = q.filter(Attendance.work_date <= to_date)
-    return q.order_by(Attendance.work_date.desc(), Attendance.user_id.asc()).all()
+    recs = q.order_by(Attendance.work_date.desc(), Attendance.user_id.asc()).all()
+    _apply_late_exemption(db, current.company_id, recs)
+    return recs
 
 
 @router.put("/{attendance_id}", response_model=AttendanceOut)
@@ -192,6 +240,7 @@ def attendance_summary(
         q = q.filter(Attendance.user_id == current.id)
 
     records = q.all()
+    _apply_late_exemption(db, current.company_id, records)   # đơn đi muộn duyệt -> không tính vào late_days
     # Lọc đúng tháng (so khớp tiền tố "YYYY-MM") rồi gom theo người.
     by_user: dict[int, AttendanceSummary] = {}
     users = {u.id: u for u in db.query(User).filter(User.company_id == current.company_id).all()}
