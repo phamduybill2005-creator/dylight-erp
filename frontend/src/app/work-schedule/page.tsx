@@ -28,6 +28,9 @@ import {
 } from "@heroicons/react/24/outline";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
+import { splitDepts } from "@/components/filter-bar";
+import { PRESET_DEPARTMENTS } from "@/lib/departments";
+import { normalizeDept } from "@/lib/groups";
 import StudentScheduleModal from "@/components/student-schedule-modal";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
@@ -319,19 +322,18 @@ export default function WorkSchedulePage() {
     });
   };
 
-  // Danh sách phòng ban (chỉ từ nhân sự đang làm việc)
-  const departments = useMemo(() => {
-    const set = new Set<string>();
-    users.forEach((u) => {
-      if (u.department) set.add(u.department.trim());
-    });
-    return Array.from(set).sort();
-  }, [users]);
+  // Danh sách phòng ban: DÙNG 4 PHÒNG CHUẨN như các mục khác. Trước đây lấy
+  // nguyên chuỗi department của từng người, nên ai thuộc 2 phòng ("Phòng BIM,
+  // Phòng Thiết kế đường 2D") là chuỗi ghép đó thành một mục riêng -> danh sách
+  // phình ra cả chục dòng trùng lặp.
+  const departments = PRESET_DEPARTMENTS;
 
   // Lọc danh sách nhân viên: CHỈ LẤY NHÂN VIÊN ĐANG LÀM VIỆC
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      if (deptFilter && u.department !== deptFilter) return false;
+      // Tách chuỗi + chuẩn hoá tên (kể cả tên tiếng Nhật) -> người thuộc
+      // nhiều phòng được tính ở TỪNG phòng, giống bộ lọc các trang khác.
+      if (deptFilter && !splitDepts(u.department).map(normalizeDept).includes(deptFilter)) return false;
       if (searchTerm) {
         const query = searchTerm.toLowerCase();
         const matchName = u.full_name.toLowerCase().includes(query);
@@ -438,7 +440,7 @@ export default function WorkSchedulePage() {
                   : "text-white/80 hover:text-white"
               }`}
             >
-              Theo tháng (Toàn màn hình)
+              Theo tháng
             </button>
             <button
               onClick={() => setViewMode("WEEK")}
