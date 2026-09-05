@@ -18,9 +18,12 @@ import { formatDate } from "@/lib/format";
 import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
 
 // Danh sách LÝ DO nghỉ phép cố định — người xin nghỉ chỉ được chọn 1 trong các mục này.
+// LƯU Ý: "ĐI HỌC" phải viết HOA — bên dưới có bộ lọc ẩn các đơn tự sinh từ
+// lịch sinh viên có lý do bắt đầu bằng "Đi học" (viết thường). Đổi về "Đi học"
+// là đơn người dùng gửi sẽ biến mất khỏi danh sách.
 const LEAVE_REASONS = [
   "GIỖ TẾT", "HIẾU SỰ", "HỶ SỰ", "ỐM ĐAU", "NGỦ QUÊN", "TẮC ĐƯỜNG",
-  "HỎNG XE", "SINH NHẬT", "THIÊN TAI", "BIA RƯỢU", "HỌC HÀNH", "YÊU ĐƯƠNG",
+  "HỎNG XE", "SINH NHẬT", "THIÊN TAI", "BIA RƯỢU", "ĐI HỌC", "YÊU ĐƯƠNG",
   "GIA ĐÌNH",
 ];
 
@@ -175,15 +178,15 @@ export default function LeavePage() {
             {leaveCategory === "LATE" ? (
               <select value={lateSlot} onChange={(e) => setLateSlot(e.target.value as "MORNING" | "AFTERNOON")}
                 className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
-                <option value="MORNING">Đi muộn sáng (Xanh biển)</option>
-                <option value="AFTERNOON">Đi muộn chiều (Xanh ngọc)</option>
+                <option value="MORNING">Đi muộn sáng</option>
+                <option value="AFTERNOON">Đi muộn chiều</option>
               </select>
             ) : (
               <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel font-medium">
-                <option value="FULL">Cả ngày (Đỏ trầm)</option>
-                <option value="MORNING">Buổi sáng (Vàng hổ phách)</option>
-                <option value="AFTERNOON">Buổi chiều (Tím)</option>
+                <option value="FULL">Cả ngày</option>
+                <option value="MORNING">Buổi sáng</option>
+                <option value="AFTERNOON">Buổi chiều</option>
               </select>
             )}
           </div>
