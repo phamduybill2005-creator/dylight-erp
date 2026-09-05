@@ -62,6 +62,7 @@ export default function LeavePage() {
   const [leaveCategory, setLeaveCategory] = useState<"LEAVE" | "LATE">("LEAVE");
   const [lateSlot, setLateSlot] = useState<"MORNING" | "AFTERNOON">("MORNING");
   const [reason, setReason] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);   // lỗi backend trả về (VD quá hạn 19h)
   const [saving, setSaving] = useState(false);
   const [deciding, setDeciding] = useState<number | null>(null);
 
@@ -85,6 +86,7 @@ export default function LeavePage() {
     e.preventDefault();
     if (!fromDate || !toDate || !reason) return;   // bắt buộc chọn 1 lý do
     setSaving(true);
+    setSubmitError(null);
     try {
       const finalType = leaveCategory === "LATE"
         ? (lateSlot === "AFTERNOON" ? "LATE_AFTERNOON" : "LATE_MORNING")
@@ -93,7 +95,11 @@ export default function LeavePage() {
       setFromDate(""); setToDate(""); setLeaveType("FULL"); setLeaveCategory("LEAVE"); setLateSlot("MORNING"); setReason("");
       const list = await api.myLeaves();
       setMine(list);
-    } catch { /* noop */ } finally { setSaving(false); }
+    } catch (err) {
+      // Trước đây nuốt lỗi -> backend từ chối (VD quá hạn 19h) mà người gửi
+      // không biết gì. Nay hiện đúng thông điệp backend trả về.
+      setSubmitError(err instanceof Error ? err.message : "Gửi đơn thất bại, thử lại giúp mình.");
+    } finally { setSaving(false); }
   }
 
   async function decide(id: number, status: "APPROVED" | "REJECTED") {
@@ -211,7 +217,16 @@ export default function LeavePage() {
             </select>
           </div>
         </div>
-        <div className="mt-3 flex justify-end">
+        {submitError && (
+          <p className="mt-3 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[11px] font-semibold text-bad">
+            {submitError}
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] text-muted">
+            ⏰ Đơn phải gửi <b className="text-ink">trước 19h ngày hôm trước</b> ngày nghỉ — gửi sau
+            sẽ không được xét duyệt.
+          </p>
           <button type="submit" disabled={saving || !fromDate || !toDate || !reason}
             className="flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
             <PaperAirplaneIcon className="h-4 w-4" /> {saving ? "Đang gửi…" : "Gửi đơn"}

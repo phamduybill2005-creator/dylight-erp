@@ -2,7 +2,7 @@
 Router Nghỉ phép (Leave) — nhân viên xin nghỉ, quản lý trực tiếp / Giám đốc duyệt.
 """
 import calendar
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -22,6 +22,22 @@ _MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
 def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     if payload.to_date < payload.from_date:
         raise HTTPException(400, "Ngày kết thúc phải sau ngày bắt đầu.")
+
+    # QUY TẮC 19H (mọi loại nghỉ + đi muộn): đơn nghỉ bắt đầu ngày N phải gửi
+    # TRƯỚC 19:00 ngày N-1. Gửi sau mốc đó (kể cả xin cho chính hôm nay hay
+    # ngày đã qua) thì nghiễm nhiên không được xét duyệt -> chặn ngay khi gửi,
+    # báo rõ lý do thay vì để đơn treo rồi bị từ chối.
+    # (Đăng ký lịch sinh viên đi endpoint riêng /leave/student-schedule, KHÔNG
+    # dính luật này.)
+    deadline = datetime.combine(payload.from_date - timedelta(days=1), time(19, 0))
+    if vn_now() >= deadline:
+        raise HTTPException(
+            400,
+            f"Đơn nghỉ ngày {payload.from_date.strftime('%d/%m/%Y')} phải gửi trước "
+            f"19h ngày {deadline.strftime('%d/%m/%Y')}. Đã quá hạn nên đơn không được "
+            "xét duyệt — vui lòng liên hệ trực tiếp quản lý.",
+        )
+
     rec = LeaveRequest(company_id=current.company_id, user_id=current.id, source="LEAVE", **payload.model_dump())
     db.add(rec)
     db.commit()
