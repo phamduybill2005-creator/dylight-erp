@@ -346,8 +346,12 @@ export default function CompanyOrgChart() {
       )}
 
       {/* Khung cuộn ngang của sơ đồ */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex min-w-[1200px] flex-col items-center space-y-6 py-2">
+      {/* Không ép min-width nữa: trước đây min-w-[1200px] làm sơ đồ LUÔN rộng hơn
+          khung -> lúc nào cũng hiện thanh kéo ngang dù nội dung thật hẹp hơn nhiều.
+          Giờ sơ đồ tự co về CHÍNH GIỮA; overflow-x-auto chỉ để phòng màn hình quá
+          hẹp (điện thoại) thì mới xuất hiện thanh kéo. */}
+      <div className="overflow-x-auto pb-2">
+        <div className="flex w-full min-w-fit flex-col items-center space-y-6 py-2">
 
           {/* Hàng 1 */}
           <div className="flex justify-center gap-4 sm:gap-6">{renderGroup("level1")}</div>
