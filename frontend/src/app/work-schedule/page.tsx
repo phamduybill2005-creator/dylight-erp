@@ -677,15 +677,11 @@ export default function WorkSchedulePage() {
                         className="border border-slate-300 bg-white px-1.5 py-1.5 text-left"
                         title={`${user.full_name} (${user.department || "Chưa phân phòng ban"})`}
                       >
+                        {/* Chỉ hiện HỌ TÊN — tên phòng vẫn xem được khi rê chuột (title). */}
                         <div className="font-bold text-slate-800 text-[11px] truncate leading-tight">
                           <span className="hidden sm:inline">{user.full_name}</span>
                           <span className="sm:hidden">{formatShortName(user.full_name)}</span>
                         </div>
-                        {user.department && (
-                          <div className="text-[9px] text-muted truncate leading-tight mt-0.5">
-                            {user.department}
-                          </div>
-                        )}
                       </td>
 
                       {/* Các ô ngày: HIỂN THỊ ĐƠN ĐÃ DUYỆT (5 KIỂU MÀU) HOẶC BẢNG TRẮNG */}
