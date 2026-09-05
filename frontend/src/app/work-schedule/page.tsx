@@ -493,7 +493,7 @@ export default function WorkSchedulePage() {
             title="Đăng ký lịch làm việc linh hoạt theo tuần cho sinh viên"
           >
             <AcademicCapIcon className="h-4 w-4" />
-            <span>Đăng ký lịch sinh viên</span>
+            <span>Đăng ký lịch làm cho sinh viên</span>
           </button>
 
           {/* Nút Xuất Excel */}

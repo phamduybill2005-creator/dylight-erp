@@ -254,7 +254,7 @@ export default function StudentScheduleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 backdrop-blur-xs">
-      <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl border border-line bg-white shadow-2xl overflow-hidden">
+      <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl border border-line bg-white shadow-2xl overflow-hidden">
         {/* ==================== HEADER ==================== */}
         <div className="flex items-center justify-between border-b border-line bg-ink px-4 py-3.5 text-white">
           <div className="flex items-center gap-2.5">
@@ -384,7 +384,7 @@ export default function StudentScheduleModal({
                   </div>
 
                   {/* Lựa chọn 4 ca làm */}
-                  <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end">
                     {SHIFT_OPTIONS.map((opt) => {
                       const isSelected = current.shift === opt.key;
                       return (
@@ -392,7 +392,7 @@ export default function StudentScheduleModal({
                           key={opt.key}
                           type="button"
                           onClick={() => setShiftForDay(w.dateStr, opt.key)}
-                          className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-bold transition ${
+                          className={`flex items-center gap-1 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-bold transition ${
                             isSelected
                               ? opt.activeClass
                               : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
