@@ -306,6 +306,10 @@ def _ensure_schema() -> None:
                     conn.execute(text("ALTER TABLE leave_requests ADD COLUMN source VARCHAR(30) DEFAULT 'LEAVE'"))
                 # Cap nhat tat ca don dang ky lich sinh vien da tao thanh source = 'SCHEDULE' de khong bi hien o Don cua toi
                 conn.execute(text("UPDATE leave_requests SET source = 'SCHEDULE' WHERE reason LIKE 'Đi học%' AND from_date = to_date"))
+                # Ly do "HỌC HÀNH" da doi ten thanh "ĐI HỌC" tren form -> dua don CU
+                # ve ten moi cho Lich lam viec hien thong nhat. Viet HOA nen KHONG
+                # dinh bo loc/UPDATE 'Đi học%' (chu thuong) cua lich sinh vien.
+                conn.execute(text("UPDATE leave_requests SET reason = 'ĐI HỌC' WHERE reason = 'HỌC HÀNH'"))
     except Exception as _e:  # noqa: BLE001
         print(f"[ensure-schema] cot quan trong bo qua: {_e}")
 
