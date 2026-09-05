@@ -17,7 +17,7 @@ import {
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { isDirector, isSeniorManagerUp } from "@/lib/roles";
+import { isDirector, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept } from "@/lib/groups";
 import { formatVND, computeAutoStatus } from "@/lib/format";
@@ -340,6 +340,22 @@ export default function RevenuePage() {
           <h2 className="text-lg font-bold text-ink">Không có quyền truy cập</h2>
           <p className="mt-1 text-xs text-muted">
             Trang Doanh thu chỉ hiển thị cho Quản lý cấp cao, Quản trị hệ thống và Ban Giám đốc.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // CHẶN TRUY CẬP THẲNG BẰNG URL: ẩn mục ở menu thôi chưa đủ, ai gõ /revenue
+  // vẫn vào được. Dùng CHUNG canSeeRevenue với menu nên không bao giờ lệch.
+  if (me && !canSeeRevenue(me)) {
+    return (
+      <AppShell>
+        <div className="rounded-xl2 border border-line bg-white p-8 text-center shadow-card">
+          <h1 className="text-base font-bold text-ink">Không có quyền truy cập</h1>
+          <p className="mt-1 text-xs text-muted">
+            Mục Doanh thu chỉ dành cho Ban Giám đốc, Quản trị hệ thống, Quản lý cấp cao và các
+            nhân sự được chỉ định. Cần xem, vui lòng liên hệ Ban Giám đốc.
           </p>
         </div>
       </AppShell>

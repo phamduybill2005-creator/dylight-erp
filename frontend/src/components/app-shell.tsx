@@ -24,7 +24,7 @@ import {
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import { api, tokenStore } from "@/lib/api";
-import { isSeniorManagerUp, roleTier } from "@/lib/roles";
+import { roleTier, canSeeRevenue } from "@/lib/roles";
 import type { User } from "@/lib/types";
 import NotificationsBell from "./notifications-bell";
 import ChatWidget from "./chat-widget";
@@ -38,7 +38,7 @@ type NavLink = { href: string; label: string; icon: IconType };
 // Menu đầy đủ cho sidebar desktop (mobile dùng bản rút gọn 4 mục bên dưới).
 function deskNav(user: User | null): NavLink[] {
   const tier = roleTier(user?.role);
-  const showRevenue = isSeniorManagerUp(user);
+  const showRevenue = canSeeRevenue(user);   // lãnh đạo + danh sách chỉ định (lib/roles)
 
   if (tier === "STAFF") {
     const items: NavLink[] = [

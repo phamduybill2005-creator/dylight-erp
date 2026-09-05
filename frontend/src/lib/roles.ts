@@ -83,6 +83,32 @@ export function isSeniorManagerUp(
   return r === "ADMIN" || r === "DIRECTOR" || r === "MANAGER_TOP";
 }
 
+/**
+ * Nhân sự được CHỈ ĐỊNH RIÊNG xem tab Doanh thu, ngoài cấp lãnh đạo.
+ * So khớp theo HỌ TÊN viết hoa (đúng như hiển thị trong hệ thống). Đổi người
+ * phụ trách doanh thu thì sửa danh sách này.
+ */
+const REVENUE_EXTRA_NAMES = ["N.V.CUONG", "D.M.QUANG", "H.T.DUC", "L.M.HUNG"];
+
+/**
+ * Được xem tab DOANH THU hay không: Giám đốc / Quản trị hệ thống / Quản lý cấp
+ * cao, HOẶC nằm trong danh sách chỉ định ở trên. Dùng CHUNG cho menu bên trái và
+ * chính trang /revenue để hai chỗ không bao giờ lệch nhau.
+ */
+export function canSeeRevenue(
+  u: {
+    role?: Role | null;
+    full_name?: string | null;
+    has_subordinates?: boolean | null;
+    manager_id?: number | null;
+    manager_ids?: string | number[] | null;
+  } | null | undefined,
+): boolean {
+  if (!u) return false;
+  if (isSeniorManagerUp(u)) return true;
+  return REVENUE_EXTRA_NAMES.includes((u.full_name || "").trim().toUpperCase());
+}
+
 /** Thứ tự cấp bậc từ CAO đến THẤP (0 = Giám đốc lớn nhất). */
 export const RANK_WEIGHT: Record<RankKey, number> = {
   DIRECTOR: 0,
