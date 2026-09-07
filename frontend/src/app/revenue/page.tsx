@@ -22,6 +22,7 @@ import { isDirector, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept } from "@/lib/groups";
 import { formatVND, computeAutoStatus } from "@/lib/format";
+import { pickJpyRate, computeRevenueVnd, parseJpyInput } from "@/lib/revenue";
 import type { Project, User, Timesheet } from "@/lib/types";
 
 /** Số giờ -> "X,X ngày" (8 giờ = 1 ngày). */
@@ -236,19 +237,14 @@ export default function RevenuePage() {
     [projects],
   );
 
-  const currentVcbRate = useMemo(() => {
-    if (!vcbData?.jpy) return 159.90;
-    return vcbData.jpy[rateType] || vcbData.jpy.transfer || 159.90;
-  }, [vcbData, rateType]);
+  // Tỷ giá + công thức lấy từ lib/revenue -> bảng Dự án dùng CHUNG, không lệch số.
+  const currentVcbRate = useMemo(() => pickJpyRate(vcbData, rateType), [vcbData, rateType]);
 
   /** Doanh thu từng dự án (VNĐ) = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank */
-  const revenueOf = useCallback((p: Project): number => {
-    const h = Number(p.client_hours ?? 0);
-    // Ưu tiên globalJpy nếu có, không thì dùng unit_price của dự án
-    const globalJpy = Number(globalJpyDraft.replace(/\./g, "").replace(/,/g, "").replace(/[^\d]/g, "")) || 0;
-    const jpy = globalJpy > 0 ? globalJpy : Number(p.unit_price ?? 0);
-    return h > 0 && jpy > 0 ? Math.round(h * jpy * currentVcbRate) : 0;
-  }, [currentVcbRate, globalJpyDraft]);
+  const revenueOf = useCallback(
+    (p: Project): number => computeRevenueVnd(p, parseJpyInput(globalJpyDraft), currentVcbRate),
+    [currentVcbRate, globalJpyDraft],
+  );
 
   const rows = useMemo(() => {
     const list = projects.filter((p) => {

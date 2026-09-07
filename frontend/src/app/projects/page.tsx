@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
+import { useRevenueCalc } from "@/lib/revenue";
 import { useRouter } from "next/navigation";
 import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon, ArchiveBoxIcon, StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
@@ -84,14 +85,6 @@ function parseMoney(s: string): number | null {
 /** Quy giờ ra NGÀY công: 8 giờ = 1 ngày (cùng quy ước với total_days của Real time). */
 function hoursToDays(h: number): string {
   return (Math.round((h / 8) * 10) / 10).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
-}
-
-/** DOANH THU = Time khách hàng × Đơn giá (nhập ở trang Doanh thu).
- *  KHÔNG còn nhập tay ở bảng này -> tránh hai nơi ra hai con số khác nhau. */
-function revenueOf(p: Project): number {
-  const h = Number(p.client_hours ?? 0);
-  const price = Number(p.unit_price ?? 0);
-  return h > 0 && price > 0 ? h * price : 0;
 }
 
 /** Số -> chuỗi có dấu chấm ngăn nghìn để hiện trong ô nhập ("78.000.000"). */
@@ -178,6 +171,8 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   // Bộ lọc: theo phòng ban (thành viên) / người chủ trì / dự án cụ thể.
   const [filters, setFilters] = useStickyState<Filters>("projects.filters", NO_FILTERS);
+  // Doanh thu dùng CHUNG công thức + tỷ giá với trang Doanh thu (lib/revenue).
+  const { revenueOf, rate: jpyRate, jpyGlobal } = useRevenueCalc();
 
   // Danh sách ID dự án được GHIM (đồng bộ hoàn toàn với tab Tiến độ)
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
@@ -1167,13 +1162,13 @@ export default function ProjectsPage() {
                       {st.label}
                     </span>
                   </td>
-                  {/* DOANH THU — TÍNH RA từ Time khách hàng × Đơn giá (nhập ở trang
-                      Doanh thu). Để chỉ xem ở đây cho khỏi lệch số giữa hai bảng. */}
+                  {/* DOANH THU — LẤY CHUNG công thức với trang Doanh thu:
+                      Time khách hàng × Đơn giá Yên × Tỷ giá VCB. Chỉ xem ở đây. */}
                   <td className={`${TD} text-right whitespace-nowrap`}>
                     {revenueOf(p) > 0 ? (
                       <span
                         className="block truncate font-semibold text-ink tnum"
-                        title={`${p.client_hours}h × ${groupNumber(p.unit_price)}₫ — sửa ở trang Doanh thu`}
+                        title={`${p.client_hours}h × ${groupNumber(jpyGlobal > 0 ? jpyGlobal : p.unit_price)}¥ × ${jpyRate.toLocaleString("vi-VN")}đ — sửa ở trang Doanh thu`}
                       >
                         {formatVND(revenueOf(p))}
                       </span>
