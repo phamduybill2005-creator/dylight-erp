@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   XMarkIcon,
   AcademicCapIcon,
@@ -8,6 +8,7 @@ import {
   ChevronRightIcon,
   CheckCircleIcon,
   CalendarDaysIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
@@ -134,6 +135,14 @@ export default function StudentScheduleModal({
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
+  /**
+   * Bản lịch đang chờ CHÉP sang tuần sau, lưu theo THỨ (0 = Thứ Hai … 5 = Thứ Bảy)
+   * chứ không theo ngày, để áp đúng thứ tương ứng của tuần mới.
+   * Dùng ref chứ không dùng state: đổi tuần sẽ chạy lại effect nạp lịch cũ và
+   * XOÁ MẤT bản vừa chép — ref cho phép effect đọc rồi áp đè ngay trong lượt đó.
+   */
+  const pendingCopyRef = useRef<{ shift: StudentShift; reason: string }[] | null>(null);
+
   // Đồng bộ lịch hiện tại của user trong tuần đang chọn
   useEffect(() => {
     if (!isOpen) return;
@@ -172,6 +181,19 @@ export default function StudentScheduleModal({
       }
     });
 
+    // Vừa bấm "Chép sang tuần sau" -> ghi đè lịch tuần mới bằng bản đã chép.
+    const copied = pendingCopyRef.current;
+    if (copied) {
+      pendingCopyRef.current = null;
+      weekDays.forEach((w, i) => {
+        const c = copied[i];
+        if (c) initialMap[w.dateStr] = { ...c };
+      });
+      setDaySchedules(initialMap);
+      setSuccessMsg("Đã chép lịch từ tuần trước — kiểm tra lại rồi bấm \"Lưu đăng ký lịch tuần\".");
+      return;
+    }
+
     setDaySchedules(initialMap);
     setSuccessMsg("");
   }, [isOpen, selectedUserId, weekDays, existingLeaves]);
@@ -192,6 +214,15 @@ export default function StudentScheduleModal({
 
   const handleThisWeek = () => {
     setCurrentWeekDate(new Date());
+  };
+
+  /** Chép nguyên lịch tuần đang xem sang tuần sau (dành cho lịch học cố định). */
+  const handleCopyToNextWeek = () => {
+    pendingCopyRef.current = weekDays.map((w) => {
+      const c = daySchedules[w.dateStr] || { shift: "ALL_DAY" as StudentShift, reason: "" };
+      return { shift: c.shift, reason: c.reason };
+    });
+    handleNextWeek();   // effect ở trên sẽ áp bản vừa chép cho tuần mới
   };
 
   const setShiftForDay = (dateStr: string, shift: StudentShift) => {
@@ -332,6 +363,17 @@ export default function StudentScheduleModal({
               title="Tuần sau"
             >
               <ChevronRightIcon className="h-4 w-4" />
+            </button>
+            {/* Lịch học thường cố định hằng tuần -> chép sang tuần sau cho khỏi
+                điền lại. Chỉ chép vào form, vẫn phải bấm Lưu mới có hiệu lực. */}
+            <button
+              type="button"
+              onClick={handleCopyToNextWeek}
+              title="Chép nguyên lịch tuần này sang tuần sau (vẫn phải bấm Lưu)"
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+            >
+              <DocumentDuplicateIcon className="h-4 w-4" />
+              Chép sang tuần sau
             </button>
             <span className="ml-1 rounded-lg bg-amber/15 px-2.5 py-1 text-xs font-bold text-amber-deep">
               {monday ? formatDate(monday) : ""} → {saturday ? formatDate(saturday) : ""}
