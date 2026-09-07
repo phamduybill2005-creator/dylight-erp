@@ -15,7 +15,7 @@ import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/fi
 import PersonPicker from "@/components/person-picker";
 import ArchiveModal from "@/components/archive-modal";
 import { api } from "@/lib/api";
-import { isManagerUp, isSeniorManagerUp } from "@/lib/roles";
+import { isManagerUp, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept } from "@/lib/groups";
 import { resolveDoscoLead } from "@/lib/project-lead";
@@ -702,7 +702,11 @@ export default function ProjectsPage() {
 
   const TH = `border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 ${isBanDoMode ? "px-1 py-1 text-[10px]" : "px-1.5 py-1.5"}`;
   const TD = `border border-line align-middle ${isBanDoMode ? "px-1 py-1 text-[10.5px]" : "px-1.5 py-1.5"}`;
-  const infoCols = isBanDoMode ? 21 : 15;
+  /** Cột DOANH THU dùng ĐÚNG quyền của tab Doanh thu: Giám đốc / Quản trị hệ
+   *  thống / Quản lý cấp cao + danh sách chỉ định (lib/roles.canSeeRevenue). */
+  const showRevenue = canSeeRevenue(me);
+  // Ẩn cột -> bớt 1 ô khi gộp dòng "không tìm thấy dự án".
+  const infoCols = (isBanDoMode ? 21 : 15) - (showRevenue ? 0 : 1);
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -829,7 +833,7 @@ export default function ProjectsPage() {
               <col className="w-[66px]" />   {/* Manual time */}
               <col className="w-[60px]" />   {/* Real time */}
               <col className="w-[88px]" />   {/* Trạng thái — đủ chứa "Hoàn thành" 1 dòng */}
-              <col className="w-[104px]" />  {/* Doanh thu */}
+              {showRevenue && <col className="w-[104px]" />}  {/* Doanh thu */}
             </colgroup>
           ) : (
             <colgroup>
@@ -853,7 +857,7 @@ export default function ProjectsPage() {
               {/* Trạng thái: nhãn "Hoàn thành" đo được 74px + padding 12 = 86px
                   -> lấy 92px, trước để 82px nên bị xuống dòng. */}
               <col className="w-[92px]" />   {/* Trạng thái */}
-              <col className="w-[130px]" />  {/* Doanh thu */}
+              {showRevenue && <col className="w-[130px]" />}  {/* Doanh thu */}
             </colgroup>
           )}
           <thead>
@@ -884,7 +888,11 @@ export default function ProjectsPage() {
               <th className={`${TH} text-center`} title="Thời gian NHẬP TAY — gõ số giờ, tự quy ra ngày (8 giờ = 1 ngày)">Manual time</th>
               <th className={`${TH} text-center`} title={filterMonth ? `Thời gian làm thực tế nhập trong tháng ${filterMonth}` : "Thời gian làm thực tế realtime (tính từ chấm công tiến độ)"}>Real time</th>
               <th className={TH}>Trạng thái</th>
-              <th className={`${TH} text-right`} title="Doanh thu — nhập tay (VND)">Doanh thu</th>
+              {showRevenue && (
+                <th className={`${TH} text-right`} title="Doanh thu = Time khách hàng × Đơn giá Yên × Tỷ giá VCB">
+                  Doanh thu
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -1163,19 +1171,22 @@ export default function ProjectsPage() {
                     </span>
                   </td>
                   {/* DOANH THU — LẤY CHUNG công thức với trang Doanh thu:
-                      Time khách hàng × Đơn giá Yên × Tỷ giá VCB. Chỉ xem ở đây. */}
-                  <td className={`${TD} text-right whitespace-nowrap`}>
-                    {revenueOf(p) > 0 ? (
-                      <span
-                        className="block truncate font-semibold text-ink tnum"
-                        title={`${p.client_hours}h × ${groupNumber(jpyGlobal > 0 ? jpyGlobal : p.unit_price)}¥ × ${jpyRate.toLocaleString("vi-VN")}đ — sửa ở trang Doanh thu`}
-                      >
-                        {formatVND(revenueOf(p))}
-                      </span>
-                    ) : (
-                      <span className="text-muted" title="Nhập Time khách hàng và Đơn giá ở trang Doanh thu">—</span>
-                    )}
-                  </td>
+                      Time khách hàng × Đơn giá Yên × Tỷ giá VCB. Chỉ xem ở đây.
+                      Ẩn hẳn ô với người không có quyền (giống tab Doanh thu). */}
+                  {showRevenue && (
+                    <td className={`${TD} text-right whitespace-nowrap`}>
+                      {revenueOf(p) > 0 ? (
+                        <span
+                          className="block truncate font-semibold text-ink tnum"
+                          title={`${p.client_hours}h × ${groupNumber(jpyGlobal > 0 ? jpyGlobal : p.unit_price)}¥ × ${jpyRate.toLocaleString("vi-VN")}đ — sửa ở trang Doanh thu`}
+                        >
+                          {formatVND(revenueOf(p))}
+                        </span>
+                      ) : (
+                        <span className="text-muted" title="Nhập Time khách hàng và Đơn giá ở trang Doanh thu">—</span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
