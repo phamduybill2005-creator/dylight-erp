@@ -62,6 +62,31 @@ def my_leaves(db: Session = Depends(get_db), current: User = Depends(get_current
     )
 
 
+@router.get("/decided-by-me", response_model=list[LeaveOut])
+def leaves_decided_by_me(
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(*_MANAGER_ROLES)),
+):
+    """Các đơn CHÍNH NGƯỜI ĐANG ĐĂNG NHẬP đã duyệt — để tra lại mình đã đồng ý gì.
+
+    Chỉ lấy đơn tạo từ mục Nghỉ phép (bỏ đơn đăng ký lịch sinh viên, vì loại đó
+    tự duyệt hàng loạt nên lẫn vào sẽ nhiễu).
+    """
+    from sqlalchemy import or_
+    return (
+        db.query(LeaveRequest)
+        .filter(
+            LeaveRequest.company_id == current.company_id,
+            LeaveRequest.decided_by_id == current.id,
+            LeaveRequest.status == LeaveStatus.APPROVED,
+            or_(LeaveRequest.source == "LEAVE", LeaveRequest.source.is_(None)),
+            LeaveRequest.source != "SCHEDULE",
+        )
+        .order_by(LeaveRequest.decided_at.desc().nullslast(), LeaveRequest.from_date.desc())
+        .all()
+    )
+
+
 @router.get("", response_model=list[LeaveOut])
 def list_leaves(
     status: LeaveStatus | None = None,

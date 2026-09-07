@@ -341,6 +341,8 @@ export const api = {
   createLeave: (payload: { from_date: string; to_date: string; leave_type?: string | null; reason?: string | null }) =>
     request<LeaveRequest>("/leave", { method: "POST", body: JSON.stringify(payload) }),
   myLeaves: () => request<LeaveRequest[]>("/leave/me"),
+  /** Đơn nghỉ do CHÍNH TÔI duyệt (chỉ quản lý trở lên gọi được). */
+  leavesDecidedByMe: () => request<LeaveRequest[]>("/leave/decided-by-me"),
   leaveList: (status?: string) => request<LeaveRequest[]>(`/leave${status ? `?status=${status}` : ""}`),
   decideLeave: (id: number, status: "APPROVED" | "REJECTED") =>
     request<LeaveRequest>(`/leave/${id}/decide`, { method: "POST", body: JSON.stringify({ status }) }),

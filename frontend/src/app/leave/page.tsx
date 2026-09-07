@@ -53,6 +53,7 @@ export default function LeavePage() {
 
   const [mine, setMine] = useState<LeaveRequest[]>([]);
   const [pending, setPending] = useState<LeaveRequest[]>([]);
+  const [approvedByMe, setApprovedByMe] = useState<LeaveRequest[]>([]);   // đơn CHÍNH TÔI đã duyệt
   const [users, setUsers] = useState<User[]>([]);   // để ánh xạ nhân viên -> phòng ban khi lọc
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
 
@@ -75,6 +76,7 @@ export default function LeavePage() {
         ];
         if (isManagerUp(u.role)) {
           tasks.push(api.leaveList("PENDING").then(setPending).catch(() => {}));
+          tasks.push(api.leavesDecidedByMe().then(setApprovedByMe).catch(() => {}));
           api.users().then(setUsers).catch(() => {});   // cho bộ lọc phòng ban
         }
         Promise.all(tasks).finally(() => setLoading(false));
@@ -106,11 +108,12 @@ export default function LeavePage() {
     setDeciding(id);
     try {
       await api.decideLeave(id, status);
-      const [p, m] = await Promise.all([
+      const [p, m, a] = await Promise.all([
         api.leaveList("PENDING").catch(() => pending),
         api.myLeaves().catch(() => mine),
+        api.leavesDecidedByMe().catch(() => approvedByMe),   // vừa duyệt -> hiện ngay bên dưới
       ]);
-      setPending(p); setMine(m);
+      setPending(p); setMine(m); setApprovedByMe(a);
     } catch { /* noop */ } finally { setDeciding(null); }
   }
 
@@ -118,7 +121,12 @@ export default function LeavePage() {
     return <AppShell><div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div></AppShell>;
   }
 
-  const canApprove = isManagerUp(me.role);
+  // Quyền DUYỆT phải khớp backend: require_roles(MANAGER, ACCOUNTANT, DIRECTOR)
+  // + ADMIN. KHÔNG gồm MANAGER_MID — trước đây dùng isManagerUp nên quản lý cấp
+  // trung vẫn thấy nút Duyệt, bấm vào là backend trả 403.
+  const canApprove =
+    me.role === "ADMIN" || me.role === "DIRECTOR" ||
+    me.role === "MANAGER" || me.role === "ACCOUNTANT";
 
   // Lọc đơn chờ duyệt theo PHÒNG BAN của người xin nghỉ (ánh xạ qua danh sách nhân sự).
   const deptOfUser = (uid: number) => users.find((u) => u.id === uid)?.department;
@@ -284,6 +292,52 @@ export default function LeavePage() {
           </tbody>
         </table>
       </div>
+
+      {/* Đơn CHÍNH TÔI đã duyệt — chỉ hiện với người có quyền duyệt */}
+      {canApprove && (
+        <>
+          <h2 className="mt-6 mb-2 text-sm font-bold text-ink">
+            Đơn tôi đã duyệt{" "}
+            <span className="font-normal text-muted">({approvedByMe.length})</span>
+          </h2>
+          <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+            <table className="w-full min-w-[720px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
+                  <th className="border border-line px-3 py-2">Nhân viên</th>
+                  <th className="border border-line px-3 py-2">Từ ngày</th>
+                  <th className="border border-line px-3 py-2">Đến ngày</th>
+                  <th className="border border-line px-3 py-2 text-right">Lịch làm / Số ngày</th>
+                  <th className="border border-line px-3 py-2">Lý do</th>
+                  <th className="border border-line px-3 py-2">Duyệt lúc</th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvedByMe.length === 0 ? (
+                  <tr>
+                    <td className="border border-line px-3 py-6 text-center text-xs text-muted" colSpan={6}>
+                      Bạn chưa duyệt đơn nào.
+                    </td>
+                  </tr>
+                ) : (
+                  approvedByMe.map((l) => (
+                    <tr key={l.id} className="text-xs hover:bg-paper/60">
+                      <td className="border border-line px-3 py-2 font-semibold text-ink">{l.user_name || "—"}</td>
+                      <td className="border border-line px-3 py-2 text-muted">{formatDate(l.from_date)}</td>
+                      <td className="border border-line px-3 py-2 text-muted">{formatDate(l.to_date)}</td>
+                      <td className="border border-line px-3 py-2 text-right">{formatDaysDisplay(l)}</td>
+                      <td className="border border-line px-3 py-2 text-muted">{l.reason || "—"}</td>
+                      <td className="border border-line px-3 py-2 text-muted">
+                        {l.decided_at ? formatDate(l.decided_at) : "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Đơn chờ duyệt toàn công ty — Quản lý trở lên */}
       {canApprove && (
