@@ -314,7 +314,7 @@ export default function StudentScheduleModal({
         </div>
 
         {/* ==================== THANH ĐIỀU KHIỂN: CHỌN NGƯỜI & CHỌN TUẦN ==================== */}
-        <div className="grid grid-cols-1 gap-3 border-b border-line bg-slate-50 p-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 border-b border-line bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           {/* Chọn nhân sự / sinh viên */}
           <div className="flex items-center gap-2">
             <label className="text-xs font-semibold text-muted whitespace-nowrap">
@@ -340,7 +340,7 @@ export default function StudentScheduleModal({
           </div>
 
           {/* Chọn tuần làm việc */}
-          <div className="flex items-center justify-end gap-1.5">
+          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:flex-nowrap">
             <button
               type="button"
               onClick={handlePrevWeek}
@@ -352,7 +352,7 @@ export default function StudentScheduleModal({
             <button
               type="button"
               onClick={handleThisWeek}
-              className="rounded-lg border border-line bg-white px-2.5 py-1 text-xs font-semibold text-ink hover:bg-paper transition"
+              className="whitespace-nowrap rounded-lg border border-line bg-white px-2.5 py-1 text-xs font-semibold text-ink hover:bg-paper transition"
             >
               Tuần này
             </button>
@@ -370,12 +370,12 @@ export default function StudentScheduleModal({
               type="button"
               onClick={handleCopyToNextWeek}
               title="Chép nguyên lịch tuần này sang tuần sau (vẫn phải bấm Lưu)"
-              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
             >
               <DocumentDuplicateIcon className="h-4 w-4" />
               Chép sang tuần sau
             </button>
-            <span className="ml-1 rounded-lg bg-amber/15 px-2.5 py-1 text-xs font-bold text-amber-deep">
+            <span className="ml-1 shrink-0 whitespace-nowrap rounded-lg bg-amber/15 px-2.5 py-1 text-xs font-bold text-amber-deep">
               {monday ? formatDate(monday) : ""} → {saturday ? formatDate(saturday) : ""}
             </span>
           </div>
