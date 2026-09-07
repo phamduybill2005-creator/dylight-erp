@@ -20,7 +20,15 @@ let cachedMe: User | null = null;
 export const tokenStore = {
   get: () => (typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null),
   set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
-  clear: () => { cachedMe = null; localStorage.removeItem(TOKEN_KEY); },
+  clear: () => {
+    cachedMe = null;
+    localStorage.removeItem(TOKEN_KEY);
+    // Đăng xuất -> quên luôn ID và mọi lựa chọn đã nhớ của phiên này.
+    try {
+      localStorage.removeItem("dylight_uid");
+      sessionStorage.clear();
+    } catch {}
+  },
 };
 
 /** Hàm fetch lõi: chèn token, parse JSON, ném lỗi có thông điệp tiếng Việt. */
@@ -89,6 +97,9 @@ export const api = {
   me: async () => {
     const u = await request<User>("/auth/me");
     cachedMe = u;
+    // Ghi lại ID để useStickyState tách lựa chọn theo TỪNG NGƯỜI (hai người dùng
+    // chung máy không thừa hưởng bộ lọc của nhau).
+    try { localStorage.setItem("dylight_uid", String(u.id)); } catch {}
     return u;
   },
   /** Người dùng đã nạp gần nhất (đồng bộ, không gọi mạng) — dùng làm state khởi tạo. */

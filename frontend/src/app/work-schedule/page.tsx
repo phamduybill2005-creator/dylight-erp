@@ -13,6 +13,7 @@
 // - Chỉ hiển thị nhân viên đang làm việc.
 
 import { useEffect, useMemo, useState } from "react";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { useRouter } from "next/navigation";
 import {
   CalendarDaysIcon,
@@ -145,15 +146,15 @@ export default function WorkSchedulePage() {
   const [loading, setLoading] = useState(true);
 
   // Chế độ xem: "MONTH" (Theo tháng - full màn hình không scroll ngang) hoặc "WEEK" (Theo tuần)
-  const [viewMode, setViewMode] = useState<"MONTH" | "WEEK">("MONTH");
+  const [viewMode, setViewMode] = useStickyState<"MONTH" | "WEEK">("schedule.viewMode", "MONTH");
 
   // Thời gian đang chọn
   const today = todayLocal();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
   // Bộ lọc
-  const [deptFilter, setDeptFilter] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [deptFilter, setDeptFilter] = useStickyState("schedule.dept", "");
+  const [searchTerm, setSearchTerm] = useStickyState("schedule.search", "");
 
   // Modal chi tiết khi click vào ô bất kỳ
   const [selectedCell, setSelectedCell] = useState<{

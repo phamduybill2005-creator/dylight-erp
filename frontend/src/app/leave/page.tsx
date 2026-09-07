@@ -5,6 +5,7 @@
 // duyệt/từ chối trực tiếp. Không có màn chặn quyền: ai cũng vào được.
 
 import { useEffect, useState } from "react";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -55,7 +56,7 @@ export default function LeavePage() {
   const [pending, setPending] = useState<LeaveRequest[]>([]);
   const [approvedByMe, setApprovedByMe] = useState<LeaveRequest[]>([]);   // đơn CHÍNH TÔI đã duyệt
   const [users, setUsers] = useState<User[]>([]);   // để ánh xạ nhân viên -> phòng ban khi lọc
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [filters, setFilters] = useStickyState<Filters>("leave.filters", NO_FILTERS);
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");

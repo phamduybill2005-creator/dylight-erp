@@ -6,6 +6,7 @@
 // Doanh thu (VNĐ) = Time khách hàng (h) × Đơn giá Yên (¥/h) × Tỷ giá Vietcombank Realtime.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { useRouter } from "next/navigation";
 import {
   StarIcon as StarIconOutline,
@@ -70,9 +71,9 @@ export default function RevenuePage() {
   const [me, setMe] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterDept, setFilterDept] = useState("");
-  const [filterMonth, setFilterMonth] = useState("");
+  const [searchQuery, setSearchQuery] = useStickyState("revenue.search", "");
+  const [filterDept, setFilterDept] = useStickyState("revenue.dept", "");
+  const [filterMonth, setFilterMonth] = useStickyState("revenue.month", "");
   const [monthTimesheets, setMonthTimesheets] = useState<Timesheet[]>([]);
 
   // Tải danh sách timesheets của tháng khi filterMonth thay đổi

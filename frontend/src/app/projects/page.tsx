@@ -5,6 +5,7 @@
 // Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { useRouter } from "next/navigation";
 import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon, ArchiveBoxIcon, StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
@@ -176,7 +177,7 @@ export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   // Bộ lọc: theo phòng ban (thành viên) / người chủ trì / dự án cụ thể.
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [filters, setFilters] = useStickyState<Filters>("projects.filters", NO_FILTERS);
 
   // Danh sách ID dự án được GHIM (đồng bộ hoàn toàn với tab Tiến độ)
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
@@ -274,11 +275,11 @@ export default function ProjectsPage() {
   }, [projects]);
 
   // Bộ lọc tìm kiếm
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterLead, setFilterLead] = useState("");
-  const [filterDept, setFilterDept] = useState("");
+  const [searchQuery, setSearchQuery] = useStickyState("projects.search", "");
+  const [filterLead, setFilterLead] = useStickyState("projects.lead", "");
+  const [filterDept, setFilterDept] = useStickyState("projects.dept", "");
   // Lọc theo THÁNG NHẬN dự án, dạng "YYYY-MM" (khớp tiền tố của start_date "YYYY-MM-DD").
-  const [filterMonth, setFilterMonth] = useState("");
+  const [filterMonth, setFilterMonth] = useStickyState("projects.month", "");
   const [monthTimesheets, setMonthTimesheets] = useState<Timesheet[]>([]);
 
   // Tải danh sách timesheets của tháng khi filterMonth thay đổi

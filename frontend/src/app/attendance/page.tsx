@@ -5,6 +5,7 @@
 //  - Quản lý/Giám đốc: bảng chấm công toàn đội theo ngày + tổng hợp giờ làm/đi trễ theo kỳ.
 
 import { useEffect, useState } from "react";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { useRouter } from "next/navigation";
 import {
   ClockIcon,
@@ -119,9 +120,9 @@ export default function AttendancePage() {
   const [date, setDate] = useState(todayStr());
   const [dayList, setDayList] = useState<Attendance[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary[]>([]);
-  const [summaryPeriod, setSummaryPeriod] = useState(monthStr());  // tháng đang xem tổng hợp
+  const [summaryPeriod, setSummaryPeriod] = useStickyState("attendance.period", monthStr());  // tháng đang xem tổng hợp
   const [allUsers, setAllUsers] = useState<User[]>([]);            // để map người -> phòng ban khi lọc
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);     // lọc tổng hợp theo phòng ban
+  const [filters, setFilters] = useStickyState<Filters>("attendance.filters", NO_FILTERS);   // lọc tổng hợp theo phòng ban
   // Chi tiết từng ngày của 1 người (mở khi bấm vào người trong bảng tổng hợp).
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
   const [detailRecs, setDetailRecs] = useState<Attendance[]>([]);
