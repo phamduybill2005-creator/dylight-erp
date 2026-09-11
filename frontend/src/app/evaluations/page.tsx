@@ -6,11 +6,12 @@
 //  - KẾ TOÁN : chấm cấp dưới trực tiếp theo ngày/dự án + xem điểm nhân viên chấm mình.
 //  - GIÁM ĐỐC / QUẢN TRỊ / QL CẤP CAO / QL CẤP TRUNG: bảng THÁNG (Office time / Project
 //    time / Đi muộn) + bấm sao chấm mọi người (TRỪ Giám đốc — không ai chấm Giám đốc) + xuất Excel.
+//  Mỗi người (trừ Giám đốc) có mục RIÊNG TƯ "Đánh giá tôi nhận được" theo tháng: ai chấm mình bao nhiêu sao.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
-import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL, userRankWeight } from "@/lib/roles";
@@ -93,7 +94,7 @@ function RateStars({ value, busy, onRate }: { value: number; busy?: boolean; onR
 }
 
 // Thẻ 1 phiếu — hiện NGÀY chấm + DỰ ÁN (nếu có) + sao + nhận xét.
-function EvalCard({ e, who }: { e: Evaluation; who: "evaluator" | "evaluatee" }) {
+function EvalCard({ e, who, showDate = true }: { e: Evaluation; who: "evaluator" | "evaluatee"; showDate?: boolean }) {
   const name = who === "evaluator" ? e.evaluator_name : e.evaluatee_name;
   const isStaff = who === "evaluator"
     ? e.direction === "STAFF_TO_MANAGER"
@@ -110,7 +111,7 @@ function EvalCard({ e, who }: { e: Evaluation; who: "evaluator" | "evaluatee" })
             <span className="text-[10px] font-normal text-muted">({roleLabel})</span>
           </p>
         </div>
-        <span className="shrink-0 text-[11px] text-muted">{fmtDay(e.eval_date)}</span>
+        {showDate && <span className="shrink-0 text-[11px] text-muted">{fmtDay(e.eval_date)}</span>}
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <Stars value={e.rating} />
@@ -128,6 +129,43 @@ function EvalCard({ e, who }: { e: Evaluation; who: "evaluator" | "evaluatee" })
       </div>
       {e.comment && <p className="mt-2 text-xs leading-relaxed text-ink/80">{e.comment}</p>}
     </div>
+  );
+}
+
+// Mục RIÊNG TƯ: ai đã chấm MÌNH bao nhiêu sao trong tháng đang xem. Chỉ người đăng nhập thấy
+// — dữ liệu từ /evaluations/received, backend chỉ trả phiếu có người nhận là chính mình.
+function ReceivedSection({ items, month }: { items: Evaluation[]; month: string }) {
+  const list = items.filter((e) => (e.eval_date || "").startsWith(month));
+  const avg = avgOf(list.map((e) => e.rating));
+  return (
+    <section className="mt-5">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <ChatBubbleLeftRightIcon className="h-5 w-5 text-steel" />
+          <h2 className="text-sm font-semibold text-ink">
+            Đánh giá tôi nhận được — tháng {fmtMonth(month)} ({list.length})
+          </h2>
+        </div>
+        <span className="flex items-center gap-1.5 text-[11px] text-muted">
+          {list.length > 0 && (
+            <>
+              TB <b className="text-amber-deep">{avg.toFixed(1)}★</b> ·
+            </>
+          )}
+          <LockClosedIcon className="h-3.5 w-3.5" />
+          Chỉ mình bạn thấy
+        </span>
+      </div>
+      <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
+        {list.length === 0 ? (
+          <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2">
+            Chưa có ai đánh giá bạn trong tháng này.
+          </p>
+        ) : (
+          list.map((e) => <EvalCard key={e.id} e={e} who="evaluator" showDate={false} />)
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -472,21 +510,7 @@ export default function EvaluationsPage() {
           )}
         </section>
 
-        <section className="mt-5">
-          <div className="mb-2 flex items-center gap-2">
-            <ChatBubbleLeftRightIcon className="h-5 w-5 text-steel" />
-            <h2 className="text-sm font-semibold text-ink">Đánh giá tôi nhận được</h2>
-          </div>
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {received.length === 0 ? (
-              <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2">
-                Chưa có đánh giá nào về bạn.
-              </p>
-            ) : (
-              received.map((e) => <EvalCard key={e.id} e={e} who="evaluator" />)
-            )}
-          </div>
-        </section>
+        <ReceivedSection items={received} month={selMonth} />
       </AppShell>
     );
   }
@@ -598,6 +622,9 @@ export default function EvaluationsPage() {
             </div>
           )}
         </section>
+
+        {/* Mục RIÊNG TƯ: ai đã chấm mình bao nhiêu sao (Giám đốc không nhận đánh giá -> ẩn) */}
+        {user.role !== "DIRECTOR" && <ReceivedSection items={received} month={selMonth} />}
       </AppShell>
     );
   }
