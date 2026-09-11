@@ -1,11 +1,12 @@
-# Ảnh cho job đồng bộ chấm công Yunatt (service "yunatt-sync", profile "jobs").
-# Ảnh Playwright đã có sẵn Chromium nên ảnh backend không phải cài trình duyệt.
-# Bản ảnh phải trùng playwright==1.49.1 trong requirements.txt.
 FROM mcr.microsoft.com/playwright/python:v1.49.1-noble
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /code
 
 COPY requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
