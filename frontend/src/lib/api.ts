@@ -301,6 +301,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  // Bỏ sao: xoá phiếu CHUNG mình đã chấm 1 người trong khoảng ngày (bảng đánh giá tháng).
+  deleteMyEvaluation: (evaluateeId: number, fromDate: string, toDate: string) =>
+    request<void>(`/evaluations/mine?evaluatee_id=${evaluateeId}&from_date=${fromDate}&to_date=${toDate}`, { method: "DELETE" }),
   evaluationsSummary: (period: string) =>
     request<EvaluationSummary[]>(`/evaluations/summary?period=${period}`),
   allEvaluations: (period: string) =>

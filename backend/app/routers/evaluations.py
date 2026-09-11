@@ -122,6 +122,31 @@ def create_or_update_evaluation(
     return rec
 
 
+@router.delete("/mine", status_code=204)
+def delete_my_evaluation(
+    evaluatee_id: int,
+    from_date: date,
+    to_date: date,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """BỎ SAO (bấm lại đúng sao đang chọn ở bảng đánh giá tháng): xoá các phiếu CHUNG (không
+    gắn dự án) CHÍNH MÌNH đã chấm người đó trong khoảng ngày. Chỉ xoá phiếu của mình."""
+    if to_date < from_date:
+        raise HTTPException(400, "Ngày kết thúc phải sau ngày bắt đầu.")
+    (
+        db.query(Evaluation)
+        .filter(
+            Evaluation.evaluator_id == current.id,
+            Evaluation.evaluatee_id == evaluatee_id,
+            Evaluation.project_id.is_(None),
+            Evaluation.eval_date >= from_date, Evaluation.eval_date <= to_date,
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+
+
 @router.get("/received", response_model=list[EvaluationOut])
 def evaluations_received(
     db: Session = Depends(get_db), current: User = Depends(get_current_user)

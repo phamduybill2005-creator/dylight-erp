@@ -52,7 +52,8 @@ function Stars({ value, onChange }: { value: number; onChange?: (n: number) => v
           key={n}
           type="button"
           disabled={!onChange}
-          onClick={() => onChange?.(n)}
+          onClick={() => onChange?.(n === value ? 0 : n)}   // bấm lại đúng sao đang chọn = bỏ sao
+          title={onChange && n === value ? "Bấm lại để bỏ sao" : undefined}
           className={onChange ? "transition-transform active:scale-90" : "cursor-default"}
         >
           <StarIcon className={`h-6 w-6 ${n <= value ? "text-amber" : "text-line"}`} />
@@ -63,7 +64,7 @@ function Stars({ value, onChange }: { value: number; onChange?: (n: number) => v
 }
 
 // 5 sao MỜ để chấm nhanh ngay trên bảng: rê chuột xem trước, bấm để lưu; đã chấm
-// thì sáng tới số sao đã chọn (bấm sao khác để sửa).
+// thì sáng tới số sao đã chọn (bấm sao khác để sửa, bấm lại đúng sao đang chọn để bỏ).
 function RateStars({ value, busy, onRate }: { value: number; busy?: boolean; onRate: (n: number) => void }) {
   const [hover, setHover] = useState(0);
   const shown = hover || value;
@@ -77,9 +78,11 @@ function RateStars({ value, busy, onRate }: { value: number; busy?: boolean; onR
           onMouseEnter={() => setHover(n)}
           onFocus={() => setHover(n)}
           onBlur={() => setHover(0)}
-          onClick={() => onRate(n)}
-          title={`${n} sao — ${RATING_LABELS[n]}`}
-          aria-label={`Chấm ${n} sao`}
+          // Tắt xem trước ngay khi bấm: nếu không, chuột còn nằm trên sao sẽ vẫn tô sáng
+          // và trông như bỏ sao chưa ăn.
+          onClick={() => { setHover(0); onRate(n); }}
+          title={n === value ? "Bấm lại để bỏ sao" : `${n} sao — ${RATING_LABELS[n]}`}
+          aria-label={n === value ? "Bỏ sao" : `Chấm ${n} sao`}
           className="p-0.5 transition-transform hover:scale-110 active:scale-90 disabled:cursor-wait"
         >
           <StarIcon className={`h-5 w-5 ${n <= shown ? "text-amber" : "text-line"}`} />
@@ -176,20 +179,23 @@ export default function EvaluationsPage() {
     return () => { alive = false; };
   }, [user, selMonth]);
 
-  // Giám đốc bấm sao: lưu phiếu CHUNG (không gắn dự án) vào NGÀY 1 của tháng đang xem.
-  // Cùng 1 ngày nên bấm sao khác là SỬA phiếu đó, không sinh thêm phiếu.
+  // Bấm sao: lưu phiếu CHUNG (không gắn dự án) vào NGÀY 1 của tháng đang xem — cùng 1 ngày nên
+  // bấm sao khác là SỬA phiếu đó. Bấm lại ĐÚNG sao đang chọn = BỎ SAO (xoá phiếu tháng đó).
   async function rateUser(uid: number, stars: number) {
     const before = overview.find((r) => r.user_id === uid)?.my_rating ?? null;
+    const unrate = before === stars;
     const setMine = (v: number | null) =>
       setOverview((rows) => rows.map((r) => (r.user_id === uid ? { ...r, my_rating: v } : r)));
-    setMine(stars);
+    setMine(unrate ? null : stars);
     setRatingUid(uid);
     setRateMsg("");
     try {
-      await api.createEvaluation({ evaluatee_id: uid, eval_date: monthRange(selMonth)[0], project_id: null, rating: stars });
+      const [from, to] = monthRange(selMonth);
+      if (unrate) await api.deleteMyEvaluation(uid, from, to);
+      else await api.createEvaluation({ evaluatee_id: uid, eval_date: from, project_id: null, rating: stars });
     } catch (err) {
       setMine(before);
-      setRateMsg(err instanceof Error ? err.message : "Không lưu được đánh giá.");
+      setRateMsg(err instanceof Error ? err.message : unrate ? "Không bỏ được sao." : "Không lưu được đánh giá.");
     } finally {
       setRatingUid(null);
     }
@@ -507,7 +513,7 @@ export default function EvaluationsPage() {
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-ink">Đánh giá nhân sự tháng {fmtMonth(selMonth)} ({rows.length})</h2>
               <p className="mt-0.5 text-[11px] text-muted">
-                Cộng cả tháng: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm tháng này, bấm sao khác để sửa.
+                Cộng cả tháng: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm tháng này, bấm sao khác để sửa, bấm lại đúng sao đang chọn để bỏ.
               </p>
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
             </div>
