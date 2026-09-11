@@ -3,9 +3,9 @@
 // Trang Đánh giá 2 chiều (Nhân viên <-> Quản lý trực tiếp) — chấm THEO TỪNG NGÀY
 // & TỪNG DỰ ÁN (dự án tùy chọn), TỔNG HỢP THEO TUẦN.
 //  - STAFF   : chấm quản lý trực tiếp THEO THÁNG (mỗi tháng 1 phiếu) + xem điểm mình nhận.
-//  - MANAGER : chấm cấp dưới trực tiếp theo ngày/dự án + xem điểm nhân viên chấm mình.
-//  - DIRECTOR: bảng THÁNG (Office time / Project time / Đi muộn) + bấm sao chấm từng người
-//              + xuất Excel.
+//  - KẾ TOÁN : chấm cấp dưới trực tiếp theo ngày/dự án + xem điểm nhân viên chấm mình.
+//  - GIÁM ĐỐC / QUẢN TRỊ / QL CẤP CAO / QL CẤP TRUNG: bảng THÁNG (Office time / Project
+//    time / Đi muộn) + bấm sao chấm mọi người (TRỪ Giám đốc — không ai chấm Giám đốc) + xuất Excel.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -37,6 +37,8 @@ function monthRange(m: string): [string, string] {
   const last = new Date(y, mo, 0).getDate();
   return [`${m}-01`, `${m}-${String(last).padStart(2, "0")}`];
 }
+// Vai trò dùng BẢNG ĐÁNH GIÁ THÁNG (chấm được mọi người trừ Giám đốc) — khớp _TABLE_ROLES ở backend.
+const MONTH_TABLE_ROLES: string[] = ["DIRECTOR", "ADMIN", "MANAGER", "MANAGER_MID"];
 const fmtMonth = (m: string) => `${m.slice(5, 7)}/${m.slice(0, 4)}`;
 const fmtDay = (s?: string | null) =>
   s ? new Date(s + "T00:00:00").toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" }) : "—";
@@ -157,11 +159,12 @@ export default function EvaluationsPage() {
 
   const period = weekSaturday();
   const tier = user ? roleTier(user.role) : "STAFF";
+  const usesMonthTable = !!user && MONTH_TABLE_ROLES.includes(user.role);
 
   // Bảng đánh giá: Office time / Project time / Đi muộn + sao mình đã chấm, CỘNG CẢ THÁNG đang
   // chọn — cùng khoảng ngày với file Excel ở Tổng hợp chấm công nên số khớp nhau.
   useEffect(() => {
-    if (!user || roleTier(user.role) !== "DIRECTOR") return;
+    if (!user || !MONTH_TABLE_ROLES.includes(user.role)) return;
     let alive = true;
     setOverviewLoading(true);
     setRateMsg("");
@@ -352,10 +355,12 @@ export default function EvaluationsPage() {
       if (n && n !== user.id && !directIds.includes(n)) directIds.push(n);
     }
     const mgrOptions: { key: string; mgrId: number; name: string; projectId: number | null; ctx: string }[] = [];
-    for (const id of directIds) if (id !== user.id)
+    // Không ai được chấm Giám đốc (backend cũng chặn) -> bỏ khỏi danh sách.
+    const isDirector = (id: number) => colleagues.find((c) => c.id === id)?.role === "DIRECTOR";
+    for (const id of directIds) if (id !== user.id && !isDirector(id))
       mgrOptions.push({ key: `d${id}`, mgrId: id, name: cName(id) || "Quản lý", projectId: null, ctx: "quản lý trực tiếp" });
     for (const p of projects) {
-      if (!p.lead_id || p.lead_id === user.id) continue;
+      if (!p.lead_id || p.lead_id === user.id || isDirector(p.lead_id)) continue;
       if (!(p.members ?? []).some((m) => m.id === user.id)) continue;   // chỉ dự án MÌNH tham gia
       mgrOptions.push({ key: `p${p.id}`, mgrId: p.lead_id, name: p.lead_name || "Chủ trì", projectId: p.id, ctx: `chủ trì · ${projectLabel(p)}` });
     }
@@ -480,8 +485,8 @@ export default function EvaluationsPage() {
     );
   }
 
-  // ============ GIÁM ĐỐC (xem số liệu tổng hợp theo tuần) ============
-  if (tier === "DIRECTOR") {
+  // ===== GIÁM ĐỐC / QUẢN TRỊ / QL CẤP CAO / QL CẤP TRUNG: bảng đánh giá THÁNG =====
+  if (usesMonthTable) {
     // Bảng tháng: KHÔNG hiện Giám đốc; xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng
     // không nhảy khi bấm. Xuất Excel dùng chính danh sách này nên cũng bỏ Giám đốc.
     const rows = overview
@@ -591,7 +596,7 @@ export default function EvaluationsPage() {
     );
   }
 
-  // ==================== QUẢN LÝ ====================
+  // ============ KẾ TOÁN: chấm cấp dưới trực tiếp theo ngày ============
   return (
     <AppShell>
       <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">

@@ -598,7 +598,7 @@ class StarOverviewRow(BaseModel):
 
 
 class EvaluationOverviewRow(BaseModel):
-    """1 dòng bảng Đánh giá của Giám đốc trong 1 khoảng ngày (trang Đánh giá gửi cả 1 tháng).
+    """1 dòng bảng đánh giá tháng (GĐ / Quản trị / QL cấp cao / QL cấp trung xem).
     Office time / Project time / Đi muộn tính GIỐNG file Excel ở trang Tổng hợp chấm công."""
     user_id: int
     full_name: str

@@ -3,8 +3,10 @@ Router Đánh giá (Evaluations) — 2 chiều giữa Nhân viên ↔ Quản lý
 
 Quy tắc chiều đánh giá (chốt với người dùng):
   - Nhân viên (FIELD_STAFF) chấm điểm QUẢN LÝ TRỰC TIẾP của mình (manager_id).
-  - Quản lý (MANAGER / ACCOUNTANT) chấm điểm CẤP DƯỚI trực tiếp của mình.
-  - Giám đốc / Quản trị chấm được MỌI NGƯỜI trong công ty (bấm sao ở bảng đánh giá tháng).
+  - Kế toán (ACCOUNTANT) chấm điểm CẤP DƯỚI trực tiếp của mình.
+  - Giám đốc / Quản trị / Quản lý cấp cao / Quản lý cấp trung chấm được MỌI NGƯỜI trong
+    công ty (bấm sao ở bảng đánh giá tháng).
+  - KHÔNG AI được chấm Giám đốc.
 Chấm THEO TỪNG NGÀY (eval_date) & TỪNG DỰ ÁN (project_id, tùy chọn) — mỗi (ngày, dự án)
 một phiếu (gửi lại thì ghi đè); kỳ tuần (period = Thứ 7) tự suy từ ngày để TỔNG HỢP THEO TUẦN.
 """
@@ -29,7 +31,8 @@ from app.schemas import (
 
 router = APIRouter(prefix="/evaluations", tags=["Đánh giá"])
 
-_MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT)
+# Dùng BẢNG ĐÁNH GIÁ THÁNG và chấm được mọi người (trừ Giám đốc).
+_TABLE_ROLES = (UserRole.DIRECTOR, UserRole.ADMIN, UserRole.MANAGER, UserRole.MANAGER_MID)
 _VIEW_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
 
 
@@ -52,6 +55,8 @@ def create_or_update_evaluation(
         raise HTTPException(404, "Không tìm thấy người được đánh giá trong công ty.")
     if evaluatee.id == current.id:
         raise HTTPException(400, "Không thể tự đánh giá chính mình.")
+    if evaluatee.role == UserRole.DIRECTOR:
+        raise HTTPException(403, "Không ai được đánh giá Giám đốc.")
 
     # Dự án (tùy chọn) phải thuộc cùng công ty — lấy SỚM để còn kiểm tra chủ trì.
     proj = None
@@ -78,13 +83,13 @@ def create_or_update_evaluation(
         if not is_direct_mgr and not is_project_lead:
             raise HTTPException(403, "Bạn chỉ được đánh giá quản lý trực tiếp của mình hoặc chủ trì dự án bạn tham gia.")
         direction = EvaluationDirection.STAFF_TO_MANAGER
-    elif current.role in _MANAGER_ROLES:
+    elif current.role in _TABLE_ROLES:
+        # GĐ / Quản trị / QL cấp cao / QL cấp trung chấm bất kỳ ai trong công ty ở bảng đánh
+        # giá tháng (Giám đốc đã bị chặn ở trên). Xếp chung chiều MANAGER_TO_STAFF.
+        direction = EvaluationDirection.MANAGER_TO_STAFF
+    elif current.role == UserRole.ACCOUNTANT:
         if evaluatee.manager_id != current.id:
             raise HTTPException(403, "Bạn chỉ được đánh giá nhân viên cấp dưới trực tiếp.")
-        direction = EvaluationDirection.MANAGER_TO_STAFF
-    elif current.role in (UserRole.DIRECTOR, UserRole.ADMIN):
-        # Giám đốc / Quản trị chấm bất kỳ ai trong công ty từ bảng tổng hợp (bấm sao).
-        # Là đánh giá từ cấp trên xuống nên xếp chung chiều MANAGER_TO_STAFF.
         direction = EvaluationDirection.MANAGER_TO_STAFF
     else:
         raise HTTPException(403, "Vai trò này không tham gia chấm điểm đánh giá.")
@@ -247,9 +252,10 @@ def evaluation_overview(
     from_date: date,
     to_date: date,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+    current: User = Depends(require_roles(*_TABLE_ROLES)),
 ):
-    """Bảng Đánh giá của Giám đốc: mỗi người đang làm (trừ chính mình) trong khoảng ngày.
+    """Bảng đánh giá tháng (GĐ / Quản trị / QL cấp cao / QL cấp trung): mỗi người đang làm
+    trong khoảng ngày, TRỪ chính mình và Giám đốc (không ai được chấm Giám đốc).
       - office_hours : giờ có mặt theo chấm công, đã trừ nghỉ trưa (như "tổng giờ" ở Tổng hợp).
       - project_hours: tổng giờ khai ở bảng tiến độ dự án (timesheets).
       - late_days    : số ngày đi muộn, đã miễn ngày có đơn đi muộn được duyệt.
@@ -262,7 +268,7 @@ def evaluation_overview(
     users = (
         db.query(User)
         .filter(
-            User.company_id == cid, User.id != current.id,
+            User.company_id == cid, User.id != current.id, User.role != UserRole.DIRECTOR,
             User.is_active.is_(True), User.is_approved.is_(True),
         )
         .all()
