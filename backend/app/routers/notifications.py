@@ -2,11 +2,15 @@
 Router Thông báo nội bộ — Giám đốc/Quản lý gửi cho cấp dưới hoặc toàn thể.
 Mỗi người nhận = 1 bản ghi (fan-out) để theo dõi đã đọc/chưa đọc riêng.
 Phạm vi gửi: USER (1 người) | MANAGERS (quản lý+kế toán) | STAFF (nhân viên) | EVERYONE.
+Kèm nhắc ĐÁNH GIÁ HẰNG THÁNG: từ 8:00 ngày 27 mọi người nhận 1 thông báo từ "Hệ thống".
 """
+import threading
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, vn_now
 from app.deps import get_current_user
 from app.models import Notification, User, UserRole
 from app.schemas import NotificationCreate, NotificationOut
@@ -15,6 +19,39 @@ router = APIRouter(prefix="/notifications", tags=["Thông báo"])
 
 _DIRECTORS = (UserRole.ADMIN, UserRole.DIRECTOR)
 _MANAGERS_UP = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER, UserRole.ACCOUNTANT)
+
+# ---- Nhắc ĐÁNH GIÁ HẰNG THÁNG (quy định: ngày 27 hằng tháng mọi người vào mục Đánh giá) ----
+# Tạo "lười" khi người đó mở app (chuông gọi /me + /me/unread-count ~20 giây/lần) thay vì
+# chạy lịch nền: không phụ thuộc scheduler (chỉ bật khi YUNATT_ENABLED), backend khởi động
+# lại cũng không mất. Mỗi người 1 thông báo/tháng — nhận diện bằng tiêu đề có tháng.
+EVAL_REMINDER_DAY = 27
+EVAL_REMINDER_HOUR = 8          # từ 8:00 sáng ngày 27 (tránh bật popup lúc nửa đêm)
+_eval_reminder_lock = threading.Lock()          # chuông gọi 2 API CÙNG LÚC -> chống tạo trùng
+_eval_reminded: set[tuple[int, str]] = set()    # (user_id, "YYYY-MM") đã chắc chắn có thông báo
+
+
+def _ensure_eval_reminder(db: Session, user: User) -> None:
+    now = vn_now()
+    if now < datetime(now.year, now.month, EVAL_REMINDER_DAY, EVAL_REMINDER_HOUR):
+        return
+    key = (user.id, now.strftime("%Y-%m"))
+    if key in _eval_reminded:
+        return
+    title = f"Đến hạn đánh giá tháng {now:%m/%Y}"
+    with _eval_reminder_lock:
+        exists = (
+            db.query(Notification.id)
+            .filter(Notification.recipient_id == user.id, Notification.title == title)
+            .first()
+        )
+        if not exists:
+            db.add(Notification(
+                company_id=user.company_id, sender_id=None, recipient_id=user.id, title=title,
+                body=(f"Theo quy định, ngày {EVAL_REMINDER_DAY} hằng tháng mọi người vào mục "
+                      f"Đánh giá để chấm đánh giá tháng {now:%m/%Y}."),
+            ))
+            db.commit()
+        _eval_reminded.add(key)
 
 
 def _resolve_recipients(db: Session, sender: User, target: str, target_user_id: int | None):
@@ -69,6 +106,7 @@ def send_notification(
 
 @router.get("/me", response_model=list[NotificationOut])
 def my_notifications(limit: int = 50, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    _ensure_eval_reminder(db, current)
     return (
         db.query(Notification)
         .filter(Notification.recipient_id == current.id)
@@ -80,6 +118,7 @@ def my_notifications(limit: int = 50, db: Session = Depends(get_db), current: Us
 
 @router.get("/me/unread-count")
 def unread_count(db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    _ensure_eval_reminder(db, current)
     n = (
         db.query(Notification)
         .filter(Notification.recipient_id == current.id, Notification.is_read == False)  # noqa: E712
