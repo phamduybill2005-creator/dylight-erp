@@ -476,10 +476,11 @@ export default function EvaluationsPage() {
 
   // ============ GIÁM ĐỐC (xem số liệu tổng hợp theo tuần) ============
   if (tier === "DIRECTOR") {
-    // Bảng tháng: xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng không nhảy khi bấm.
-    const rows = [...overview].sort(
-      (x, y) => userRankWeight(x) - userRankWeight(y) || x.full_name.localeCompare(y.full_name, "vi")
-    );
+    // Bảng tháng: KHÔNG hiện Giám đốc; xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng
+    // không nhảy khi bấm. Xuất Excel dùng chính danh sách này nên cũng bỏ Giám đốc.
+    const rows = overview
+      .filter((r) => r.role !== "DIRECTOR")
+      .sort((x, y) => userRankWeight(x) - userRankWeight(y) || x.full_name.localeCompare(y.full_name, "vi"));
     const hoursCell = (h: number) =>
       h > 0 ? <span className="font-semibold text-ink">{h.toFixed(1)}h</span> : <span className="text-muted">—</span>;
     return (
