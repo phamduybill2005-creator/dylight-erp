@@ -551,22 +551,16 @@ export interface EvaluationSummary {
   num_ratings: number;
 }
 
-// Tổng hợp số sao mỗi người NHẬN — tách rõ nguồn, mọi thời gian.
-export interface StarOverviewRow {
+/** 1 dòng bảng Đánh giá của Giám đốc trong 1 tuần (CN..T7). */
+export interface EvaluationOverviewRow {
   user_id: number;
   full_name: string;
   role: Role;
   department?: string | null;
-  from_manager_avg?: number | null;   // quản lý trực tiếp chấm
-  from_manager_count: number;
-  from_staff_avg?: number | null;      // nhân viên / cấp dưới chấm
-  from_staff_count: number;
-  project_avg?: number | null;         // đánh giá theo dự án
-  project_count: number;
-  item_avg?: number | null;            // đánh giá hạng mục công việc
-  item_count: number;
-  overall_avg?: number | null;         // gộp tất cả
-  overall_count: number;
+  office_hours: number;         // giờ có mặt theo chấm công (đã trừ nghỉ trưa)
+  project_hours: number;        // giờ khai ở bảng tiến độ dự án
+  late_days: number;            // số ngày đi muộn (đơn đi muộn đã duyệt không tính)
+  my_rating?: number | null;    // sao mình đã chấm trong tuần; null = chưa chấm
 }
 
 // Chat nội bộ — hội thoại 1-1 (DIRECT) và nhóm tự tạo (GROUP).

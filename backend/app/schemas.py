@@ -597,6 +597,19 @@ class StarOverviewRow(BaseModel):
     overall_count: int = 0
 
 
+class EvaluationOverviewRow(BaseModel):
+    """1 dòng bảng Đánh giá của Giám đốc trong 1 khoảng ngày (trang Đánh giá gửi 1 tuần CN..T7).
+    Office time / Project time / Đi muộn tính GIỐNG file Excel ở trang Tổng hợp chấm công."""
+    user_id: int
+    full_name: str
+    role: UserRole
+    department: str | None = None
+    office_hours: float = 0        # giờ có mặt theo chấm công (đã trừ nghỉ trưa)
+    project_hours: float = 0       # tổng giờ khai ở bảng tiến độ dự án (timesheets)
+    late_days: int = 0             # số ngày đi muộn (đã miễn ngày có đơn đi muộn được duyệt)
+    my_rating: int | None = None   # sao NGƯỜI XEM đã chấm người này trong khoảng ngày; None = chưa chấm
+
+
 # --------- Đánh giá theo DỰ ÁN (chấm chéo 360° giữa các thành viên) ---------
 class ProjectEvaluationCreate(BaseModel):
     project_id: int

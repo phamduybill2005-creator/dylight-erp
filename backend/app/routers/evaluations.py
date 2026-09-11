@@ -4,7 +4,7 @@ Router Đánh giá (Evaluations) — 2 chiều giữa Nhân viên ↔ Quản lý
 Quy tắc chiều đánh giá (chốt với người dùng):
   - Nhân viên (FIELD_STAFF) chấm điểm QUẢN LÝ TRỰC TIẾP của mình (manager_id).
   - Quản lý (MANAGER / ACCOUNTANT) chấm điểm CẤP DƯỚI trực tiếp của mình.
-  - Giám đốc chỉ XEM, không chấm điểm.
+  - Giám đốc / Quản trị chấm được MỌI NGƯỜI trong công ty (bấm sao ở bảng tổng hợp tuần).
 Chấm THEO TỪNG NGÀY (eval_date) & TỪNG DỰ ÁN (project_id, tùy chọn) — mỗi (ngày, dự án)
 một phiếu (gửi lại thì ghi đè); kỳ tuần (period = Thứ 7) tự suy từ ngày để TỔNG HỢP THEO TUẦN.
 """
@@ -17,10 +17,15 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import (
-    Evaluation, EvaluationDirection, Project, ProjectEvaluation, ProjectItem,
-    User, UserRole,
+    Attendance, Evaluation, EvaluationDirection, Project, ProjectEvaluation, ProjectItem,
+    Timesheet, User, UserRole,
 )
-from app.schemas import EvaluationCreate, EvaluationOut, EvaluationSummary, StarOverviewRow
+# Dùng CHUNG luật miễn trễ (đơn đi muộn được duyệt) với trang Chấm công để số
+# "Đi muộn" ở bảng Đánh giá khớp đúng số ở Tổng hợp.
+from app.routers.attendance import _apply_late_exemption
+from app.schemas import (
+    EvaluationCreate, EvaluationOut, EvaluationOverviewRow, EvaluationSummary, StarOverviewRow,
+)
 
 router = APIRouter(prefix="/evaluations", tags=["Đánh giá"])
 
@@ -76,6 +81,10 @@ def create_or_update_evaluation(
     elif current.role in _MANAGER_ROLES:
         if evaluatee.manager_id != current.id:
             raise HTTPException(403, "Bạn chỉ được đánh giá nhân viên cấp dưới trực tiếp.")
+        direction = EvaluationDirection.MANAGER_TO_STAFF
+    elif current.role in (UserRole.DIRECTOR, UserRole.ADMIN):
+        # Giám đốc / Quản trị chấm bất kỳ ai trong công ty từ bảng tổng hợp (bấm sao).
+        # Là đánh giá từ cấp trên xuống nên xếp chung chiều MANAGER_TO_STAFF.
         direction = EvaluationDirection.MANAGER_TO_STAFF
     else:
         raise HTTPException(403, "Vai trò này không tham gia chấm điểm đánh giá.")
@@ -231,6 +240,86 @@ def star_overview(
     # Xếp hạng: điểm TB cao lên đầu; cùng điểm thì nhiều phiếu hơn lên trước.
     out.sort(key=lambda r: (-(r.overall_avg or 0), -r.overall_count))
     return out
+
+
+@router.get("/overview", response_model=list[EvaluationOverviewRow])
+def evaluation_overview(
+    from_date: date,
+    to_date: date,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+):
+    """Bảng Đánh giá của Giám đốc: mỗi người đang làm (trừ chính mình) trong khoảng ngày.
+      - office_hours : giờ có mặt theo chấm công, đã trừ nghỉ trưa (như "tổng giờ" ở Tổng hợp).
+      - project_hours: tổng giờ khai ở bảng tiến độ dự án (timesheets).
+      - late_days    : số ngày đi muộn, đã miễn ngày có đơn đi muộn được duyệt.
+      - my_rating    : sao CHÍNH MÌNH đã chấm người đó trong khoảng ngày (phiếu chung,
+                       không gắn dự án); nhiều phiếu thì lấy phiếu mới nhất."""
+    if to_date < from_date:
+        raise HTTPException(400, "Ngày kết thúc phải sau ngày bắt đầu.")
+    cid = current.company_id
+
+    users = (
+        db.query(User)
+        .filter(
+            User.company_id == cid, User.id != current.id,
+            User.is_active.is_(True), User.is_approved.is_(True),
+        )
+        .all()
+    )
+
+    records = (
+        db.query(Attendance)
+        .filter(
+            Attendance.company_id == cid,
+            Attendance.work_date >= from_date, Attendance.work_date <= to_date,
+        )
+        .all()
+    )
+    _apply_late_exemption(db, cid, records)
+    office: dict[int, float] = {}
+    late: dict[int, int] = {}
+    for rec in records:
+        # Làm tròn TỪNG NGÀY như attendance_summary để tổng khớp đúng Tổng hợp.
+        office[rec.user_id] = office.get(rec.user_id, 0) + round(rec.worked_minutes / 60, 2)
+        if rec.is_late:
+            late[rec.user_id] = late.get(rec.user_id, 0) + 1
+
+    project = {
+        uid: float(h or 0)
+        for uid, h in (
+            db.query(Timesheet.user_id, func.sum(Timesheet.hours))
+            .filter(
+                Timesheet.company_id == cid,
+                Timesheet.work_date >= from_date, Timesheet.work_date <= to_date,
+            )
+            .group_by(Timesheet.user_id)
+            .all()
+        )
+    }
+
+    mine: dict[int, int] = {}
+    for ev in (
+        db.query(Evaluation)
+        .filter(
+            Evaluation.evaluator_id == current.id,
+            Evaluation.project_id.is_(None),
+            Evaluation.eval_date >= from_date, Evaluation.eval_date <= to_date,
+        )
+        .order_by(Evaluation.id)   # phiếu mới hơn ghi đè phiếu cũ
+    ):
+        mine[ev.evaluatee_id] = ev.rating
+
+    return [
+        EvaluationOverviewRow(
+            user_id=u.id, full_name=u.full_name, role=u.role, department=u.department,
+            office_hours=round(office.get(u.id, 0), 2),
+            project_hours=round(project.get(u.id, 0), 2),
+            late_days=late.get(u.id, 0),
+            my_rating=mine.get(u.id),
+        )
+        for u in users
+    ]
 
 
 @router.get("", response_model=list[EvaluationOut])

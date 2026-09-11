@@ -4,7 +4,8 @@
 // & TỪNG DỰ ÁN (dự án tùy chọn), TỔNG HỢP THEO TUẦN.
 //  - STAFF   : chấm quản lý trực tiếp theo ngày + xem điểm mình nhận.
 //  - MANAGER : chấm cấp dưới trực tiếp theo ngày/dự án + xem điểm nhân viên chấm mình.
-//  - DIRECTOR: chỉ xem — tổng hợp trung bình theo tuần + tất cả phiếu (kèm ngày/dự án).
+//  - DIRECTOR: bảng tuần (Office time / Project time / Đi muộn) + bấm sao chấm từng người,
+//              tổng hợp trung bình theo tuần + tất cả phiếu (kèm ngày/dự án).
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,9 +13,9 @@ import { StarIcon } from "@heroicons/react/24/solid";
 import { ChatBubbleLeftRightIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
-import { roleTier, ROLE_LABEL } from "@/lib/roles";
+import { roleTier, ROLE_LABEL, userRankWeight } from "@/lib/roles";
 import { dateLocal, todayLocal } from "@/lib/format";
-import type { Evaluation, EvaluationSummary, StarOverviewRow, User, Project, Colleague } from "@/lib/types";
+import type { Evaluation, EvaluationSummary, EvaluationOverviewRow, User, Project, Colleague } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
   1: "Cần xem xét lại",
@@ -28,6 +29,12 @@ const RATING_LABELS: Record<number, string> = {
 function weekSaturday(d: Date = new Date()): string {
   const x = new Date(d);
   x.setDate(x.getDate() + (6 - x.getDay())); // CN(0)…T7(6) -> tới Thứ 7 cùng tuần
+  return dateLocal(x);
+}
+// Chủ Nhật mở đầu tuần có Thứ 7 = sat (tuần CN..T7, khớp backend).
+function weekSunday(sat: string): string {
+  const x = new Date(sat + "T00:00:00");
+  x.setDate(x.getDate() - 6);
   return dateLocal(x);
 }
 const fmtSat = (s: string) =>
@@ -48,6 +55,33 @@ function Stars({ value, onChange }: { value: number; onChange?: (n: number) => v
           className={onChange ? "transition-transform active:scale-90" : "cursor-default"}
         >
           <StarIcon className={`h-6 w-6 ${n <= value ? "text-amber" : "text-line"}`} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// 5 sao MỜ để chấm nhanh ngay trên bảng: rê chuột xem trước, bấm để lưu; đã chấm
+// thì sáng tới số sao đã chọn (bấm sao khác để sửa).
+function RateStars({ value, busy, onRate }: { value: number; busy?: boolean; onRate: (n: number) => void }) {
+  const [hover, setHover] = useState(0);
+  const shown = hover || value;
+  return (
+    <div className={`inline-flex items-center ${busy ? "opacity-60" : ""}`} onMouseLeave={() => setHover(0)}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={busy}
+          onMouseEnter={() => setHover(n)}
+          onFocus={() => setHover(n)}
+          onBlur={() => setHover(0)}
+          onClick={() => onRate(n)}
+          title={`${n} sao — ${RATING_LABELS[n]}`}
+          aria-label={`Chấm ${n} sao`}
+          className="p-0.5 transition-transform hover:scale-110 active:scale-90 disabled:cursor-wait"
+        >
+          <StarIcon className={`h-5 w-5 ${n <= shown ? "text-amber" : "text-line"}`} />
         </button>
       ))}
     </div>
@@ -118,7 +152,10 @@ export default function EvaluationsPage() {
   const [selPeriod, setSelPeriod] = useState(weekSaturday());
   const [summary, setSummary] = useState<EvaluationSummary[]>([]);
   const [allEvals, setAllEvals] = useState<Evaluation[]>([]);
-  const [starRows, setStarRows] = useState<StarOverviewRow[]>([]);   // tổng hợp sao 3 nguồn (mọi thời gian)
+  const [overview, setOverview] = useState<EvaluationOverviewRow[]>([]);   // bảng đánh giá tuần
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [ratingUid, setRatingUid] = useState<number | null>(null);   // người đang lưu sao
+  const [rateMsg, setRateMsg] = useState("");
 
   const period = weekSaturday();
   const tier = user ? roleTier(user.role) : "STAFF";
@@ -129,10 +166,39 @@ export default function EvaluationsPage() {
     api.allEvaluations(selPeriod).then(setAllEvals).catch(() => {});
   }, [user, selPeriod]);
 
+  // Bảng đánh giá: Office time / Project time / Đi muộn + sao mình đã chấm, theo TUẦN đang chọn.
   useEffect(() => {
     if (!user || roleTier(user.role) !== "DIRECTOR") return;
-    api.evaluationsStarOverview().then(setStarRows).catch(() => {});   // mọi thời gian, không theo tuần
-  }, [user]);
+    let alive = true;
+    setOverviewLoading(true);
+    setRateMsg("");
+    api.evaluationsOverview(weekSunday(selPeriod), selPeriod)
+      .then((rows) => { if (alive) setOverview(rows); })
+      .catch(() => { if (alive) setOverview([]); })
+      .finally(() => { if (alive) setOverviewLoading(false); });
+    return () => { alive = false; };
+  }, [user, selPeriod]);
+
+  // Giám đốc bấm sao: lưu phiếu CHUNG (không gắn dự án) vào ngày Thứ 7 của tuần đang xem.
+  // Cùng 1 ngày nên bấm sao khác là SỬA phiếu đó, không sinh thêm phiếu.
+  async function rateUser(uid: number, stars: number) {
+    const before = overview.find((r) => r.user_id === uid)?.my_rating ?? null;
+    const setMine = (v: number | null) =>
+      setOverview((rows) => rows.map((r) => (r.user_id === uid ? { ...r, my_rating: v } : r)));
+    setMine(stars);
+    setRatingUid(uid);
+    setRateMsg("");
+    try {
+      await api.createEvaluation({ evaluatee_id: uid, eval_date: selPeriod, project_id: null, rating: stars });
+      api.evaluationsSummary(selPeriod).then(setSummary).catch(() => {});
+      api.allEvaluations(selPeriod).then(setAllEvals).catch(() => {});
+    } catch (err) {
+      setMine(before);
+      setRateMsg(err instanceof Error ? err.message : "Không lưu được đánh giá.");
+    } finally {
+      setRatingUid(null);
+    }
+  }
 
   useEffect(() => {
     api.me()
@@ -382,18 +448,12 @@ export default function EvaluationsPage() {
     const avgAll = summary.length
       ? (summary.reduce((a, s) => a + s.avg_rating, 0) / summary.length).toFixed(2)
       : "—";
-    const starCell = (avg: number | null | undefined, count: number) =>
-      count > 0 && avg != null ? (
-        <span className="inline-flex items-center gap-0.5 font-semibold text-ink">
-          {avg.toFixed(1)}
-          <StarIcon className="h-3 w-3 text-amber" />
-          <span className="ml-0.5 text-[10px] font-normal text-muted">({count})</span>
-        </span>
-      ) : (
-        <span className="text-muted">—</span>
-      );
-    const overallColor = (v: number) =>
-      v >= 4 ? "text-ok" : v >= 2.5 ? "text-amber-deep" : "text-bad";
+    // Bảng tuần: xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng không nhảy khi bấm.
+    const rows = [...overview].sort(
+      (x, y) => userRankWeight(x) - userRankWeight(y) || x.full_name.localeCompare(y.full_name, "vi")
+    );
+    const hoursCell = (h: number) =>
+      h > 0 ? <span className="font-semibold text-ink">{h.toFixed(1)}h</span> : <span className="text-muted">—</span>;
     return (
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
@@ -401,35 +461,56 @@ export default function EvaluationsPage() {
           <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự — tổng hợp tuần</h1>
         </header>
 
-        {/* TỔNG HỢP SỐ SAO mỗi người — gộp 3 nguồn, mọi thời gian */}
+        {/* Chọn TUẦN — áp cho bảng đánh giá và các mục tổng hợp bên dưới */}
+        <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-3 shadow-card">
+          <div className="text-xs text-muted">
+            Tuần <b className="text-ink">CN {fmtSat(weekSunday(selPeriod))}</b> – <b className="text-ink">Thứ 7 {fmtSat(selPeriod)}</b>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={selPeriod}
+              disabled={ratingUid !== null}
+              onChange={(e) => e.target.value && setSelPeriod(weekSaturday(new Date(e.target.value + "T00:00:00")))}
+              className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel disabled:opacity-60"
+            />
+            <button
+              onClick={() => setSelPeriod(weekSaturday())}
+              disabled={ratingUid !== null}
+              className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper disabled:opacity-60"
+            >
+              Tuần này
+            </button>
+          </div>
+        </section>
+
+        {/* BẢNG ĐÁNH GIÁ TUẦN: Office time / Project time / Đi muộn + bấm sao để chấm */}
         <section className="mt-4">
           <div className="mb-2">
-            <h2 className="text-sm font-semibold text-ink">
-              Tổng hợp sao đánh giá mỗi người ({starRows.length})
-            </h2>
+            <h2 className="text-sm font-semibold text-ink">Đánh giá nhân sự ({rows.length})</h2>
             <p className="mt-0.5 text-[11px] text-muted">
-              Tách rõ nguồn (mọi thời gian): <b className="text-steel">QL trực tiếp chấm</b> · <b className="text-steel">Nhân viên chấm</b> · <b className="text-steel">Dự án</b> · <b className="text-steel">Hạng mục công việc</b>. Số trong ngoặc = số phiếu.
+              <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm, bấm sao khác để sửa.
             </p>
+            {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
           </div>
-          {starRows.length === 0 ? (
+          {rows.length === 0 ? (
             <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">
-              Chưa có sao đánh giá nào.
+              {overviewLoading ? "Đang tải…" : "Chưa có nhân sự nào."}
             </p>
           ) : (
             <div className="overflow-x-auto rounded-xl2 bg-white shadow-card">
-              <table className="w-full min-w-[680px] text-xs">
+              <table className="w-full min-w-[640px] text-xs">
                 <thead>
                   <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
                     <th className="px-3 py-2 font-semibold">Người</th>
-                    <th className="px-3 py-2 text-center font-semibold">QL trực tiếp<br/>chấm</th>
-                    <th className="px-3 py-2 text-center font-semibold">Nhân viên<br/>chấm</th>
-                    <th className="px-3 py-2 text-center font-semibold">Dự án</th>
-                    <th className="px-3 py-2 text-center font-semibold">Hạng mục</th>
-                    <th className="px-3 py-2 text-center font-semibold">Tổng</th>
+                    <th className="px-3 py-2 text-center font-semibold">Office time</th>
+                    <th className="px-3 py-2 text-center font-semibold">Project time</th>
+                    <th className="px-3 py-2 text-center font-semibold">Đi muộn</th>
+                    <th className="px-3 py-2 text-center font-semibold">Đánh giá</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {starRows.map((r, i) => (
+                <tbody className={overviewLoading ? "opacity-60" : ""}>
+                  {rows.map((r, i) => (
                     <tr key={r.user_id} className="border-b border-line/50 last:border-0 hover:bg-paper/60">
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
@@ -442,16 +523,23 @@ export default function EvaluationsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-center">{starCell(r.from_manager_avg, r.from_manager_count)}</td>
-                      <td className="px-3 py-2 text-center">{starCell(r.from_staff_avg, r.from_staff_count)}</td>
-                      <td className="px-3 py-2 text-center">{starCell(r.project_avg, r.project_count)}</td>
-                      <td className="px-3 py-2 text-center">{starCell(r.item_avg, r.item_count)}</td>
-                      <td className="px-3 py-2 text-center">
-                        <span className={`inline-flex items-center gap-0.5 text-sm font-bold ${overallColor(r.overall_avg ?? 0)}`}>
-                          {(r.overall_avg ?? 0).toFixed(1)}
-                          <StarIcon className="h-3.5 w-3.5" />
-                          <span className="ml-0.5 text-[10px] font-normal text-muted">({r.overall_count})</span>
-                        </span>
+                      <td className="px-3 py-2 text-center tnum">{hoursCell(r.office_hours)}</td>
+                      <td className="px-3 py-2 text-center tnum">{hoursCell(r.project_hours)}</td>
+                      <td className="px-3 py-2 text-center tnum">
+                        {r.late_days > 0 ? (
+                          <span className="rounded-full bg-bad/10 px-2 py-0.5 text-[11px] font-bold text-bad">{r.late_days}</span>
+                        ) : (
+                          <span className="text-muted">0</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex justify-center">
+                          <RateStars
+                            value={r.my_rating ?? 0}
+                            busy={ratingUid === r.user_id}
+                            onRate={(n) => rateUser(r.user_id, n)}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -459,26 +547,6 @@ export default function EvaluationsPage() {
               </table>
             </div>
           )}
-        </section>
-
-        <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-3 shadow-card">
-          <div className="text-xs text-muted">
-            Tuần đến hết <b className="text-ink">Thứ 7 {fmtSat(selPeriod)}</b>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={selPeriod}
-              onChange={(e) => e.target.value && setSelPeriod(weekSaturday(new Date(e.target.value + "T00:00:00")))}
-              className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel"
-            />
-            <button
-              onClick={() => setSelPeriod(weekSaturday())}
-              className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper"
-            >
-              Tuần này
-            </button>
-          </div>
         </section>
 
         <section className="mt-4">
