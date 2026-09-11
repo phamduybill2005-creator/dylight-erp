@@ -4,18 +4,18 @@
 // & TỪNG DỰ ÁN (dự án tùy chọn), TỔNG HỢP THEO TUẦN.
 //  - STAFF   : chấm quản lý trực tiếp theo ngày + xem điểm mình nhận.
 //  - MANAGER : chấm cấp dưới trực tiếp theo ngày/dự án + xem điểm nhân viên chấm mình.
-//  - DIRECTOR: bảng THÁNG (Office time / Project time / Đi muộn) + bấm sao chấm từng người,
-//              tổng hợp trung bình theo tuần + tất cả phiếu (kèm ngày/dự án).
+//  - DIRECTOR: bảng THÁNG (Office time / Project time / Đi muộn) + bấm sao chấm từng người
+//              + xuất Excel.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
-import { ChatBubbleLeftRightIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL, userRankWeight } from "@/lib/roles";
 import { dateLocal, monthLocal, todayLocal } from "@/lib/format";
-import type { Evaluation, EvaluationSummary, EvaluationOverviewRow, User, Project, Colleague } from "@/lib/types";
+import type { Evaluation, EvaluationOverviewRow, User, Project, Colleague } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
   1: "Cần xem xét lại",
@@ -29,12 +29,6 @@ const RATING_LABELS: Record<number, string> = {
 function weekSaturday(d: Date = new Date()): string {
   const x = new Date(d);
   x.setDate(x.getDate() + (6 - x.getDay())); // CN(0)…T7(6) -> tới Thứ 7 cùng tuần
-  return dateLocal(x);
-}
-// Chủ Nhật mở đầu tuần có Thứ 7 = sat (tuần CN..T7, khớp backend).
-function weekSunday(sat: string): string {
-  const x = new Date(sat + "T00:00:00");
-  x.setDate(x.getDate() - 6);
   return dateLocal(x);
 }
 // Ngày đầu / ngày cuối của tháng "YYYY-MM".
@@ -155,24 +149,16 @@ export default function EvaluationsPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // director: tổng hợp + tất cả phiếu theo tuần
-  const [selPeriod, setSelPeriod] = useState(weekSaturday());
-  const [summary, setSummary] = useState<EvaluationSummary[]>([]);
-  const [allEvals, setAllEvals] = useState<Evaluation[]>([]);
+  // director: bảng đánh giá THÁNG
   const [selMonth, setSelMonth] = useState(monthLocal());   // tháng của bảng đánh giá
   const [overview, setOverview] = useState<EvaluationOverviewRow[]>([]);   // bảng đánh giá tháng
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [ratingUid, setRatingUid] = useState<number | null>(null);   // người đang lưu sao
   const [rateMsg, setRateMsg] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const period = weekSaturday();
   const tier = user ? roleTier(user.role) : "STAFF";
-
-  useEffect(() => {
-    if (!user || roleTier(user.role) !== "DIRECTOR") return;
-    api.evaluationsSummary(selPeriod).then(setSummary).catch(() => {});
-    api.allEvaluations(selPeriod).then(setAllEvals).catch(() => {});
-  }, [user, selPeriod]);
 
   // Bảng đánh giá: Office time / Project time / Đi muộn + sao mình đã chấm, CỘNG CẢ THÁNG đang
   // chọn — cùng khoảng ngày với file Excel ở Tổng hợp chấm công nên số khớp nhau.
@@ -200,13 +186,48 @@ export default function EvaluationsPage() {
     setRateMsg("");
     try {
       await api.createEvaluation({ evaluatee_id: uid, eval_date: monthRange(selMonth)[0], project_id: null, rating: stars });
-      api.evaluationsSummary(selPeriod).then(setSummary).catch(() => {});
-      api.allEvaluations(selPeriod).then(setAllEvals).catch(() => {});
     } catch (err) {
       setMine(before);
       setRateMsg(err instanceof Error ? err.message : "Không lưu được đánh giá.");
     } finally {
       setRatingUid(null);
+    }
+  }
+
+  // Xuất Excel ĐÚNG bảng đang xem (tháng đang chọn, cùng thứ tự dòng).
+  async function exportExcel(rows: EvaluationOverviewRow[]) {
+    setExporting(true);
+    setRateMsg("");
+    try {
+      const XLSX = await import("xlsx");   // chỉ nạp khi bấm -> không làm nặng trang
+      const r1 = (h: number) => Math.round(h * 10) / 10;
+      const headers = [
+        "STT", "Họ và tên", "Chức vụ", "Phòng ban",
+        "Office time (giờ)", "Project time (giờ)", "Đi muộn (ngày)", "Đánh giá (sao)", "Xếp loại",
+      ];
+      const data = rows.map((r, i) => [
+        i + 1,
+        r.full_name,
+        ROLE_LABEL[r.role] || "Nhân viên",
+        r.department || "",
+        r1(r.office_hours),
+        r1(r.project_hours),
+        r.late_days,
+        r.my_rating ?? "",
+        r.my_rating ? RATING_LABELS[r.my_rating] : "",
+      ]);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      ws["!cols"] = [
+        { wch: 6 }, { wch: 22 }, { wch: 18 }, { wch: 30 },
+        { wch: 16 }, { wch: 17 }, { wch: 14 }, { wch: 14 }, { wch: 18 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `Đánh giá ${selMonth}`);
+      XLSX.writeFile(wb, `Danh_gia_nhan_su_${selMonth}.xlsx`);
+    } catch (err) {
+      setRateMsg(err instanceof Error ? `Không xuất được Excel: ${err.message}` : "Không xuất được Excel.");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -455,9 +476,6 @@ export default function EvaluationsPage() {
 
   // ============ GIÁM ĐỐC (xem số liệu tổng hợp theo tuần) ============
   if (tier === "DIRECTOR") {
-    const avgAll = summary.length
-      ? (summary.reduce((a, s) => a + s.avg_rating, 0) / summary.length).toFixed(2)
-      : "—";
     // Bảng tháng: xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng không nhảy khi bấm.
     const rows = [...overview].sort(
       (x, y) => userRankWeight(x) - userRankWeight(y) || x.full_name.localeCompare(y.full_name, "vi")
@@ -482,6 +500,15 @@ export default function EvaluationsPage() {
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={() => exportExcel(rows)}
+                disabled={exporting || overviewLoading || rows.length === 0}
+                className="flex items-center gap-1.5 rounded-xl2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer disabled:cursor-default disabled:opacity-60"
+                title={`Xuất file Excel tháng ${fmtMonth(selMonth)}`}
+              >
+                <ArrowDownTrayIcon className={`h-3.5 w-3.5 ${exporting ? "animate-bounce" : ""}`} />
+                {exporting ? "Đang xuất..." : "Xuất Excel"}
+              </button>
               <input
                 type="month"
                 value={selMonth}
@@ -552,101 +579,6 @@ export default function EvaluationsPage() {
               </table>
             </div>
           )}
-        </section>
-
-        {/* Chọn TUẦN — cho các mục tổng hợp tuần bên dưới */}
-        <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-3 shadow-card">
-          <div className="text-xs text-muted">
-            Tuần <b className="text-ink">CN {fmtSat(weekSunday(selPeriod))}</b> – <b className="text-ink">Thứ 7 {fmtSat(selPeriod)}</b>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={selPeriod}
-              onChange={(e) => e.target.value && setSelPeriod(weekSaturday(new Date(e.target.value + "T00:00:00")))}
-              className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel"
-            />
-            <button
-              onClick={() => setSelPeriod(weekSaturday())}
-              className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper"
-            >
-              Tuần này
-            </button>
-          </div>
-        </section>
-
-        <section className="mt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">Điểm trung bình mỗi người ({summary.length})</h2>
-            <span className="text-[11px] text-muted">TB chung: <b className="text-amber-deep">{avgAll}★</b></span>
-          </div>
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
-            {summary.length === 0 ? (
-              <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2 xl:col-span-3">
-                Chưa có đánh giá nào trong tuần này.
-              </p>
-            ) : (
-              summary.map((s) => (
-                <div key={s.user_id} className="flex items-center justify-between rounded-xl2 bg-white p-3 shadow-card">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">
-                      {s.full_name}{" "}
-                      <span className="text-xs font-normal text-muted">
-                        ({ROLE_LABEL[s.role] || "Nhân viên"})
-                      </span>
-                    </p>
-                    <p className="text-[10px] text-muted">{s.num_ratings} phiếu trong tuần</p>
-                  </div>
-                  <span
-                    className={`flex shrink-0 items-center gap-1 text-sm font-bold ${
-                      s.avg_rating >= 4 ? "text-ok" : s.avg_rating >= 2.5 ? "text-amber-deep" : "text-bad"
-                    }`}
-                  >
-                    {s.avg_rating.toFixed(1)} <StarIcon className="h-4 w-4" />
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="mt-5">
-          <div className="mb-2 flex items-center gap-2">
-            <ChatBubbleLeftRightIcon className="h-5 w-5 text-steel" />
-            <h2 className="text-sm font-semibold text-ink">Tất cả phiếu trong tuần ({allEvals.length})</h2>
-          </div>
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {allEvals.length === 0 ? (
-              <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card lg:col-span-2">
-                Chưa có phiếu nào.
-              </p>
-            ) : (
-              allEvals.map((e) => (
-                <div key={e.id} className="rounded-xl2 bg-white p-3 shadow-card">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="min-w-0 truncate text-xs text-ink">
-                      {e.direction === "STAFF_TO_MANAGER" ? (
-                        <span>
-                          <b>{e.evaluator_name}</b> <span className="text-[10px] text-muted">(NV)</span> <span className="text-muted">→</span> <b>{e.evaluatee_name}</b> <span className="text-[10px] text-muted">(QL)</span>
-                        </span>
-                      ) : (
-                        <span>
-                          <b>{e.evaluator_name}</b> <span className="text-[10px] text-muted">(QL)</span> <span className="text-muted">→</span> <b>{e.evaluatee_name}</b> <span className="text-[10px] text-muted">(NV)</span>
-                        </span>
-                      )}
-                    </p>
-                    <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-amber-deep bg-amber/10 px-1.5 py-0.5 rounded">
-                      {e.rating}★ {RATING_LABELS[e.rating]}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-muted">
-                    {fmtDay(e.eval_date)} · {e.project_name || "Chung"}
-                  </p>
-                  {e.comment && <p className="mt-1 text-[11px] text-muted">{e.comment}</p>}
-                </div>
-              ))
-            )}
-          </div>
         </section>
       </AppShell>
     );
