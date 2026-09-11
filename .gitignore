@@ -19,5 +19,9 @@ frontend/.env.local
 
 # --- Môi trường & hệ thống ---
 .env
+backend/.env.before-local-db
+backend/yunatt.env
+frontend/.env
+postgres.env
 .DS_Store
 *.log

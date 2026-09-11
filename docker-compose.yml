@@ -1,93 +1,46 @@
-# ====================================================================
-# DYLIGHT ERP — cấu hình PRODUCTION trên VPS (https://erp.dosco.vn)
-#
-#   postgres     PostgreSQL 18, dữ liệu nằm trong volume (KHÔNG mở cổng 5432)
-#   backend      FastAPI  -> cổng 8000
-#   frontend     Next.js  -> cổng 3000
-#   yunatt-sync  job kéo chấm công Yunatt bằng Playwright (profile "jobs",
-#                KHÔNG tự chạy cùng "up", chỉ chạy khi gọi)
-#
-# Bí mật KHÔNG nằm trong file này mà ở 3 file cạnh nó — TUYỆT ĐỐI KHÔNG commit:
-#   .env          biến cho backend: DATABASE_URL, SECRET_KEY, ATTENDANCE_API_KEY...
-#   postgres.env  POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
-#   yunatt.env    DATABASE_URL, YUNATT_EMAIL, YUNATT_PASSWORD
-#   (DATABASE_URL trỏ vào service này: postgresql+psycopg2://USER:PASS@postgres:5432/DB)
-#
-# Triển khai / cập nhật:
-#   docker compose up -d --build
-# Chạy job đồng bộ Yunatt (VD cron của máy chủ lúc 20:00 hằng ngày):
+# DYLIGHT ERP — cấu hình production trên VPS (https://erp.dosco.vn).
+# Bí mật nằm trong các file env trên máy chủ, KHÔNG commit:
+#   ./backend/.env, ./backend/yunatt.env, ./postgres.env
+# Job đồng bộ chấm công Yunatt:
 #   docker compose --profile jobs run --rm yunatt-sync
-#
-# ĐANG CÓ DỮ LIỆU THẬT -> KHÔNG chạy "python -m app.seed" (tạo tài khoản demo
-# mật khẩu 123456).
-# ====================================================================
 
 services:
   postgres:
     image: postgres:18
     restart: unless-stopped
-    env_file: postgres.env
+    env_file: ./postgres.env
     volumes:
-      # Từ bản 18, ảnh postgres lưu dữ liệu ở /var/lib/postgresql/18/docker nên
-      # volume gắn vào /var/lib/postgresql (KHÔNG phải .../data như bản 16).
-      - dylight_pgdata:/var/lib/postgresql
-    # Không có "ports:" -> 5432 chỉ mở trong mạng nội bộ Docker cho backend/job.
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      - postgres_data:/var/lib/postgresql
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     restart: unless-stopped
-    env_file: .env
-    environment:
-      # ÉP cứng, .env không ghi đè được:
-      # - DEBUG/AUTO_SEED mặc định là true trong config.py; để nguyên trên máy chủ
-      #   thật là tự tạo tài khoản demo mật khẩu 123456 -> cửa hậu.
-      # - Ảnh backend không có Chromium; việc cào Yunatt do service yunatt-sync lo.
-      DEBUG: "false"
-      AUTO_SEED: "false"
-      YUNATT_ENABLED: "false"
-      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-https://erp.dosco.vn}
+    env_file: ./backend/.env
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     ports:
-      - "8000:8000"
-    volumes:
-      # Ảnh hóa đơn tải lên (UPLOAD_DIR="uploads", WORKDIR=/code).
-      - dylight_uploads:/code/uploads
+      - "127.0.0.1:8000:8000"
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
       args:
-        # Next.js "nướng" NEXT_PUBLIC_* vào bundle LÚC BUILD -> đổi domain phải build lại.
         NEXT_PUBLIC_API_BASE: https://erp.dosco.vn/api/v1
         NEXT_PUBLIC_ASSET_BASE: https://erp.dosco.vn
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
   yunatt-sync:
     build:
       context: ./backend
       dockerfile: Dockerfile.yunatt
     profiles: ["jobs"]
-    env_file: yunatt.env
-    # Chromium sinh nhiều tiến trình con -> cần init để dọn tiến trình mồ côi.
-    init: true
-    depends_on:
-      postgres:
-        condition: service_healthy
+    env_file:
+      - ./backend/.env
+      - ./backend/yunatt.env
 
 volumes:
-  dylight_pgdata:
-  dylight_uploads:
+  postgres_data:
