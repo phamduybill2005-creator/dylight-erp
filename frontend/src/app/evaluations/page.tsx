@@ -2,7 +2,7 @@
 
 // Trang Đánh giá 2 chiều (Nhân viên <-> Quản lý trực tiếp) — chấm THEO TỪNG NGÀY
 // & TỪNG DỰ ÁN (dự án tùy chọn), TỔNG HỢP THEO TUẦN.
-//  - STAFF   : chấm quản lý trực tiếp theo ngày + xem điểm mình nhận.
+//  - STAFF   : chấm quản lý trực tiếp THEO THÁNG (mỗi tháng 1 phiếu) + xem điểm mình nhận.
 //  - MANAGER : chấm cấp dưới trực tiếp theo ngày/dự án + xem điểm nhân viên chấm mình.
 //  - DIRECTOR: bảng THÁNG (Office time / Project time / Đi muộn) + bấm sao chấm từng người
 //              + xuất Excel.
@@ -38,8 +38,6 @@ function monthRange(m: string): [string, string] {
   return [`${m}-01`, `${m}-${String(last).padStart(2, "0")}`];
 }
 const fmtMonth = (m: string) => `${m.slice(5, 7)}/${m.slice(0, 4)}`;
-const fmtSat = (s: string) =>
-  new Date(s + "T00:00:00").toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 const fmtDay = (s?: string | null) =>
   s ? new Date(s + "T00:00:00").toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" }) : "—";
 const avgOf = (rs: number[]) => (rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0);
@@ -150,7 +148,7 @@ export default function EvaluationsPage() {
   const [msg, setMsg] = useState("");
 
   // director: bảng đánh giá THÁNG
-  const [selMonth, setSelMonth] = useState(monthLocal());   // tháng của bảng đánh giá
+  const [selMonth, setSelMonth] = useState(monthLocal());   // tháng đang chọn (bảng GĐ / form Nhân viên)
   const [overview, setOverview] = useState<EvaluationOverviewRow[]>([]);   // bảng đánh giá tháng
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [ratingUid, setRatingUid] = useState<number | null>(null);   // người đang lưu sao
@@ -273,15 +271,20 @@ export default function EvaluationsPage() {
     resetForm(false);
   }
 
-  // Gửi 1 phiếu cho evaluatee (dùng chung cho cả 2 chiều).
-  async function submitFor(evaluateeId: number, projectId: number | null = evalProjectId === "" ? null : Number(evalProjectId)) {
+  // Gửi 1 phiếu cho evaluatee (dùng chung cho cả 2 chiều). evalDay: ngày ghi phiếu — Quản lý
+  // chấm theo ngày đang chọn; Nhân viên chấm theo THÁNG nên truyền ngày 01 của tháng.
+  async function submitFor(
+    evaluateeId: number,
+    projectId: number | null = evalProjectId === "" ? null : Number(evalProjectId),
+    evalDay: string = evalDate,
+  ) {
     if (rating < 1) { setMsg("Vui lòng chọn số sao."); return; }
     setSaving(true);
     setMsg("");
     try {
       await api.createEvaluation({
         evaluatee_id: evaluateeId,
-        eval_date: evalDate,
+        eval_date: evalDay,
         project_id: projectId,
         rating,
         comment: comment || null,
@@ -361,7 +364,10 @@ export default function EvaluationsPage() {
     const targetMgrName = selMgr?.name ?? null;
     const targetIsSelf = targetMgrId != null && targetMgrId === user.id;
     const canPickTarget = mgrOptions.length > 0;
-    const myWeek = targetMgrId ? weekGivenTo(targetMgrId) : [];
+    // Phiếu mình đã chấm quản lý này trong THÁNG đang chọn.
+    const myMonth = targetMgrId
+      ? given.filter((g) => g.evaluatee_id === targetMgrId && (g.eval_date || "").startsWith(selMonth))
+      : [];
     return (
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
@@ -373,13 +379,13 @@ export default function EvaluationsPage() {
           {canPickTarget ? (
             <>
               <p className="text-xs text-muted">
-                Chọn <b className="text-ink">quản lý</b> cần chấm — chỉ gồm <b className="text-ink">quản lý trực tiếp</b> + <b className="text-ink">chủ trì các dự án bạn tham gia</b>. Tổng hợp tuần đến <b className="text-ink">Thứ 7 {fmtSat(period)}</b>
+                Chọn <b className="text-ink">quản lý</b> cần chấm — chỉ gồm <b className="text-ink">quản lý trực tiếp</b> + <b className="text-ink">chủ trì các dự án bạn tham gia</b>. Chấm <b className="text-ink">theo tháng</b>: mỗi tháng một phiếu cho mỗi quản lý, gửi lại trong tháng là sửa phiếu đó.
               </p>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <div>
-                  <label className="mb-1 block text-[10px] font-semibold text-muted">Ngày</label>
-                  <input type="date" value={evalDate} max={todayLocal()} onChange={(e) => setEvalDate(e.target.value || todayLocal())}
+                  <label className="mb-1 block text-[10px] font-semibold text-muted">Tháng</label>
+                  <input type="month" value={selMonth} max={monthLocal()} onChange={(e) => { setSelMonth(e.target.value || monthLocal()); setMsg(""); }}
                     className="w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel" />
                 </div>
                 <div>
@@ -422,22 +428,22 @@ export default function EvaluationsPage() {
               {msg && <p className="mt-2 text-[11px] font-semibold text-steel">{msg}</p>}
 
               <button
-                onClick={() => targetMgrId && submitFor(targetMgrId, selMgr?.projectId ?? null)}
+                onClick={() => targetMgrId && submitFor(targetMgrId, selMgr?.projectId ?? null, monthRange(selMonth)[0])}
                 disabled={saving || rating < 1 || !targetMgrId || targetIsSelf}
                 className="mt-3 w-full rounded-xl2 bg-ink py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {saving ? "Đang lưu…" : "Gửi đánh giá ngày"}
+                {saving ? "Đang lưu…" : `Gửi đánh giá tháng ${fmtMonth(selMonth)}`}
               </button>
 
-              {myWeek.length > 0 && (
+              {myMonth.length > 0 && (
                 <div className="mt-4 border-t border-line pt-3">
                   <p className="mb-2 text-[11px] font-semibold text-muted">
-                    Tuần này bạn đã chấm ({myWeek.length}) · TB {avgOf(myWeek.map((g) => g.rating)).toFixed(1)}★
+                    Tháng {fmtMonth(selMonth)} bạn đã chấm ({myMonth.length}) · TB {avgOf(myMonth.map((g) => g.rating)).toFixed(1)}★
                   </p>
                   <div className="space-y-1.5">
-                    {myWeek.map((g) => (
+                    {myMonth.map((g) => (
                       <div key={g.id} className="flex items-center justify-between rounded-lg bg-paper px-2.5 py-1.5 text-[11px]">
-                        <span className="text-muted">{fmtDay(g.eval_date)} · {g.project_name || "Chung"}</span>
+                        <span className="text-muted">{g.project_name || "Chung"}</span>
                         <span className="flex items-center gap-1.5">
                           <span className="font-semibold text-amber-deep">{RATING_LABELS[g.rating]}</span>
                           <span className="flex items-center gap-0.5 font-semibold text-amber">{g.rating}<StarIcon className="h-3 w-3" /></span>
