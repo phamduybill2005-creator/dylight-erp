@@ -1,0 +1,40 @@
+# Ảnh riêng cho JOB đồng bộ chấm công Yunatt (service "yunatt-sync" trong
+# docker-compose.yml, profile "jobs"): chạy scripts/yunatt_sync_ci.py rồi thoát.
+#
+# Tách khỏi backend/Dockerfile vì job cần Chromium để đăng nhập cổng Yunatt.
+# Ảnh Playwright chính chủ đã có sẵn Chromium + thư viện hệ thống, nên ảnh
+# backend chạy 24/7 vẫn gọn, không phải cài trình duyệt.
+#
+# PHIÊN BẢN: ảnh chỉ chứa TRÌNH DUYỆT; gói Python playwright do requirements.txt
+# cài. Hai bản phải TRÙNG NHAU, lệch là không tìm thấy Chromium -> job hỏng lúc
+# chạy. Bước kiểm tra bên dưới làm build báo lỗi ngay thay vì hỏng âm thầm.
+ARG PLAYWRIGHT_VERSION=1.49.1
+FROM mcr.microsoft.com/playwright/python:v${PLAYWRIGHT_VERSION}-noble
+ARG PLAYWRIGHT_VERSION
+
+# TZ: current_month()/default_months() dùng giờ máy để chọn tháng cần kéo.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8 \
+    TZ=Asia/Ho_Chi_Minh
+
+# TZ cần dữ liệu múi giờ; ảnh gốc thường đã có sẵn, thiếu thì mới cài.
+RUN [ -f /usr/share/zoneinfo/Asia/Ho_Chi_Minh ] || { \
+      apt-get update \
+      && apt-get install -y --no-install-recommends tzdata \
+      && rm -rf /var/lib/apt/lists/*; \
+    }
+
+WORKDIR /code
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN v="$(pip show playwright | awk '/^Version:/{print $2}')"; \
+    [ "$v" = "$PLAYWRIGHT_VERSION" ] || { \
+      echo "LOI: requirements.txt dung playwright $v nhung anh Playwright la v$PLAYWRIGHT_VERSION"; \
+      exit 1; \
+    }
+
+COPY . .
+
+CMD ["python", "scripts/yunatt_sync_ci.py"]
