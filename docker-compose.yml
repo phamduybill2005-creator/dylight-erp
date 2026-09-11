@@ -1,46 +1,70 @@
-# DYLIGHT ERP — cấu hình production trên VPS (https://erp.dosco.vn).
-# Bí mật nằm trong các file env trên máy chủ, KHÔNG commit:
-#   ./backend/.env, ./backend/yunatt.env, ./postgres.env
-# Job đồng bộ chấm công Yunatt:
-#   docker compose --profile jobs run --rm yunatt-sync
-
 services:
-  postgres:
-    image: postgres:18
-    restart: unless-stopped
-    env_file: ./postgres.env
-    volumes:
-      - postgres_data:/var/lib/postgresql
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dosco-erp-api
     restart: unless-stopped
-    env_file: ./backend/.env
-    depends_on:
-      - postgres
+    env_file:
+      - ./backend/.env
     ports:
       - "127.0.0.1:8000:8000"
+    networks:
+      - dosco-net
+
+  postgres:
+    image: postgres:18
+    container_name: dosco-erp-db
+    restart: unless-stopped
+    env_file:
+      - ./postgres.env
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dosco-net
 
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE: https://erp.dosco.vn/api/v1
-        NEXT_PUBLIC_ASSET_BASE: https://erp.dosco.vn
+        NEXT_PUBLIC_API_BASE: "https://erp.dosco.vn/api/v1"
+        NEXT_PUBLIC_ASSET_BASE: "https://erp.dosco.vn"
+    container_name: dosco-erp-web
     restart: unless-stopped
-    depends_on:
-      - backend
+    env_file:
+      - ./frontend/.env
     ports:
       - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - dosco-net
 
   yunatt-sync:
     build:
       context: ./backend
       dockerfile: Dockerfile.yunatt
-    profiles: ["jobs"]
     env_file:
       - ./backend/.env
       - ./backend/yunatt.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dosco-net
+    profiles:
+      - jobs
+
+networks:
+  dosco-net:
+    driver: bridge
 
 volumes:
   postgres_data:
