@@ -294,8 +294,6 @@ export const api = {
   // --- Evaluations (Đánh giá) ---
   evaluationsReceived: () => request<Evaluation[]>("/evaluations/received"),
   evaluationsGiven: () => request<Evaluation[]>("/evaluations/given"),
-  evaluationsForUser: (evaluateeId: number) =>
-    request<Evaluation[]>(`/evaluations?evaluatee_id=${evaluateeId}`),
   createEvaluation: (payload: { evaluatee_id: number; eval_date: string; project_id?: number | null; rating: number; comment?: string | null }) =>
     request<Evaluation>("/evaluations", {
       method: "POST",
@@ -306,8 +304,6 @@ export const api = {
     request<void>(`/evaluations/mine?evaluatee_id=${evaluateeId}&from_date=${fromDate}&to_date=${toDate}`, { method: "DELETE" }),
   evaluationsSummary: (period: string) =>
     request<EvaluationSummary[]>(`/evaluations/summary?period=${period}`),
-  allEvaluations: (period: string) =>
-    request<Evaluation[]>(`/evaluations/all?period=${period}`),
   evaluationsOverview: (fromDate: string, toDate: string) =>
     request<EvaluationOverviewRow[]>(`/evaluations/overview?from_date=${fromDate}&to_date=${toDate}`),
 

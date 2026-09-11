@@ -7,6 +7,8 @@ Quy tắc chiều đánh giá (chốt với người dùng):
   - Giám đốc / Quản trị / Quản lý cấp cao / Quản lý cấp trung chấm được MỌI NGƯỜI trong
     công ty (bấm sao ở bảng đánh giá tháng).
   - KHÔNG AI được chấm Giám đốc.
+RIÊNG TƯ: mỗi người chỉ xem được phiếu MÌNH NHẬN (/received) và phiếu MÌNH CHẤM (/given);
+KHÔNG có API xem phiếu (ai chấm ai bao nhiêu sao) của người khác — đừng thêm lại.
 Chấm THEO TỪNG NGÀY (eval_date) & TỪNG DỰ ÁN (project_id, tùy chọn) — mỗi (ngày, dự án)
 một phiếu (gửi lại thì ghi đè); kỳ tuần (period = Thứ 7) tự suy từ ngày để TỔNG HỢP THEO TUẦN.
 """
@@ -33,7 +35,6 @@ router = APIRouter(prefix="/evaluations", tags=["Đánh giá"])
 
 # Dùng BẢNG ĐÁNH GIÁ THÁNG và chấm được mọi người (trừ Giám đốc).
 _TABLE_ROLES = (UserRole.DIRECTOR, UserRole.ADMIN, UserRole.MANAGER, UserRole.MANAGER_MID)
-_VIEW_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
 
 
 def _week_saturday(d: date) -> str:
@@ -171,19 +172,6 @@ def evaluations_given(
         .order_by(Evaluation.period.desc(), Evaluation.id.desc())
         .all()
     )
-
-
-@router.get("/all", response_model=list[EvaluationOut])
-def all_evaluations(
-    period: str | None = None,
-    db: Session = Depends(get_db),
-    current: User = Depends(require_roles(UserRole.DIRECTOR)),
-):
-    """TẤT CẢ phiếu đánh giá trong công ty (Giám đốc) — lọc theo kỳ (tuần) nếu có."""
-    q = db.query(Evaluation).filter(Evaluation.company_id == current.company_id)
-    if period:
-        q = q.filter(Evaluation.period == period)
-    return q.order_by(Evaluation.period.desc(), Evaluation.id.desc()).all()
 
 
 @router.get("/summary", response_model=list[EvaluationSummary])
@@ -351,21 +339,3 @@ def evaluation_overview(
         )
         for u in users
     ]
-
-
-@router.get("", response_model=list[EvaluationOut])
-def evaluations_for_user(
-    evaluatee_id: int,
-    db: Session = Depends(get_db),
-    current: User = Depends(require_roles(*_VIEW_ROLES)),
-):
-    """Quản lý / Giám đốc xem toàn bộ phiếu đánh giá của một người (cùng công ty)."""
-    target = db.get(User, evaluatee_id)
-    if not target or target.company_id != current.company_id:
-        raise HTTPException(404, "Không tìm thấy nhân viên.")
-    return (
-        db.query(Evaluation)
-        .filter(Evaluation.evaluatee_id == evaluatee_id)
-        .order_by(Evaluation.period.desc(), Evaluation.id.desc())
-        .all()
-    )
