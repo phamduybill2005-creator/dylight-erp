@@ -4,7 +4,7 @@ Router Đánh giá (Evaluations) — 2 chiều giữa Nhân viên ↔ Quản lý
 Quy tắc chiều đánh giá (chốt với người dùng):
   - Nhân viên (FIELD_STAFF) chấm điểm QUẢN LÝ TRỰC TIẾP của mình (manager_id).
   - Quản lý (MANAGER / ACCOUNTANT) chấm điểm CẤP DƯỚI trực tiếp của mình.
-  - Giám đốc / Quản trị chấm được MỌI NGƯỜI trong công ty (bấm sao ở bảng tổng hợp tuần).
+  - Giám đốc / Quản trị chấm được MỌI NGƯỜI trong công ty (bấm sao ở bảng đánh giá tháng).
 Chấm THEO TỪNG NGÀY (eval_date) & TỪNG DỰ ÁN (project_id, tùy chọn) — mỗi (ngày, dự án)
 một phiếu (gửi lại thì ghi đè); kỳ tuần (period = Thứ 7) tự suy từ ngày để TỔNG HỢP THEO TUẦN.
 """

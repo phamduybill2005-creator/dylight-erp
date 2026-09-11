@@ -551,7 +551,7 @@ export interface EvaluationSummary {
   num_ratings: number;
 }
 
-/** 1 dòng bảng Đánh giá của Giám đốc trong 1 tuần (CN..T7). */
+/** 1 dòng bảng Đánh giá của Giám đốc trong 1 tháng. */
 export interface EvaluationOverviewRow {
   user_id: number;
   full_name: string;
@@ -560,7 +560,7 @@ export interface EvaluationOverviewRow {
   office_hours: number;         // giờ có mặt theo chấm công (đã trừ nghỉ trưa)
   project_hours: number;        // giờ khai ở bảng tiến độ dự án
   late_days: number;            // số ngày đi muộn (đơn đi muộn đã duyệt không tính)
-  my_rating?: number | null;    // sao mình đã chấm trong tuần; null = chưa chấm
+  my_rating?: number | null;    // sao mình đã chấm trong tháng; null = chưa chấm
 }
 
 // Chat nội bộ — hội thoại 1-1 (DIRECT) và nhóm tự tạo (GROUP).

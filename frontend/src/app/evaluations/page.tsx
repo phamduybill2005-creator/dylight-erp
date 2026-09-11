@@ -4,7 +4,7 @@
 // & TỪNG DỰ ÁN (dự án tùy chọn), TỔNG HỢP THEO TUẦN.
 //  - STAFF   : chấm quản lý trực tiếp theo ngày + xem điểm mình nhận.
 //  - MANAGER : chấm cấp dưới trực tiếp theo ngày/dự án + xem điểm nhân viên chấm mình.
-//  - DIRECTOR: bảng tuần (Office time / Project time / Đi muộn) + bấm sao chấm từng người,
+//  - DIRECTOR: bảng THÁNG (Office time / Project time / Đi muộn) + bấm sao chấm từng người,
 //              tổng hợp trung bình theo tuần + tất cả phiếu (kèm ngày/dự án).
 
 import { useEffect, useMemo, useState } from "react";
@@ -14,7 +14,7 @@ import { ChatBubbleLeftRightIcon, UserCircleIcon, FolderIcon } from "@heroicons/
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL, userRankWeight } from "@/lib/roles";
-import { dateLocal, todayLocal } from "@/lib/format";
+import { dateLocal, monthLocal, todayLocal } from "@/lib/format";
 import type { Evaluation, EvaluationSummary, EvaluationOverviewRow, User, Project, Colleague } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
@@ -37,6 +37,13 @@ function weekSunday(sat: string): string {
   x.setDate(x.getDate() - 6);
   return dateLocal(x);
 }
+// Ngày đầu / ngày cuối của tháng "YYYY-MM".
+function monthRange(m: string): [string, string] {
+  const [y, mo] = m.split("-").map(Number);
+  const last = new Date(y, mo, 0).getDate();
+  return [`${m}-01`, `${m}-${String(last).padStart(2, "0")}`];
+}
+const fmtMonth = (m: string) => `${m.slice(5, 7)}/${m.slice(0, 4)}`;
 const fmtSat = (s: string) =>
   new Date(s + "T00:00:00").toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 const fmtDay = (s?: string | null) =>
@@ -152,7 +159,8 @@ export default function EvaluationsPage() {
   const [selPeriod, setSelPeriod] = useState(weekSaturday());
   const [summary, setSummary] = useState<EvaluationSummary[]>([]);
   const [allEvals, setAllEvals] = useState<Evaluation[]>([]);
-  const [overview, setOverview] = useState<EvaluationOverviewRow[]>([]);   // bảng đánh giá tuần
+  const [selMonth, setSelMonth] = useState(monthLocal());   // tháng của bảng đánh giá
+  const [overview, setOverview] = useState<EvaluationOverviewRow[]>([]);   // bảng đánh giá tháng
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [ratingUid, setRatingUid] = useState<number | null>(null);   // người đang lưu sao
   const [rateMsg, setRateMsg] = useState("");
@@ -166,20 +174,22 @@ export default function EvaluationsPage() {
     api.allEvaluations(selPeriod).then(setAllEvals).catch(() => {});
   }, [user, selPeriod]);
 
-  // Bảng đánh giá: Office time / Project time / Đi muộn + sao mình đã chấm, theo TUẦN đang chọn.
+  // Bảng đánh giá: Office time / Project time / Đi muộn + sao mình đã chấm, CỘNG CẢ THÁNG đang
+  // chọn — cùng khoảng ngày với file Excel ở Tổng hợp chấm công nên số khớp nhau.
   useEffect(() => {
     if (!user || roleTier(user.role) !== "DIRECTOR") return;
     let alive = true;
     setOverviewLoading(true);
     setRateMsg("");
-    api.evaluationsOverview(weekSunday(selPeriod), selPeriod)
+    const [from, to] = monthRange(selMonth);
+    api.evaluationsOverview(from, to)
       .then((rows) => { if (alive) setOverview(rows); })
       .catch(() => { if (alive) setOverview([]); })
       .finally(() => { if (alive) setOverviewLoading(false); });
     return () => { alive = false; };
-  }, [user, selPeriod]);
+  }, [user, selMonth]);
 
-  // Giám đốc bấm sao: lưu phiếu CHUNG (không gắn dự án) vào ngày Thứ 7 của tuần đang xem.
+  // Giám đốc bấm sao: lưu phiếu CHUNG (không gắn dự án) vào NGÀY 1 của tháng đang xem.
   // Cùng 1 ngày nên bấm sao khác là SỬA phiếu đó, không sinh thêm phiếu.
   async function rateUser(uid: number, stars: number) {
     const before = overview.find((r) => r.user_id === uid)?.my_rating ?? null;
@@ -189,7 +199,7 @@ export default function EvaluationsPage() {
     setRatingUid(uid);
     setRateMsg("");
     try {
-      await api.createEvaluation({ evaluatee_id: uid, eval_date: selPeriod, project_id: null, rating: stars });
+      await api.createEvaluation({ evaluatee_id: uid, eval_date: monthRange(selMonth)[0], project_id: null, rating: stars });
       api.evaluationsSummary(selPeriod).then(setSummary).catch(() => {});
       api.allEvaluations(selPeriod).then(setAllEvals).catch(() => {});
     } catch (err) {
@@ -448,7 +458,7 @@ export default function EvaluationsPage() {
     const avgAll = summary.length
       ? (summary.reduce((a, s) => a + s.avg_rating, 0) / summary.length).toFixed(2)
       : "—";
-    // Bảng tuần: xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng không nhảy khi bấm.
+    // Bảng tháng: xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng không nhảy khi bấm.
     const rows = [...overview].sort(
       (x, y) => userRankWeight(x) - userRankWeight(y) || x.full_name.localeCompare(y.full_name, "vi")
     );
@@ -458,40 +468,35 @@ export default function EvaluationsPage() {
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
-          <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự — tổng hợp tuần</h1>
+          <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự</h1>
         </header>
 
-        {/* Chọn TUẦN — áp cho bảng đánh giá và các mục tổng hợp bên dưới */}
-        <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-3 shadow-card">
-          <div className="text-xs text-muted">
-            Tuần <b className="text-ink">CN {fmtSat(weekSunday(selPeriod))}</b> – <b className="text-ink">Thứ 7 {fmtSat(selPeriod)}</b>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={selPeriod}
-              disabled={ratingUid !== null}
-              onChange={(e) => e.target.value && setSelPeriod(weekSaturday(new Date(e.target.value + "T00:00:00")))}
-              className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel disabled:opacity-60"
-            />
-            <button
-              onClick={() => setSelPeriod(weekSaturday())}
-              disabled={ratingUid !== null}
-              className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper disabled:opacity-60"
-            >
-              Tuần này
-            </button>
-          </div>
-        </section>
-
-        {/* BẢNG ĐÁNH GIÁ TUẦN: Office time / Project time / Đi muộn + bấm sao để chấm */}
+        {/* BẢNG ĐÁNH GIÁ THÁNG: Office time / Project time / Đi muộn + bấm sao để chấm */}
         <section className="mt-4">
-          <div className="mb-2">
-            <h2 className="text-sm font-semibold text-ink">Đánh giá nhân sự ({rows.length})</h2>
-            <p className="mt-0.5 text-[11px] text-muted">
-              <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm, bấm sao khác để sửa.
-            </p>
-            {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
+          <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-ink">Đánh giá nhân sự tháng {fmtMonth(selMonth)} ({rows.length})</h2>
+              <p className="mt-0.5 text-[11px] text-muted">
+                Cộng cả tháng: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm tháng này, bấm sao khác để sửa.
+              </p>
+              {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <input
+                type="month"
+                value={selMonth}
+                disabled={ratingUid !== null}
+                onChange={(e) => e.target.value && setSelMonth(e.target.value)}
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel disabled:opacity-60"
+              />
+              <button
+                onClick={() => setSelMonth(monthLocal())}
+                disabled={ratingUid !== null}
+                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper disabled:opacity-60"
+              >
+                Tháng này
+              </button>
+            </div>
           </div>
           {rows.length === 0 ? (
             <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">
@@ -547,6 +552,27 @@ export default function EvaluationsPage() {
               </table>
             </div>
           )}
+        </section>
+
+        {/* Chọn TUẦN — cho các mục tổng hợp tuần bên dưới */}
+        <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-3 shadow-card">
+          <div className="text-xs text-muted">
+            Tuần <b className="text-ink">CN {fmtSat(weekSunday(selPeriod))}</b> – <b className="text-ink">Thứ 7 {fmtSat(selPeriod)}</b>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={selPeriod}
+              onChange={(e) => e.target.value && setSelPeriod(weekSaturday(new Date(e.target.value + "T00:00:00")))}
+              className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel"
+            />
+            <button
+              onClick={() => setSelPeriod(weekSaturday())}
+              className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper"
+            >
+              Tuần này
+            </button>
+          </div>
         </section>
 
         <section className="mt-4">
