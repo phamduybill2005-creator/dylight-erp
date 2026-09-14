@@ -11,11 +11,15 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
-import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, ChevronRightIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, ChevronRightIcon, FunnelIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL, userRankWeight } from "@/lib/roles";
 import { dateLocal, monthLocal, todayLocal } from "@/lib/format";
+import { useStickyState } from "@/lib/use-sticky-state";
+import { PRESET_DEPARTMENTS } from "@/lib/departments";
+import { normalizeDept } from "@/lib/groups";
+import { splitDepts } from "@/components/filter-bar";
 import type { Evaluation, EvaluationOverviewRow, User, Project, Colleague } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
@@ -242,6 +246,8 @@ export default function EvaluationsPage() {
   const [openUid, setOpenUid] = useState<number | null>(null);
   const [projHours, setProjHours] = useState<Record<string, ProjHourRow[] | "loading" | "error">>({});
   const [exporting, setExporting] = useState(false);
+  // Lọc bảng tháng theo PHÒNG BAN (4 phòng chuẩn như các trang khác); nhớ qua F5.
+  const [selDept, setSelDept] = useStickyState("evaluations.dept", "");
 
   const period = weekSaturday();
   const tier = user ? roleTier(user.role) : "STAFF";
@@ -590,8 +596,10 @@ export default function EvaluationsPage() {
   if (usesMonthTable) {
     // Bảng tháng: KHÔNG hiện Giám đốc; xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng
     // không nhảy khi bấm. Xuất Excel dùng chính danh sách này nên cũng bỏ Giám đốc.
+    // Người thuộc nhiều phòng ("Phòng Bản đồ, Phòng AI") được tính ở TỪNG phòng, giống bộ lọc các trang khác.
     const rows = overview
       .filter((r) => r.role !== "DIRECTOR")
+      .filter((r) => !selDept || splitDepts(r.department).map(normalizeDept).includes(selDept))
       .sort((x, y) => userRankWeight(x) - userRankWeight(y) || x.full_name.localeCompare(y.full_name, "vi"));
     const hoursCell = (h: number) =>
       h > 0 ? <span className="font-semibold text-ink">{h.toFixed(1)}h</span> : <span className="text-muted">—</span>;
@@ -606,13 +614,29 @@ export default function EvaluationsPage() {
         <section className="mt-4">
           <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-ink">Đánh giá nhân sự tháng {fmtMonth(selMonth)} ({rows.length})</h2>
+              <h2 className="text-sm font-semibold text-ink">
+                Đánh giá nhân sự tháng {fmtMonth(selMonth)}{selDept ? ` · ${selDept}` : ""} ({rows.length})
+              </h2>
               <p className="mt-0.5 text-[11px] text-muted">
                 Cộng cả tháng: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm tháng này, bấm sao khác để sửa, bấm lại đúng sao đang chọn để bỏ.
               </p>
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 rounded-lg border border-line bg-white px-2 py-1.5">
+                <FunnelIcon className="h-3.5 w-3.5 text-muted" />
+                <select
+                  value={selDept}
+                  onChange={(e) => setSelDept(e.target.value)}
+                  aria-label="Lọc theo phòng ban"
+                  className="bg-transparent text-xs font-medium text-ink outline-none"
+                >
+                  <option value="">Tất cả phòng ban</option>
+                  {PRESET_DEPARTMENTS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </label>
               <button
                 onClick={() => exportExcel(rows)}
                 disabled={exporting || overviewLoading || rows.length === 0}
@@ -640,7 +664,7 @@ export default function EvaluationsPage() {
           </div>
           {rows.length === 0 ? (
             <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">
-              {overviewLoading ? "Đang tải…" : "Chưa có nhân sự nào."}
+              {overviewLoading ? "Đang tải…" : selDept ? `Không có ai thuộc ${selDept}.` : "Chưa có nhân sự nào."}
             </p>
           ) : (
             <div className="overflow-x-auto rounded-xl2 bg-white shadow-card">
