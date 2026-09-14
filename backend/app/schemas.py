@@ -1116,28 +1116,32 @@ class ProjectItemRatingUpsert(BaseModel):
 
 
 # ------------------------- ORG CHART (sơ đồ tổ chức) -------------------------
-class OrgChartNode(BaseModel):
-    """Một ô nhân sự trong sơ đồ. Giữ ĐÚNG tên trường camelCase như frontend."""
+class OrgChartDepartment(BaseModel):
+    """Một PHÒNG BAN = một làn trên sơ đồ. color chọn từ danh sách cố định (_COLORS ở router)."""
     key: str
     name: str
-    deptLabel: str = ""
-    jpDeptLabel: str = ""
-    bgClass: str = "bg-slate-100"
-    textClass: str = "text-slate-900"
-    borderColor: str = "border-slate-300"
+    jpName: str = ""
+    color: str = "teal"
+
+
+class OrgChartPerson(BaseModel):
+    """Một người trên sơ đồ. Giữ ĐÚNG tên trường camelCase như frontend.
+    - key      : họ tên tài khoản ERP (để liên kết & xem hồ sơ) hoặc tên tự đặt — không trùng.
+    - dept     : key phòng ban; None = lãnh đạo, vẽ ở trên cùng.
+    - parent   : key cấp trên trực tiếp; None = không có."""
+    key: str
+    name: str
+    title: str = ""                   # chức danh tự ghi (dùng khi chưa liên kết tài khoản ERP)
+    dept: str | None = None
+    extraDepts: list[str] = []        # phòng kiêm nhiệm (chỉ ghi nhãn)
+    parent: str | None = None
 
 
 class OrgChartData(BaseModel):
-    """Các CỤM ô theo đúng bố cục đang vẽ (nhánh trái = 3D, nhánh phải = Cầu đường)."""
-    level1: list[OrgChartNode] = []
-    level2: list[OrgChartNode] = []
-    level3: list[OrgChartNode] = []
-    level4Left: list[OrgChartNode] = []
-    level4Right: list[OrgChartNode] = []
-    level5Left: list[OrgChartNode] = []
-    level5Right: list[OrgChartNode] = []
-    level6Left: list[OrgChartNode] = []
-    level6Right: list[OrgChartNode] = []
+    """Sơ đồ phiên bản 2: phòng ban (làn) + người (có cấp trên). Bản cũ được router tự chuyển."""
+    version: int = 2
+    departments: list[OrgChartDepartment] = []
+    people: list[OrgChartPerson] = []
 
 
 class OrgChartOut(BaseModel):

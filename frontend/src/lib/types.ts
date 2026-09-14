@@ -606,28 +606,32 @@ export interface Department {
   order_index: number;
 }
 
-/** Một ô nhân sự trong SƠ ĐỒ TỔ CHỨC (khớp OrgChartNode ở backend). */
-export interface OrgChartNode {
+/** Màu làn phòng ban trên SƠ ĐỒ TỔ CHỨC — danh sách cố định, khớp _COLORS ở backend. */
+export type OrgChartColor = "teal" | "violet" | "amber" | "sky" | "rose" | "emerald";
+
+/** Một PHÒNG BAN = một làn trên sơ đồ (khớp OrgChartDepartment ở backend). */
+export interface OrgChartDepartment {
   key: string;
   name: string;
-  deptLabel: string;
-  jpDeptLabel: string;
-  bgClass: string;
-  textClass: string;
-  borderColor: string;
+  jpName: string;
+  color: OrgChartColor;
 }
 
-/** Các CỤM ô theo đúng bố cục đang vẽ (nhánh trái = 3D, nhánh phải = Cầu đường). */
+/** Một người trên sơ đồ (khớp OrgChartPerson ở backend). */
+export interface OrgChartPerson {
+  key: string;                 // họ tên tài khoản ERP (để liên kết) hoặc tên tự đặt — không trùng
+  name: string;                // tên hiển thị ngắn, vd "SƠN"
+  title: string;               // chức danh tự ghi (dùng khi chưa liên kết tài khoản ERP)
+  dept: string | null;         // key phòng ban; null = lãnh đạo, vẽ ở trên cùng
+  extraDepts: string[];        // phòng kiêm nhiệm (chỉ ghi nhãn)
+  parent: string | null;       // key cấp trên trực tiếp; null = không có
+}
+
+/** Sơ đồ phiên bản 2: phòng ban (làn) + người (có cấp trên). */
 export interface OrgChartData {
-  level1: OrgChartNode[];
-  level2: OrgChartNode[];
-  level3: OrgChartNode[];
-  level4Left: OrgChartNode[];
-  level4Right: OrgChartNode[];
-  level5Left: OrgChartNode[];
-  level5Right: OrgChartNode[];
-  level6Left: OrgChartNode[];
-  level6Right: OrgChartNode[];
+  version: 2;
+  departments: OrgChartDepartment[];
+  people: OrgChartPerson[];
 }
 
 export interface OrgChartOut {
