@@ -8,10 +8,10 @@
 //    time / Đi muộn) + bấm sao chấm mọi người (TRỪ Giám đốc — không ai chấm Giám đốc) + xuất Excel.
 //  Mỗi người (trừ Giám đốc) có mục RIÊNG TƯ "Đánh giá tôi nhận được" theo tháng: ai chấm mình bao nhiêu sao.
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
-import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, ChevronRightIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL, userRankWeight } from "@/lib/roles";
@@ -132,6 +132,48 @@ function EvalCard({ e, who, showDate = true }: { e: Evaluation; who: "evaluator"
   );
 }
 
+// Giờ khai theo TỪNG DỰ ÁN của 1 người trong tháng (bấm tên ở bảng tháng). Cùng nguồn
+// timesheets với cột Project time nên cộng lại bằng đúng số ở cột đó.
+type ProjHourRow = { project_id: number; code: string; name: string; hours: number };
+
+function ProjectHoursDetail({ data, month }: { data: ProjHourRow[] | "loading" | "error" | undefined; month: string }) {
+  if (data === undefined || data === "loading") {
+    return <p className="ml-6 py-1 text-[11px] text-muted">Đang tải giờ dự án…</p>;
+  }
+  if (data === "error") {
+    return <p className="ml-6 py-1 text-[11px] font-semibold text-bad">Không tải được giờ dự án — bấm lại tên để thử lại.</p>;
+  }
+  if (data.length === 0) {
+    return <p className="ml-6 py-1 text-[11px] text-muted">Tháng {fmtMonth(month)} chưa khai giờ dự án nào.</p>;
+  }
+  const total = data.reduce((sum, p) => sum + p.hours, 0);
+  return (
+    <div className="ml-6 max-w-xl">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+        Giờ theo dự án · tháng {fmtMonth(month)} ({data.length} dự án)
+      </p>
+      <table className="w-full text-[11px]">
+        <tbody>
+          {data.map((p) => (
+            <tr key={p.project_id} className="border-b border-line/40 last:border-0">
+              <td className="w-28 py-1 pr-2 font-mono text-muted">{p.code || "—"}</td>
+              <td className="py-1 pr-2 text-ink">{p.name}</td>
+              <td className="w-16 py-1 text-right font-semibold text-ink tnum">{p.hours.toFixed(1)}h</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t border-line">
+            <td />
+            <td className="pt-1 pr-2 text-right text-[10px] font-semibold uppercase text-muted">Tổng</td>
+            <td className="pt-1 text-right font-bold text-ink tnum">{total.toFixed(1)}h</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 // Mục RIÊNG TƯ: ai đã chấm MÌNH bao nhiêu sao trong tháng đang xem. Chỉ người đăng nhập thấy
 // — dữ liệu từ /evaluations/received, backend chỉ trả phiếu có người nhận là chính mình.
 function ReceivedSection({ items, month }: { items: Evaluation[]; month: string }) {
@@ -196,6 +238,9 @@ export default function EvaluationsPage() {
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [ratingUid, setRatingUid] = useState<number | null>(null);   // người đang lưu sao
   const [rateMsg, setRateMsg] = useState("");
+  // Bấm tên 1 người trong bảng tháng -> mở dòng giờ theo từng dự án (cache theo người + tháng).
+  const [openUid, setOpenUid] = useState<number | null>(null);
+  const [projHours, setProjHours] = useState<Record<string, ProjHourRow[] | "loading" | "error">>({});
   const [exporting, setExporting] = useState(false);
 
   const period = weekSaturday();
@@ -216,6 +261,32 @@ export default function EvaluationsPage() {
       .finally(() => { if (alive) setOverviewLoading(false); });
     return () => { alive = false; };
   }, [user, selMonth]);
+
+  // Đổi tháng -> đóng dòng chi tiết đang mở (số của tháng cũ không còn đúng).
+  useEffect(() => { setOpenUid(null); }, [selMonth]);
+
+  async function toggleProjects(uid: number) {
+    if (openUid === uid) { setOpenUid(null); return; }
+    setOpenUid(uid);
+    const key = `${uid}:${selMonth}`;
+    if (Array.isArray(projHours[key]) || projHours[key] === "loading") return;
+    setProjHours((m) => ({ ...m, [key]: "loading" }));
+    try {
+      const [from, to] = monthRange(selMonth);
+      const list = await api.timesheets({ from, to, userId: uid });
+      const byProject = new Map<number, ProjHourRow>();
+      for (const t of list) {
+        const row = byProject.get(t.project_id)
+          ?? { project_id: t.project_id, code: t.project_code || "", name: t.project_name || `Dự án #${t.project_id}`, hours: 0 };
+        row.hours += Number(t.hours || 0);
+        byProject.set(t.project_id, row);
+      }
+      const items = [...byProject.values()].sort((a, b) => b.hours - a.hours);
+      setProjHours((m) => ({ ...m, [key]: items }));
+    } catch {
+      setProjHours((m) => ({ ...m, [key]: "error" }));
+    }
+  }
 
   // Bấm sao: lưu phiếu CHUNG (không gắn dự án) vào NGÀY 1 của tháng đang xem — cùng 1 ngày nên
   // bấm sao khác là SỬA phiếu đó. Bấm lại ĐÚNG sao đang chọn = BỎ SAO (xoá phiếu tháng đó).
@@ -537,7 +608,7 @@ export default function EvaluationsPage() {
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-ink">Đánh giá nhân sự tháng {fmtMonth(selMonth)} ({rows.length})</h2>
               <p className="mt-0.5 text-[11px] text-muted">
-                Cộng cả tháng: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm tháng này, bấm sao khác để sửa, bấm lại đúng sao đang chọn để bỏ.
+                Cộng cả tháng: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm tháng này, bấm sao khác để sửa, bấm lại đúng sao đang chọn để bỏ.
               </p>
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
             </div>
@@ -585,12 +656,22 @@ export default function EvaluationsPage() {
                 </thead>
                 <tbody className={overviewLoading ? "opacity-60" : ""}>
                   {rows.map((r, i) => (
-                    <tr key={r.user_id} className="border-b border-line/50 last:border-0 hover:bg-paper/60">
+                    <Fragment key={r.user_id}>
+                    <tr className="border-b border-line/50 last:border-0 hover:bg-paper/60">
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
                           <span className="w-4 shrink-0 text-right text-[10px] font-semibold text-muted">{i + 1}</span>
                           <div className="min-w-0">
-                            <p className="truncate font-semibold text-ink">{r.full_name}</p>
+                            <button
+                              type="button"
+                              onClick={() => toggleProjects(r.user_id)}
+                              aria-expanded={openUid === r.user_id}
+                              title="Xem giờ theo từng dự án"
+                              className="group flex max-w-full items-center gap-1 text-left"
+                            >
+                              <span className="truncate font-semibold text-ink group-hover:text-steel group-hover:underline">{r.full_name}</span>
+                              <ChevronRightIcon className={`h-3 w-3 shrink-0 text-muted transition-transform ${openUid === r.user_id ? "rotate-90" : ""}`} />
+                            </button>
                             <p className="truncate text-[10px] text-muted">
                               {ROLE_LABEL[r.role] || "Nhân viên"}{r.department ? ` · ${r.department}` : ""}
                             </p>
@@ -616,6 +697,14 @@ export default function EvaluationsPage() {
                         </div>
                       </td>
                     </tr>
+                    {openUid === r.user_id && (
+                      <tr className="border-b border-line/50 bg-paper/60">
+                        <td colSpan={5} className="px-3 py-2">
+                          <ProjectHoursDetail data={projHours[`${r.user_id}:${selMonth}`]} month={selMonth} />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
