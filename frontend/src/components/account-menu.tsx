@@ -21,13 +21,18 @@ import {
   ChevronDownIcon,
   EnvelopeIcon,
   LockClosedIcon,
+  EyeIcon,
+  ArrowUturnLeftIcon,
 } from "@heroicons/react/24/outline";
-import { api } from "@/lib/api";
-import { roleTitle } from "@/lib/roles";
+import { api, previewRole } from "@/lib/api";
+import { roleTitle, ROLE_LABEL } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
-import type { User } from "@/lib/types";
+import type { Role, User } from "@/lib/types";
 
 type IconType = React.ComponentType<{ className?: string }>;
+
+/** Các vai trò có thể chọn để XEM GIAO DIỆN (Giám đốc / Quản trị mới thấy mục này). */
+const PREVIEW_ROLES: Role[] = ["DIRECTOR", "ADMIN", "MANAGER", "MANAGER_MID", "ACCOUNTANT", "FIELD_STAFF"];
 
 function Row({ icon: Icon, label, value }: { icon: IconType; label: string; value?: string | null }) {
   if (!value) return null;
@@ -117,6 +122,15 @@ export default function AccountMenu({
 
   const role = roleTitle(user?.role, user?.has_subordinates, !user?.manager_id && !user?.manager_ids);
 
+  // Chế độ XEM GIAO DIỆN với vai trò khác: gate theo tài khoản THẬT, không theo vai trò đang xem.
+  const real = api.realUser() ?? user;
+  const previewing = previewRole.get();
+  const canPreview = previewRole.allowed(real);
+  function choosePreview(r: Role | null) {
+    previewRole.set(r && r !== real?.role ? r : null);
+    window.location.reload();   // mọi trang nạp lại me() -> menu, cột, nút đổi theo vai trò đã chọn
+  }
+
   const panel = (
     <div
       className={`absolute z-50 flex max-h-[85vh] w-72 flex-col overflow-hidden rounded-xl2 bg-white text-ink shadow-card border border-line ${
@@ -129,7 +143,9 @@ export default function AccountMenu({
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-bold">{user?.full_name ?? "—"}</p>
-          <p className="truncate text-[10px] font-semibold text-amber">{role}</p>
+          <p className="truncate text-[10px] font-semibold text-amber">
+            {role}{previewing ? " · đang xem" : ""}
+          </p>
         </div>
       </div>
 
@@ -189,6 +205,41 @@ export default function AccountMenu({
       </div>
 
       <div className="border-t border-line p-2">
+        {/* Giám đốc / Quản trị: xem web hiện ra sao với từng loại tài khoản (chỉ đổi giao diện) */}
+        {canPreview && (
+          <div className="mb-1 border-b border-line pb-2">
+            <p className="flex items-center gap-1.5 px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-muted">
+              <EyeIcon className="h-3.5 w-3.5" /> Xem giao diện với vai trò
+            </p>
+            <div className="grid grid-cols-2 gap-1 px-2">
+              {PREVIEW_ROLES.map((r) => {
+                const active = (previewing ?? real?.role) === r;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => choosePreview(r)}
+                    className={`rounded-lg border px-2 py-1.5 text-left text-[11px] font-semibold transition-colors ${
+                      active ? "border-ink bg-ink text-white" : "border-line bg-paper text-ink hover:border-steel"
+                    }`}
+                  >
+                    {ROLE_LABEL[r]}
+                  </button>
+                );
+              })}
+            </div>
+            {previewing && (
+              <button
+                type="button"
+                onClick={() => choosePreview(null)}
+                className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-amber-deep hover:bg-amber/10"
+              >
+                <ArrowUturnLeftIcon className="h-4 w-4" /> Thoát chế độ xem (về {ROLE_LABEL[real!.role]})
+              </button>
+            )}
+            <p className="px-3 pt-1 text-[10px] text-muted">Chỉ đổi giao diện; mọi thao tác vẫn thực hiện bằng tài khoản thật.</p>
+          </div>
+        )}
         <Link
           href="/colleagues"
           onClick={() => setOpen(false)}

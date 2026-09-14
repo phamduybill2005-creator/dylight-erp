@@ -2,7 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 
-import type { Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
+import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -16,12 +16,60 @@ const TOKEN_KEY = "dylight_token";
 // Cache người dùng hiện tại (/me) trong bộ nhớ để KHÔNG phải chờ mạng mỗi lần
 // chuyển trang -> hết "giật màn hình trắng". Chỉ tồn tại trong phiên SPA; reset khi đăng xuất.
 let cachedMe: User | null = null;
+// Tài khoản THẬT (chưa đổi vai trò) — menu tài khoản cần để hiện đúng người & gate chế độ xem.
+let realMe: User | null = null;
+
+// ---- XEM GIAO DIỆN VỚI VAI TRÒ KHÁC (chỉ Giám đốc / Quản trị hệ thống) ----
+// Chỉ đổi vai trò ở PHÍA GIAO DIỆN: mọi trang đọc api.me()/cachedUser() nên tự đổi
+// menu, cột, nút theo vai trò được chọn. Token vẫn là tài khoản thật -> máy chủ vẫn
+// trả dữ liệu theo quyền thật, và mọi thao tác ghi vẫn ghi bằng tài khoản thật.
+// Lưu trong sessionStorage: đóng trình duyệt / đăng xuất là hết (tokenStore.clear xoá).
+const PREVIEW_ROLE_KEY = "dylight_preview_role";
+const PREVIEW_ALLOWED: Role[] = ["ADMIN", "DIRECTOR"];
+const ROLE_VALUES: Role[] = ["ADMIN", "DIRECTOR", "MANAGER", "MANAGER_MID", "ACCOUNTANT", "FIELD_STAFF"];
+
+export const previewRole = {
+  get(): Role | null {
+    try {
+      const r = sessionStorage.getItem(PREVIEW_ROLE_KEY) as Role | null;
+      return r && ROLE_VALUES.includes(r) ? r : null;
+    } catch {
+      return null;
+    }
+  },
+  set(r: Role | null) {
+    try {
+      if (r) sessionStorage.setItem(PREVIEW_ROLE_KEY, r);
+      else sessionStorage.removeItem(PREVIEW_ROLE_KEY);
+    } catch {}
+  },
+  /** Tài khoản này có được dùng chế độ xem không (tính theo vai trò THẬT). */
+  allowed: (u: User | null | undefined) => !!u && PREVIEW_ALLOWED.includes(u.role),
+};
+
+/** Trả về bản sao người dùng với vai trò đang xem; không đủ quyền thì xoá lựa chọn và giữ nguyên. */
+function applyPreviewRole(u: User): User {
+  const r = previewRole.get();
+  if (!r) return u;
+  if (!previewRole.allowed(u)) { previewRole.set(null); return u; }
+  if (r === u.role) return u;
+  // Quản lý cấp cao = quản lý KHÔNG có cấp trên; cấp trung / nhân viên giữ quản lý thật.
+  return {
+    ...u,
+    role: r,
+    manager_id: r === "MANAGER" ? null : u.manager_id,
+    manager_ids: r === "MANAGER" ? null : u.manager_ids,
+    manager_name: r === "MANAGER" ? null : u.manager_name,
+    has_subordinates: r === "MANAGER" || r === "MANAGER_MID",
+  };
+}
 
 export const tokenStore = {
   get: () => (typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null),
   set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
   clear: () => {
     cachedMe = null;
+    realMe = null;
     localStorage.removeItem(TOKEN_KEY);
     // Đăng xuất -> quên luôn ID và mọi lựa chọn đã nhớ của phiên này.
     try {
@@ -96,14 +144,17 @@ export const api = {
   // dùng cachedUser() để render ngay -> không nháy trắng trong lúc chờ mạng.
   me: async () => {
     const u = await request<User>("/auth/me");
-    cachedMe = u;
+    realMe = u;
+    cachedMe = applyPreviewRole(u);   // đang "xem với vai trò khác" -> mọi trang thấy vai trò đó
     // Ghi lại ID để useStickyState tách lựa chọn theo TỪNG NGƯỜI (hai người dùng
     // chung máy không thừa hưởng bộ lọc của nhau).
     try { localStorage.setItem("dylight_uid", String(u.id)); } catch {}
-    return u;
+    return cachedMe;
   },
   /** Người dùng đã nạp gần nhất (đồng bộ, không gọi mạng) — dùng làm state khởi tạo. */
   cachedUser: (): User | null => cachedMe,
+  /** Tài khoản THẬT đã nạp gần nhất (không đổi vai trò) — cho menu tài khoản / thanh báo chế độ xem. */
+  realUser: (): User | null => realMe,
 
   // --- Dữ liệu ---
   companies: () => request<Company[]>("/companies"),

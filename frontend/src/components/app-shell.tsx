@@ -22,10 +22,11 @@ import {
   CalendarIcon,
   TableCellsIcon,
   BanknotesIcon,
+  EyeIcon,
 } from "@heroicons/react/24/outline";
-import { api, tokenStore } from "@/lib/api";
-import { roleTier, canSeeRevenue } from "@/lib/roles";
-import type { User } from "@/lib/types";
+import { api, previewRole, tokenStore } from "@/lib/api";
+import { roleTier, canSeeRevenue, ROLE_LABEL } from "@/lib/roles";
+import type { Role, User } from "@/lib/types";
 import NotificationsBell from "./notifications-bell";
 import ChatWidget from "./chat-widget";
 import AccountMenu from "./account-menu";
@@ -91,6 +92,9 @@ export default function AppShell({
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(api.cachedUser());
   const tier = roleTier(user?.role);
+  // Đang XEM GIAO DIỆN với vai trò khác? Đọc sau khi mount (sessionStorage không có khi render phía máy chủ).
+  const [previewing, setPreviewing] = useState<Role | null>(null);
+  useEffect(() => { setPreviewing(previewRole.get()); }, []);
 
   useEffect(() => {
     if (!tokenStore.get()) {
@@ -103,6 +107,11 @@ export default function AppShell({
   function logout() {
     tokenStore.clear();
     router.replace("/login");
+  }
+
+  function exitPreview() {
+    previewRole.set(null);
+    window.location.reload();
   }
 
   const isActive = (href: string) =>
@@ -148,6 +157,24 @@ export default function AppShell({
           </div>
         </div>
       </header>
+
+      {/* Thanh báo: Giám đốc / Quản trị đang XEM GIAO DIỆN với vai trò khác (chỉ đổi giao diện) */}
+      {previewing && (
+        <div className="sticky top-14 z-30 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber/40 bg-amber/15 px-3 py-1.5 text-center text-[11px] font-semibold text-amber-deep">
+          <EyeIcon className="h-4 w-4 shrink-0" />
+          <span>
+            Đang xem giao diện với vai trò <b className="text-ink">{ROLE_LABEL[previewing]}</b> — mọi thao tác vẫn thực hiện bằng tài khoản thật
+            {api.realUser()?.full_name ? ` (${api.realUser()!.full_name})` : ""}.
+          </span>
+          <button
+            type="button"
+            onClick={exitPreview}
+            className="rounded-full border border-amber-deep/40 bg-white px-2.5 py-0.5 text-[11px] font-bold text-amber-deep hover:bg-amber/20"
+          >
+            Thoát chế độ xem
+          </button>
+        </div>
+      )}
 
       {/* ====================== MAIN CONTENT AREA ====================== */}
       <motion.main
