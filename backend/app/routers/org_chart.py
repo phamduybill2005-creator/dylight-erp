@@ -96,7 +96,7 @@ _V2_COLOR = {
 }
 
 
-def _from_v2(data: dict) -> dict:
+def _from_v2(data: dict, director_names: tuple[str, ...] = ()) -> dict:
     """Đổi dữ liệu BẢN 2 (departments + people, có cấp trên) về bố cục hàng cố định của
     bản này, để không mất người nếu DB đã lỡ lưu bằng giao diện làn phòng ban:
       lãnh đạo -> hàng 3; phòng thứ nhất -> hàng 2 (cấp 0) + hàng 1 (cấp dưới);
@@ -116,15 +116,31 @@ def _from_v2(data: dict) -> dict:
         par = by_key.get(p.get("parent")) if p.get("parent") else None
         return depth(par, seen) + 1 if par and lane(par) == lane(p) else 0
 
+    # Ô có sẵn trong sơ đồ gốc -> lấy lại ĐÚNG màu + nhãn cũ của ô đó (bản 2 không lưu
+    # màu riêng từng ô; nếu suy từ màu làn thì cả hàng cùng một màu, khác hẳn trước).
+    style_by_key = {n["key"].lower(): n for g in DEFAULT_CHART.values() for n in g}
+    # Ô đã được liên kết tài khoản ERP (mã đổi thành họ tên) -> dò theo TÊN hiển thị.
+    style_by_name = {n["name"].strip().lower(): n for g in DEFAULT_CHART.values() for n in g}
+
     def node(p: dict, d: dict | None) -> dict:
+        key = (p.get("key") or p["name"]).strip()
+        orig = style_by_key.get(key.lower()) or style_by_name.get(p["name"].strip().lower())
+        if orig:
+            return {**orig, "key": key, "name": p["name"].strip()}
         extras = [x["name"] for x in depts if x.get("key") in (p.get("extraDepts") or [])]
         bg, text, border = _V2_COLOR.get((d or {}).get("color", ""), ("bg-green-500", _DARK, "border-green-600"))
         return {
-            "key": (p.get("key") or p["name"]).strip(), "name": p["name"].strip(),
+            "key": key, "name": p["name"].strip(),
             "deptLabel": " & ".join([d["name"]] + extras) if d else "",
             "jpDeptLabel": (d or {}).get("jpName", "") or "",
             "bgClass": bg, "textClass": text, "borderColor": border,
         }
+
+    # Ô Giám đốc do bản 2 TỰ THÊM lên trên cùng khi chuyển đổi -> sơ đồ gốc không có, bỏ.
+    directors = {n.lower() for n in director_names}
+    people = [p for p in people
+              if not (lane(p) is None and not p.get("parent") and (p.get("key") or "").lower() in directors
+                      and (p.get("key") or "").lower() not in style_by_key)]
 
     out = {g: [] for g in ("level1", "level2", "level3", "level4Left", "level4Right", "level5Left", "level5Right", "level6Left", "level6Right")}
     for p in sorted((p for p in people if lane(p) is None), key=depth):
@@ -156,7 +172,13 @@ def get_org_chart(
         )
     stored = row.data or DEFAULT_CHART
     if isinstance(stored, dict) and "people" in stored:
-        stored = _from_v2(stored)   # DB lỡ lưu bản 2 -> đổi ngược, không mất người
+        # DB lỡ lưu bản 2 -> đổi ngược, không mất người; bỏ ô Giám đốc mà bản 2 tự thêm.
+        directors = tuple(
+            u.full_name for u in db.query(User)
+            .filter(User.company_id == current.company_id, User.role == UserRole.DIRECTOR)
+            .all()
+        )
+        stored = _from_v2(stored, directors)
     return OrgChartOut(
         data=OrgChartData.model_validate(stored),
         updated_at=row.updated_at,
