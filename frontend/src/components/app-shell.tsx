@@ -1,11 +1,12 @@
 "use client";
 
 // Khung giao diện RESPONSIVE — dùng được cả trên điện thoại và máy tính (PC/web).
-//  - Mobile (< lg): thanh tiêu đề trên + thanh điều hướng dưới.
-//  - Desktop (lg+): thanh điều hướng dọc (sidebar) bên trái với menu đầy đủ; nội dung giãn rộng.
+//  - Desktop (lg+): thanh tiêu đề với menu ngang đầy đủ.
+//  - Điện thoại (< lg): CÙNG menu đầy đủ đó, xếp thành dải cuộn ngang ngay dưới tiêu đề
+//    (mục đang mở tự cuộn vào giữa). Không còn thanh 3-4 mục dưới đáy như trước.
 // Menu thay đổi theo 3 tầng vai trò (Giám đốc / Quản lý / Nhân viên).
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -36,7 +37,7 @@ import EvaluationAlert from "./evaluation-alert";
 type IconType = React.ComponentType<{ className?: string }>;
 type NavLink = { href: string; label: string; icon: IconType };
 
-// Menu đầy đủ cho sidebar desktop (mobile dùng bản rút gọn 4 mục bên dưới).
+// Menu đầy đủ — dùng CHUNG cho máy tính và điện thoại.
 function deskNav(user: User | null): NavLink[] {
   const tier = roleTier(user?.role);
   const showRevenue = canSeeRevenue(user);   // lãnh đạo + danh sách chỉ định (lib/roles)
@@ -117,6 +118,18 @@ export default function AppShell({
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href.split("?")[0]);
 
+  // Điện thoại: đổi trang -> cuộn mục đang mở vào giữa dải menu (không cuộn trang dọc).
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = mobileNavRef.current?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!el || !mobileNavRef.current) return;
+    const box = mobileNavRef.current;
+    // Gán scrollLeft trực tiếp (scrollTo({behavior:"smooth"}) bị bỏ qua trên một số trình duyệt di động).
+    const r = el.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    box.scrollLeft = box.scrollLeft + (r.left - b.left) - (box.clientWidth - r.width) / 2;
+  }, [pathname]);
+
   return (
     <div className="min-h-screen bg-paper flex flex-col">
       {/* ====================== TOP NAVBAR (DESKTOP & MOBILE) ====================== */}
@@ -156,11 +169,33 @@ export default function AppShell({
             <AccountMenu user={user} onLogout={logout} variant="topbar" />
           </div>
         </div>
+
+        {/* ĐIỆN THOẠI: menu ĐẦY ĐỦ như máy tính, dải cuộn ngang dưới tiêu đề */}
+        <nav aria-label="Menu" className="border-t border-white/10 lg:hidden">
+          <div ref={mobileNavRef} className="no-scrollbar flex gap-1 overflow-x-auto px-2 py-1.5">
+            {deskNav(user).map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  data-active={active ? "true" : undefined}
+                  className={`flex min-w-[4.5rem] shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 text-[10px] font-semibold transition-colors ${
+                    active ? "bg-gradient-to-r from-amber to-amber-deep text-white shadow-sm shadow-amber/30" : "text-white/75 active:bg-white/10"
+                  }`}
+                >
+                  <item.icon className={`h-5 w-5 ${active ? "text-white" : "text-white/70"}`} />
+                  <span className="whitespace-nowrap">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </header>
 
       {/* Thanh báo: Giám đốc / Quản trị đang XEM GIAO DIỆN với vai trò khác (chỉ đổi giao diện) */}
       {previewing && (
-        <div className="sticky top-14 z-30 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber/40 bg-amber/15 px-3 py-1.5 text-center text-[11px] font-semibold text-amber-deep">
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber/40 bg-amber/15 px-3 py-1.5 text-center text-[11px] font-semibold text-amber-deep">
           <EyeIcon className="h-4 w-4 shrink-0" />
           <span>
             Đang xem giao diện với vai trò <b className="text-ink">{ROLE_LABEL[previewing]}</b> — mọi thao tác vẫn thực hiện bằng tài khoản thật
@@ -182,59 +217,15 @@ export default function AppShell({
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="flex-1 w-full px-3 sm:px-4 lg:px-6 pb-24 lg:pb-8 pt-4"
+        className="flex-1 w-full px-3 sm:px-4 lg:px-6 pb-8 pt-4"
       >
         <div className={`mx-auto w-full ${maxWidthClass}`}>{children}</div>
       </motion.main>
-
-      {/* ====================== MOBILE BOTTOM NAV ====================== */}
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md lg:hidden">
-        <div className="relative mx-3 mb-3 flex items-center justify-around rounded-xl2 bg-white px-6 py-2 shadow-card border border-line">
-          {tier === "STAFF" ? (
-            <>
-              <NavItem href="/" label="Trang chủ" icon={HomeIcon} active={pathname === "/"} />
-              <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
-              <NavItem href="/attendance" label="Tổng hợp" icon={ClockIcon} active={pathname.startsWith("/attendance")} />
-              <NavItem href="/profile" label="Cá nhân" icon={UserCircleIcon} active={pathname === "/profile"} />
-            </>
-          ) : (
-            <>
-              <NavItem href="/" label="Tổng quan" icon={HomeIcon} active={pathname === "/"} />
-              <NavItem href="/projects" label="Dự án" icon={FolderIcon} active={pathname.startsWith("/projects")} />
-              <NavItem href="/employees" label="Profile" icon={UsersIcon} active={pathname.startsWith("/employees")} />
-            </>
-          )}
-        </div>
-      </nav>
 
       <NotificationsBell />
       <ChatWidget />
       <DeadlineAlert user={user} />
       <EvaluationAlert user={user} />
     </div>
-  );
-}
-
-function NavItem({
-  href,
-  label,
-  icon: Icon,
-  active,
-}: {
-  href: string;
-  label: string;
-  icon: IconType;
-  active: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex flex-col items-center gap-0.5 transition-all duration-200 active:scale-95 ${
-        active ? "text-amber scale-105 font-medium" : "text-muted hover:text-ink"
-      }`}
-    >
-      <Icon className={`h-6 w-6 transition-transform duration-200 ${active ? "stroke-[2.5]" : ""}`} />
-      <span className="text-[10px]">{label}</span>
-    </Link>
   );
 }

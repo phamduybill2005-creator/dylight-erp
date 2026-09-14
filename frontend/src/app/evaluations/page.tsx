@@ -622,7 +622,8 @@ export default function EvaluationsPage() {
               </p>
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
             </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {/* min-w-0 (không shrink-0): trên điện thoại hàng công cụ tự xuống dòng thay vì tràn ngang */}
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <label className="flex items-center gap-1.5 rounded-lg border border-line bg-white px-2 py-1.5">
                 <FunnelIcon className="h-3.5 w-3.5 text-muted" />
                 <select

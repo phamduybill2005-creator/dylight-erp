@@ -710,7 +710,8 @@ export default function ProjectsPage() {
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
-      <div className="flex items-start justify-between gap-3">
+      {/* flex-wrap: trên điện thoại 2 nút xuống dòng dưới tiêu đề thay vì tràn ngang */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-ink lg:text-2xl">Dự án</h1>
           <p className="mt-0.5 text-xs text-muted lg:text-sm">

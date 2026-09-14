@@ -69,3 +69,11 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* Dải cuộn ngang (menu) — giấu thanh cuộn nhưng vẫn cuộn được bằng tay / chuột. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
