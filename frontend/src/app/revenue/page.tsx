@@ -363,46 +363,21 @@ export default function RevenuePage() {
     <AppShell maxWidthClass="max-w-md lg:max-w-none">
       {/* Header & Thẻ Tổng */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-ink">Doanh thu</h1>
-          <p className="mt-0.5 text-xs text-muted">
-            Doanh thu = <b className="text-ink">Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime</b>.
-          </p>
-        </div>
-
-        {/* Cột phải: Thẻ tổng + Widget converter nhỏ bên dưới */}
-        <div className="flex flex-col gap-1.5" style={{ minWidth: 320 }}>
-          {/* Thẻ tổng doanh thu */}
-          <div className="flex items-center gap-4 rounded-xl2 border border-line bg-white px-5 py-3 shadow-card">
-            <div>
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted">Tổng doanh thu (VNĐ)</span>
-              <span className="block text-xl font-extrabold text-emerald-700 tnum">{formatVND(tong)}</span>
-            </div>
-            <div className="border-l border-line pl-3.5">
-              <span className="block text-[10px] text-muted">Công khách hàng</span>
-              <span className="block text-sm font-bold text-steel tnum">
-                {hoursToDays(tongGioKhach)} công <span className="text-[10px] font-normal text-muted">({tongGioKhach.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h)</span>
-              </span>
-            </div>
-            <div className="border-l border-line pl-3.5">
-              <span className="block text-[10px] text-muted">Đã tính</span>
-              <span className="block text-sm font-bold text-steel tnum">{soCoDoanhThu}/{rows.length}</span>
-            </div>
-          </div>
-
-          {/* Widget converter — chiều ngang bằng thẻ Tổng doanh thu */}
-          <div className="w-full">
-            <div className={`flex flex-wrap items-center justify-between gap-2.5 rounded-xl2 border px-3.5 py-2 shadow-sm transition-all ${
+          {/* Khung tỷ giá — nằm gọn dưới tiêu đề, thu nhỏ */}
+          <div className="mt-1.5">
+            <div className={`inline-flex max-w-full flex-wrap items-center gap-2 rounded-xl border px-2.5 py-1 shadow-sm transition-all ${
               parsedGlobalJpy > 0
                 ? "border-emerald-300 bg-emerald-50/80 ring-1 ring-emerald-200"
                 : "border-line bg-white hover:border-slate-300"
             }`}>
               {/* VCB badge + Tỷ giá */}
               <div className="flex items-center gap-2 shrink-0">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-600 text-white font-black text-[10px] shadow-2xs">VCB</div>
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-600 text-white font-black text-[9px] shadow-2xs">VCB</div>
                 <div>
-                  <span className="block text-[9px] font-semibold text-muted uppercase leading-none">Tỷ giá JPY</span>
-                  <span className="block text-xs font-bold text-emerald-700 tnum mt-0.5">
+                  <span className="block text-[8px] font-semibold text-muted uppercase leading-none">Tỷ giá JPY</span>
+                  <span className="block text-[11px] font-bold text-emerald-700 tnum mt-0.5">
                     1 ¥ = {currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ₫
                   </span>
                 </div>
@@ -410,7 +385,7 @@ export default function RevenuePage() {
 
               {/* Ô nhập JPY chung (CHỈ GIÁM ĐỐC ĐƯỢC NHẬP) */}
               <div
-                className={`flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 transition-all flex-1 min-w-[130px] ${
+                className={`flex items-center gap-1 rounded-md border border-line px-2 py-0.5 transition-all min-w-[120px] ${
                   isDirectorUser
                     ? "bg-slate-50/70 focus-within:border-emerald-500 focus-within:bg-white"
                     : "bg-slate-100/70 opacity-80 cursor-not-allowed"
@@ -436,17 +411,17 @@ export default function RevenuePage() {
                       ? "Nhập đơn giá Yên/giờ chung cho tất cả dự án"
                       : "Chỉ tài khoản Giám đốc mới có quyền nhập đơn giá chung"
                   }
-                  className="w-full text-xs font-bold text-slate-800 outline-none tnum bg-transparent placeholder:text-slate-400 placeholder:font-normal disabled:cursor-not-allowed"
+                  className="w-full text-[11px] font-bold text-slate-800 outline-none tnum bg-transparent placeholder:text-slate-400 placeholder:font-normal disabled:cursor-not-allowed"
                 />
                 <span className="text-[10px] font-medium text-slate-400 shrink-0">¥/h</span>
               </div>
 
               {/* Kết quả quy đổi VNĐ */}
               <div className="flex items-center gap-1.5 shrink-0">
-                <ArrowRightIcon className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                <ArrowRightIcon className="h-3 w-3 text-emerald-500 shrink-0" />
                 <div className="text-right">
-                  <span className="block text-[9px] font-semibold text-muted uppercase leading-none">Quy đổi</span>
-                  <span className="block text-xs font-extrabold text-emerald-800 tnum mt-0.5 whitespace-nowrap">
+                  <span className="block text-[8px] font-semibold text-muted uppercase leading-none">Quy đổi</span>
+                  <span className="block text-[11px] font-extrabold text-emerald-800 tnum mt-0.5 whitespace-nowrap">
                     {parsedGlobalJpy > 0 ? `${formatVND(calcGlobalVnd)}/h` : "— ₫/h"}
                   </span>
                 </div>
@@ -458,11 +433,29 @@ export default function RevenuePage() {
                 onClick={() => fetchVcb(true)}
                 disabled={vcbLoading}
                 title={vcbData?.updated_at ? `Cập nhật lúc: ${vcbData.updated_at}` : "Cập nhật tỷ giá"}
-                className="shrink-0 rounded-lg p-1 text-emerald-600 hover:bg-emerald-100/60 hover:text-emerald-800 transition-colors disabled:opacity-40 cursor-pointer"
+                className="shrink-0 rounded-md p-0.5 text-emerald-600 hover:bg-emerald-100/60 hover:text-emerald-800 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                <ArrowPathIcon className={`h-3.5 w-3.5 ${vcbLoading ? "animate-spin" : ""}`} />
+                <ArrowPathIcon className={`h-3 w-3 ${vcbLoading ? "animate-spin" : ""}`} />
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Cột phải: thẻ tổng doanh thu */}
+        <div className="flex items-center gap-4 rounded-xl2 border border-line bg-white px-5 py-3 shadow-card">
+          <div>
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted">Tổng doanh thu (VNĐ)</span>
+            <span className="block text-xl font-extrabold text-emerald-700 tnum">{formatVND(tong)}</span>
+          </div>
+          <div className="border-l border-line pl-3.5">
+            <span className="block text-[10px] text-muted">Công khách hàng</span>
+            <span className="block text-sm font-bold text-steel tnum">
+              {hoursToDays(tongGioKhach)} công <span className="text-[10px] font-normal text-muted">({tongGioKhach.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h)</span>
+            </span>
+          </div>
+          <div className="border-l border-line pl-3.5">
+            <span className="block text-[10px] text-muted">Đã tính</span>
+            <span className="block text-sm font-bold text-steel tnum">{soCoDoanhThu}/{rows.length}</span>
           </div>
         </div>
       </div>
