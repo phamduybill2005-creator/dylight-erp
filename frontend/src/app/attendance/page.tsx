@@ -23,6 +23,7 @@ import { api } from "@/lib/api";
 import { roleTier, isSeniorManagerUp } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import { todayLocal, monthLocal } from "@/lib/format";
+import { loadAttendanceExportRows } from "@/lib/attendance-export";
 import type { Attendance, AttendanceSummary, User } from "@/lib/types";
 
 const todayStr = todayLocal;
@@ -146,57 +147,15 @@ export default function AttendancePage() {
   async function exportExcel() {
     setExporting(true);
     try {
-      let usersList = allUsers;
-      if (!usersList || usersList.length === 0) {
-        usersList = await api.users();
-        setAllUsers(usersList);
-      }
-
-      const [y, m] = summaryPeriod.split("-").map(Number);
-      const lastDay = new Date(y, m, 0).getDate();
-      const fromDate = `${summaryPeriod}-01`;
-      const toDate = `${summaryPeriod}-${String(lastDay).padStart(2, "0")}`;
-
-      const [tsList, sumList] = await Promise.all([
-        api.timesheets({ from: fromDate, to: toDate }).catch(() => []),
-        api.attendanceSummary(summaryPeriod).catch(() => summary),
-      ]);
-
-      // Gom project time (tổng thời gian làm các dự án từ bảng tiến độ) theo user_id
-      const projectTimeByUser: Record<number, number> = {};
-      for (const t of tsList) {
-        if (t.user_id) {
-          projectTimeByUser[t.user_id] = (projectTimeByUser[t.user_id] || 0) + Number(t.hours || 0);
-        }
-      }
-
-      // Gom attendance summary (giờ máy chấm công và số buổi đi muộn) theo user_id
-      const summaryByUser: Record<number, AttendanceSummary> = {};
-      for (const s of sumList) {
-        summaryByUser[s.user_id] = s;
-      }
-
-      // Lọc danh sách nhân viên theo phòng ban nếu đang chọn bộ lọc
-      const filteredUsers = usersList.filter(
-        (u) => !filters.dept || splitDepts(u.department).includes(filters.dept)
+      // Luôn lấy lại users khi bấm xuất; không dùng allUsers cũ vì tài khoản vừa
+      // bị xóa ở trang khác có thể vẫn còn trong state của trang Tổng hợp.
+      const { users: latestUsers, rows } = await loadAttendanceExportRows(
+        api,
+        summaryPeriod,
+        filters.dept,
+        summary,
       );
-
-      // Chuẩn bị dữ liệu theo đúng định dạng
-      const rows = filteredUsers.map((u, idx) => {
-        const pTime = Math.round((projectTimeByUser[u.id] || 0) * 10) / 10;
-        const s = summaryByUser[u.id];
-        const oTime = s ? Math.round(Number(s.total_hours || 0) * 10) / 10 : 0;
-        const late = s ? Number(s.late_days || 0) : 0;
-
-        return [
-          idx + 1,
-          u.full_name || "",
-          u.department || "",
-          pTime,
-          oTime,
-          late,
-        ];
-      });
+      setAllUsers(latestUsers);
 
       const headers = ["STT", "Họ và tên", "Phòng ban", "Project time", "Office time", "Đi muộn"];
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
