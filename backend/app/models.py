@@ -36,6 +36,25 @@ project_members = Table(
     Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
 )
 
+# Bảng liên kết nhiều-nhiều giữa Đầu việc và những người cùng thực hiện.
+# Tách khỏi timesheets để một người vẫn được phân công dù chưa nhập giờ nào.
+project_item_workers = Table(
+    "project_item_workers",
+    Base.metadata,
+    Column(
+        "project_item_id",
+        Integer,
+        ForeignKey("project_items.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "user_id",
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
 
 # --------------------------------------------------------------------------
 # CÁC KIỂU LIỆT KÊ (ENUM) — chuẩn hóa trạng thái nghiệp vụ
@@ -427,6 +446,9 @@ class ProjectItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assignee: Mapped["User | None"] = relationship("User", foreign_keys=[assignee_id])
+    workers: Mapped[list["User"]] = relationship(
+        "User", secondary=project_item_workers, order_by="User.id", lazy="selectin"
+    )
 
     @property
     def amount(self) -> Decimal:
@@ -436,6 +458,10 @@ class ProjectItem(Base):
     @property
     def assignee_name(self) -> str | None:
         return self.assignee.full_name if self.assignee else None
+
+    @property
+    def worker_ids(self) -> list[int]:
+        return [worker.id for worker in self.workers]
 
 
 class ProjectItemRating(Base):

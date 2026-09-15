@@ -471,6 +471,7 @@ export interface ProjectItem {
   department?: string | null;  // phòng ban phụ trách (gán ở cấp nhóm cha)
   assignee_id?: number | null;   // người được giao đầu việc (giao việc cho ai)
   assignee_name?: string | null; // tên người được giao (hiển thị)
+  worker_ids?: number[];       // người cùng thực hiện, vẫn giữ khi chưa có giờ công
   rating?: number;         // đánh giá hạng mục: 0 = chưa chấm, 1..5 sao
   note?: string | null;
   due_date?: string | null;    // hạn nộp (YYYY-MM-DD) từng hạng mục/đầu việc

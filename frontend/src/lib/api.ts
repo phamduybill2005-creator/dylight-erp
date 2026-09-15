@@ -288,6 +288,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  addProjectItemWorker: (itemId: number, userId: number) =>
+    request<ProjectItem>(`/project-items/${itemId}/workers/${userId}`, {
+      method: "POST",
+    }),
   deleteProjectItem: (id: number) =>
     request<void>(`/project-items/${id}`, { method: "DELETE" }),
   projectItemRatings: (projectId: number) =>

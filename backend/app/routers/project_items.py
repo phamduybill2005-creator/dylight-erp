@@ -179,6 +179,42 @@ def update_item(
     return _out(item, current)
 
 
+@router.post("/{item_id}/workers/{user_id}", response_model=ProjectItemOut)
+def add_item_worker(
+    item_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Gắn một thành viên dự án vào đầu việc, kể cả khi họ chưa nhập giờ."""
+    item = db.get(ProjectItem, item_id)
+    if not item or item.company_id != current.company_id or item.is_deleted:
+        raise HTTPException(404, "Không tìm thấy đầu việc.")
+    project = _assert_member(db, current, item.project_id)
+
+    worker = db.get(User, user_id)
+    if not worker or worker.company_id != current.company_id:
+        raise HTTPException(400, "Người thực hiện không hợp lệ.")
+    is_project_member = (
+        project.lead_id == worker.id
+        or db.query(project_members)
+        .filter(
+            project_members.c.project_id == project.id,
+            project_members.c.user_id == worker.id,
+        )
+        .first()
+        is not None
+    )
+    if not is_project_member:
+        raise HTTPException(400, "Người thực hiện phải là thành viên dự án.")
+
+    if worker not in item.workers:
+        item.workers.append(worker)
+        db.commit()
+        db.refresh(item)
+    return _out(item, current)
+
+
 @router.delete("/{item_id}", status_code=204)
 def delete_item(
     item_id: int,

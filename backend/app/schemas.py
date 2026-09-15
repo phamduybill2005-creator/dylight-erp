@@ -411,6 +411,7 @@ class ProjectItemOut(ProjectItemBase):
     unit_price: Decimal | None = None     # đơn giá
     amount: Decimal | None = None         # thành tiền = khối lượng × đơn giá (tính sẵn từ model)
     assignee_name: str | None = None      # tên người được giao (hiển thị)
+    worker_ids: list[int] = Field(default_factory=list)  # người cùng thực hiện, kể cả chưa nhập giờ
     created_at: datetime
 
 

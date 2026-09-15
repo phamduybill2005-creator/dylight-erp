@@ -22,7 +22,7 @@ import {
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal, formatDate } from "@/lib/format";
-import type { ProjectItem, ProjectItemRating, Timesheet, User } from "@/lib/types";
+import type { ProjectItem, Timesheet, User } from "@/lib/types";
 
 function mondayOf(d: string): string {
   const [y, m, dd] = d.split("-").map(Number);
@@ -63,7 +63,6 @@ export default function ProjectTimesheet({
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [hourEdits, setHourEdits] = useState<Record<string, string>>({});
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [tempWorkers, setTempWorkers] = useState<Record<number, number[]>>({});
   const [addingWorkerForItemId, setAddingWorkerForItemId] = useState<number | null>(null);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -146,8 +145,8 @@ export default function ProjectTimesheet({
           workerIds.add(e.user_id);
         }
       }
-      // 3. Người được thêm tạm để phân bổ giờ
-      for (const uid of tempWorkers[it.id] ?? []) {
+      // 3. Người đã được thêm và lưu trên đầu việc, kể cả chưa nhập giờ
+      for (const uid of it.worker_ids ?? []) {
         workerIds.add(uid);
       }
       // 4. Người dùng hiện tại nếu chưa có ai
@@ -168,7 +167,7 @@ export default function ProjectTimesheet({
         } as User;
       });
     },
-    [entries, tempWorkers, currentUserId, members, nameOf, projectId]
+    [entries, currentUserId, members, nameOf, projectId]
   );
 
   const hkey = (uid: number, itemId: number, d: string) => `${uid}:${itemId}:${d}`;
@@ -240,12 +239,14 @@ export default function ProjectTimesheet({
   }
 
   // Thêm nhân sự vào đầu việc để phân bổ/tách giờ
-  function handleAddWorkerToItem(itemId: number, uid: number) {
-    setTempWorkers((prev) => ({
-      ...prev,
-      [itemId]: Array.from(new Set([...(prev[itemId] || []), uid])),
-    }));
+  async function handleAddWorkerToItem(itemId: number, uid: number) {
     setAddingWorkerForItemId(null);
+    try {
+      const updated = await api.addProjectItemWorker(itemId, uid);
+      setItems((prev) => prev.map((item) => (item.id === itemId ? updated : item)));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không thể thêm người vào đầu việc.");
+    }
   }
 
   // Chuyển trạng thái hoàn thành
