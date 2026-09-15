@@ -35,6 +35,7 @@ import { formatVND, formatDate } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, deptLabel, normalizeDept, geoDeptOf } from "@/lib/groups";
 import { resolveDoscoLead } from "@/lib/project-lead";
+import { buildProjectDetailUpdatePayload } from "@/lib/project-detail-edit";
 import type { Project, Contract, Progress, User } from "@/lib/types";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -95,6 +96,7 @@ export default function ProjectDetailPage() {
   const [nameInput, setNameInput] = useState("");     // プロジェクト名 (tên dự án)
   const [startInput, setStartInput] = useState("");   // ngày bắt đầu YYYY-MM-DD
   const [endInput, setEndInput] = useState("");       // ngày kết thúc YYYY-MM-DD
+  const [internalDeadlineInput, setInternalDeadlineInput] = useState(""); // hạn nội bộ YYYY-MM-DD
   const [savingMembers, setSavingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -225,8 +227,9 @@ export default function ProjectDetailPage() {
       setEvalInput(project.evaluation ?? "");
       setCodeInput(project.code ?? "");
       setNameInput(project.name ?? "");
-      setStartInput(project.start_date ?? "");
-      setEndInput(project.end_date ?? "");
+      setStartInput(project.start_date?.slice(0, 10) ?? "");
+      setEndInput(project.end_date?.slice(0, 10) ?? "");
+      setInternalDeadlineInput(project.internal_deadline?.slice(0, 10) ?? "");
     }
   }, [project]);
 
@@ -267,18 +270,20 @@ export default function ProjectDetailPage() {
         leadId != null && !selectedMemberIds.includes(leadId)
           ? [...selectedMemberIds, leadId]
           : selectedMemberIds;
-      await api.updateProject(project.id, {
-        member_ids: memberIds,
-        lead_id: leadId,
-        name: nameInput.trim(),
-        code: codeInput.trim() || project.code,   // không để trống mã (NOT NULL)
-        start_date: startInput || null,
-        end_date: endInput || null,
-        geo_manager: geoInput.trim() || null,
-        dosco_manager: doscoInput.trim() || null,
-        group_name: groupNameInput.trim() || null,
-        evaluation: evalInput.trim() || null,
-      });
+      await api.updateProject(project.id, buildProjectDetailUpdatePayload({
+        memberIds,
+        leadId,
+        name: nameInput,
+        code: codeInput,
+        existingCode: project.code,   // không để trống mã (NOT NULL)
+        startDate: startInput,
+        endDate: endInput,
+        internalDeadline: internalDeadlineInput,
+        geoManager: geoInput,
+        doscoManager: doscoInput,
+        groupName: groupNameInput,
+        evaluation: evalInput,
+      }));
       setMembersModal(false);
       loadData();
     } catch (err) {
@@ -909,7 +914,7 @@ export default function ProjectDetailPage() {
                     className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold text-muted">Ngày bắt đầu</label>
                     <input
@@ -927,6 +932,16 @@ export default function ProjectDetailPage() {
                       min={startInput || undefined}
                       onChange={(e) => setEndInput(e.target.value)}
                       className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-muted">Hạn nội bộ</label>
+                    <input
+                      type="date"
+                      value={internalDeadlineInput}
+                      min={startInput || undefined}
+                      onChange={(e) => setInternalDeadlineInput(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-xs outline-none focus:border-steel"
                     />
                   </div>
                 </div>
