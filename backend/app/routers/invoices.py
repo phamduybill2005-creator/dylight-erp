@@ -5,8 +5,8 @@
 Luồng:
   1) Cán bộ hiện trường POST ảnh hóa đơn -> /invoices/upload
   2) Lưu ảnh vào ổ đĩa, gọi dịch vụ AI bóc tách dữ liệu.
-  3) Tạo bản ghi Invoice trạng thái EXTRACTED (chờ kế toán duyệt).
-  4) Kế toán PATCH chỉnh sửa nếu cần rồi /verify -> tính vào chi phí.
+  3) Tạo bản ghi Invoice trạng thái EXTRACTED (chờ phê duyệt).
+  4) Người có quyền duyệt PATCH chỉnh sửa nếu cần rồi /verify -> tính vào chi phí.
 ==========================================================================
 """
 import os
@@ -125,8 +125,8 @@ def list_invoices(
     status: InvoiceStatus | None = None,
     project_id: int | None = None,
     db: Session = Depends(get_db),
-    # Chỉ Quản lý/Kế toán/Giám đốc được xem số tiền hóa đơn (nhân viên không thấy tiền).
-    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
+    # Chỉ Quản lý/Giám đốc được xem số tiền hóa đơn (nhân viên không thấy tiền).
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.DIRECTOR)),
 ):
     """Liệt kê hóa đơn; lọc theo ?status= và ?project_id=."""
     q = db.query(Invoice).filter(Invoice.company_id == current.company_id)
@@ -141,8 +141,8 @@ def list_invoices(
 def get_invoice(
     invoice_id: int,
     db: Session = Depends(get_db),
-    # Chỉ Quản lý/Kế toán/Giám đốc được xem chi tiết tiền hóa đơn (nhân viên không thấy tiền).
-    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
+    # Chỉ Quản lý/Giám đốc được xem chi tiết tiền hóa đơn (nhân viên không thấy tiền).
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.DIRECTOR)),
 ):
     inv = db.get(Invoice, invoice_id)
     if not inv or inv.company_id != current.company_id:
@@ -155,10 +155,10 @@ def update_invoice(
     invoice_id: int,
     payload: InvoiceUpdate,
     db: Session = Depends(get_db),
-    # Chỉ Quản lý/Kế toán/Giám đốc được sửa hóa đơn (nhân viên hiện trường chỉ upload).
-    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)),
+    # Chỉ Quản lý/Giám đốc được sửa hóa đơn (nhân viên hiện trường chỉ upload).
+    current: User = Depends(require_roles(UserRole.MANAGER, UserRole.DIRECTOR)),
 ):
-    """Chỉnh sửa dữ liệu hóa đơn (kế toán đối chiếu lại số AI đọc)."""
+    """Chỉnh sửa dữ liệu hóa đơn (người có quyền duyệt đối chiếu lại số AI đọc)."""
     inv = db.get(Invoice, invoice_id)
     if not inv or inv.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy hóa đơn.")
@@ -176,7 +176,7 @@ def update_invoice(
 def verify_invoice(
     invoice_id: int,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(UserRole.ACCOUNTANT, UserRole.DIRECTOR, UserRole.MANAGER)),
+    current: User = Depends(require_roles(UserRole.DIRECTOR, UserRole.MANAGER)),
 ):
     """Duyệt hóa đơn -> trạng thái VERIFIED -> được tính vào chi phí dự án."""
     inv = db.get(Invoice, invoice_id)

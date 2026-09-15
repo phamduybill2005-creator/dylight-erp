@@ -7,7 +7,6 @@ thanh toán và tiến độ — đủ để Dashboard hiển thị số liệu 
 Tài khoản đăng nhập demo:
   - giamdoc@dosco.vn / 123456    (DIRECTOR — giao diện Giám đốc, thấy tài chính)
   - quanly@dosco.vn  / 123456    (MANAGER — giao diện Quản lý, ẩn doanh thu/lãi-lỗ)
-  - ketoan@dosco.vn  / 123456    (ACCOUNTANT — cùng nhóm Quản lý)
   - hientruong@dosco.vn / 123456 (FIELD_STAFF — giao diện Nhân viên)
 """
 from datetime import date, datetime, timedelta
@@ -42,10 +41,6 @@ def run():
                        hashed_password=hash_password("123456"), role=UserRole.DIRECTOR,
                        phone="0912345678", address="Hoàng Mai, Hà Nội", dob=date(1980, 5, 20),
                        identity_card="001080123456", cv_details="Giám đốc điều hành DOSCO")
-        ketoan = User(company_id=c1.id, email="ketoan@dosco.vn", full_name="Trần Thị Kế",
-                      hashed_password=hash_password("123456"), role=UserRole.ACCOUNTANT,
-                      phone="0987654321", address="Thanh Xuân, Hà Nội", dob=date(1988, 10, 15),
-                      identity_card="001088654321", cv_details="Kế toán trưởng với 10 năm kinh nghiệm")
         quanly = User(company_id=c1.id, email="quanly@dosco.vn", full_name="Phạm Văn Quản",
                       hashed_password=hash_password("123456"), role=UserRole.MANAGER,
                       phone="0911222333", address="Cầu Giấy, Hà Nội", dob=date(1985, 7, 8),
@@ -58,12 +53,11 @@ def run():
         admin_hcm = User(company_id=c2.id, email="admin@dosco.vn", full_name="Quản trị HCM",
                          hashed_password=hash_password("123456"), role=UserRole.ADMIN)
 
-        db.add_all([giamdoc, ketoan, quanly, hientruong, admin_hcm])
+        db.add_all([giamdoc, quanly, hientruong, admin_hcm])
         db.flush()
 
         # Thiết lập người quản lý trực tiếp
         quanly.manager_id = giamdoc.id
-        ketoan.manager_id = giamdoc.id
         hientruong.manager_id = quanly.id
 
         # --- Gói thầu ---
@@ -116,7 +110,7 @@ def run():
                     amount_no_vat=Decimal("2100000000"), vat_amount=Decimal("210000000"),
                     total_amount=Decimal("2310000000"), category="vật tư",
                     status=InvoiceStatus.VERIFIED, ocr_confidence=Decimal("94")),
-            # Hóa đơn vừa AI bóc tách, đang chờ kế toán duyệt
+            # Hóa đơn vừa AI bóc tách, đang chờ phê duyệt
             Invoice(company_id=c1.id, project_id=p1.id, contract_id=ct1.id,
                     supplier_name="Công ty CP Vận tải Sông Hồng", supplier_tax_code="0107778899",
                     invoice_number="3C25SH/0099", invoice_date=date(2025, 6, 1),

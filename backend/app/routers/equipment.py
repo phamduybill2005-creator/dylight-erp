@@ -14,7 +14,7 @@ from app.schemas import (
 
 router = APIRouter(prefix="/equipment", tags=["Thiết bị"])
 
-_GUARD = require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
+_GUARD = require_roles(UserRole.MANAGER, UserRole.DIRECTOR)
 
 
 @router.get("", response_model=list[EquipmentOut])

@@ -2,7 +2,7 @@
 //
 // 3 tầng giao diện (chốt với người dùng):
 //   DIRECTOR : ADMIN + DIRECTOR    -> thấy đầy đủ, gồm doanh thu / lãi-lỗ.
-//   MANAGER  : MANAGER + ACCOUNTANT -> ẩn doanh thu/lãi-lỗ, vẫn chụp + duyệt hóa đơn.
+//   MANAGER  : MANAGER + MANAGER_MID -> ẩn doanh thu/lãi-lỗ; quyền duyệt hóa đơn kiểm tra riêng.
 //   STAFF    : FIELD_STAFF          -> việc cá nhân, chấm công, đánh giá quản lý.
 
 import type { Role } from "./types";
@@ -11,7 +11,7 @@ export type Tier = "DIRECTOR" | "MANAGER" | "STAFF";
 
 export function roleTier(role: Role | undefined | null): Tier {
   if (role === "ADMIN" || role === "DIRECTOR") return "DIRECTOR";
-  if (role === "MANAGER" || role === "MANAGER_MID" || role === "ACCOUNTANT") return "MANAGER";
+  if (role === "MANAGER" || role === "MANAGER_MID") return "MANAGER";
   return "STAFF";
 }
 
@@ -33,7 +33,6 @@ export const ROLE_LABEL: Record<Role, string> = {
   DIRECTOR: "Giám đốc",
   MANAGER: "Quản lý cấp cao",
   MANAGER_MID: "Quản lý cấp trung",
-  ACCOUNTANT: "Kế toán",
   FIELD_STAFF: "Nhân viên",
 };
 
@@ -44,14 +43,13 @@ export const TIER_LABEL: Record<Tier, string> = {
 };
 
 export type RankKey =
-  | "ADMIN" | "DIRECTOR" | "MANAGER_TOP" | "MANAGER_MID" | "ACCOUNTANT" | "STAFF";
+  | "ADMIN" | "DIRECTOR" | "MANAGER_TOP" | "MANAGER_MID" | "STAFF";
 
 export const RANKS: { key: RankKey; label: string; role: Role; top?: boolean }[] = [
   { key: "DIRECTOR", label: "Giám đốc", role: "DIRECTOR" },
   { key: "ADMIN", label: "Quản trị hệ thống", role: "ADMIN" },
   { key: "MANAGER_TOP", label: "Quản lý cấp cao", role: "MANAGER", top: true },
   { key: "MANAGER_MID", label: "Quản lý cấp trung", role: "MANAGER_MID", top: false },
-  { key: "ACCOUNTANT", label: "Kế toán", role: "ACCOUNTANT" },
   { key: "STAFF", label: "Nhân viên", role: "FIELD_STAFF" },
 ];
 
@@ -66,7 +64,6 @@ export function rankOf(
 ): RankKey {
   if (role === "ADMIN") return "ADMIN";
   if (role === "DIRECTOR") return "DIRECTOR";
-  if (role === "ACCOUNTANT") return "ACCOUNTANT";
   if (role === "MANAGER_MID") return "MANAGER_MID";
   if (role === "MANAGER") return "MANAGER_TOP";
   if (role === "FIELD_STAFF" && hasSubordinates) return "MANAGER_MID";
@@ -115,8 +112,7 @@ export const RANK_WEIGHT: Record<RankKey, number> = {
   ADMIN: 1,
   MANAGER_TOP: 2,
   MANAGER_MID: 3,
-  ACCOUNTANT: 4,
-  STAFF: 5,
+  STAFF: 4,
 };
 
 export function userRankWeight(
@@ -128,7 +124,7 @@ export function userRankWeight(
   return RANK_WEIGHT[r] ?? 99;
 }
 
-/** Thang THĂNG CẤP theo thời gian (thấp → cao). Kế toán là nhánh riêng. */
+/** Thang THĂNG CẤP theo thời gian (thấp → cao). */
 export const PROMOTION_LADDER: RankKey[] = ["STAFF", "MANAGER_MID", "MANAGER_TOP", "ADMIN", "DIRECTOR"];
 
 /** Cấp kế tiếp khi thăng cấp; null = đã kịch trần hoặc không nằm trên thang. */

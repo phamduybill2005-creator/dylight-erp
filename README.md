@@ -100,7 +100,6 @@ Mật khẩu chung: `123456`
 | Vai trò | Email |
 |---------|-------|
 | Giám đốc (xem báo cáo lãi/lỗ) | `giamdoc@dosco.vn` |
-| Kế toán (duyệt hóa đơn) | `ketoan@dosco.vn` |
 | Cán bộ hiện trường (chụp hóa đơn) | `hientruong@dosco.vn` |
 | Quản trị (công ty khác) | `admin@dosco.vn` |
 
@@ -134,7 +133,7 @@ giao diện → tích hợp). Các phần đã hoàn thiện:
 Hướng phát triển tiếp theo (gợi ý):
 
 - Màn hình chi tiết hợp đồng, biểu đồ tiến độ.
-- Cho phép kế toán **sửa** trường AI trước khi duyệt (endpoint PATCH đã sẵn).
+- Cho phép người có quyền duyệt **sửa** trường AI trước khi duyệt (endpoint PATCH đã sẵn).
 - Lưu file lên **S3/Cloud Storage** thay vì đĩa cục bộ; token qua cookie httpOnly.
 
 ---

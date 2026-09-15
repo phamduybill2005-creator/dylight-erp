@@ -274,10 +274,6 @@ export default function TimesheetPage() {
         </div>
       </header>
 
-      <p className="mt-3 rounded-xl2 border border-line bg-white p-3 text-[11px] text-muted shadow-card">
-        Bảng tổng hợp <b className="text-ink">số giờ làm thực tế</b> từ mục Tiến độ của từng Dự án (chế độ chỉ đọc, dữ liệu tự động đồng bộ real-time từ Tiến độ Dự án).
-      </p>
-
       {/* Thanh điều khiển: chế độ xem Toàn đội / Cá nhân / Chọn phòng ban & Tuần / Tháng */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-2 shadow-card">
         <div className="flex flex-wrap items-center gap-2">

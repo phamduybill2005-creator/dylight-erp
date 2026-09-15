@@ -122,12 +122,12 @@ export default function LeavePage() {
     return <AppShell><div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-steel border-t-amber" /></div></AppShell>;
   }
 
-  // Quyền DUYỆT phải khớp backend: require_roles(MANAGER, ACCOUNTANT, DIRECTOR)
+  // Quyền DUYỆT phải khớp backend: require_roles(MANAGER, DIRECTOR)
   // + ADMIN. KHÔNG gồm MANAGER_MID — trước đây dùng isManagerUp nên quản lý cấp
   // trung vẫn thấy nút Duyệt, bấm vào là backend trả 403.
   const canApprove =
     me.role === "ADMIN" || me.role === "DIRECTOR" ||
-    me.role === "MANAGER" || me.role === "ACCOUNTANT";
+    me.role === "MANAGER";
 
   // Lọc đơn chờ duyệt theo PHÒNG BAN của người xin nghỉ (ánh xạ qua danh sách nhân sự).
   const deptOfUser = (uid: number) => users.find((u) => u.id === uid)?.department;

@@ -17,7 +17,7 @@ from app.schemas import DesignDocCreate, DesignDocOut, DesignDocUpdate
 
 router = APIRouter(prefix="/design-docs", tags=["Hồ sơ thiết kế"])
 
-_EDIT = require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
+_EDIT = require_roles(UserRole.MANAGER, UserRole.DIRECTOR)
 
 
 @router.get("", response_model=list[DesignDocOut])

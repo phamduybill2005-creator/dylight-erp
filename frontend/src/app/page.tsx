@@ -22,6 +22,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import CompanyOrgChart from "@/components/company-org-chart";
+import PersonalProjectsCard from "@/components/personal-projects-card";
 import { ArcReactorWatermark, IronManBanner } from "@/components/ironman-theme";
 import { api } from "@/lib/api";
 import { roleTier, roleTitle, type Tier } from "@/lib/roles";
@@ -112,30 +113,50 @@ export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(api.cachedUser());
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const refreshProjects = useRef<() => void>(() => {});
   const [kpi, setKpi] = useState<KpiSummary | null>(null);
   const [profit, setProfit] = useState<ProjectProfit[]>([]);
 
   useEffect(() => {
     let alive = true;
+    let projectsPending = false;
+    let currentTier: Tier | undefined;
+    function loadProjects() {
+      if (!alive || projectsPending) return;
+      projectsPending = true;
+      api.projects().then((data) => {
+        if (!alive) return;
+        setProjects(data);
+        setProjectsLoaded(true);
+        setProjectsError(null);
+      }).catch(() => {
+        if (alive) setProjectsError("Không thể cập nhật dự án. Vui lòng thử lại.");
+      }).finally(() => { projectsPending = false; });
+    }
+    refreshProjects.current = loadProjects;
     // Nạp phần dữ liệu theo tầng (không đụng /me) — dùng cho cả lần đầu lẫn polling.
     function loadDashboard(tier: Tier) {
-      if (tier === "STAFF") {
-        api.projects().then((d) => alive && setProjects(d)).catch(() => {});
-      } else if (tier === "MANAGER") {
-        // Quản lý: KHÔNG gọi /dashboard/summary|profit (đã chặn ở backend) — chỉ dữ liệu vận hành.
-        api.projects().then((d) => alive && setProjects(d)).catch(() => {});
-      } else {
+      loadProjects();
+      if (tier === "DIRECTOR") {
         api.kpiSummary().then((d) => alive && setKpi(d)).catch(() => {});
         api.profitByProject().then((d) => alive && setProfit(d)).catch(() => {});
-        api.projects().then((d) => alive && setProjects(d)).catch(() => {});
       }
     }
+
+    function refreshVisible() {
+      if (currentTier && document.visibilityState === "visible") loadDashboard(currentTier);
+    }
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
 
     let timer: ReturnType<typeof setInterval> | undefined;
     api.me().then((u) => {
       if (!alive) return;
       setUser(u);
       const tier = roleTier(u.role);
+      currentTier = tier;
       loadDashboard(tier);
       // Cập nhật gần thời gian thực (~20s). Không nạp lại /me để tránh nháy màn hình.
       timer = setInterval(() => {
@@ -144,7 +165,12 @@ export default function DashboardPage() {
     }).catch(() => {
       router.push("/login");
     });
-    return () => { alive = false; if (timer) clearInterval(timer); };
+    return () => {
+      alive = false;
+      if (timer) clearInterval(timer);
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
   }, [router]);
 
   if (!user) {
@@ -271,6 +297,8 @@ export default function DashboardPage() {
               </div>
             </section>
           )}
+
+        <PersonalProjectsCard user={user} projects={projects} loaded={projectsLoaded} error={projectsError} onRefresh={() => refreshProjects.current()} />
 
         {/* Đánh giá quản lý */}
         <section className="mt-5">
@@ -406,15 +434,7 @@ export default function DashboardPage() {
 
             {/* ---- Hai thẻ KPI chính (chỉ Giám đốc) ---- */}
             <section className="grid grid-cols-2 gap-3 lg:gap-4">
-              <div className={`rounded-xl2 p-4 lg:p-6 text-white card-hover ${
-                isIronManUser 
-                  ? "bg-black/45 backdrop-blur-md border-2 border-cyan-500/60 shadow-[0_0_25px_rgba(0,240,255,0.25)]" 
-                  : "bg-gradient-to-br from-slate-900 to-ink border border-white/5"
-              }`}>
-                <p className="text-xs text-cyan-200/70 font-mono">Hợp đồng đang quản lý</p>
-                <p className="mt-2 text-3xl lg:text-4xl font-bold tnum text-cyan-400 drop-shadow-[0_0_10px_rgba(0,240,255,0.7)]">{kpi?.active_contracts ?? "—"}</p>
-                <p className="mt-1 text-[11px] text-white/50 font-mono">gói thầu / dự án</p>
-              </div>
+              <PersonalProjectsCard user={user} projects={projects} loaded={projectsLoaded} error={projectsError} onRefresh={() => refreshProjects.current()} ironMan={isIronManUser} />
               <div className={`rounded-xl2 p-4 lg:p-6 text-white card-hover ${
                 isIronManUser 
                   ? "bg-black/45 backdrop-blur-md border-2 border-yellow-500/60 shadow-[0_0_25px_rgba(255,215,0,0.25)]" 
@@ -455,10 +475,7 @@ export default function DashboardPage() {
             Điều hành dự án, nhân sự và chấm công. (Số liệu doanh thu/lãi-lỗ do Ban Giám đốc quản lý.)
           </p>
           <div className="relative z-10 mt-4 grid grid-cols-2 gap-3 lg:max-w-md">
-            <div className="rounded-xl2 bg-white/10 p-3 card-hover">
-              <p className="text-[11px] text-white/60">Dự án</p>
-              <p className="mt-1 text-2xl font-bold tnum">{projects.length}</p>
-            </div>
+            <PersonalProjectsCard user={user} projects={projects} loaded={projectsLoaded} error={projectsError} onRefresh={() => refreshProjects.current()} />
           </div>
         </section>
       )}

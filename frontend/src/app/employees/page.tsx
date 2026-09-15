@@ -220,7 +220,7 @@ export default function EmployeesPage() {
         <XMarkIcon className="h-16 w-16 text-bad" />
         <h1 className="mt-4 text-lg font-bold text-ink">Không có quyền truy cập</h1>
         <p className="mt-2 text-sm text-muted max-w-xs">
-          Trang này chỉ dành cho cấp Quản lý, Kế toán và Ban Giám đốc.
+          Trang này chỉ dành cho Quản trị hệ thống, cấp Quản lý và Ban Giám đốc.
         </p>
       </div>
     );
@@ -249,7 +249,7 @@ export default function EmployeesPage() {
   const pendingUsers = users.filter((u) => !u.is_approved && u.is_active);
   const approvedUsers = users.filter((u) => u.is_approved);
 
-  // Danh sách nhân sự lọc & sắp xếp từ CẤP BẬC CAO ĐẾN THẤP (Admin -> Giám đốc -> QL Cấp cao -> QL Cấp trung -> Kế toán -> Nhân viên)
+  // Danh sách nhân sự lọc & sắp xếp từ CẤP BẬC CAO ĐẾN THẤP (Admin -> Giám đốc -> QL Cấp cao -> QL Cấp trung -> Nhân viên)
   const filteredUsers = approvedUsers
     .filter(
       (u) =>

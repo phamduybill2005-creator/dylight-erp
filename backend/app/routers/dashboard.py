@@ -20,7 +20,7 @@ from app.schemas import KpiSummary, ProjectProfit
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 # Số liệu tài chính (doanh thu / lãi-lỗ) chỉ dành cho Giám đốc (ADMIN tự được phép).
-# Tầng Quản lý (MANAGER/ACCOUNTANT) bị chặn tại đây — khớp yêu cầu ẩn doanh thu.
+# Tầng Quản lý (MANAGER) bị chặn tại đây — khớp yêu cầu ẩn doanh thu.
 _FINANCE_GUARD = require_roles(UserRole.DIRECTOR)
 
 

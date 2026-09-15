@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   title: "CÔNG TY DOSCO — Quản lý dự án xây dựng",
   description: "Đấu thầu, hợp đồng, dự án, tiến độ và báo cáo lãi/lỗ.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/favicon.svg?v=dosco-2", type: "image/svg+xml", sizes: "any" }],
+    shortcut: "/favicon.svg?v=dosco-2",
+  },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "CÔNG TY DOSCO" },
   // ERP nội bộ chạy trên tên miền công ty (erp.dosco.vn) -> CẤM lập chỉ mục.
   // robots.txt chỉ ngăn thu thập; thẻ noindex mới ngăn trang lọt vào kết quả

@@ -54,7 +54,7 @@ def can_see_money(user: User) -> bool:
     Quản lý cấp cao/cấp trung và nhân viên đều KHÔNG thấy. Khớp đúng
     canSeeMoney (= isDirector) ở frontend.
 
-    Ngoại lệ: hóa đơn chi phí đầu vào (Hóa đơn AI) vẫn cho Quản lý/Kế toán
+    Ngoại lệ: hóa đơn chi phí đầu vào (Hóa đơn AI) vẫn cho Quản lý
     chụp + duyệt — xem router invoices.py (không dùng hàm này).
     """
     return user.role in (UserRole.ADMIN, UserRole.DIRECTOR)
@@ -64,22 +64,21 @@ def is_staff_tier(user: User) -> bool:
     """
     True nếu người dùng ở TẦNG NHÂN VIÊN (STAFF).
 
-    Dùng whitelist 4 vai trò quản-lý-trở-lên (ADMIN/DIRECTOR/MANAGER/ACCOUNTANT),
-    khớp đúng roleTier ở frontend. Vai trò mới thêm sau này mặc định bị coi là
+    Dùng whitelist ADMIN/DIRECTOR/MANAGER cho các nghiệp vụ này.
+    Vai trò mới thêm sau này mặc định bị coi là
     STAFF — an toàn hơn blacklist. (Việc ẩn TIỀN nay dùng can_see_money.)
     """
     return user.role not in (
         UserRole.ADMIN,
         UserRole.DIRECTOR,
         UserRole.MANAGER,
-        UserRole.ACCOUNTANT,
     )
 
 
 def require_roles(*roles: UserRole):
     """
     Factory tạo dependency chặn theo vai trò.
-    Dùng: Depends(require_roles(UserRole.ACCOUNTANT, UserRole.DIRECTOR))
+    Dùng: Depends(require_roles(UserRole.DIRECTOR))
     """
     def checker(user: User = Depends(get_current_user)) -> User:
         if user.role not in roles and user.role != UserRole.ADMIN:

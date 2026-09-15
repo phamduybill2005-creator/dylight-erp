@@ -301,7 +301,7 @@ export default function AttendancePage() {
     return () => { alive = false; clearInterval(id); };
   }, [user, summaryPeriod]);
 
-  // Tài khoản khác (Quản lý cấp trung / Kế toán / Nhân viên): poll lịch sử chấm công cá nhân của mình (~20s).
+  // Tài khoản khác (Quản lý cấp trung / Nhân viên): poll lịch sử chấm công cá nhân của mình (~20s).
   useEffect(() => {
     if (!user || isSeniorManagerUp(user)) return;
     let alive = true;
@@ -379,7 +379,7 @@ export default function AttendancePage() {
     );
   }
 
-  // ==================== CÁ NHÂN (Quản lý cấp trung, Kế toán, Nhân viên) ====================
+  // ==================== CÁ NHÂN (Quản lý cấp trung, Nhân viên) ====================
   if (!isSeniorManagerUp(user)) {
     const today = myRecords.find((r) => r.work_date === todayStr());
     const totalMins = myRecords.reduce((a, r) => a + r.worked_minutes, 0);

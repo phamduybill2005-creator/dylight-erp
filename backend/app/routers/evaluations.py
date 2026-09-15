@@ -3,7 +3,6 @@ Router Đánh giá (Evaluations) — 2 chiều giữa Nhân viên ↔ Quản lý
 
 Quy tắc chiều đánh giá (chốt với người dùng):
   - Nhân viên (FIELD_STAFF) chấm điểm QUẢN LÝ TRỰC TIẾP của mình (manager_id).
-  - Kế toán (ACCOUNTANT) chấm điểm CẤP DƯỚI trực tiếp của mình.
   - Giám đốc / Quản trị / Quản lý cấp cao / Quản lý cấp trung chấm được MỌI NGƯỜI trong
     công ty (bấm sao ở bảng đánh giá tháng).
   - KHÔNG AI được chấm Giám đốc.
@@ -87,10 +86,6 @@ def create_or_update_evaluation(
     elif current.role in _TABLE_ROLES:
         # GĐ / Quản trị / QL cấp cao / QL cấp trung chấm bất kỳ ai trong công ty ở bảng đánh
         # giá tháng (Giám đốc đã bị chặn ở trên). Xếp chung chiều MANAGER_TO_STAFF.
-        direction = EvaluationDirection.MANAGER_TO_STAFF
-    elif current.role == UserRole.ACCOUNTANT:
-        if evaluatee.manager_id != current.id:
-            raise HTTPException(403, "Bạn chỉ được đánh giá nhân viên cấp dưới trực tiếp.")
         direction = EvaluationDirection.MANAGER_TO_STAFF
     else:
         raise HTTPException(403, "Vai trò này không tham gia chấm điểm đánh giá.")

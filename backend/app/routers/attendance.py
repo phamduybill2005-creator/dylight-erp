@@ -25,7 +25,7 @@ from app.services import yunatt_service
 router = APIRouter(prefix="/attendance", tags=["Chấm công"])
 
 # Vai trò được xem chấm công toàn công ty (ADMIN tự được phép trong require_roles).
-_MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
+_MANAGER_ROLES = (UserRole.MANAGER, UserRole.DIRECTOR)
 
 
 def _is_senior_manager_up(user: User) -> bool:

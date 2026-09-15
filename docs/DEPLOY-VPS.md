@@ -99,7 +99,7 @@ SECRET_KEY=<chuỗi ngẫu nhiên thứ 1>
 ATTENDANCE_API_KEY=<chuỗi ngẫu nhiên thứ 2>
 POSTGRES_PASSWORD=<mật khẩu mạnh cho Postgres>
 
-# AI đọc hóa đơn (bỏ trống thì kế toán nhập tay, KHÔNG bịa số)
+# AI đọc hóa đơn (bỏ trống thì người có quyền duyệt nhập tay, KHÔNG bịa số)
 OCR_PROVIDER=openai
 OPENAI_API_KEY=<sk-... nếu có>
 ```
@@ -152,7 +152,7 @@ docker compose -f docker-compose.prod.yml exec backend python -m app.seed
 ```
 
 > **CẢNH BÁO:** lệnh này tạo tài khoản demo mật khẩu `123456`
-> (`giamdoc@dosco.vn`, `quanly@dosco.vn`, `ketoan@dosco.vn`,
+> (`giamdoc@dosco.vn`, `quanly@dosco.vn`,
 > `hientruong@dosco.vn`). Chạy xong **phải đổi mật khẩu ngay lập tức**.
 > Nếu dùng **Cách A (Neon đã có dữ liệu thật)** thì **TUYỆT ĐỐI KHÔNG chạy lệnh này**.
 

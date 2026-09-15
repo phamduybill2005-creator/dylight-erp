@@ -73,6 +73,14 @@ def _ensure_schema() -> None:
                 conn.execute(text("ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(50)"))
         except Exception:
             pass
+        # Vai trò Kế toán (ACCOUNTANT) đã bỏ khỏi UserRole. Tài khoản cũ còn giá trị này sẽ
+        # KHÔNG nạp được (LookupError khi đọc bảng users -> hỏng cả trang Đồng nghiệp, Tổng hợp...)
+        # -> hạ về Quản lý cấp trung; Giám đốc/Quản trị phân lại vai trò nếu cần.
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE users SET role = 'MANAGER_MID' WHERE role = 'ACCOUNTANT'"))
+        except Exception:
+            pass
 
         # Projects: cột lead_id + group_name/geo_manager_id/dosco_manager_id cho DB cũ.
         if "projects" in insp.get_table_names():

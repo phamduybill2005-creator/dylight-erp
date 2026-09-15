@@ -56,7 +56,7 @@ users      (1) ───< activity_logs  (nhật ký thao tác)
 | # | Bảng | Vai trò chính |
 |---|------|---------------|
 | 1 | `companies` | Pháp nhân/chi nhánh (gốc multi-tenant) |
-| 2 | `users` | Tài khoản + vai trò (ADMIN, DIRECTOR, MANAGER, ACCOUNTANT, FIELD_STAFF) |
+| 2 | `users` | Tài khoản + vai trò (ADMIN, DIRECTOR, MANAGER, MANAGER_MID, FIELD_STAFF) |
 | 3 | `bids` | Gói thầu đang theo đuổi/đã trúng |
 | 4 | `projects` | Dự án thi công |
 | 5 | `contracts` | Hợp đồng (giá trị chưa VAT, % VAT) |
@@ -78,11 +78,11 @@ Ngoài các trường nghiệp vụ, bảng này lưu kết quả AI:
 - `status` — `PENDING → PROCESSING → EXTRACTED → VERIFIED / REJECTED`.
 
 Chỉ hóa đơn **VERIFIED** mới được tính vào chi phí trong báo cáo lãi/lỗ →
-giám đốc luôn nhìn thấy con số đã được kế toán kiểm chứng.
+giám đốc luôn nhìn thấy con số đã được người có quyền duyệt kiểm chứng.
 
 ## 4. Trạng thái & vai trò
 
 - **UserRole**: ADMIN (toàn quyền), DIRECTOR (xem báo cáo), MANAGER (chỉ huy
-  trưởng), ACCOUNTANT (duyệt hóa đơn), FIELD_STAFF (chụp & tải hóa đơn).
+  trưởng), MANAGER_MID (quản lý cấp trung), FIELD_STAFF (chụp & tải hóa đơn).
 - Quyền duyệt hóa đơn (`/invoices/{id}/verify`) giới hạn cho ADMIN, DIRECTOR,
-  ACCOUNTANT, MANAGER.
+  MANAGER.

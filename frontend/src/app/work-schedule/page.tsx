@@ -188,7 +188,6 @@ export default function WorkSchedulePage() {
           const roleOrder: Record<string, number> = {
             DIRECTOR: 1,
             MANAGER: 2,
-            ACCOUNTANT: 3,
             ENGINEER: 4,
             STAFF: 5,
           };

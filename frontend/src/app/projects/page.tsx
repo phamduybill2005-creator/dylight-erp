@@ -714,9 +714,6 @@ export default function ProjectsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-ink lg:text-2xl">Dự án</h1>
-          <p className="mt-0.5 text-xs text-muted lg:text-sm">
-            Theo dõi vòng đời dự án từ đấu thầu tới quyết toán.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <button

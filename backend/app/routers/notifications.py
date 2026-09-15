@@ -1,7 +1,7 @@
 """
 Router Thông báo nội bộ — Giám đốc/Quản lý gửi cho cấp dưới hoặc toàn thể.
 Mỗi người nhận = 1 bản ghi (fan-out) để theo dõi đã đọc/chưa đọc riêng.
-Phạm vi gửi: USER (1 người) | MANAGERS (quản lý+kế toán) | STAFF (nhân viên) | EVERYONE.
+Phạm vi gửi: USER (1 người) | MANAGERS (quản lý) | STAFF (nhân viên) | EVERYONE.
 Kèm nhắc ĐÁNH GIÁ HẰNG THÁNG: từ 8:00 ngày 27 mọi người nhận 1 thông báo từ "Hệ thống".
 """
 import threading
@@ -18,7 +18,7 @@ from app.schemas import NotificationCreate, NotificationOut
 router = APIRouter(prefix="/notifications", tags=["Thông báo"])
 
 _DIRECTORS = (UserRole.ADMIN, UserRole.DIRECTOR)
-_MANAGERS_UP = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER, UserRole.ACCOUNTANT)
+_MANAGERS_UP = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)
 
 # ---- Nhắc ĐÁNH GIÁ HẰNG THÁNG (quy định: ngày 27 hằng tháng mọi người vào mục Đánh giá) ----
 # Tạo "lười" khi người đó mở app (chuông gọi /me + /me/unread-count ~20 giây/lần) thay vì
@@ -66,7 +66,7 @@ def _resolve_recipients(db: Session, sender: User, target: str, target_user_id: 
             raise HTTPException(400, "Người nhận không hợp lệ.")
         return [u]
     if target == "MANAGERS":
-        return base.filter(User.role.in_([UserRole.MANAGER, UserRole.ACCOUNTANT])).all()
+        return base.filter(User.role == UserRole.MANAGER).all()
     if target == "STAFF":
         return base.filter(User.role == UserRole.FIELD_STAFF).all()
     if target == "EVERYONE":

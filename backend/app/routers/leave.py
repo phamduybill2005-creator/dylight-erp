@@ -15,7 +15,7 @@ from app.schemas import LeaveCreate, LeaveDecision, LeaveOut, StudentWeekSchedul
 
 router = APIRouter(prefix="/leave", tags=["Nghỉ phép"])
 
-_MANAGER_ROLES = (UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
+_MANAGER_ROLES = (UserRole.MANAGER, UserRole.DIRECTOR)
 
 
 @router.post("", response_model=LeaveOut, status_code=201)

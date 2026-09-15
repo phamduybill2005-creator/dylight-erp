@@ -1,7 +1,7 @@
 """Router Quản lý Đấu thầu (Bids) — CRUD cơ bản, lọc theo công ty.
 
 Phân quyền TIỀN: chỉ GIÁM ĐỐC thấy/đặt `package_value` (giá gói thầu).
-Quản lý/Kế toán vẫn theo dõi + soạn hồ sơ thầu (tên, chủ đầu tư, trạng thái,
+Quản lý vẫn theo dõi + soạn hồ sơ thầu (tên, chủ đầu tư, trạng thái,
 ngày nộp) nhưng KHÔNG thấy con số giá gói thầu, và KHÔNG đặt được nó.
 Nhân viên (STAFF) không truy cập module đấu thầu.
 """
@@ -16,7 +16,7 @@ from app.schemas import BidCreate, BidOut, BidUpdate
 router = APIRouter(prefix="/bids", tags=["Đấu thầu"])
 
 # Đấu thầu là module Quản lý trở lên (không dành cho nhân viên).
-_GUARD = require_roles(UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.DIRECTOR)
+_GUARD = require_roles(UserRole.MANAGER, UserRole.DIRECTOR)
 
 
 def _out(bid: Bid, current: User) -> BidOut:

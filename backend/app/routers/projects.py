@@ -3,7 +3,7 @@ Router Quản lý Dự án (Projects) — CRUD, lọc theo công ty + theo THÀN
 
 Nguyên tắc quyền:
 - Director/Admin: xem & quản trị MỌI dự án của công ty.
-- Người khác (Quản lý/Kế toán/Nhân viên): CHỈ thấy dự án mà mình là thành viên
+- Người khác (Quản lý/Nhân viên): CHỈ thấy dự án mà mình là thành viên
   hoặc là người chủ trì (lead). Cô lập theo company_id luôn được giữ.
 - Quản lý thành viên / đặt người chủ trì: Director/Admin hoặc chính người chủ trì
   hiện tại của dự án (để chỉ huy trưởng tự điều phối đội của mình).
@@ -70,7 +70,7 @@ def _mgr_ids_of(u: User) -> set[int]:
 
 def _is_manager_tier(db: Session, user: User) -> bool:
     """Từ quản lý cấp trung trở lên (có vai trò quản lý hoặc đang có cấp dưới)."""
-    if _is_director(user) or user.role in (UserRole.MANAGER, UserRole.MANAGER_MID, UserRole.ACCOUNTANT):
+    if _is_director(user) or user.role in (UserRole.MANAGER, UserRole.MANAGER_MID):
         return True
     return _has_subordinates(db, user)
 

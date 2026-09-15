@@ -32,7 +32,7 @@ import type { Role, User } from "@/lib/types";
 type IconType = React.ComponentType<{ className?: string }>;
 
 /** Các vai trò có thể chọn để XEM GIAO DIỆN (Giám đốc / Quản trị mới thấy mục này). */
-const PREVIEW_ROLES: Role[] = ["DIRECTOR", "ADMIN", "MANAGER", "MANAGER_MID", "ACCOUNTANT", "FIELD_STAFF"];
+const PREVIEW_ROLES: Role[] = ["DIRECTOR", "ADMIN", "MANAGER", "MANAGER_MID", "FIELD_STAFF"];
 
 function Row({ icon: Icon, label, value }: { icon: IconType; label: string; value?: string | null }) {
   if (!value) return null;

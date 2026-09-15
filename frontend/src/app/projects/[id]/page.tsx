@@ -56,7 +56,6 @@ function getRoleRank(role?: string | null, hasSubordinates?: boolean | null): nu
   if (!role) return 99;
   if (role === "ADMIN" || role === "DIRECTOR") return 0;
   if (role === "MANAGER" || (role === "FIELD_STAFF" && hasSubordinates)) return 1;
-  if (role === "ACCOUNTANT") return 2;
   return 3; // FIELD_STAFF without subordinates (Nhân viên)
 }
 

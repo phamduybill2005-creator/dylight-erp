@@ -2,7 +2,7 @@
 Router Timesheet — GIỜ LÀM THỰC TẾ mỗi người khai cho từng dự án theo NGÀY.
 
 - Nhân viên: chỉ khai & xem GIỜ CỦA MÌNH.
-- Quản lý/Kế toán/Giám đốc: xem giờ MỌI NGƯỜI (để tổng hợp Dự án × Ngày, kiểm soát
+- Quản lý/Giám đốc: xem giờ MỌI NGƯỜI (để tổng hợp Dự án × Ngày, kiểm soát
   dự án từng ngày) và có thể khai hộ (user_id trong payload).
 
 1 dòng = (người, dự án, ngày) -> số giờ. Ghi đè khi khai lại; khai 0 giờ = xóa ô.

@@ -26,20 +26,22 @@ let realMe: User | null = null;
 // Lưu trong sessionStorage: đóng trình duyệt / đăng xuất là hết (tokenStore.clear xoá).
 const PREVIEW_ROLE_KEY = "dylight_preview_role";
 const PREVIEW_ALLOWED: Role[] = ["ADMIN", "DIRECTOR"];
-const ROLE_VALUES: Role[] = ["ADMIN", "DIRECTOR", "MANAGER", "MANAGER_MID", "ACCOUNTANT", "FIELD_STAFF"];
+const ROLE_VALUES: Role[] = ["ADMIN", "DIRECTOR", "MANAGER", "MANAGER_MID", "FIELD_STAFF"];
 
 export const previewRole = {
   get(): Role | null {
     try {
       const r = sessionStorage.getItem(PREVIEW_ROLE_KEY) as Role | null;
-      return r && ROLE_VALUES.includes(r) ? r : null;
+      if (r && ROLE_VALUES.includes(r)) return r;
+      if (r !== null) sessionStorage.removeItem(PREVIEW_ROLE_KEY);
+      return null;
     } catch {
       return null;
     }
   },
   set(r: Role | null) {
     try {
-      if (r) sessionStorage.setItem(PREVIEW_ROLE_KEY, r);
+      if (r && ROLE_VALUES.includes(r)) sessionStorage.setItem(PREVIEW_ROLE_KEY, r);
       else sessionStorage.removeItem(PREVIEW_ROLE_KEY);
     } catch {}
   },

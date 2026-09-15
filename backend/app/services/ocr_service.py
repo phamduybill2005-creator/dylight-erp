@@ -31,7 +31,7 @@ async def extract_invoice(image_bytes: bytes, mime_type: str = "image/jpeg") -> 
     """Chọn nhà cung cấp OCR theo cấu hình và trả về dữ liệu chuẩn hóa.
 
     QUAN TRỌNG (toàn vẹn số liệu): KHI DÙNG THẬT tuyệt đối KHÔNG bịa số. Nếu AI lỗi
-    hoặc chưa cấu hình khóa -> trả kết quả TRỐNG (số = 0) để kế toán nhập tay, thay vì
+    hoặc chưa cấu hình khóa -> trả kết quả TRỐNG (số = 0) để người có quyền duyệt nhập tay, thay vì
     sinh số ngẫu nhiên. Dữ liệu demo ngẫu nhiên CHỈ chạy khi OCR_PROVIDER == "mock".
     """
     provider = settings.OCR_PROVIDER.lower()
@@ -39,7 +39,7 @@ async def extract_invoice(image_bytes: bytes, mime_type: str = "image/jpeg") -> 
         try:
             return await _extract_openai(image_bytes, mime_type)
         except Exception as exc:  # noqa: BLE001 — không để AI lỗi làm sập upload
-            print(f"[OCR] Lỗi OpenAI: {exc}. Trả kết quả TRỐNG để kế toán nhập tay.")
+            print(f"[OCR] Lỗi OpenAI: {exc}. Trả kết quả TRỐNG để người có quyền duyệt nhập tay.")
             return _empty_result()
     if provider == "google" and settings.GOOGLE_VISION_API_KEY:
         try:
@@ -55,7 +55,7 @@ async def extract_invoice(image_bytes: bytes, mime_type: str = "image/jpeg") -> 
 
 
 def _empty_result() -> OcrResult:
-    """Không đọc được -> để trống cho kế toán nhập tay (KHÔNG bịa số tiền)."""
+    """Không đọc được -> để trống cho người có quyền duyệt nhập tay (KHÔNG bịa số tiền)."""
     return OcrResult(confidence=Decimal(0))
 
 

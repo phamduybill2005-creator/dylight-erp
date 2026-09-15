@@ -267,7 +267,7 @@ class OcrResult(BaseModel):
 
 
 class InvoiceUpdate(BaseModel):
-    """Kế toán chỉnh sửa số liệu AI bóc tách. KHÔNG cho đổi 'status' ở đây —
+    """Người có quyền duyệt chỉnh sửa số liệu AI bóc tách. KHÔNG cho đổi 'status' ở đây —
     duyệt/từ chối phải qua /verify, /reject (có kiểm soát vai trò) để chống tự duyệt."""
     supplier_name: str | None = None
     supplier_tax_code: str | None = None

@@ -45,7 +45,6 @@ class UserRole(str, enum.Enum):
     DIRECTOR = "DIRECTOR"        # Giám đốc (xem báo cáo, lãi/lỗ)
     MANAGER = "MANAGER"          # Quản lý cấp cao
     MANAGER_MID = "MANAGER_MID"  # Quản lý cấp trung
-    ACCOUNTANT = "ACCOUNTANT"    # Kế toán (duyệt hóa đơn, quyết toán)
     FIELD_STAFF = "FIELD_STAFF"  # Cán bộ hiện trường (chụp hóa đơn)
 
 
@@ -75,7 +74,7 @@ class ContractStatus(str, enum.Enum):
 class InvoiceStatus(str, enum.Enum):
     PENDING = "PENDING"          # Vừa upload, chờ OCR
     PROCESSING = "PROCESSING"    # AI đang bóc tách
-    EXTRACTED = "EXTRACTED"      # Đã có dữ liệu, chờ kế toán duyệt
+    EXTRACTED = "EXTRACTED"      # Đã có dữ liệu, chờ phê duyệt
     VERIFIED = "VERIFIED"        # Đã duyệt -> tính vào chi phí
     REJECTED = "REJECTED"        # Bị từ chối
 
