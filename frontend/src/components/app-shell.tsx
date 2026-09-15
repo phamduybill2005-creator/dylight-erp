@@ -153,7 +153,7 @@ export default function AppShell({
                   href={item.href}
                   className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
                     active
-                      ? "bg-gradient-to-r from-amber to-amber-deep text-white shadow-sm shadow-amber/30 scale-105"
+                      ? "bg-gradient-to-r from-amber to-amber-deep text-white shadow-sm shadow-amber/30 ring-1 ring-inset ring-amber/40"
                       : "text-white/75 hover:bg-white/10 hover:text-white"
                   }`}
                 >

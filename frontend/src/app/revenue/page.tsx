@@ -492,7 +492,7 @@ export default function RevenuePage() {
       <p className="mt-2 text-xs text-muted">Tìm thấy: <b className="text-ink">{rows.length}</b> dự án</p>
 
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
-      <div className="mt-3 max-h-[calc(100vh-360px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card">
+      <div className="mt-3 max-h-[calc(100vh-200px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card">
         <table className="w-full min-w-[920px] table-fixed border-collapse text-[11px]">
           <colgroup>
             <col className="w-[40px]" />   {/* STT */}
