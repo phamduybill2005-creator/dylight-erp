@@ -63,6 +63,9 @@ function applyPreviewRole(u: User): User {
     manager_ids: r === "MANAGER" ? null : u.manager_ids,
     manager_name: r === "MANAGER" ? null : u.manager_name,
     has_subordinates: r === "MANAGER" || r === "MANAGER_MID",
+    // Xem thử bằng vai trò khác thì bảng giờ cũng phải khóa/mở theo vai trò đó,
+    // đúng 3 cấp được sửa giờ mọi người ở app/routers/timesheets.py.
+    can_edit_all_hours: r === "ADMIN" || r === "DIRECTOR" || r === "MANAGER",
   };
 }
 

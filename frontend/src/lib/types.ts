@@ -24,6 +24,9 @@ export interface User {
   work_start?: string | null;    // giờ làm cơ sở "HH:MM" (đánh giá đi muộn)
   work_end?: string | null;      // giờ ra cơ sở "HH:MM"
   has_subordinates?: boolean;    // BE tính: người này có ≥1 cấp dưới trực tiếp
+  // BE tính, CHỈ có ở /auth/me: được sửa giờ của mọi người trên mọi đầu việc hay
+  // không (Giám đốc / Quản trị hệ thống / Quản lý cấp cao = true).
+  can_edit_all_hours?: boolean;
 }
 
 export interface Company {

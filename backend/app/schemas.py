@@ -56,6 +56,10 @@ class UserOut(BaseModel):
     work_start: str | None = None    # giờ làm cơ sở "HH:MM" (đánh giá đi muộn)
     work_end: str | None = None      # giờ ra cơ sở "HH:MM"
     has_subordinates: bool = False   # người này đang là quản lý trực tiếp của ≥1 người
+    # BE tính, CHỈ bơm ở /auth/me (giống has_subordinates): được sửa giờ của mọi
+    # người trên mọi đầu việc hay không — Giám đốc/Quản trị hệ thống/Quản lý cấp
+    # cao = True. Frontend dùng cờ này để khóa ô nhập giờ đúng như backend chặn.
+    can_edit_all_hours: bool = False
 
 class UserUpdate(BaseModel):
     full_name: str | None = None

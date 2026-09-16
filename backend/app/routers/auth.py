@@ -16,6 +16,7 @@ from app.schemas import (
     Token, UserOut, UserUpdate, UserCreate, UserDepartmentChange,
     GoogleLoginRequest, ChangePassword, AdminResetPassword,
 )
+from app.routers.timesheets import can_edit_all_hours
 from app.security import create_access_token, verify_password, hash_password
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
@@ -148,6 +149,9 @@ def read_me(
     current.has_subordinates = db.query(User.id).filter(
         User.manager_id == current.id, User.company_id == current.company_id
     ).first() is not None
+    # Cờ khóa ô nhập giờ ở bảng Tiến độ: lấy thẳng từ luật của backend để giao
+    # diện không bao giờ lệch với chỗ thực sự chặn (routers/timesheets.py).
+    current.can_edit_all_hours = can_edit_all_hours(current)
     return current
 
 

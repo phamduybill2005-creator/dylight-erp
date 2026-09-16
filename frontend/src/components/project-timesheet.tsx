@@ -46,6 +46,7 @@ export default function ProjectTimesheet({
   members,
   currentUserId,
   canManage,
+  canEditAllHours,
   startDate = null,
   endDate = null,
   onHoursChange,
@@ -54,6 +55,9 @@ export default function ProjectTimesheet({
   members: User[];
   currentUserId: number | null;
   canManage: boolean;
+  /** Giám đốc / Quản trị hệ thống / Quản lý cấp cao: sửa được giờ của mọi người
+   *  trên mọi đầu việc. Lấy từ /auth/me để không bao giờ lệch với backend. */
+  canEditAllHours: boolean;
   startDate?: string | null;
   endDate?: string | null;
   onHoursChange?: () => void;
@@ -168,6 +172,34 @@ export default function ProjectTimesheet({
       });
     },
     [entries, currentUserId, members, nameOf, projectId]
+  );
+
+  // QUYỀN SỬA SỐ GIỜ — soi gương đúng app/routers/timesheets.py để ô nào backend
+  // chặn thì ở đây cũng khóa, không để người dùng gõ xong mới báo lỗi.
+  const ownsItem = useCallback(
+    (it: ProjectItem): boolean => {
+      if (currentUserId == null) return false;
+      if (it.assignee_id === currentUserId) return true;
+      const ids = it.worker_ids ?? [];
+      if (ids.includes(currentUserId)) return true;
+      // Đầu việc chưa giao cho ai thì còn trống, không phải của người khác.
+      return it.assignee_id == null && ids.length === 0;
+    },
+    [currentUserId]
+  );
+
+  const canEditHours = useCallback(
+    (uid: number, it: ProjectItem): boolean =>
+      canEditAllHours || (uid === currentUserId && ownsItem(it)),
+    [canEditAllHours, currentUserId, ownsItem]
+  );
+
+  const lockReason = useCallback(
+    (uid: number, it: ProjectItem): string =>
+      uid !== currentUserId
+        ? "Chỉ Giám đốc, Quản trị hệ thống và Quản lý cấp cao mới sửa được giờ của người khác."
+        : "Bạn không được giao đầu việc này nên không sửa giờ ở đây được.",
+    [currentUserId]
   );
 
   const hkey = (uid: number, itemId: number, d: string) => `${uid}:${itemId}:${d}`;
@@ -388,12 +420,19 @@ export default function ProjectTimesheet({
               </p>
             </div>
           </div>
-          <button
-            onClick={handleCleanOrphans}
-            className="rounded-lg bg-bad px-3 py-1.5 text-xs font-bold text-white hover:bg-bad/90 transition shadow-xs"
-          >
-            Dọn sạch {orphanEntries.length} giờ này
-          </button>
+          {canEditAllHours ? (
+            <button
+              onClick={handleCleanOrphans}
+              className="rounded-lg bg-bad px-3 py-1.5 text-xs font-bold text-white hover:bg-bad/90 transition shadow-xs"
+            >
+              Dọn sạch {orphanEntries.length} giờ này
+            </button>
+          ) : (
+            // Dọn sạch đụng vào giờ của cả người khác -> để cấp cao trở lên làm.
+            <span className="text-[11px] font-semibold text-amber-800">
+              Báo Giám đốc / Quản lý cấp cao dọn giúp.
+            </span>
+          )}
         </div>
       )}
 
@@ -655,8 +694,10 @@ export default function ProjectTimesheet({
                                         )}
                                       </div>
 
-                                      {/* Nút xóa giờ của nhân sự này nếu đã có giờ */}
-                                      {wTotal > 0 && (
+                                      {/* Nút xóa giờ của nhân sự này nếu đã có giờ — cùng
+                                          luật với ô nhập: chỉ giờ của mình trên đầu việc
+                                          của mình, hoặc cấp cao trở lên. */}
+                                      {wTotal > 0 && canEditHours(w.id, c) && (
                                         <button
                                           onClick={() => handleClearWorkerOnItem(w.id, c.id, w.full_name)}
                                           className="text-bad hover:bg-bad/10 p-0.5 rounded transition"
@@ -675,6 +716,7 @@ export default function ProjectTimesheet({
                                   {days.map((d) => {
                                     const v = hoursMap.get(hkey(w.id, c.id, d)) ?? 0;
                                     const displayVal = hoursValue(w.id, c.id, d);
+                                    const mayEdit = canEditHours(w.id, c);
 
                                     return (
                                       <td
@@ -689,7 +731,9 @@ export default function ProjectTimesheet({
                                             : ""
                                         }`}
                                       >
-                                        {d <= today ? (
+                                        {d > today ? (
+                                          <span className="block px-1 py-0.5 tnum text-line">–</span>
+                                        ) : mayEdit ? (
                                           <input
                                             type="text"
                                             inputMode="decimal"
@@ -708,7 +752,14 @@ export default function ProjectTimesheet({
                                             className="h-7 w-full min-w-[32px] bg-transparent text-center text-xs font-bold text-ink outline-none placeholder:text-line/60 focus:bg-white focus:ring-1 focus:ring-amber-500"
                                           />
                                         ) : (
-                                          <span className="block px-1 py-0.5 tnum text-line">–</span>
+                                          // KHÓA: không phải giờ của mình / không phải đầu việc của mình.
+                                          // Vẫn cho XEM số, chỉ bỏ ô nhập (backend cũng chặn y hệt).
+                                          <span
+                                            title={lockReason(w.id, c)}
+                                            className="block h-7 px-1 py-1.5 tnum text-xs font-bold text-ink/60 cursor-not-allowed"
+                                          >
+                                            {v > 0 ? num1(v) : "–"}
+                                          </span>
                                         )}
                                       </td>
                                     );

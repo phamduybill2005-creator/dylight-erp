@@ -1,11 +1,14 @@
 """
 Router Timesheet — GIỜ LÀM THỰC TẾ mỗi người khai cho từng dự án theo NGÀY.
 
-- Nhân viên: chỉ khai & xem GIỜ CỦA MÌNH.
-- Quản lý/Giám đốc: xem giờ MỌI NGƯỜI (để tổng hợp Dự án × Ngày, kiểm soát
-  dự án từng ngày) và có thể khai hộ (user_id trong payload).
+QUYỀN SỬA SỐ GIỜ (chốt với chủ doanh nghiệp):
+- Giám đốc / Quản trị hệ thống / Quản lý CẤP CAO  -> sửa giờ của MỌI NGƯỜI trên
+  MỌI đầu việc của dự án họ xem được (kể cả khai hộ).
+- Quản lý CẤP TRUNG trở xuống (gồm nhân viên)     -> CHỈ khai/sửa giờ CỦA CHÍNH
+  MÌNH, và CHỈ trên ĐẦU VIỆC ĐƯỢC GIAO cho mình (phụ trách chính hoặc nằm trong
+  danh sách người cùng làm). Không đụng được vào đầu việc của người khác.
 
-1 dòng = (người, dự án, ngày) -> số giờ. Ghi đè khi khai lại; khai 0 giờ = xóa ô.
+1 dòng = (người, dự án, đầu việc, ngày) -> số giờ. Ghi đè khi khai lại; 0 giờ = xóa ô.
 """
 from datetime import date
 
@@ -14,12 +17,73 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
-from app.deps import get_current_user, is_staff_tier
-from app.models import Project, ProjectItem, Timesheet, User
-from app.routers.projects import _can_view
+from app.deps import get_current_user
+from app.models import Project, ProjectItem, Timesheet, User, UserRole
+from app.routers.projects import SENIOR_MANAGER_EMAILS, _can_view
 from app.schemas import TimesheetOut, TimesheetUpsert
 
 router = APIRouter(prefix="/timesheets", tags=["Nhân công theo ngày"])
+
+# Đúng 3 vai trò được sửa giờ của mọi người: Quản trị hệ thống, Giám đốc, Quản
+# lý cấp cao. MANAGER_MID (cấp trung) và FIELD_STAFF (nhân viên) thì không.
+_HOURS_FULL_ACCESS_ROLES = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)
+
+
+def can_edit_all_hours(user: User) -> bool:
+    """True nếu người này được sửa giờ của MỌI NGƯỜI trên MỌI đầu việc.
+
+    Xét THẲNG theo VAI TRÒ, cố ý KHÔNG dùng _is_senior_manager của projects.py:
+    hàm đó suy "cấp cao" ra từ sơ đồ tổ chức (có cấp dưới + không có ai quản lý
+    bên trên) nên một Quản lý cấp trung — thậm chí một nhân viên — đang quản
+    người khác sẽ lọt vào diện sửa giờ của cả công ty. Quyền sửa số giờ phải bám
+    đúng cấp bậc được phân, không suy diễn. Vẫn giữ danh sách email cấp cao chốt
+    cứng để khớp với phần còn lại của hệ thống.
+
+    Dùng chung cho router này và cờ can_edit_all_hours trả ở /auth/me, để giao
+    diện khóa ô nhập giờ đúng y như backend chặn.
+    """
+    if user.role in _HOURS_FULL_ACCESS_ROLES:
+        return True
+    return (user.email or "").strip().lower() in SENIOR_MANAGER_EMAILS
+
+
+def _owns_item(user: User, item: ProjectItem) -> bool:
+    """Đầu việc này CÓ PHẢI của người dùng không.
+
+    Của mình khi: là người phụ trách chính, HOẶC nằm trong danh sách người cùng
+    làm. Đầu việc CHƯA giao cho ai (không phụ trách chính và chưa có người cùng
+    làm) thì còn trống — không phải đầu việc của người khác — nên thành viên dự
+    án vẫn khai giờ của chính mình vào đó được.
+    """
+    if item.assignee_id == user.id:
+        return True
+    worker_ids = {w.id for w in (item.workers or [])}
+    if user.id in worker_ids:
+        return True
+    return item.assignee_id is None and not worker_ids
+
+
+def _assert_can_edit_hours(
+    current: User, target_uid: int, item: ProjectItem | None
+) -> None:
+    """Chặn 3 việc với quản lý cấp trung trở xuống: khai hộ người khác, khai giờ
+    không gắn đầu việc, và khai vào đầu việc của người khác."""
+    if can_edit_all_hours(current):
+        return
+    if target_uid != current.id:
+        raise HTTPException(
+            403,
+            "Bạn chỉ được khai/sửa giờ của chính mình. Sửa giờ cho người khác là "
+            "quyền của Giám đốc, Quản trị hệ thống và Quản lý cấp cao.",
+        )
+    if item is None:
+        raise HTTPException(403, "Phải chọn đầu việc trước khi khai giờ.")
+    if not _owns_item(current, item):
+        raise HTTPException(
+            403,
+            "Bạn không được giao đầu việc này nên không khai/sửa giờ ở đây được. "
+            "Chỉ khai giờ ở những đầu việc của mình.",
+        )
 
 
 @router.get("", response_model=list[TimesheetOut])
@@ -52,8 +116,8 @@ def upsert_timesheet(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    """Khai/sửa giờ 1 ô (người, dự án, ngày). hours = 0 -> xóa ô.
-    Quản lý+ có thể khai hộ người khác (payload.user_id)."""
+    """Khai/sửa giờ 1 ô (người, đầu việc, ngày). hours = 0 -> xóa ô.
+    Chỉ Giám đốc / Quản trị hệ thống / Quản lý cấp cao khai hộ người khác được."""
     # Không cho khai giờ cho NGÀY TƯƠNG LAI (chỉ hôm nay & các ngày đã qua).
     if payload.work_date > vn_now().date():
         raise HTTPException(400, "Không thể khai giờ cho ngày trong tương lai.")
@@ -73,10 +137,14 @@ def upsert_timesheet(
 
     # Đầu việc (hạng mục) — nếu có, phải thuộc đúng dự án này.
     item_id = payload.project_item_id
+    item: ProjectItem | None = None
     if item_id is not None:
         item = db.get(ProjectItem, item_id)
         if not item or item.project_id != payload.project_id:
             raise HTTPException(404, "Không tìm thấy đầu việc trong dự án.")
+
+    # CHẶN theo cấp bậc + đầu việc được giao (xem docstring đầu file).
+    _assert_can_edit_hours(current, target_uid, item)
 
     # Khóa 1 ô = (người, dự án, đầu việc, ngày). project_item_id NULL cần lọc riêng.
     q = (
@@ -123,6 +191,19 @@ def delete_timesheet(
     proj = db.get(Project, rec.project_id)
     if not proj or not _can_view(db, proj, current):
         raise HTTPException(403, "Không có quyền xóa giờ trên dự án này.")
+    # Cấp trung trở xuống: chỉ xóa được giờ CỦA MÌNH. Dòng giờ cũ chưa gắn đầu
+    # việc (giờ lạc) vẫn tự dọn được phần của mình; giờ đã gắn đầu việc thì đầu
+    # việc đó phải là của mình.
+    if not can_edit_all_hours(current):
+        if rec.user_id != current.id:
+            raise HTTPException(403, "Bạn chỉ được xóa giờ của chính mình.")
+        if rec.project_item_id is not None:
+            item = db.get(ProjectItem, rec.project_item_id)
+            if item is not None and not _owns_item(current, item):
+                raise HTTPException(
+                    403,
+                    "Bạn không được giao đầu việc này nên không xóa giờ ở đây được.",
+                )
     db.delete(rec)
     db.commit()
     return Response(status_code=204)
@@ -144,7 +225,20 @@ def clear_worker_hours(
     proj = db.get(Project, payload.project_id)
     if not proj or proj.company_id != current.company_id or not _can_view(db, proj, current):
         raise HTTPException(404, "Không tìm thấy dự án.")
+
+    item: ProjectItem | None = None
+    if payload.project_item_id is not None:
+        item = db.get(ProjectItem, payload.project_item_id)
+        if not item or item.project_id != payload.project_id:
+            raise HTTPException(404, "Không tìm thấy đầu việc trong dự án.")
+
+    # Xóa sạch giờ cũng là SỬA SỐ -> cùng luật với khai giờ. Cấp trung trở xuống
+    # chỉ xóa được giờ của mình trên đầu việc của mình, và bắt buộc chỉ rõ đầu
+    # việc (không cho quét sạch cả dự án).
+    _assert_can_edit_hours(current, payload.user_id, item)
+
     q = db.query(Timesheet).filter(
+        Timesheet.company_id == current.company_id,
         Timesheet.project_id == payload.project_id,
         Timesheet.user_id == payload.user_id,
     )

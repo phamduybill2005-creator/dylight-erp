@@ -657,12 +657,15 @@ export default function ProjectDetailPage() {
         {/* Tab Tiến độ */}
         {activeTab === "progress" && (
           <div className="space-y-4">
-            {/* Bảng tiến độ ngày = NHÂN CÔNG theo ngày: chỉ cần điền số giờ vào là chạy. */}
+            {/* Bảng tiến độ ngày = NHÂN CÔNG theo ngày: chỉ cần điền số giờ vào là chạy.
+                canEditAllHours lấy thẳng từ /auth/me (backend tính) — cấp trung trở
+                xuống chỉ sửa được giờ của mình trên đầu việc được giao. */}
             <ProjectTimesheet
               projectId={projectId}
               members={project.members ?? []}
               currentUserId={currentUser?.id ?? null}
               canManage={canManage}
+              canEditAllHours={currentUser?.can_edit_all_hours ?? false}
               startDate={project.start_date ?? null}
               endDate={project.end_date ?? null}
               onHoursChange={() => loadData(true)}

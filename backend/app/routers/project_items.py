@@ -192,6 +192,17 @@ def add_item_worker(
         raise HTTPException(404, "Không tìm thấy đầu việc.")
     project = _assert_member(db, current, item.project_id)
 
+    # PHÂN NGƯỜI vào đầu việc = giao việc -> chỉ chủ trì/quản lý dự án, hoặc
+    # chính người phụ trách đầu việc đó. Nếu để ai cũng thêm được thì luật "chỉ
+    # khai giờ ở đầu việc của mình" (routers/timesheets.py) bị lách: tự thêm
+    # mình vào đầu việc của người khác rồi khai giờ ở đó.
+    if not (_can_manage(db, project, current) or item.assignee_id == current.id):
+        raise HTTPException(
+            403,
+            "Chỉ chủ trì/quản lý dự án hoặc người phụ trách đầu việc mới thêm "
+            "được người cùng làm.",
+        )
+
     worker = db.get(User, user_id)
     if not worker or worker.company_id != current.company_id:
         raise HTTPException(400, "Người thực hiện không hợp lệ.")
