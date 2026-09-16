@@ -60,6 +60,9 @@ class UserOut(BaseModel):
     # người trên mọi đầu việc hay không — Giám đốc/Quản trị hệ thống/Quản lý cấp
     # cao = True. Frontend dùng cờ này để khóa ô nhập giờ đúng như backend chặn.
     can_edit_all_hours: bool = False
+    # Cũng 3 cấp đó: được XÓA VĨNH VIỄN dữ liệu trong thùng rác hay không. Tách
+    # cờ riêng để sau này muốn siết/nới một bên thì không kéo bên kia theo.
+    can_purge_archive: bool = False
 
 class UserUpdate(BaseModel):
     full_name: str | None = None

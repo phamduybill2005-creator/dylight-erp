@@ -63,9 +63,10 @@ function applyPreviewRole(u: User): User {
     manager_ids: r === "MANAGER" ? null : u.manager_ids,
     manager_name: r === "MANAGER" ? null : u.manager_name,
     has_subordinates: r === "MANAGER" || r === "MANAGER_MID",
-    // Xem thử bằng vai trò khác thì bảng giờ cũng phải khóa/mở theo vai trò đó,
-    // đúng 3 cấp được sửa giờ mọi người ở app/routers/timesheets.py.
+    // Xem thử bằng vai trò khác thì bảng giờ và nút xóa vĩnh viễn cũng phải
+    // khóa/mở theo vai trò đó — đúng 3 cấp ở deps.is_top_leadership.
     can_edit_all_hours: r === "ADMIN" || r === "DIRECTOR" || r === "MANAGER",
+    can_purge_archive: r === "ADMIN" || r === "DIRECTOR" || r === "MANAGER",
   };
 }
 
@@ -322,6 +323,14 @@ export const api = {
     request<DeletedItem[]>(`/archive/deleted-items${projectId ? `?project_id=${projectId}` : ""}`),
   restoreItem: (itemId: number) =>
     request<{ message: string }>(`/archive/restore-item/${itemId}`, { method: "POST" }),
+  /** XÓA VĨNH VIỄN — không khôi phục lại được. Chỉ 3 cấp lãnh đạo gọi được. */
+  purgeItem: (itemId: number) =>
+    request<{ deleted_items: number }>(`/archive/purge-item/${itemId}`, { method: "DELETE" }),
+  purgeProject: (projectId: number) =>
+    request<{ deleted_project: string; deleted_items: number }>(
+      `/archive/purge-project/${projectId}`,
+      { method: "DELETE" }
+    ),
 
   // --- Attendance (Chấm công) ---
   attendanceMe: (fromDate?: string, toDate?: string) => {

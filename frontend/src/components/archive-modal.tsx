@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { XMarkIcon, ArrowPathIcon, ArchiveBoxIcon, FolderIcon, QueueListIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, ArrowPathIcon, ArchiveBoxIcon, FolderIcon, QueueListIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatDate } from "@/lib/format";
-import type { DeletedProject, DeletedItem } from "@/lib/types";
+import type { DeletedProject, DeletedItem, User } from "@/lib/types";
 
 interface ArchiveModalProps {
   isOpen: boolean;
@@ -20,8 +20,14 @@ export default function ArchiveModal({ isOpen, onClose, projectId, onRestored }:
   const [deletedItems, setDeletedItems] = useState<DeletedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [purgingId, setPurgingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [me, setMe] = useState<User | null>(api.cachedUser());
+
+  // Nút "Xóa vĩnh viễn" chỉ hiện với Giám đốc / Quản trị hệ thống / Quản lý cấp
+  // cao. Cờ do backend tính (deps.is_top_leadership) nên giao diện không tự đoán.
+  const canPurge = me?.can_purge_archive ?? false;
 
   useEscapeKey(onClose, isOpen);
 
@@ -46,6 +52,7 @@ export default function ArchiveModal({ isOpen, onClose, projectId, onRestored }:
   useEffect(() => {
     if (isOpen) {
       loadArchiveData();
+      api.me().then(setMe).catch(() => {});
     }
   }, [isOpen, projectId]);
 
@@ -79,6 +86,55 @@ export default function ArchiveModal({ isOpen, onClose, projectId, onRestored }:
     }
   };
 
+  const handlePurgeProject = async (proj: DeletedProject) => {
+    if (
+      !window.confirm(
+        `XÓA VĨNH VIỄN dự án "${proj.code} – ${proj.name}"?\n\n` +
+          `Toàn bộ hạng mục và giờ công của dự án sẽ mất hẳn, KHÔNG khôi phục lại được.\n\n` +
+          `Nếu chỉ muốn cất đi cho gọn thì cứ để nguyên trong thùng rác — thùng rác không tự xóa.`
+      )
+    )
+      return;
+    setPurgingId(`proj-${proj.id}`);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      await api.purgeProject(proj.id);
+      setSuccessMsg(`Đã xóa vĩnh viễn dự án "${proj.name}".`);
+      await loadArchiveData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xóa vĩnh viễn dự án thất bại.");
+    } finally {
+      setPurgingId(null);
+    }
+  };
+
+  const handlePurgeItem = async (item: DeletedItem) => {
+    const isGroup = item.parent_id == null;
+    if (
+      !window.confirm(
+        `XÓA VĨNH VIỄN hạng mục "${item.name || "(chưa đặt tên)"}"?\n\n` +
+          (isGroup ? `Đây là NHÓM CHA — các đầu việc con bên trong sẽ mất theo.\n` : "") +
+          `Giờ công đã khai ở hạng mục này cũng mất hẳn, KHÔNG khôi phục lại được.`
+      )
+    )
+      return;
+    setPurgingId(`item-${item.id}`);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const res = await api.purgeItem(item.id);
+      setSuccessMsg(
+        `Đã xóa vĩnh viễn ${res.deleted_items > 1 ? `${res.deleted_items} hạng mục` : "hạng mục"}.`
+      );
+      await loadArchiveData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xóa vĩnh viễn hạng mục thất bại.");
+    } finally {
+      setPurgingId(null);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -104,9 +160,13 @@ export default function ArchiveModal({ isOpen, onClose, projectId, onRestored }:
         </div>
 
         {/* Thông báo phân quyền phòng ban */}
-        <div className="bg-steel/10 px-5 py-2 text-[11px] text-steel font-medium border-b border-steel/20 flex items-center gap-1.5">
+        <div className="bg-steel/10 px-5 py-2 text-[11px] text-steel font-medium border-b border-steel/20 flex items-start gap-1.5">
           <span>ℹ️</span>
-          <span>Dữ liệu đã xóa được tự động lọc theo đúng phòng ban và phân công của bạn để bạn khôi phục nhanh nhất.</span>
+          <span>
+            Dữ liệu đã xóa được tự động lọc theo đúng phòng ban và phân công của bạn để bạn khôi phục nhanh nhất.
+            {" "}Thùng rác <b>không tự xóa theo thời gian</b> — dữ liệu nằm đây tới khi có người xóa vĩnh viễn
+            {canPurge ? "." : ", việc này chỉ Giám đốc / Quản trị hệ thống / Quản lý cấp cao làm được."}
+          </span>
         </div>
 
         {/* Tabs navigation */}
@@ -199,16 +259,30 @@ export default function ArchiveModal({ isOpen, onClose, projectId, onRestored }:
                             <div className="text-[10px] text-muted/70">{formatDate(item.deleted_at)}</div>
                           )}
                         </td>
-                        <td className="p-2.5 text-right">
-                          <button
-                            type="button"
-                            disabled={restoringId === `item-${item.id}`}
-                            onClick={() => handleRestoreItem(item)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-ok/15 px-2.5 py-1 text-xs font-bold text-ok hover:bg-ok hover:text-white transition-all shadow-sm disabled:opacity-50"
-                          >
-                            <ArrowPathIcon className={`h-3.5 w-3.5 ${restoringId === `item-${item.id}` ? "animate-spin" : ""}`} />
-                            Khôi phục
-                          </button>
+                        <td className="p-2.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              disabled={restoringId === `item-${item.id}` || purgingId === `item-${item.id}`}
+                              onClick={() => handleRestoreItem(item)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-ok/15 px-2.5 py-1 text-xs font-bold text-ok hover:bg-ok hover:text-white transition-all shadow-sm disabled:opacity-50"
+                            >
+                              <ArrowPathIcon className={`h-3.5 w-3.5 ${restoringId === `item-${item.id}` ? "animate-spin" : ""}`} />
+                              Khôi phục
+                            </button>
+                            {canPurge && (
+                              <button
+                                type="button"
+                                disabled={purgingId === `item-${item.id}` || restoringId === `item-${item.id}`}
+                                onClick={() => handlePurgeItem(item)}
+                                title="Xóa vĩnh viễn — không khôi phục lại được"
+                                className="inline-flex items-center gap-1 rounded-lg bg-bad/10 px-2.5 py-1 text-xs font-bold text-bad hover:bg-bad hover:text-white transition-all shadow-sm disabled:opacity-50"
+                              >
+                                <TrashIcon className={`h-3.5 w-3.5 ${purgingId === `item-${item.id}` ? "animate-pulse" : ""}`} />
+                                Xóa vĩnh viễn
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -246,16 +320,30 @@ export default function ArchiveModal({ isOpen, onClose, projectId, onRestored }:
                             <div className="text-[10px] text-muted/70">{formatDate(proj.deleted_at)}</div>
                           )}
                         </td>
-                        <td className="p-2.5 text-right">
-                          <button
-                            type="button"
-                            disabled={restoringId === `proj-${proj.id}`}
-                            onClick={() => handleRestoreProject(proj)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-ok/15 px-2.5 py-1 text-xs font-bold text-ok hover:bg-ok hover:text-white transition-all shadow-sm disabled:opacity-50"
-                          >
-                            <ArrowPathIcon className={`h-3.5 w-3.5 ${restoringId === `proj-${proj.id}` ? "animate-spin" : ""}`} />
-                            Khôi phục
-                          </button>
+                        <td className="p-2.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              disabled={restoringId === `proj-${proj.id}` || purgingId === `proj-${proj.id}`}
+                              onClick={() => handleRestoreProject(proj)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-ok/15 px-2.5 py-1 text-xs font-bold text-ok hover:bg-ok hover:text-white transition-all shadow-sm disabled:opacity-50"
+                            >
+                              <ArrowPathIcon className={`h-3.5 w-3.5 ${restoringId === `proj-${proj.id}` ? "animate-spin" : ""}`} />
+                              Khôi phục
+                            </button>
+                            {canPurge && (
+                              <button
+                                type="button"
+                                disabled={purgingId === `proj-${proj.id}` || restoringId === `proj-${proj.id}`}
+                                onClick={() => handlePurgeProject(proj)}
+                                title="Xóa vĩnh viễn — không khôi phục lại được"
+                                className="inline-flex items-center gap-1 rounded-lg bg-bad/10 px-2.5 py-1 text-xs font-bold text-bad hover:bg-bad hover:text-white transition-all shadow-sm disabled:opacity-50"
+                              >
+                                <TrashIcon className={`h-3.5 w-3.5 ${purgingId === `proj-${proj.id}` ? "animate-pulse" : ""}`} />
+                                Xóa vĩnh viễn
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

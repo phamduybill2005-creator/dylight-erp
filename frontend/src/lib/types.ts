@@ -27,6 +27,8 @@ export interface User {
   // BE tính, CHỈ có ở /auth/me: được sửa giờ của mọi người trên mọi đầu việc hay
   // không (Giám đốc / Quản trị hệ thống / Quản lý cấp cao = true).
   can_edit_all_hours?: boolean;
+  // BE tính, CHỈ có ở /auth/me: được XÓA VĨNH VIỄN dữ liệu trong Thùng rác.
+  can_purge_archive?: boolean;
 }
 
 export interface Company {

@@ -17,34 +17,25 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
-from app.deps import get_current_user
-from app.models import Project, ProjectItem, Timesheet, User, UserRole
-from app.routers.projects import SENIOR_MANAGER_EMAILS, _can_view
+from app.deps import get_current_user, is_top_leadership
+from app.models import Project, ProjectItem, Timesheet, User
+from app.routers.projects import _can_view
 from app.schemas import TimesheetOut, TimesheetUpsert
 
 router = APIRouter(prefix="/timesheets", tags=["Nhân công theo ngày"])
-
-# Đúng 3 vai trò được sửa giờ của mọi người: Quản trị hệ thống, Giám đốc, Quản
-# lý cấp cao. MANAGER_MID (cấp trung) và FIELD_STAFF (nhân viên) thì không.
-_HOURS_FULL_ACCESS_ROLES = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)
 
 
 def can_edit_all_hours(user: User) -> bool:
     """True nếu người này được sửa giờ của MỌI NGƯỜI trên MỌI đầu việc.
 
-    Xét THẲNG theo VAI TRÒ, cố ý KHÔNG dùng _is_senior_manager của projects.py:
-    hàm đó suy "cấp cao" ra từ sơ đồ tổ chức (có cấp dưới + không có ai quản lý
-    bên trên) nên một Quản lý cấp trung — thậm chí một nhân viên — đang quản
-    người khác sẽ lọt vào diện sửa giờ của cả công ty. Quyền sửa số giờ phải bám
-    đúng cấp bậc được phân, không suy diễn. Vẫn giữ danh sách email cấp cao chốt
-    cứng để khớp với phần còn lại của hệ thống.
+    Đúng 3 vai trò: Quản trị hệ thống, Giám đốc, Quản lý cấp cao — xem
+    deps.is_top_leadership để biết vì sao xét thẳng theo vai trò chứ không suy
+    từ sơ đồ tổ chức. MANAGER_MID (cấp trung) và FIELD_STAFF thì không.
 
     Dùng chung cho router này và cờ can_edit_all_hours trả ở /auth/me, để giao
     diện khóa ô nhập giờ đúng y như backend chặn.
     """
-    if user.role in _HOURS_FULL_ACCESS_ROLES:
-        return True
-    return (user.email or "").strip().lower() in SENIOR_MANAGER_EMAILS
+    return is_top_leadership(user)
 
 
 def _owns_item(user: User, item: ProjectItem) -> bool:

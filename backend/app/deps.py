@@ -45,6 +45,29 @@ def get_current_user(
     return user
 
 
+# "Quản lý cấp cao" chốt cứng theo email — để chắc chắn đúng người kể cả khi dữ
+# liệu sơ đồ tổ chức chưa chuẩn.
+SENIOR_MANAGER_EMAILS = {"dhson@dosco.vn", "hklam@dosco.vn", "ncbinh@dosco.vn"}
+
+# Đúng 3 vai trò lãnh đạo cao nhất: Quản trị hệ thống, Giám đốc, Quản lý cấp cao.
+_TOP_LEADERSHIP_ROLES = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)
+
+
+def is_top_leadership(user: User) -> bool:
+    """True với Quản trị hệ thống / Giám đốc / Quản lý cấp cao.
+
+    Xét THẲNG theo VAI TRÒ được phân, cố ý KHÔNG dùng _is_senior_manager của
+    projects.py: hàm đó suy "cấp cao" ra từ sơ đồ tổ chức (có cấp dưới + không
+    có ai quản lý bên trên) nên một Quản lý cấp trung — thậm chí một nhân viên —
+    đang quản người khác sẽ lọt vào. Dùng cho những việc KHÔNG LÙI ĐƯỢC: sửa giờ
+    của người khác (routers/timesheets.py) và xóa vĩnh viễn khỏi thùng rác
+    (routers/archive.py).
+    """
+    if user.role in _TOP_LEADERSHIP_ROLES:
+        return True
+    return (user.email or "").strip().lower() in SENIOR_MANAGER_EMAILS
+
+
 def can_see_money(user: User) -> bool:
     """
     True nếu người dùng được xem TIỀN của dự án (giá trị hợp đồng, chi phí,

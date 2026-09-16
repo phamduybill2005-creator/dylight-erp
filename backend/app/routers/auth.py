@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.deps import get_current_user, require_roles
+from app.deps import get_current_user, require_roles, is_top_leadership
 from app.ratelimit import check_login_allowed, record_login_failure, clear_login_failures
 from app.models import User, UserRole, Company
 from app.schemas import (
@@ -152,6 +152,8 @@ def read_me(
     # Cờ khóa ô nhập giờ ở bảng Tiến độ: lấy thẳng từ luật của backend để giao
     # diện không bao giờ lệch với chỗ thực sự chặn (routers/timesheets.py).
     current.can_edit_all_hours = can_edit_all_hours(current)
+    # Cờ hiện nút "Xóa vĩnh viễn" trong Thùng rác (routers/archive.py).
+    current.can_purge_archive = is_top_leadership(current)
     return current
 
 

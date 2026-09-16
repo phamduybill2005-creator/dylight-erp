@@ -15,7 +15,7 @@ from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
-from app.deps import get_current_user
+from app.deps import get_current_user, SENIOR_MANAGER_EMAILS
 from app.models import (
     Assignment, ChatMessage, Company, Contract, Conversation, ConversationMember, DesignDocument,
     Invoice, MessageReaction, Payment, Progress, Project, ProjectEvaluation, ProjectItem,
@@ -37,8 +37,8 @@ router = APIRouter(prefix="/projects", tags=["Dự án"])
 #                                               dự án có CẤP DƯỚI của mình tham gia.
 #   4. Nhân viên                             -> chỉ xem + làm phần việc của mình.
 # "Cấp cao" = quản lý KHÔNG có ai quản lý bên trên (khớp nhãn roleTitle ở frontend);
-# kèm danh sách email chốt cứng để chắc chắn đúng người dù dữ liệu sơ đồ chưa chuẩn.
-SENIOR_MANAGER_EMAILS = {"dhson@dosco.vn", "hklam@dosco.vn", "ncbinh@dosco.vn"}
+# kèm danh sách email chốt cứng (SENIOR_MANAGER_EMAILS ở deps.py) để chắc chắn
+# đúng người dù dữ liệu sơ đồ chưa chuẩn.
 
 
 def _is_director(user: User) -> bool:
