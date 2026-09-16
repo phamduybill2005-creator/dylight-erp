@@ -435,6 +435,8 @@ export interface ActivityLog {
   id: number; company_id: number; user_id?: number | null; action: string;
   entity_type?: string | null; entity_id?: number | null; detail?: string | null;
   created_at: string; user_name?: string | null;
+  action_label?: string | null;   // BE dịch sẵn sang tiếng Việt (app/audit.py)
+  entity_label?: string | null;
 }
 
 // Tài chính

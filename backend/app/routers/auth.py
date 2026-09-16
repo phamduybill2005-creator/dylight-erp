@@ -17,6 +17,7 @@ from app.schemas import (
     GoogleLoginRequest, ChangePassword, AdminResetPassword,
 )
 from app.routers.timesheets import can_edit_all_hours
+from app.audit import log_activity, role_vi
 from app.security import create_access_token, verify_password, hash_password
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
@@ -171,6 +172,7 @@ def change_password(
     current.token_version = (current.token_version or 0) + 1
     db.commit()
     db.refresh(current)
+    log_activity(db, current, "user.change_password", "user", current.id, current.full_name)
     return Token(access_token=_issue_token(current))
 
 
@@ -242,6 +244,8 @@ def create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+    log_activity(db, current, "user.create", "user", user.id,
+                 f"{user.full_name} ({user.email}) · {role_vi(user.role)}")
     return _with_has_sub(db, user, current.company_id)
 
 
@@ -296,11 +300,25 @@ def update_user(
         else:
             update_data["manager_ids"] = None
 
+    # Chụp giá trị cũ để nhật ký ghi rõ "từ … sang …". Chỉ ghi các thay đổi về
+    # QUYỀN TRUY CẬP; sửa hồ sơ thường (điện thoại, địa chỉ…) thì không ghi.
+    old_role, old_active, old_approved = user.role, user.is_active, user.is_approved
+
     for k, v in update_data.items():
         setattr(user, k, v)
 
     db.commit()
     db.refresh(user)
+    if user.role != old_role:
+        log_activity(db, current, "user.role_change", "user", user.id,
+                     f"{user.full_name}: {role_vi(old_role)} → {role_vi(user.role)}")
+    if old_active and not user.is_active:
+        log_activity(db, current, "user.lock", "user", user.id, user.full_name)
+    elif not old_active and user.is_active:
+        log_activity(db, current, "user.unlock", "user", user.id, user.full_name)
+    if not old_approved and user.is_approved:
+        log_activity(db, current, "user.approve", "user", user.id,
+                     f"{user.full_name} · {role_vi(user.role)}")
     # Tính has_subordinates (runtime attr) để frontend nhận đúng cấp bậc ngay sau khi lưu.
     return _with_has_sub(db, user, current.company_id)
 
@@ -332,6 +350,7 @@ def admin_reset_password(
     # Đặt lại mật khẩu -> vô hiệu MỌI token cũ của người bị reset (buộc đăng nhập lại).
     user.token_version = (user.token_version or 0) + 1
     db.commit()
+    log_activity(db, current, "user.reset_password", "user", user.id, user.full_name)
 
 
 def _dept_list(s: str | None) -> list[str]:
@@ -470,7 +489,10 @@ def delete_user(
         if n_admin <= 1:
             raise HTTPException(400, "Không thể xóa tài khoản Quản trị hệ thống cuối cùng.")
 
+    info = f"{target.full_name} ({target.email}) · {role_vi(target.role)}"
+    target_id = target.id
     _purge_user_references(db, target.id)
     db.delete(target)
     db.commit()
+    log_activity(db, current, "user.delete", "user", target_id, info)
 

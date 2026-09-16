@@ -69,9 +69,14 @@ export default function AuditPage() {
               <tr key={l.id} className="odd:bg-white even:bg-paper/40 hover:bg-amber/10">
                 <td className="border border-line px-3 py-2 whitespace-nowrap text-muted">{new Date(l.created_at).toLocaleString("vi-VN")}</td>
                 <td className="border border-line px-3 py-2 font-semibold text-ink">{l.user_name || "—"}</td>
-                <td className="border border-line px-3 py-2 font-mono text-[12px] text-steel">{l.action}</td>
+                {/* Nhãn tiếng Việt do backend dịch; rê chuột xem mã gốc (tiện tra cứu kỹ thuật). */}
+                <td className="border border-line px-3 py-2 font-semibold text-steel" title={l.action}>
+                  {l.action_label || l.action}
+                </td>
                 <td className="border border-line px-3 py-2 text-muted whitespace-nowrap">
-                  {l.entity_type ? `${l.entity_type}${l.entity_id ? ` #${l.entity_id}` : ""}` : "—"}
+                  {l.entity_type
+                    ? `${l.entity_label || l.entity_type}${l.entity_id ? ` #${l.entity_id}` : ""}`
+                    : "—"}
                 </td>
                 <td className="border border-line px-3 py-2 text-muted">{l.detail || "—"}</td>
               </tr>

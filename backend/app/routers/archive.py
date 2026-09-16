@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
+from app.audit import log_activity
 from app.database import get_db, vn_now
 from app.deps import get_current_user, is_top_leadership
 from app.models import (
@@ -123,6 +124,7 @@ def restore_project(
         synchronize_session=False,
     )
     db.commit()
+    log_activity(db, current, "archive.restore_project", "project", p.id, f"{p.code} – {p.name}")
     db.refresh(p)
     return _to_out(db, p)
 
@@ -192,6 +194,7 @@ def restore_item(
     item.deleted_by_id = None
 
     # Nếu dự án bị đánh dấu xóa -> tự khôi phục cả dự án
+    project_was_deleted = bool(proj.is_deleted)
     if proj.is_deleted:
         proj.is_deleted = False
         proj.deleted_at = None
@@ -216,6 +219,9 @@ def restore_item(
         )
 
     db.commit()
+    log_activity(db, current, "archive.restore_item", "project_item", item.id,
+                 f'"{item.name or "(chưa đặt tên)"}" · {proj.code}'
+                 + (" · kèm khôi phục cả dự án" if project_was_deleted else ""))
     return {"message": "Khôi phục hạng mục thành công."}
 
 
@@ -230,6 +236,8 @@ def purge_item(
     item = db.get(ProjectItem, item_id)
     if not item or item.company_id != current.company_id or not item.is_deleted:
         raise HTTPException(404, "Không tìm thấy hạng mục đã xóa.")
+    proj = db.get(Project, item.project_id)
+    info = f'"{item.name or "(chưa đặt tên)"}" · {proj.code if proj else "?"}'
 
     # Nhóm cha thì cuốn theo các đầu việc con (kể cả con chưa đánh dấu xóa —
     # để cha một nơi con một nẻo thì bảng hạng mục sẽ hỏng cây 2 cấp).
@@ -253,6 +261,8 @@ def purge_item(
     ))
     db.query(ProjectItem).filter(ProjectItem.id.in_(ids)).delete(synchronize_session=False)
     db.commit()
+    log_activity(db, current, "archive.purge_item", "project_item", item_id,
+                 info + (f" · kèm {len(ids) - 1} đầu việc con" if len(ids) > 1 else ""))
     return {"deleted_items": len(ids)}
 
 
@@ -324,6 +334,8 @@ def purge_project(
     # Xóa bằng câu lệnh thẳng, KHÔNG dùng db.delete(p): ORM sẽ tự đi xóa lại các
     # dòng thành viên dự án (quan hệ members) vốn đã xóa tay ở trên -> lệch số
     # dòng -> StaleDataError. Mọi bảng liên quan đã dọn xong nên đi thẳng là đủ.
-    db.query(Project).filter(Project.id == p.id).delete(synchronize_session=False)
+    db.query(Project).filter(Project.id == project_id).delete(synchronize_session=False)
     db.commit()
+    log_activity(db, current, "archive.purge_project", "project", project_id,
+                 f"{code} – {name}" + (f" · kèm {len(item_ids)} hạng mục" if item_ids else ""))
     return {"deleted_project": f"{code} – {name}", "deleted_items": len(item_ids)}

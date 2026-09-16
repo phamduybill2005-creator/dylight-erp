@@ -946,6 +946,10 @@ class ActivityLogOut(BaseModel):
     detail: str | None = None
     created_at: datetime
     user_name: str | None = None
+    # Nhãn TIẾNG VIỆT cho mã hành động / loại đối tượng — router audit bơm vào
+    # từ app/audit.py (ACTION_LABELS, ENTITY_LABELS).
+    action_label: str | None = None
+    entity_label: str | None = None
 
 
 # ------------------------- FINANCE (tài chính) -------------------------

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
+from app.audit import hours_vi, log_activity
 from app.database import get_db, vn_now
 from app.deps import get_current_user, can_see_money
 from app.models import ProjectItem, Project, User, ProjectItemRating, project_members, Timesheet
@@ -281,6 +282,13 @@ def remove_item_worker(
             "Quản lý cấp cao gỡ.",
         )
 
+    # Tổng giờ sắp mất theo — ghi vào nhật ký cho rõ hậu quả.
+    lost = db.query(func.coalesce(func.sum(Timesheet.hours), 0)).filter(
+        Timesheet.company_id == current.company_id,
+        Timesheet.project_item_id == item.id,
+        Timesheet.user_id == user_id,
+    ).scalar()
+
     if worker in item.workers:
         item.workers.remove(worker)
     # Gỡ người thì giờ họ đã khai TRÊN CHÍNH ĐẦU VIỆC NÀY phải đi theo: bảng
@@ -293,6 +301,11 @@ def remove_item_worker(
     ).delete(synchronize_session=False)
 
     db.commit()
+    log_activity(
+        db, current, "project_item.remove_worker", "project_item", item.id,
+        f'{worker.full_name} khỏi "{item.name}" · {project.code}'
+        + (f" · xóa kèm {hours_vi(lost)}" if lost else ""),
+    )
     db.refresh(item)
     return _out(item, current)
 
@@ -331,9 +344,19 @@ def delete_item(
         )
 
     # Xoá toàn bộ giờ timesheet gắn với các hạng mục bị xóa để không bị cộng dồn ma ở bảng ngoài
+    lost = db.query(func.coalesce(func.sum(Timesheet.hours), 0)).filter(
+        Timesheet.project_item_id.in_(del_item_ids)
+    ).scalar()
     db.query(Timesheet).filter(Timesheet.project_item_id.in_(del_item_ids)).delete(synchronize_session=False)
 
     db.commit()
+    proj = db.get(Project, item.project_id)
+    log_activity(
+        db, current, "project_item.delete", "project_item", item.id,
+        f'"{item.name or "(chưa đặt tên)"}" · {proj.code if proj else "?"}'
+        + (f" · kèm {len(del_item_ids) - 1} đầu việc con" if len(del_item_ids) > 1 else "")
+        + (f" · xóa {hours_vi(lost)} giờ công" if lost else ""),
+    )
     return None
 
 

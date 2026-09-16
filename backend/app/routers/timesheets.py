@@ -11,11 +11,14 @@ QUYỀN SỬA SỐ GIỜ (chốt với chủ doanh nghiệp):
 1 dòng = (người, dự án, đầu việc, ngày) -> số giờ. Ghi đè khi khai lại; 0 giờ = xóa ô.
 """
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.audit import date_vi, hours_vi, log_activity
 from app.database import get_db, vn_now
 from app.deps import get_current_user, is_top_leadership
 from app.models import Project, ProjectItem, Timesheet, User
@@ -52,6 +55,15 @@ def _owns_item(user: User, item: ProjectItem) -> bool:
     if user.id in worker_ids:
         return True
     return item.assignee_id is None and not worker_ids
+
+
+def _person(db: Session, uid: int) -> str:
+    u = db.get(User, uid)
+    return u.full_name if u else f"#{uid}"
+
+
+def _item_label(item: ProjectItem | None, fallback: str) -> str:
+    return f'"{item.name}"' if item else fallback
 
 
 def _assert_can_edit_hours(
@@ -150,10 +162,22 @@ def upsert_timesheet(
         else q.filter(Timesheet.project_item_id.is_(None))
     rec = q.first()
 
+    # Sửa HỘ người khác -> ghi nhật ký "giờ cũ → giờ mới". Tự khai giờ của mình
+    # thì không ghi (xem nguyên tắc ở app/audit.py). Chụp giờ cũ trước khi ghi đè.
+    old_hours = rec.hours if rec else None
+    log_prefix = (
+        f"{_person(db, target_uid)} · {proj.code} · {_item_label(item, 'cấp dự án')} · "
+        f"{date_vi(payload.work_date)}: "
+        f"{hours_vi(old_hours) if old_hours is not None else 'trống'} → "
+    ) if target_uid != current.id else None
+
     if payload.hours <= 0:
         if rec:
             db.delete(rec)
             db.commit()
+            if log_prefix:
+                log_activity(db, current, "timesheet.edit_other", "project", proj.id,
+                             log_prefix + "xóa")
         return {"deleted": True}
 
     if rec is None:
@@ -166,6 +190,9 @@ def upsert_timesheet(
     rec.hours = payload.hours
     rec.note = payload.note
     db.commit()
+    if log_prefix and (old_hours is None or Decimal(str(old_hours)) != Decimal(str(payload.hours))):
+        log_activity(db, current, "timesheet.edit_other", "project", proj.id,
+                     log_prefix + hours_vi(payload.hours))
     db.refresh(rec)
     return TimesheetOut.model_validate(rec).model_dump(mode="json")
 
@@ -195,8 +222,17 @@ def delete_timesheet(
                     403,
                     "Bạn không được giao đầu việc này nên không xóa giờ ở đây được.",
                 )
+    # Chụp thông tin trước khi xóa; chỉ ghi nhật ký khi xóa giờ của NGƯỜI KHÁC.
+    info = None
+    if rec.user_id != current.id:
+        it = db.get(ProjectItem, rec.project_item_id) if rec.project_item_id else None
+        info = (f"{_person(db, rec.user_id)} · {proj.code} · "
+                f"{_item_label(it, 'giờ chưa gắn đầu việc')} · "
+                f"{date_vi(rec.work_date)}: {hours_vi(rec.hours)}")
     db.delete(rec)
     db.commit()
+    if info:
+        log_activity(db, current, "timesheet.delete_other", "project", proj.id, info)
     return Response(status_code=204)
 
 
@@ -235,6 +271,13 @@ def clear_worker_hours(
     )
     if payload.project_item_id is not None:
         q = q.filter(Timesheet.project_item_id == payload.project_item_id)
+    lost = q.with_entities(func.coalesce(func.sum(Timesheet.hours), 0)).scalar()
     deleted = q.delete(synchronize_session=False)
     db.commit()
+    if deleted and payload.user_id != current.id:
+        log_activity(
+            db, current, "timesheet.clear_other", "project", proj.id,
+            f"{_person(db, payload.user_id)} · {proj.code} · "
+            f"{_item_label(item, 'cả dự án')} · xóa {deleted} dòng ({hours_vi(lost)})",
+        )
     return {"deleted": deleted}

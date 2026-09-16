@@ -15,6 +15,7 @@ from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
+from app.audit import log_activity
 from app.deps import get_current_user, SENIOR_MANAGER_EMAILS
 from app.models import (
     Assignment, ChatMessage, Company, Contract, Conversation, ConversationMember, DesignDocument,
@@ -591,11 +592,13 @@ def delete_project(
     p.deleted_by_id = current.id
 
     # Đánh dấu xóa toàn bộ hạng mục thuộc dự án này
-    db.query(ProjectItem).filter(ProjectItem.project_id == project_id).update(
+    n_items = db.query(ProjectItem).filter(ProjectItem.project_id == project_id).update(
         {"is_deleted": True, "deleted_at": vn_now(), "deleted_by_id": current.id},
         synchronize_session=False,
     )
     db.commit()
+    log_activity(db, current, "project.delete", "project", project_id,
+                 f"{p.code} – {p.name}" + (f" · kèm {n_items} hạng mục" if n_items else ""))
     return None
 
 

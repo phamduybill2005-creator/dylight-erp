@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
+from app.audit import date_vi, log_activity
 from app.config import settings
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
@@ -210,12 +211,22 @@ def update_attendance(
     if not rec or rec.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy bản ghi chấm công.")
 
+    was_late = rec.is_late          # trạng thái đang hiển thị (tự tính hoặc đã đè)
     if payload.is_late_override is not None:
         rec.is_late_override = payload.is_late_override
     if payload.note is not None:
         rec.note = payload.note
     db.commit()
     db.refresh(rec)
+    # Đổi mác đi muộn làm đổi thẳng cột "Đi muộn" ở Tổng hợp & Đánh giá -> ghi lại.
+    # Chỉ sửa ghi chú thì không ghi.
+    if rec.is_late != was_late:
+        before = "tính đi muộn" if was_late else "không tính đi muộn"
+        after = "tính đi muộn" if rec.is_late else "không tính đi muộn"
+        log_activity(db, current, "attendance.late_override", "attendance", rec.id,
+                     f"{rec.user_name or f'#{rec.user_id}'} · {date_vi(rec.work_date)}: "
+                     f"{before} → {after}")
+        db.refresh(rec)
     return rec
 
 
