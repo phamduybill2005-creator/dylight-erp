@@ -13,8 +13,15 @@ const departmentsOf = (value?: string | null) =>
 
 /**
  * Nạp dữ liệu mới nhất và tạo các dòng xuất Excel.
- * Danh sách user từ server là nguồn chân lý, nên dữ liệu giờ cũ không thể làm
- * xuất hiện lại một tài khoản đã bị xóa.
+ *
+ * File phải KHỚP ĐÚNG danh sách đang hiện ở bảng Tổng hợp. Một người được xuất
+ * khi thỏa CẢ HAI:
+ *  - có trong /attendance/summary của tháng (có dữ liệu chấm công) — đây chính
+ *    là nguồn dựng bảng trên màn hình. Trước đây lấy MỌI tài khoản từ /users nên
+ *    lòi ra người không có trên màn hình, vd tài khoản Giám đốc không chấm công
+ *    thành dòng 0 / 0 / 0;
+ *  - vẫn còn trong /users — tài khoản đã xóa không được hiện lại dù dữ liệu giờ
+ *    cũ của họ còn sót.
  */
 export async function loadAttendanceExportRows(
   client: AttendanceExportClient,
@@ -43,18 +50,20 @@ export async function loadAttendanceExportRows(
 
   const summaryByUser = new Map(summaries.map((item) => [item.user_id, item]));
   const filteredUsers = users.filter(
-    (user) => !department || departmentsOf(user.department).includes(department),
+    (user) =>
+      summaryByUser.has(user.id) &&
+      (!department || departmentsOf(user.department).includes(department)),
   );
 
   const rows = filteredUsers.map<ExportCell[]>((user, index) => {
-    const summary = summaryByUser.get(user.id);
+    const summary = summaryByUser.get(user.id)!;   // đã lọc ở trên: chắc chắn có
     return [
       index + 1,
       user.full_name || "",
       user.department || "",
       Math.round((projectTimeByUser.get(user.id) || 0) * 10) / 10,
-      summary ? Math.round(Number(summary.total_hours || 0) * 10) / 10 : 0,
-      summary ? Number(summary.late_days || 0) : 0,
+      Math.round(Number(summary.total_hours || 0) * 10) / 10,
+      Number(summary.late_days || 0),
     ];
   });
 
