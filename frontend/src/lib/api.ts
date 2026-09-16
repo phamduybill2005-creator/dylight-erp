@@ -295,6 +295,11 @@ export const api = {
     request<ProjectItem>(`/project-items/${itemId}/workers/${userId}`, {
       method: "POST",
     }),
+  /** Gỡ người khỏi đầu việc; BE xóa luôn giờ họ đã khai trên chính đầu việc đó. */
+  removeProjectItemWorker: (itemId: number, userId: number) =>
+    request<ProjectItem>(`/project-items/${itemId}/workers/${userId}`, {
+      method: "DELETE",
+    }),
   deleteProjectItem: (id: number) =>
     request<void>(`/project-items/${id}`, { method: "DELETE" }),
   projectItemRatings: (projectId: number) =>

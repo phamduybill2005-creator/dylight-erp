@@ -11,6 +11,7 @@ from app.database import get_db, vn_now
 from app.deps import get_current_user, can_see_money
 from app.models import ProjectItem, Project, User, ProjectItemRating, project_members, Timesheet
 from app.routers.projects import _can_view, _can_manage
+from app.routers.timesheets import can_edit_all_hours
 from app.schemas import ProjectItemCreate, ProjectItemUpdate, ProjectItemOut, ProjectItemRatingOut, ProjectItemRatingUpsert
 
 router = APIRouter(prefix="/project-items", tags=["Hạng mục dự toán"])
@@ -223,6 +224,76 @@ def add_item_worker(
         item.workers.append(worker)
         db.commit()
         db.refresh(item)
+    return _out(item, current)
+
+
+@router.delete("/{item_id}/workers/{user_id}", response_model=ProjectItemOut)
+def remove_item_worker(
+    item_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Gỡ một người ra khỏi đầu việc (thêm nhầm, hoặc họ không làm nữa)."""
+    item = db.get(ProjectItem, item_id)
+    if not item or item.company_id != current.company_id or item.is_deleted:
+        raise HTTPException(404, "Không tìm thấy đầu việc.")
+    project = _assert_member(db, current, item.project_id)
+
+    # Gỡ người cũng là điều phối nhân sự -> cùng luật với add_item_worker.
+    if not (_can_manage(db, project, current) or item.assignee_id == current.id):
+        raise HTTPException(
+            403,
+            "Chỉ chủ trì/quản lý dự án hoặc người phụ trách đầu việc mới gỡ "
+            "được người cùng làm.",
+        )
+    # Người phụ trách chính luôn hiện trên đầu việc (bảng dựng từ assignee_id),
+    # gỡ khỏi danh sách người cùng làm cũng không mất -> chặn cho khỏi hiểu nhầm.
+    if item.assignee_id == user_id:
+        raise HTTPException(
+            400,
+            "Người này đang là Phụ trách chính của đầu việc. Hãy đổi Phụ trách "
+            "chính sang người khác trước khi gỡ.",
+        )
+
+    worker = db.get(User, user_id)
+    if not worker or worker.company_id != current.company_id:
+        raise HTTPException(400, "Người thực hiện không hợp lệ.")
+
+    # Gỡ người ĐÃ KHAI GIỜ là xóa mất số giờ công của họ — tức là cửa sau của
+    # luật "chỉ sửa giờ của chính mình" (routers/timesheets.py): người phụ trách
+    # đầu việc không sửa được giờ đồng nghiệp thì cũng không được xóa sạch bằng
+    # cách gỡ họ ra. Người CHƯA khai giờ nào (thêm nhầm) thì gỡ thoải mái.
+    logged_hours = (
+        db.query(Timesheet)
+        .filter(
+            Timesheet.company_id == current.company_id,
+            Timesheet.project_item_id == item.id,
+            Timesheet.user_id == user_id,
+        )
+        .count()
+    )
+    if logged_hours and not (can_edit_all_hours(current) or user_id == current.id):
+        raise HTTPException(
+            403,
+            "Người này đã khai giờ trên đầu việc, gỡ ra là mất số giờ đó. Nhờ "
+            "chính họ xóa giờ trước, hoặc để Giám đốc / Quản trị hệ thống / "
+            "Quản lý cấp cao gỡ.",
+        )
+
+    if worker in item.workers:
+        item.workers.remove(worker)
+    # Gỡ người thì giờ họ đã khai TRÊN CHÍNH ĐẦU VIỆC NÀY phải đi theo: bảng
+    # Tiến độ dựng danh sách người làm từ cả giờ đã khai, còn giờ thì gỡ xong
+    # họ vẫn hiện nguyên chỗ cũ. Giờ ở các đầu việc khác giữ nguyên.
+    db.query(Timesheet).filter(
+        Timesheet.company_id == current.company_id,
+        Timesheet.project_item_id == item.id,
+        Timesheet.user_id == user_id,
+    ).delete(synchronize_session=False)
+
+    db.commit()
+    db.refresh(item)
     return _out(item, current)
 
 

@@ -17,6 +17,7 @@ import {
   PlusIcon,
   TrashIcon,
   UserPlusIcon,
+  UserMinusIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
@@ -278,6 +279,33 @@ export default function ProjectTimesheet({
       setItems((prev) => prev.map((item) => (item.id === itemId ? updated : item)));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Không thể thêm người vào đầu việc.");
+    }
+  }
+
+  // Gỡ người khỏi đầu việc (thêm nhầm / họ không làm nữa).
+  // BE xóa luôn giờ của họ trên chính đầu việc này — nếu không, bảng vẫn sổ họ
+  // ra vì danh sách người làm dựng từ cả giờ đã khai.
+  async function handleRemoveWorkerFromItem(
+    itemId: number,
+    uid: number,
+    workerName: string,
+    workerHours: number
+  ) {
+    const msg =
+      workerHours > 0
+        ? `"${workerName}" đang có ${num1(workerHours)}h trên đầu việc này.
+
+` +
+          `Gỡ khỏi đầu việc sẽ XÓA LUÔN số giờ đó. Bạn có chắc không?`
+        : `Gỡ "${workerName}" khỏi đầu việc này?`;
+    if (!window.confirm(msg)) return;
+    try {
+      const updated = await api.removeProjectItemWorker(itemId, uid);
+      setItems((prev) => prev.map((item) => (item.id === itemId ? updated : item)));
+      loadEntries();
+      onHoursChange?.();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không thể gỡ người khỏi đầu việc.");
     }
   }
 
@@ -694,18 +722,35 @@ export default function ProjectTimesheet({
                                         )}
                                       </div>
 
-                                      {/* Nút xóa giờ của nhân sự này nếu đã có giờ — cùng
-                                          luật với ô nhập: chỉ giờ của mình trên đầu việc
-                                          của mình, hoặc cấp cao trở lên. */}
-                                      {wTotal > 0 && canEditHours(w.id, c) && (
-                                        <button
-                                          onClick={() => handleClearWorkerOnItem(w.id, c.id, w.full_name)}
-                                          className="text-bad hover:bg-bad/10 p-0.5 rounded transition"
-                                          title={`Xóa toàn bộ ${wTotal}h của ${w.full_name} trên đầu việc này`}
-                                        >
-                                          <TrashIcon className="h-3.5 w-3.5" />
-                                        </button>
-                                      )}
+                                      <div className="flex shrink-0 items-center gap-0.5">
+                                        {/* Xóa GIỜ nhưng GIỮ người trên đầu việc — cùng luật
+                                            với ô nhập: chỉ giờ của mình trên đầu việc của
+                                            mình, hoặc cấp cao trở lên. */}
+                                        {wTotal > 0 && canEditHours(w.id, c) && (
+                                          <button
+                                            onClick={() => handleClearWorkerOnItem(w.id, c.id, w.full_name)}
+                                            className="text-bad hover:bg-bad/10 p-0.5 rounded transition"
+                                            title={`Xóa ${num1(wTotal)}h của ${w.full_name} trên đầu việc này (vẫn giữ tên trong đầu việc)`}
+                                          >
+                                            <TrashIcon className="h-3.5 w-3.5" />
+                                          </button>
+                                        )}
+                                        {/* GỠ HẲN người khỏi đầu việc. Không hiện với Phụ
+                                            trách chính (phải đổi Phụ trách chính trước) và
+                                            với dòng gợi ý chưa thực sự nằm trong đầu việc. */}
+                                        {!isMainAssignee &&
+                                          ((c.worker_ids ?? []).includes(w.id) || wTotal > 0) && (
+                                            <button
+                                              onClick={() =>
+                                                handleRemoveWorkerFromItem(c.id, w.id, w.full_name, wTotal)
+                                              }
+                                              className="text-muted hover:bg-bad/10 hover:text-bad p-0.5 rounded transition"
+                                              title={`Gỡ ${w.full_name} khỏi đầu việc này`}
+                                            >
+                                              <UserMinusIcon className="h-3.5 w-3.5" />
+                                            </button>
+                                          )}
+                                      </div>
                                     </div>
                                   </td>
                                   <td className="text-center text-[10px] text-muted">
@@ -804,7 +849,9 @@ export default function ProjectTimesheet({
       </div>
       <p className="mt-2 text-[11px] text-muted">
         📌 <b>Bảng Tiến độ theo Đầu việc</b>: Mỗi đầu việc hiển thị chi tiết từng người làm.
-        Bấm nút <b className="text-steel">+ Thêm người</b> để phân chia đầu việc cho nhân sự khác; bấm biểu tượng <b className="text-bad">thùng rác đỏ</b> để xóa bớt giờ của từng người khi cần điều chỉnh.
+        Bấm <b className="text-steel">+ Thêm người</b> để phân chia đầu việc cho nhân sự khác;
+        biểu tượng <b className="text-bad">thùng rác đỏ</b> xóa bớt giờ nhưng vẫn giữ tên người trong đầu việc;
+        biểu tượng <b>người có dấu trừ</b> gỡ hẳn người đó khỏi đầu việc (kèm giờ họ đã khai ở đây).
       </p>
     </div>
   );
