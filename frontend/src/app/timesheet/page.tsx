@@ -3,9 +3,11 @@
 // Bảng NHÂN CÔNG theo ngày — CHẾ ĐỘ CHỈ ĐỌC.
 // Tổng hợp giá trị real-time từ phần Tiến độ của từng Dự án (bảng timesheets).
 // Tất cả tài khoản đều nhìn thấy dữ liệu nhưng không sửa/nhập được.
+// Bấm vào mã/tên dự án ở cột đầu để mở trang chi tiết dự án đó.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ClockIcon, ChevronLeftIcon, ChevronRightIcon, UserIcon, UsersIcon, BuildingOfficeIcon, StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
@@ -526,16 +528,19 @@ export default function TimesheetPage() {
                               )}
                             </button>
 
-                            {/* Mã + Tên dự án */}
-                            <div className="min-w-0 flex-1">
+                            {/* Mã + Tên dự án — bấm để mở trang chi tiết dự án */}
+                            <Link
+                              href={`/projects/${p.id}`}
+                              className="group min-w-0 flex-1 rounded focus-visible:outline-steel"
+                              title={`${p.name} — mở chi tiết dự án`}
+                            >
                               <span className="font-mono text-[9px] font-bold text-bad leading-none block truncate">{p.code}</span>
                               <span
-                                className={`block ${isMonth ? "max-w-[95px] lg:max-w-[125px] text-[10px]" : "max-w-[160px] text-[11px]"} truncate font-medium text-ink leading-tight`}
-                                title={p.name}
+                                className={`block ${isMonth ? "max-w-[95px] lg:max-w-[125px] text-[10px]" : "max-w-[160px] text-[11px]"} truncate font-medium text-ink leading-tight group-hover:text-steel group-hover:underline`}
                               >
                                 {p.name}
                               </span>
-                            </div>
+                            </Link>
                           </div>
                         </td>
                         {days.map((d) => {
