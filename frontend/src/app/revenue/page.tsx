@@ -4,6 +4,8 @@
 // Cách nhập: click vào hàng dự án → thanh chuyển đổi Vietcombank "kích hoạt" cho dự án đó.
 // Nhập số Yên ở thanh trên → chỉ cập nhật doanh thu của dự án đang chọn. Rời ô là tự lưu.
 // Doanh thu (VNĐ) = Time khách hàng (h) × Đơn giá Yên (¥/h) × Tỷ giá Vietcombank Realtime.
+// Xem theo Phòng Bản đồ: thêm nhóm cột Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section
+// — CHỈ XEM, đồng bộ từ bảng Dự án (cùng JSON `evaluation`), muốn sửa thì sang tab Dự án.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
@@ -12,6 +14,7 @@ import {
   StarIcon as StarIconOutline,
   ArrowPathIcon,
   ArrowRightIcon,
+  CheckIcon,
   LockClosedIcon,
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
@@ -20,7 +23,8 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import { getProjectDept } from "@/lib/groups";
+import { getProjectDept, isBanDoView } from "@/lib/groups";
+import { parseBanDoDetails, isBanDoTicked, analysisNumber } from "@/lib/bando-details";
 import { formatVND, computeAutoStatus } from "@/lib/format";
 import { pickJpyRate, computeRevenueVnd, parseJpyInput } from "@/lib/revenue";
 import type { Project, User, Timesheet } from "@/lib/types";
@@ -219,15 +223,22 @@ export default function RevenuePage() {
   useEffect(() => {
     let alive = true;
     api.me().then((u) => alive && setMe(u)).catch(() => {});
-    api.projects()
-      .then((d) => alive && setProjects(d))
-      .catch(() => {})
-      .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
+    // Nạp dự án lần đầu + làm mới ~20s khi tab đang mở (như bảng Dự án) để nhóm cột
+    // Phòng Bản đồ nhập bên Dự án và số giờ luôn khớp mà không cần tải lại trang.
+    const loadProjects = () => api.projects().then((d) => alive && setProjects(d)).catch(() => {});
+    loadProjects().finally(() => alive && setLoading(false));
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") loadProjects();
+    }, 20_000);
+    return () => { alive = false; clearInterval(timer); };
   }, []);
 
   const canEdit = (p: Project) =>
     isSeniorManagerUp(me) || !!me?.has_subordinates || (!!me && p.lead_id === me.id);
+
+  // Bố cục Phòng Bản đồ (cùng điều kiện với bảng Dự án): thêm 7 cột chỉ xem sau Tên dự án.
+  const isBanDoMode = isBanDoView(filterDept, me);
+  const colCount = isBanDoMode ? 15 : 8;
 
   const uniqueDepts = useMemo(
     () =>
@@ -493,7 +504,7 @@ export default function RevenuePage() {
 
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
       <div className="mt-3 max-h-[calc(100vh-200px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card">
-        <table className="w-full min-w-[920px] table-fixed border-collapse text-[11px]">
+        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1200px]" : "min-w-[920px]"}`}>
           <colgroup>
             <col className="w-[40px]" />   {/* STT */}
             <col className="w-[26px]" />   {/* Ghim ★ */}
@@ -501,6 +512,18 @@ export default function RevenuePage() {
             <col className="w-[90px]" />   {/* Mã QL */}
             {/* Tên dự án: thu nhỏ khít theo tên */}
             <col className="w-[220px]" />  {/* Tên dự án */}
+            {isBanDoMode && (
+              <>
+                {/* Nhóm cột Phòng Bản đồ — cùng bề rộng với bảng Dự án */}
+                <col className="w-[60px]" />   {/* Vùng */}
+                <col className="w-[48px]" />   {/* RIEGL */}
+                <col className="w-[48px]" />   {/* QLCL */}
+                <col className="w-[38px]" />   {/* DATA (ô tích) */}
+                <col className="w-[52px]" />   {/* Analysis (ha) */}
+                <col className="w-[38px]" />   {/* Trace (ô tích) */}
+                <col className="w-[48px]" />   {/* Section */}
+              </>
+            )}
             <col className="w-[96px]" />   {/* Manual time */}
             <col className="w-[96px]" />   {/* Realtime (AI) */}
             <col className="w-[120px]" />  {/* Time khách hàng */}
@@ -512,6 +535,20 @@ export default function RevenuePage() {
               <th className={`${TH} text-center text-amber`} title="Ghim yêu thích lên đầu">★</th>
               <th className={`${TH} whitespace-nowrap`}>Mã QL</th>
               <th className={`${TH} whitespace-nowrap`}>Tên dự án</th>
+              {isBanDoMode && (
+                <>
+                  <th className={TH} title="Vùng / khu vực — nhập ở bảng Dự án">Vùng</th>
+                  {(["RIEGL", "QLCL", "DATA", "Analysis", "Trace", "Section"] as const).map((label) => (
+                    <th
+                      key={label}
+                      className="sticky top-0 z-10 border border-teal-200 bg-teal-50 px-0.5 py-2 text-center text-[9.5px] font-bold whitespace-nowrap text-teal-900"
+                      title="Đồng bộ từ bảng Dự án — chỉ xem"
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </>
+              )}
               <th className={`${TH} text-center whitespace-nowrap`}>Manual time</th>
               <th className={`${TH} text-center whitespace-nowrap`} title={filterMonth ? `Thời gian làm thực tế nhập trong tháng ${filterMonth}` : "Thời gian làm thực tế realtime (AI)"}>
                 Realtime (AI)
@@ -524,10 +561,10 @@ export default function RevenuePage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td className={`${TD} text-center text-muted`} colSpan={8}>Đang tải…</td></tr>
+              <tr><td className={`${TD} text-center text-muted`} colSpan={colCount}>Đang tải…</td></tr>
             )}
             {!loading && rows.length === 0 && (
-              <tr><td className={`${TD} text-center text-muted`} colSpan={8}>Không tìm thấy dự án nào khớp với bộ lọc.</td></tr>
+              <tr><td className={`${TD} text-center text-muted`} colSpan={colCount}>Không tìm thấy dự án nào khớp với bộ lọc.</td></tr>
             )}
             {rows.map((p, i) => {
               const isPinned = pinnedIds.includes(p.id);
@@ -561,6 +598,44 @@ export default function RevenuePage() {
                   <td className={`${TD} font-semibold text-ink`}>
                     <div className="truncate" title={p.name}>{p.name}</div>
                   </td>
+
+                  {/* NHÓM CỘT PHÒNG BẢN ĐỒ — chỉ xem, đồng bộ từ bảng Dự án (JSON `evaluation`). */}
+                  {isBanDoMode && (() => {
+                    const bando = parseBanDoDetails(p.evaluation);
+                    const TDB = "border border-line align-middle px-1 py-2 text-center";
+                    const num = (v: string) => <span className="block font-mono text-[10.5px] text-ink">{v || "—"}</span>;
+                    const tick = (v: string) => {
+                      const on = isBanDoTicked(v);
+                      return (
+                        <span
+                          className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
+                            on ? "border-teal-700 bg-teal-700 text-white" : "border-slate-300 bg-white"
+                          }`}
+                          title={on ? "Đã tích ở bảng Dự án" : "Chưa tích"}
+                        >
+                          {on && <CheckIcon className="h-3 w-3" strokeWidth={3} />}
+                        </span>
+                      );
+                    };
+                    const ha = analysisNumber(bando.analysis);
+                    return (
+                      <>
+                        <td className="border border-line align-middle px-1 py-2">
+                          <div className="truncate text-[10.5px] text-ink" title={bando.vung}>{bando.vung || "—"}</div>
+                        </td>
+                        <td className={TDB}>{num(bando.riegl)}</td>
+                        <td className={TDB}>{num(bando.qlcl)}</td>
+                        <td className={TDB}>{tick(bando.data)}</td>
+                        <td className={TDB}>
+                          <span className="block font-mono text-[10.5px] text-ink">
+                            {ha ? <>{ha} <span className="text-[9px] text-muted">ha</span></> : "—"}
+                          </span>
+                        </td>
+                        <td className={TDB}>{tick(bando.trace)}</td>
+                        <td className={TDB}>{num(bando.section)}</td>
+                      </>
+                    );
+                  })()}
 
                   {/* MANUAL TIME */}
                   <td className={`${TD} whitespace-nowrap text-center`} onClick={(e) => e.stopPropagation()}>
@@ -667,7 +742,7 @@ export default function RevenuePage() {
           {rows.length > 0 && (
             <tfoot>
               <tr className="sticky bottom-0 bg-paper font-bold border-t-2 border-slate-300">
-                <td className={`${TD} text-right text-[11px] uppercase tracking-wide text-muted`} colSpan={7}>
+                <td className={`${TD} text-right text-[11px] uppercase tracking-wide text-muted`} colSpan={colCount - 1}>
                   Tổng cộng ({rows.length} dự án)
                 </td>
                 <td className={`${TD} whitespace-nowrap text-right text-[14px] font-black text-emerald-800 tnum`}>

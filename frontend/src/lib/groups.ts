@@ -50,6 +50,27 @@ export function deptLabel(dept?: string | null): string {
   return ja ? `${vi} (${ja})` : vi;
 }
 
+/** Người thuộc PHÒNG BẢN ĐỒ theo cột phòng ban của tài khoản — nhận cả tên Nhật
+ *  (測量解析) và tài khoản thuộc nhiều phòng ("Phòng AI, Phòng Bản đồ"). */
+export function isBanDoUser(u: { department?: string | null } | null | undefined): boolean {
+  const dept = (u?.department || "").trim();
+  if (!dept) return false;
+  return dept.split(",").some((part) => {
+    const d = part.trim();
+    return normalizeDept(d) === "Phòng Bản đồ" || d.includes("Bản đồ") || d.includes("測量解析");
+  });
+}
+
+/** Bảng Dự án và tab Doanh thu hiện BỐ CỤC PHÒNG BẢN ĐỒ khi: đang lọc phòng Bản đồ
+ *  (tên Việt hoặc Nhật), hoặc chưa lọc phòng nào mà người xem thuộc phòng Bản đồ.
+ *  Dùng CHUNG cho cả 2 trang để không bao giờ lệch nhau. */
+export function isBanDoView(
+  filterDept: string,
+  u: { department?: string | null } | null | undefined,
+): boolean {
+  return normalizeDept(filterDept) === "Phòng Bản đồ" || (filterDept === "" && isBanDoUser(u));
+}
+
 // ---------------------------------------------------------------------------
 // GEO担当 (người phụ trách phía NHẬT) thuộc phòng ban nào — họ không có tài khoản
 // nên map cứng theo tên. Chưa liệt kê -> mặc định "Phòng Thiết kế đường 2D".

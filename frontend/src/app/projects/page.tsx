@@ -17,7 +17,9 @@ import ArchiveModal from "@/components/archive-modal";
 import { api } from "@/lib/api";
 import { isManagerUp, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
-import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept } from "@/lib/groups";
+import {
+  PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept, isBanDoUser, isBanDoView,
+} from "@/lib/groups";
 import { resolveDoscoLead } from "@/lib/project-lead";
 import {
   parseBanDoDetails, stringifyBanDoDetails, isBanDoTicked, analysisNumber, TICKED,
@@ -667,13 +669,9 @@ export default function ProjectsPage() {
     }
   }
 
-  const isBanDoUser = !!me?.department && (
-    normalizeDept(me.department) === "Phòng Bản đồ" || 
-    me.department.includes("Bản đồ") || 
-    me.department.includes("測量解析")
-  );
-  const isBanDoMode = filterDept === "Phòng Bản đồ" || filterDept === "測量解析" || (filterDept === "" && isBanDoUser);
-  const canEditBanDoCols = isBanDoUser || canManage || isSeniorManagerUp(me);
+  // Bố cục Phòng Bản đồ — điều kiện dùng CHUNG với trang Doanh thu (lib/groups.isBanDoView).
+  const isBanDoMode = isBanDoView(filterDept, me);
+  const canEditBanDoCols = isBanDoUser(me) || canManage || isSeniorManagerUp(me);
   /** Ô TÍCH DATA / TRACE: CHỈ chủ trì dự án đó, Quản trị hệ thống, Giám đốc — khớp gate ở backend. */
   const canTickBanDo = (p: Project) =>
     !!me && (me.role === "ADMIN" || me.role === "DIRECTOR" || p.lead_id === me.id);
