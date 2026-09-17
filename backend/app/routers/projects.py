@@ -549,13 +549,13 @@ def update_project(
     if touches_admin and not _can_manage(db, p, current):
         raise HTTPException(403, "Bạn không có quyền quản lý thành viên/chủ trì dự án này.")
 
-    # ÉP TRẠNG THÁI dự án: CHỈ Giám đốc / Quản trị hệ thống / Quản lý CẤP CAO.
-    # (Quản lý cấp trung và nhân viên vẫn sửa được các thông tin khác.)
+    # ÉP TRẠNG THÁI dự án (Đang làm / Hoàn thành / ...): CHỈ chủ trì dự án đó,
+    # Quản trị hệ thống, Giám đốc. (Quản lý các cấp vẫn sửa được các thông tin khác.)
     if "status" in data or "status_locked" in data:
-        if not (_is_director(current) or _is_senior_manager(db, current)):
+        if not (_is_director(current) or p.lead_id == current.id):
             raise HTTPException(
                 403,
-                "Chỉ Giám đốc hoặc Quản lý cấp cao mới được đổi trạng thái dự án.",
+                "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới được đổi trạng thái dự án.",
             )
         # Tự chọn trạng thái = ÉP -> khoá lại để không bị tính đè theo tiến độ.
         # Muốn trả về tự động thì gửi riêng status_locked=false (không kèm status).

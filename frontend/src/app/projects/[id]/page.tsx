@@ -29,7 +29,7 @@ import ProjectTeamTab from "@/components/project-team-tab";
 import PersonPicker from "@/components/person-picker";
 import ArchiveModal from "@/components/archive-modal";
 import { api } from "@/lib/api";
-import { canSeeMoney, roleTitle, isDirector, isSeniorManagerUp } from "@/lib/roles";
+import { canSeeMoney, roleTitle, isDirector } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatVND, formatDate } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
@@ -176,8 +176,11 @@ export default function ProjectDetailPage() {
 
   // Tất cả tài khoản đã đăng nhập đều có quyền quản lý, chỉnh sửa dự án & hạng mục (giống Hình 2)
   const canManage = !!currentUser;
-  // ÉP TRẠNG THÁI thì hẹp hơn: chỉ Giám đốc / Quản trị hệ thống / Quản lý cấp cao.
-  const canForceStatus = isSeniorManagerUp(currentUser);
+  // ÉP TRẠNG THÁI (Đang làm / Hoàn thành / ...) thì hẹp hơn: chỉ chủ trì dự án này,
+  // Quản trị hệ thống, Giám đốc — khớp gate ở backend (update_project).
+  const canForceStatus =
+    !!currentUser &&
+    (currentUser.role === "ADMIN" || currentUser.role === "DIRECTOR" || project?.lead_id === currentUser.id);
 
   // Load current user once.
   useEffect(() => {
@@ -506,7 +509,10 @@ export default function ProjectDetailPage() {
                 <option value="AUTO">↺ Tự động theo tiến độ</option>
               </select>
             ) : (
-              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}
+                title="Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới đổi được trạng thái"
+              >
                 {PROJECT_STATUS[project.status]?.label}
               </span>
             )}
