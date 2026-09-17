@@ -873,7 +873,8 @@ function GroupRows({
   canManage?: boolean;
   currentUserId?: number | null;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Thu gọn / bung nhóm: NHỚ qua F5, riêng từng nhóm (id nhóm là duy nhất toàn hệ thống).
+  const [collapsed, setCollapsed] = useStickyState<boolean>(`projectItems.collapsed.${group.id}`, false);
   const leaderUser = group.assignee_id ? (members.find((x) => x.id === group.assignee_id) || companyUsers.find((x) => x.id === group.assignee_id)) : null;
   const groupDept = group.department || leaderUser?.department || null;
 
