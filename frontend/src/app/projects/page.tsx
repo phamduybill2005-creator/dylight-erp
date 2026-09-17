@@ -136,6 +136,8 @@ function calculateDuration(start?: string | null, end?: string | null, deadline?
 /** Ô nhập SỐ ở các cột Phòng Bản đồ (RIEGL / QLCL / Analysis / Section). */
 const BANDO_NUM_INPUT =
   "h-6 w-full rounded border border-transparent bg-transparent px-0.5 py-0.5 text-center text-[10.5px] font-mono text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white";
+/** Ai được sửa 7 cột Bản đồ — hiện ở tooltip tiêu đề cột. */
+const BANDO_EDIT_HINT = "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới sửa được";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -672,8 +674,9 @@ export default function ProjectsPage() {
   // Bố cục Phòng Bản đồ — điều kiện dùng CHUNG với trang Doanh thu (lib/groups.isBanDoView).
   const isBanDoMode = isBanDoView(filterDept, me);
   const canEditBanDoCols = isBanDoUser(me) || canManage || isSeniorManagerUp(me);
-  /** Ô TÍCH DATA / TRACE: CHỈ chủ trì dự án đó, Quản trị hệ thống, Giám đốc — khớp gate ở backend. */
-  const canTickBanDo = (p: Project) =>
+  /** 7 cột Bản đồ (Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section): CHỈ chủ trì dự án đó,
+   *  Quản trị hệ thống, Giám đốc — khớp gate ở backend. Ghi chú vẫn theo canEditBanDoCols. */
+  const canEditBanDo = (p: Project) =>
     !!me && (me.role === "ADMIN" || me.role === "DIRECTOR" || p.lead_id === me.id);
   // Gợi ý VÙNG đã dùng ở các dự án khác (datalist) -> gõ 1-2 chữ là chọn, khỏi lệch chính tả.
   const vungOptions = useMemo(
@@ -854,13 +857,13 @@ export default function ProjectsPage() {
               <th className={TH}>DOSCO担当</th>
               {isBanDoMode ? (
                 <>
-                  <th className={TH} title="Vùng / khu vực của dự án">Vùng</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>RIEGL</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>QLCL</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title="Ô tích — chỉ chủ trì dự án, Quản trị hệ thống, Giám đốc">DATA</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title="Diện tích phân tích (ha) — chỉ gõ số">Analysis</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title="Ô tích — chỉ chủ trì dự án, Quản trị hệ thống, Giám đốc">Trace</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Section</th>
+                  <th className={TH} title={`Vùng / khu vực của dự án — ${BANDO_EDIT_HINT}`}>Vùng</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={BANDO_EDIT_HINT}>RIEGL</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={BANDO_EDIT_HINT}>QLCL</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={`Ô tích — ${BANDO_EDIT_HINT}`}>DATA</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={`Diện tích phân tích (ha), chỉ gõ số — ${BANDO_EDIT_HINT}`}>Analysis</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={`Ô tích — ${BANDO_EDIT_HINT}`}>Trace</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={BANDO_EDIT_HINT}>Section</th>
                   <th className={`${TH} text-center bg-amber-50 text-amber-900 border-amber-200 font-bold text-[10px]`}>GHI CHÚ</th>
                 </>
               ) : (
@@ -912,7 +915,7 @@ export default function ProjectsPage() {
               /** Ô nhập SỐ (RIEGL / QLCL / Section) — như trước. */
               const numCell = (key: "riegl" | "qlcl" | "section") => (
                 <td className={`${TD} align-top p-0.5 text-center`} onClick={(e) => e.stopPropagation()}>
-                  {canEditBanDoCols ? (
+                  {canEditBanDo(p) ? (
                     <input
                       type="text"
                       inputMode="decimal"
@@ -933,7 +936,7 @@ export default function ProjectsPage() {
               );
               /** Ô TÍCH (DATA / TRACE) — tích là lưu ngay. Không đủ quyền thì chỉ xem (mờ, không bấm được). */
               const tickCell = (key: "data" | "trace") => {
-                const allowed = canTickBanDo(p);
+                const allowed = canEditBanDo(p);
                 return (
                   <td className={`${TD} text-center`} onClick={(e) => e.stopPropagation()}>
                     <input
@@ -1014,7 +1017,7 @@ export default function ProjectsPage() {
                     <>
                       {/* VÙNG — chữ tự do, gợi ý các vùng đã dùng (datalist đặt dưới bảng). */}
                       <td className={`${TD} align-top p-0.5`} onClick={(e) => e.stopPropagation()}>
-                        {canEditBanDoCols ? (
+                        {canEditBanDo(p) ? (
                           <input
                             type="text"
                             list="bando-vung-list"
@@ -1035,9 +1038,9 @@ export default function ProjectsPage() {
                       {numCell("riegl")}
                       {numCell("qlcl")}
                       {tickCell("data")}
-                      {/* ANALYSIS — chỉ gõ SỐ, đơn vị "ha" có sẵn cạnh ô; mọi người Phòng Bản đồ nhập được. */}
+                      {/* ANALYSIS — chỉ gõ SỐ, đơn vị "ha" có sẵn cạnh ô; quyền như 7 cột Bản đồ. */}
                       <td className={`${TD} align-top p-0.5 text-center`} onClick={(e) => e.stopPropagation()}>
-                        {canEditBanDoCols ? (
+                        {canEditBanDo(p) ? (
                           <span className="flex items-center gap-0.5">
                             <input
                               type="text"

@@ -1,10 +1,11 @@
 """Quyền sửa ô `evaluation` (JSON Phòng Bản đồ) ngay trên bảng Dự án.
 
 Luật (xem update_project ở app/routers/projects.py):
+- 7 cột Bản đồ (Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section): CHỈ chủ trì
+  dự án đó, Quản trị hệ thống, Giám đốc được đổi. Quản lý các cấp / nhân viên cùng
+  phòng sửa Ghi chú thì 7 cột này phải giữ nguyên.
 - Người CÙNG PHÒNG BAN với dự án (không cần quyền quản lý) được sửa MỖI ô
-  `evaluation` (nhập Analysis / Vùng) — gửi kèm trường khác là bị chặn.
-- Ô tích DATA / TRACE (nằm trong JSON): CHỈ chủ trì dự án, Quản trị hệ thống,
-  Giám đốc được đổi; quản lý các cấp sửa ô khác thì phải giữ nguyên 2 ô này.
+  `evaluation` (để sửa Ghi chú) — gửi kèm trường khác là bị chặn.
 
 Chạy từ thư mục backend: python -m unittest tests.test_project_evaluation_permissions -v
 """
@@ -27,6 +28,12 @@ from app.models import Company, Project, User, UserRole
 from app.routers.projects import router
 
 BANDO = "Phòng Bản đồ"
+
+# Giá trị mới cho từng cột khoá quyền — dùng để thử "đổi 1 cột" với mọi vai trò.
+LOCKED_CHANGES = {
+    "vung": "Kyushu", "riegl": "3", "qlcl": "5", "data": "1",
+    "analysis": "30", "trace": "1", "section": "4",
+}
 
 
 def bando_json(**over) -> str:
@@ -113,66 +120,68 @@ class ProjectEvaluationPermissionTests(unittest.TestCase):
         with self.sessions() as db:
             return db.get(Project, self.project_id).evaluation
 
-    # --- Người cùng phòng ban (không có quyền quản lý) ---------------------------------
+    # --- Ai được sửa gì ------------------------------------------------------------------
 
-    def test_nhan_vien_cung_phong_sua_analysis_duoc(self):
-        body = {"evaluation": bando_json(analysis="30")}
-        r = self._patch(self.staff, body)
+    def test_khong_phai_chu_tri_admin_giam_doc_thi_khong_duoc_sua_7_cot(self):
+        for user in (self.staff, self.mid, self.senior):
+            for key, new in LOCKED_CHANGES.items():
+                r = self._patch(user, {"evaluation": bando_json(**{key: new})})
+                self.assertEqual(r.status_code, 403, f"{user.email}/{key}: {r.text}")
+        self.assertEqual(self._evaluation(), bando_json())
+
+    def test_quan_ly_va_nhan_vien_cung_phong_sua_ghi_chu_giu_nguyen_7_cot_thi_duoc(self):
+        for user in (self.staff, self.mid, self.senior):
+            body = {"evaluation": bando_json(tieu_de=f"ghi chu {user.email}")}
+            r = self._patch(user, body)
+            self.assertEqual(r.status_code, 200, f"{user.email}: {r.text}")
+            self.assertEqual(self._evaluation(), body["evaluation"])
+
+    def test_chu_tri_admin_giam_doc_sua_duoc_7_cot(self):
+        for user in (self.lead, self.admin, self.director):
+            body = {"evaluation": bando_json(**LOCKED_CHANGES)}
+            r = self._patch(user, body)
+            self.assertEqual(r.status_code, 200, f"{user.email}: {r.text}")
+            self.assertEqual(self._evaluation(), body["evaluation"])
+            r = self._patch(user, {"evaluation": bando_json()})   # trả về như cũ (bỏ tích, xoá số)
+            self.assertEqual(r.status_code, 200, f"{user.email}: {r.text}")
+            self.assertEqual(self._evaluation(), bando_json())
+
+    def test_ghi_de_bang_chu_thuong_lam_mat_7_cot_thi_chi_lanh_dao_duoc(self):
+        r = self._patch(self.staff, {"evaluation": "Ghi chú thường"})
+        self.assertEqual(r.status_code, 403, r.text)
+        self.assertEqual(self._evaluation(), bando_json())
+        r = self._patch(self.admin, {"evaluation": "Ghi chú thường"})
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(self._evaluation(), body["evaluation"])
+        self.assertEqual(self._evaluation(), "Ghi chú thường")
+
+    # --- Ngoại lệ cùng phòng ban chỉ áp dụng cho MỖI ô evaluation ----------------------
 
     def test_nhan_vien_cung_phong_khong_duoc_sua_truong_khac(self):
-        r = self._patch(self.staff, {"evaluation": bando_json(analysis="30"), "name": "Doi ten"})
+        r = self._patch(self.staff, {"evaluation": bando_json(tieu_de="x"), "name": "Doi ten"})
         self.assertEqual(r.status_code, 403, r.text)
         r = self._patch(self.staff, {"name": "Doi ten"})
         self.assertEqual(r.status_code, 403, r.text)
         self.assertEqual(self._evaluation(), bando_json())
 
     def test_nhan_vien_phong_khac_bi_chan(self):
-        r = self._patch(self.other, {"evaluation": bando_json(analysis="30")})
+        r = self._patch(self.other, {"evaluation": bando_json(tieu_de="x")})
         self.assertEqual(r.status_code, 403, r.text)
 
-    def test_ghi_chu_chu_thuong_van_sua_duoc(self):
-        # Không phải JSON -> coi như chưa tích -> nhân viên cùng phòng vẫn sửa được.
-        r = self._patch(self.staff, {"evaluation": "Ghi chú thường"})
-        self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(self._evaluation(), "Ghi chú thường")
+    # --- So sánh theo giá trị đã chuẩn hoá, không so chuỗi thô ----------------------------
 
-    # --- Ô tích DATA / TRACE ---------------------------------------------------------
-
-    def test_khong_phai_chu_tri_admin_giam_doc_thi_khong_duoc_tich(self):
-        for user in (self.staff, self.mid, self.senior):
-            for key in ("data", "trace"):
-                r = self._patch(user, {"evaluation": bando_json(**{key: "1"})})
-                self.assertEqual(r.status_code, 403, f"{user.email}/{key}: {r.text}")
-        self.assertEqual(self._evaluation(), bando_json())
-
-    def test_quan_ly_sua_o_khac_giu_nguyen_tich_thi_duoc(self):
-        for user in (self.mid, self.senior):
-            body = {"evaluation": bando_json(analysis="31", vung="Kyushu")}
-            r = self._patch(user, body)
-            self.assertEqual(r.status_code, 200, f"{user.email}: {r.text}")
-            self.assertEqual(self._evaluation(), body["evaluation"])
-
-    def test_chu_tri_admin_giam_doc_duoc_tich_va_bo_tich(self):
-        for user in (self.lead, self.admin, self.director):
-            r = self._patch(user, {"evaluation": bando_json(data="1", trace="1")})
-            self.assertEqual(r.status_code, 200, f"{user.email}: {r.text}")
-            self.assertEqual(self._evaluation(), bando_json(data="1", trace="1"))
-            r = self._patch(user, {"evaluation": bando_json()})
-            self.assertEqual(r.status_code, 200, f"{user.email}: {r.text}")
-            self.assertEqual(self._evaluation(), bando_json())
-
-    def test_da_tich_thi_nhan_vien_khong_bo_tich_duoc_nhung_van_sua_analysis(self):
+    def test_gia_tri_cu_giu_nguyen_y_nghia_thi_khong_bi_chan(self):
         # Dữ liệu cũ: DATA nhập số "12" (khác 0) = đã tích.
         r = self._patch(self.admin, {"evaluation": bando_json(data="12")})
         self.assertEqual(r.status_code, 200, r.text)
-        r = self._patch(self.staff, {"evaluation": bando_json(data="")})
-        self.assertEqual(r.status_code, 403, r.text)
-        body = {"evaluation": bando_json(data="12", analysis="33")}
+        # Nhân viên gửi lại "12" y nguyên (chỉ đổi Ghi chú), thêm khoảng trắng quanh Analysis -> vẫn được.
+        body = {"evaluation": bando_json(data="12", analysis=" 28.5 ha ", tieu_de="moi")}
         r = self._patch(self.staff, body)
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(self._evaluation(), body["evaluation"])
+        # Bỏ tích ("12" -> "") hay đổi số Analysis thì bị chặn.
+        for over in ({"data": ""}, {"analysis": "29"}):
+            r = self._patch(self.staff, {"evaluation": bando_json(**{"data": "12", **over})})
+            self.assertEqual(r.status_code, 403, f"{over}: {r.text}")
 
 
 if __name__ == "__main__":

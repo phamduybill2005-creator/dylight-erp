@@ -490,27 +490,35 @@ def progress_history(project_id: int, db: Session = Depends(get_db), current: Us
     }
 
 
-def _bando_ticks(evaluation: str | None) -> tuple[bool, bool]:
-    """Trạng thái 2 ô tích DATA / TRACE của Phòng Bản đồ (JSON lưu trong `evaluation`).
+# 7 cột Bản đồ nằm trong JSON `evaluation` mà CHỈ chủ trì / Quản trị / Giám đốc được sửa.
+# Ghi chú (`tieu_de`) KHÔNG nằm trong danh sách -> vẫn theo quyền sửa dự án bình thường.
+_BANDO_LOCKED_KEYS = ("vung", "riegl", "qlcl", "data", "analysis", "trace", "section")
+_BANDO_TICK_KEYS = ("data", "trace")
 
-    Đã tích = giá trị khác rỗng và khác "0" (2 cột này trước đây nhập số) — khớp
-    isBanDoTicked ở frontend/src/lib/bando-details.ts. Không phải JSON -> chưa tích.
+
+def _bando_locked(evaluation: str | None) -> dict[str, object]:
+    """Giá trị đã chuẩn hoá của 7 cột Bản đồ khoá quyền (JSON lưu trong `evaluation`).
+
+    Ô tích DATA / TRACE quy về đã tích / chưa (khác rỗng và khác "0" — 2 cột này trước
+    đây nhập số), cột khác so chuỗi đã trim. Không phải JSON -> coi như 7 cột trống.
+    Khớp frontend/src/lib/bando-details.ts.
     """
     s = (evaluation or "").strip()
-    if not s.startswith("{"):
-        return (False, False)
-    try:
-        d = json.loads(s)
-    except ValueError:
-        return (False, False)
-    if not isinstance(d, dict):
-        return (False, False)
+    d: dict = {}
+    if s.startswith("{"):
+        try:
+            parsed = json.loads(s)
+        except ValueError:
+            parsed = None
+        if isinstance(parsed, dict):
+            d = parsed
 
-    def on(v) -> bool:
-        t = ("" if v is None else str(v)).strip().lower()
-        return t not in ("", "0", "false")
-
-    return (on(d.get("data")), on(d.get("trace")))
+    out: dict[str, object] = {}
+    for k in _BANDO_LOCKED_KEYS:
+        v = d.get(k)
+        t = ("" if v is None else str(v)).strip()
+        out[k] = (t.lower() not in ("", "0", "false")) if k in _BANDO_TICK_KEYS else t
+    return out
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
@@ -528,19 +536,20 @@ def update_project(
 
     if not _can_manage(db, p, current):
         # NGOẠI LỆ HẸP: người CÙNG PHÒNG BAN với dự án được sửa MỖI ô `evaluation`
-        # (Phòng Bản đồ nhập Analysis / Vùng ngay trên bảng Dự án) — không đụng gì khác.
+        # (người Phòng Bản đồ sửa Ghi chú ngay trên bảng Dự án) — không đụng gì khác.
         only_evaluation = set(data) == {"evaluation"}
         if not (only_evaluation and _is_project_in_user_depts(db, p, current)):
             raise HTTPException(403, "Bạn không có quyền sửa dự án này.")
 
-    # Ô TÍCH DATA / TRACE của Phòng Bản đồ (nằm trong JSON `evaluation`): CHỈ chủ trì
-    # dự án, Quản trị hệ thống, Giám đốc được đổi. Người khác sửa ô khác thì 2 ô này
-    # phải giữ nguyên (so theo đã tích / chưa tích, không so chuỗi thô).
+    # 7 cột Bản đồ (Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section, nằm trong JSON
+    # `evaluation`): CHỈ chủ trì dự án, Quản trị hệ thống, Giám đốc được đổi. Người khác
+    # sửa Ghi chú thì 7 cột này phải giữ nguyên (so giá trị đã chuẩn hoá, không so chuỗi thô).
     if "evaluation" in data and not (_is_director(current) or p.lead_id == current.id):
-        if _bando_ticks(p.evaluation) != _bando_ticks(data["evaluation"]):
+        if _bando_locked(p.evaluation) != _bando_locked(data["evaluation"]):
             raise HTTPException(
                 403,
-                "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới được tích DATA / TRACE.",
+                "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới được sửa các cột "
+                "Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section.",
             )
 
     # member_ids / lead_id là thao tác QUẢN TRỊ -> đòi quyền _can_manage.
