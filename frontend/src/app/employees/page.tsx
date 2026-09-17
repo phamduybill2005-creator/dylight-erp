@@ -30,6 +30,7 @@ import type { User, Role, Project, Assignment, Department } from "@/lib/types";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import FilterBar, { NO_FILTERS, type Filters } from "@/components/filter-bar";
 import { useEscapeKey } from "@/lib/use-escape-key";
+import { useStickyState } from "@/lib/use-sticky-state";
 
 // Một người có thể thuộc NHIỀU phòng cùng lúc — lưu trong cột `department`,
 // các phòng ngăn cách bởi dấu phẩy (VD: "Phòng BIM, Phòng AI").
@@ -52,9 +53,10 @@ export default function EmployeesPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  // Ô tìm, cách xem, bộ lọc: NHỚ qua F5 (useStickyState).
+  const [searchQuery, setSearchQuery] = useStickyState("employees.search", "");
   // Cách xem danh sách nhân sự: phẳng, gom theo phòng ban, hay gom theo quản lý.
-  const [viewMode, setViewMode] = useState<"list" | "department" | "manager">("list");
+  const [viewMode, setViewMode] = useStickyState<"list" | "department" | "manager">("employees.view", "list");
   // Danh mục phòng ban lấy từ backend (nguồn chân lý); Admin/Giám đốc thêm/đổi tên.
   const [departments, setDepartments] = useState<Department[]>([]);
   const [showDeptManager, setShowDeptManager] = useState(false);
@@ -62,8 +64,8 @@ export default function EmployeesPage() {
   const [addDeptTarget, setAddDeptTarget] = useState<string | null>(null);
   const [deptPickSearch, setDeptPickSearch] = useState("");
   // Bộ lọc dùng chung: theo phòng ban + theo người chủ trì (= quản lý trực tiếp).
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
-  
+  const [filters, setFilters] = useStickyState<Filters>("employees.filters", NO_FILTERS);
+
   // States for the edit form
   const [formData, setFormData] = useState({
     full_name: "",

@@ -38,15 +38,16 @@ export default function TimesheetPage() {
   const router = useRouter();
   const [me, setMe] = useState<User | null>(api.cachedUser());
   const [loading, setLoading] = useState(true);
-  const [weekStart, setWeekStart] = useState(() => mondayOf(todayLocal()));
+  // Kỳ đang xem, Tuần/Tháng, Toàn đội/Cá nhân, phòng ban: NHỚ qua F5 (useStickyState).
+  const [weekStart, setWeekStart] = useStickyState("timesheet.weekStart", mondayOf(todayLocal()));
   const [projects, setProjects] = useState<Project[]>([]);
   const [entries, setEntries] = useState<Timesheet[]>([]);
-  const [viewPeriod, setViewPeriod] = useState<"week" | "month">("week");
-  const [monthStr, setMonthStr] = useState(() => todayLocal().slice(0, 7)); // YYYY-MM
-  const [viewScope, setViewScope] = useState<"all" | "personal">("all");
+  const [viewPeriod, setViewPeriod] = useStickyState<"week" | "month">("timesheet.period", "week");
+  const [monthStr, setMonthStr] = useStickyState("timesheet.month", todayLocal().slice(0, 7)); // YYYY-MM
+  const [viewScope, setViewScope] = useStickyState<"all" | "personal">("timesheet.scope", "all");
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [selectedDept, setSelectedDept] = useState<string>("");
+  const [selectedDept, setSelectedDept] = useStickyState("timesheet.dept", "");
   // Mặc định ẨN dự án chưa nhập giờ trong kỳ đang xem (bật "Hiện tất cả" để xem cả).
   const [showEmpty, setShowEmpty] = useStickyState("timesheet.showEmpty", false);
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => {

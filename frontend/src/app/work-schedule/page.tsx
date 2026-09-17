@@ -148,9 +148,15 @@ export default function WorkSchedulePage() {
   // Chế độ xem: "MONTH" (Theo tháng - full màn hình không scroll ngang) hoặc "WEEK" (Theo tuần)
   const [viewMode, setViewMode] = useStickyState<"MONTH" | "WEEK">("schedule.viewMode", "MONTH");
 
-  // Thời gian đang chọn
+  // Thời gian đang chọn — NHỚ qua F5: sessionStorage chỉ giữ chuỗi nên lưu "YYYY-MM-DD",
+  // trong trang vẫn dùng Date như cũ (setCurrentDate nhận Date).
   const today = todayLocal();
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [currentDateStr, setCurrentDateStr] = useStickyState("schedule.date", today);
+  const currentDate = useMemo(() => {
+    const [y, m, d] = currentDateStr.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }, [currentDateStr]);
+  const setCurrentDate = (d: Date) => setCurrentDateStr(dateLocal(d));
 
   // Bộ lọc
   const [deptFilter, setDeptFilter] = useStickyState("schedule.dept", "");

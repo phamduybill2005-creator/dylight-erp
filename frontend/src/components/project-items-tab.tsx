@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { formatVND, dateLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import type { ProjectItem, Department, User, Project } from "@/lib/types";
@@ -261,7 +262,7 @@ export default function ProjectItemsTab({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Lọc bảng theo phòng ban phụ trách: "" = tất cả, "__none__" = chưa gán phòng.
-  const [deptFilter, setDeptFilter] = useState<string>("");
+  const [deptFilter, setDeptFilter] = useStickyState<string>("projectItems.dept", "");   // nhớ qua F5
   // Danh mục phòng ban của công ty (nguồn chân lý từ backend). Lùi về PRESET nếu chưa nạp.
   const [departments, setDepartments] = useState<Department[]>([]);
   const [companyUsers, setCompanyUsers] = useState<User[]>(allUsers && allUsers.length > 0 ? allUsers : []);

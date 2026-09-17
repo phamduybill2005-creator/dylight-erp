@@ -19,6 +19,7 @@ import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/fi
 import { api } from "@/lib/api";
 import { roleTitle } from "@/lib/roles";
 import { refreshNicknames } from "@/lib/nicknames";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type { Colleague, User } from "@/lib/types";
 
 export default function ColleaguesPage() {
@@ -26,12 +27,12 @@ export default function ColleaguesPage() {
   const [me, setMe] = useState<User | null>(api.cachedUser());
   const [list, setList] = useState<Colleague[]>([]);
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useStickyState("colleagues.search", "");   // ô tìm: nhớ qua F5
   const [editId, setEditId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [filters, setFilters] = useStickyState<Filters>("colleagues.filters", NO_FILTERS);
 
   useEffect(() => {
     api.me().then(setMe).catch(() => router.push("/login"));

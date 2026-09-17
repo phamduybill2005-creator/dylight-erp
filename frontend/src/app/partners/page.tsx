@@ -13,6 +13,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type { Partner, PartnerType, User } from "@/lib/types";
 
 const TYPE_LABEL: Record<PartnerType, string> = {
@@ -38,7 +39,7 @@ export default function PartnersPage() {
   const [denied, setDenied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [partners, setPartners] = useState<Partner[]>([]);
-  const [filter, setFilter] = useState<PartnerType | "ALL">("ALL");
+  const [filter, setFilter] = useStickyState<PartnerType | "ALL">("partners.type", "ALL");   // nhớ qua F5
 
   const [form, setForm] = useState<typeof empty & { id?: number }>(empty);
   const [showForm, setShowForm] = useState(false);

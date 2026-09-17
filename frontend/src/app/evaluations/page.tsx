@@ -237,7 +237,7 @@ export default function EvaluationsPage() {
   const [msg, setMsg] = useState("");
 
   // director: bảng đánh giá THÁNG
-  const [selMonth, setSelMonth] = useState(monthLocal());   // tháng đang chọn (bảng GĐ / form Nhân viên)
+  const [selMonth, setSelMonth] = useStickyState("evaluations.month", monthLocal());   // tháng đang chọn (bảng GĐ / form Nhân viên); nhớ qua F5
   const [overview, setOverview] = useState<EvaluationOverviewRow[]>([]);   // bảng đánh giá tháng
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [ratingUid, setRatingUid] = useState<number | null>(null);   // người đang lưu sao

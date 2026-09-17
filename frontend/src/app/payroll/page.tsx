@@ -10,6 +10,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
 import { formatVND, monthLocal } from "@/lib/format";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type { Payroll, SalaryConfig, SalaryType, User } from "@/lib/types";
 
 const monthStr = monthLocal;
@@ -22,7 +23,7 @@ export default function PayrollPage() {
 
   const [staff, setStaff] = useState<SalaryConfig[]>([]);
   const [savingId, setSavingId] = useState<number | null>(null);
-  const [period, setPeriod] = useState(monthStr());
+  const [period, setPeriod] = useStickyState("payroll.period", monthStr());   // kỳ đang xem: nhớ qua F5
   const [rows, setRows] = useState<Payroll[]>([]);
   const [generating, setGenerating] = useState(false);
   const [shared, setShared] = useState(false);

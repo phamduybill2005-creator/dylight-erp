@@ -16,6 +16,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
 import { formatCompactVND, formatVND, dateLocal } from "@/lib/format";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type { ProjectProfit } from "@/lib/types";
 
 export default function ReportsPage() {
@@ -23,7 +24,7 @@ export default function ReportsPage() {
   const [profitData, setProfitData] = useState<ProjectProfit[]>([]);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
-  const [sortBy, setSortBy] = useState<"lowest_margin" | "highest_margin" | "largest_profit">("lowest_margin");
+  const [sortBy, setSortBy] = useStickyState<"lowest_margin" | "highest_margin" | "largest_profit">("reports.sort", "lowest_margin");   // nhớ qua F5
 
   // Báo cáo lãi/lỗ lộ doanh thu -> chỉ Giám đốc. Kiểm tra vai trò trước khi tải.
   useEffect(() => {

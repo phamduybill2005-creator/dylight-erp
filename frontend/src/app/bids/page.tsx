@@ -17,6 +17,7 @@ import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { canSeeMoney } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { formatVND, formatDate, todayLocal } from "@/lib/format";
 import type { Bid, BidStatus, Project, User } from "@/lib/types";
 
@@ -37,9 +38,9 @@ export default function BidsPage() {
   // Chỉ Giám đốc thấy/đặt giá gói thầu (khớp backend). Quản lý vẫn theo dõi hồ sơ thầu.
   const showMoney = canSeeMoney(me?.role);
   
-  // Filter & Search
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  // Filter & Search — nhớ qua F5.
+  const [search, setSearch] = useStickyState("bids.search", "");
+  const [statusFilter, setStatusFilter] = useStickyState<string>("bids.status", "ALL");
 
   // Modals
   const [createModalOpen, setCreateModalOpen] = useState(false);

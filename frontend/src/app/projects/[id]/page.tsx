@@ -69,6 +69,13 @@ export default function ProjectDetailPage() {
   const [progressLogs, setProgressLogs] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"items" | "progress" | "team">("items");
+  /** Đổi tab + ghi vào URL (?tab=...) để F5 hay gửi link vẫn mở đúng tab (không tải lại trang). */
+  const switchTab = (tab: "items" | "progress" | "team") => {
+    setActiveTab(tab);
+    try {
+      window.history.replaceState(null, "", `?tab=${tab}`);
+    } catch {}
+  };
 
   // Current user & company users
   const [currentUser, setCurrentUser] = useState<User | null>(api.cachedUser());
@@ -627,9 +634,9 @@ export default function ProjectDetailPage() {
 
       {/* Tabs điều hướng */}
       <div className="mt-6 flex border-b border-line">
-        <TabButton active={activeTab === "items"} onClick={() => setActiveTab("items")} label="Hạng mục" icon={TableCellsIcon} />
-        <TabButton active={activeTab === "progress"} onClick={() => setActiveTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
-        <TabButton active={activeTab === "team"} onClick={() => setActiveTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
+        <TabButton active={activeTab === "items"} onClick={() => switchTab("items")} label="Hạng mục" icon={TableCellsIcon} />
+        <TabButton active={activeTab === "progress"} onClick={() => switchTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
+        <TabButton active={activeTab === "team"} onClick={() => switchTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
       </div>
 
       {/* Nội dung Tab */}

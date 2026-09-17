@@ -15,6 +15,7 @@ import FilterBar, { NO_FILTERS, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type { DesignDocument, DesignPhase, DesignDocStatus, Project, User } from "@/lib/types";
 
 const PHASE_LABEL: Record<DesignPhase, string> = {
@@ -41,8 +42,9 @@ export default function DesignDocsPage() {
   const [loading, setLoading] = useState(true);
   const [docs, setDocs] = useState<DesignDocument[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [filter, setFilter] = useState<DesignPhase | "ALL">("ALL");
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);   // lọc theo dự án
+  // Lọc giai đoạn + lọc dự án: nhớ qua F5.
+  const [filter, setFilter] = useStickyState<DesignPhase | "ALL">("designDocs.phase", "ALL");
+  const [filters, setFilters] = useStickyState<Filters>("designDocs.filters", NO_FILTERS);   // lọc theo dự án
 
   const [form, setForm] = useState<typeof empty & { id?: number }>(empty);
   const [showForm, setShowForm] = useState(false);

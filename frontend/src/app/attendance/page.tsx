@@ -118,7 +118,7 @@ export default function AttendancePage() {
   const [myRecords, setMyRecords] = useState<Attendance[]>([]);
 
   // MANAGER / DIRECTOR
-  const [date, setDate] = useState(todayStr());
+  const [date, setDate] = useStickyState("attendance.date", todayStr());   // ngày đang xem: nhớ qua F5
   const [dayList, setDayList] = useState<Attendance[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary[]>([]);
   const [summaryPeriod, setSummaryPeriod] = useStickyState("attendance.period", monthStr());  // tháng đang xem tổng hợp
