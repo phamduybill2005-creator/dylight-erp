@@ -22,6 +22,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { dateLocal, todayLocal, formatDate } from "@/lib/format";
 import type { ProjectItem, Timesheet, User } from "@/lib/types";
 
@@ -63,11 +64,14 @@ export default function ProjectTimesheet({
   endDate?: string | null;
   onHoursChange?: () => void;
 }) {
-  const [weekStart, setWeekStart] = useState(() => mondayOf(todayLocal()));
+  // Tuần đang xem + nhóm đang thu gọn: NHỚ qua F5, riêng từng dự án (sessionStorage chỉ
+  // giữ JSON nên nhóm thu gọn lưu dạng mảng id, trong component vẫn dùng Set như cũ).
+  const [weekStart, setWeekStart] = useStickyState(`projectTimesheet.week.${projectId}`, mondayOf(todayLocal()));
   const [entries, setEntries] = useState<Timesheet[]>([]);
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [hourEdits, setHourEdits] = useState<Record<string, string>>({});
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsedIds, setCollapsedIds] = useStickyState<string[]>(`projectTimesheet.collapsed.${projectId}`, []);
+  const collapsed = useMemo(() => new Set(collapsedIds), [collapsedIds]);
   const [addingWorkerForItemId, setAddingWorkerForItemId] = useState<number | null>(null);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -358,11 +362,9 @@ export default function ProjectTimesheet({
 
   const isOpen = (k: number) => !collapsed.has(String(k));
   const toggle = (k: number) =>
-    setCollapsed((s) => {
-      const n = new Set(s);
+    setCollapsedIds((s) => {
       const key = String(k);
-      n.has(key) ? n.delete(key) : n.add(key);
-      return n;
+      return s.includes(key) ? s.filter((x) => x !== key) : [...s, key];
     });
 
   const COLS = 1 + 1 + 7 + 1;
