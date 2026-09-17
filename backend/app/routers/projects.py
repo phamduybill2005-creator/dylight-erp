@@ -8,6 +8,7 @@ Nguyên tắc quyền:
 - Quản lý thành viên / đặt người chủ trì: Director/Admin hoặc chính người chủ trì
   hiện tại của dự án (để chỉ huy trưởng tự điều phối đội của mình).
 """
+import json
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -489,6 +490,29 @@ def progress_history(project_id: int, db: Session = Depends(get_db), current: Us
     }
 
 
+def _bando_ticks(evaluation: str | None) -> tuple[bool, bool]:
+    """Trạng thái 2 ô tích DATA / TRACE của Phòng Bản đồ (JSON lưu trong `evaluation`).
+
+    Đã tích = giá trị khác rỗng và khác "0" (2 cột này trước đây nhập số) — khớp
+    isBanDoTicked ở frontend/src/lib/bando-details.ts. Không phải JSON -> chưa tích.
+    """
+    s = (evaluation or "").strip()
+    if not s.startswith("{"):
+        return (False, False)
+    try:
+        d = json.loads(s)
+    except ValueError:
+        return (False, False)
+    if not isinstance(d, dict):
+        return (False, False)
+
+    def on(v) -> bool:
+        t = ("" if v is None else str(v)).strip().lower()
+        return t not in ("", "0", "false")
+
+    return (on(d.get("data")), on(d.get("trace")))
+
+
 @router.patch("/{project_id}", response_model=ProjectOut)
 def update_project(
     project_id: int,
@@ -499,10 +523,25 @@ def update_project(
     p = db.get(Project, project_id)
     if not p or p.company_id != current.company_id or p.is_deleted:
         raise HTTPException(404, "Không tìm thấy dự án.")
-    if not _can_manage(db, p, current):
-        raise HTTPException(403, "Bạn không có quyền sửa dự án này.")
 
     data = payload.model_dump(exclude_unset=True)
+
+    if not _can_manage(db, p, current):
+        # NGOẠI LỆ HẸP: người CÙNG PHÒNG BAN với dự án được sửa MỖI ô `evaluation`
+        # (Phòng Bản đồ nhập Analysis / Vùng ngay trên bảng Dự án) — không đụng gì khác.
+        only_evaluation = set(data) == {"evaluation"}
+        if not (only_evaluation and _is_project_in_user_depts(db, p, current)):
+            raise HTTPException(403, "Bạn không có quyền sửa dự án này.")
+
+    # Ô TÍCH DATA / TRACE của Phòng Bản đồ (nằm trong JSON `evaluation`): CHỈ chủ trì
+    # dự án, Quản trị hệ thống, Giám đốc được đổi. Người khác sửa ô khác thì 2 ô này
+    # phải giữ nguyên (so theo đã tích / chưa tích, không so chuỗi thô).
+    if "evaluation" in data and not (_is_director(current) or p.lead_id == current.id):
+        if _bando_ticks(p.evaluation) != _bando_ticks(data["evaluation"]):
+            raise HTTPException(
+                403,
+                "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới được tích DATA / TRACE.",
+            )
 
     # member_ids / lead_id là thao tác QUẢN TRỊ -> đòi quyền _can_manage.
     # (group_name / GEO担当 / DOSCO担当 là text thông tin — sửa như location.)

@@ -4,7 +4,7 @@
 // có dòng tổng cộng. Cột tài chính (Giá trị HĐ / Chi phí / Lãi-lỗ) chỉ hiện cho
 // Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
 import { useRevenueCalc } from "@/lib/revenue";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,10 @@ import { isManagerUp, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept } from "@/lib/groups";
 import { resolveDoscoLead } from "@/lib/project-lead";
+import {
+  parseBanDoDetails, stringifyBanDoDetails, isBanDoTicked, analysisNumber, TICKED,
+  type BanDoDetails,
+} from "@/lib/bando-details";
 import type { Project, User, ProjectStatus, Timesheet } from "@/lib/types";
 import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatVND } from "@/lib/format";
@@ -127,44 +131,9 @@ function calculateDuration(start?: string | null, end?: string | null, deadline?
   return "—";
 }
 
-type BanDoDetails = {
-  riegl: string;
-  qlcl: string;
-  data: string;
-  analysis: string;
-  trace: string;
-  section: string;
-  tieu_de: string;
-};
-
-function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
-  const empty: BanDoDetails = { riegl: "", qlcl: "", data: "", analysis: "", trace: "", section: "", tieu_de: "" };
-  if (!evalStr) return empty;
-  const s = evalStr.trim();
-  if (s.startsWith("{")) {
-    try {
-      const parsed = JSON.parse(s);
-      return {
-        riegl: parsed.riegl || "",
-        qlcl: parsed.qlcl || "",
-        data: parsed.data || "",
-        analysis: parsed.analysis || "",
-        trace: parsed.trace || "",
-        section: parsed.section || "",
-        tieu_de: parsed.tieu_de || "",
-      };
-    } catch {
-      return { ...empty, tieu_de: s };
-    }
-  }
-  return { ...empty, tieu_de: s };
-}
-
-function stringifyBanDoDetails(details: BanDoDetails): string {
-  const allEmpty = Object.values(details).every((v) => !v.trim());
-  if (allEmpty) return "";
-  return JSON.stringify(details);
-}
+/** Ô nhập SỐ ở các cột Phòng Bản đồ (RIEGL / QLCL / Analysis / Section). */
+const BANDO_NUM_INPUT =
+  "h-6 w-full rounded border border-transparent bg-transparent px-0.5 py-0.5 text-center text-[10.5px] font-mono text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -352,16 +321,16 @@ export default function ProjectsPage() {
     }
   }
 
-  async function saveEvaluation(p: Project) {
-    const draft = evalEdits[p.id];
-    if (draft === undefined) return;
+  /** Lưu chuỗi ĐÁNH GIÁ / JSON Phòng Bản đồ cho dự án p — dùng chung cho ô gõ
+   *  (rời ô là lưu) và ô tích DATA / TRACE (tích là lưu ngay, không chờ rời ô). */
+  async function commitEvaluation(p: Project, value: string) {
     const clear = () =>
       setEvalEdits((s) => {
         const n = { ...s };
         delete n[p.id];
         return n;
       });
-    const next = draft.trim();
+    const next = value.trim();
     if (next === (p.evaluation || "")) {
       clear();
       return;
@@ -374,6 +343,12 @@ export default function ProjectsPage() {
     } finally {
       clear();
     }
+  }
+
+  async function saveEvaluation(p: Project) {
+    const draft = evalEdits[p.id];
+    if (draft === undefined) return;
+    await commitEvaluation(p, draft);
   }
 
   // Lọc người phụ trách theo PHÒNG BAN (Nhóm) đang chọn.
@@ -699,6 +674,16 @@ export default function ProjectsPage() {
   );
   const isBanDoMode = filterDept === "Phòng Bản đồ" || filterDept === "測量解析" || (filterDept === "" && isBanDoUser);
   const canEditBanDoCols = isBanDoUser || canManage || isSeniorManagerUp(me);
+  /** Ô TÍCH DATA / TRACE: CHỈ chủ trì dự án đó, Quản trị hệ thống, Giám đốc — khớp gate ở backend. */
+  const canTickBanDo = (p: Project) =>
+    !!me && (me.role === "ADMIN" || me.role === "DIRECTOR" || p.lead_id === me.id);
+  // Gợi ý VÙNG đã dùng ở các dự án khác (datalist) -> gõ 1-2 chữ là chọn, khỏi lệch chính tả.
+  const vungOptions = useMemo(
+    () =>
+      Array.from(new Set(projects.map((p) => parseBanDoDetails(p.evaluation).vung.trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b, "vi")),
+    [projects],
+  );
 
   const TH = `border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 ${isBanDoMode ? "px-1 py-1 text-[10px]" : "px-1.5 py-1.5"}`;
   const TD = `border border-line align-middle ${isBanDoMode ? "px-1 py-1 text-[10.5px]" : "px-1.5 py-1.5"}`;
@@ -706,7 +691,7 @@ export default function ProjectsPage() {
    *  thống / Quản lý cấp cao + danh sách chỉ định (lib/roles.canSeeRevenue). */
   const showRevenue = canSeeRevenue(me);
   // Ẩn cột -> bớt 1 ô khi gộp dòng "không tìm thấy dự án".
-  const infoCols = (isBanDoMode ? 21 : 15) - (showRevenue ? 0 : 1);
+  const infoCols = (isBanDoMode ? 22 : 15) - (showRevenue ? 0 : 1);
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -811,20 +796,22 @@ export default function ProjectsPage() {
             <colgroup>
               <col className="w-[28px]" />   {/* STT */}
               <col className="w-[24px]" />   {/* Ghim ★ */}
-              <col className="w-[88px]" />   {/* Mã QL — thu nhỏ khít theo chữ */}
+              {/* Mã QL: "5138-0890" = 9 ký tự mono 12px ≈ 65px + padding 8px -> 76px (thu từ 88px để nhường chỗ cột Vùng). */}
+              <col className="w-[76px]" />   {/* Mã QL */}
               <col className="w-[138px]" />  {/* Tên dự án — thu nhỏ khít theo chữ */}
               <col className="w-[58px]" />   {/* Nhóm */}
               <col className="w-[54px]" />   {/* GEO担当 */}
-              {/* DOSCO担当: tên dài nhất (D.M.QUANG) đo được 63px ở cỡ chữ 10.5px,
-                  cộng sao 12px + gap 4px + padding 8px = 87px -> lấy 100px cho dư. */}
-              <col className="w-[100px]" />  {/* DOSCO担当 */}
+              {/* DOSCO担当: tên dài nhất (P.T.T.NHUNG) ≈ 61px ở cỡ chữ 10.5px,
+                  cộng sao 12px + gap 4px + padding 8px = 85px -> 90px (thu từ 100px để nhường chỗ cột Vùng). */}
+              <col className="w-[90px]" />   {/* DOSCO担当 */}
+              <col className="w-[60px]" />   {/* Vùng (chữ) */}
               <col className="w-[48px]" />   {/* RIEGL (nhập số) */}
               <col className="w-[48px]" />   {/* QLCL (nhập số) */}
-              <col className="w-[48px]" />   {/* DATA (nhập số) */}
-              <col className="w-[48px]" />   {/* Analysis (nhập số) */}
-              <col className="w-[48px]" />   {/* Trace (nhập số) */}
+              <col className="w-[38px]" />   {/* DATA (ô tích) */}
+              <col className="w-[52px]" />   {/* Analysis (số + "ha") */}
+              <col className="w-[38px]" />   {/* Trace (ô tích) */}
               <col className="w-[48px]" />   {/* Section (nhập số) */}
-              <col className="w-[145px]" />  {/* GHI CHÚ (cột to nhất trong 7 cột mới) */}
+              <col className="w-[145px]" />  {/* GHI CHÚ (cột to nhất trong 8 cột Bản đồ) */}
               <col className="w-[50px]" />   {/* Time in */}
               <col className="w-[50px]" />   {/* Time out */}
               <col className="w-[50px]" />   {/* Time due */}
@@ -869,11 +856,12 @@ export default function ProjectsPage() {
               <th className={TH}>DOSCO担当</th>
               {isBanDoMode ? (
                 <>
+                  <th className={TH} title="Vùng / khu vực của dự án">Vùng</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>RIEGL</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>QLCL</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>DATA</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Analysis</th>
-                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Trace</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title="Ô tích — chỉ chủ trì dự án, Quản trị hệ thống, Giám đốc">DATA</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title="Diện tích phân tích (ha) — chỉ gõ số">Analysis</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title="Ô tích — chỉ chủ trì dự án, Quản trị hệ thống, Giám đốc">Trace</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`}>Section</th>
                   <th className={`${TH} text-center bg-amber-50 text-amber-900 border-amber-200 font-bold text-[10px]`}>GHI CHÚ</th>
                 </>
@@ -907,6 +895,68 @@ export default function ProjectsPage() {
               const st = PROJECT_STATUS[effectiveStatus] ?? PROJECT_STATUS.PLANNING;
               const bando = parseBanDoDetails(evalEdits[p.id] !== undefined ? evalEdits[p.id] : p.evaluation);
               const isPinned = pinnedIds.includes(p.id);
+              // Phòng Bản đồ: gõ dở 1 ô -> cập nhật JSON nháp; rời ô (hoặc Enter) mới lưu, Esc huỷ.
+              const draftBando = (next: BanDoDetails) =>
+                setEvalEdits((s) => ({ ...s, [p.id]: stringifyBanDoDetails(next) }));
+              const bandoKeys = (e: KeyboardEvent<HTMLInputElement>) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  (e.target as HTMLInputElement).blur();
+                }
+                if (e.key === "Escape") {
+                  setEvalEdits((s) => {
+                    const n = { ...s };
+                    delete n[p.id];
+                    return n;
+                  });
+                }
+              };
+              /** Ô nhập SỐ (RIEGL / QLCL / Section) — như trước. */
+              const numCell = (key: "riegl" | "qlcl" | "section") => (
+                <td className={`${TD} align-top p-0.5 text-center`} onClick={(e) => e.stopPropagation()}>
+                  {canEditBanDoCols ? (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={bando[key]}
+                      onChange={(e) => draftBando({ ...bando, [key]: e.target.value })}
+                      onBlur={() => saveEvaluation(p)}
+                      onKeyDown={bandoKeys}
+                      placeholder="0"
+                      title="Nhập số"
+                      className={BANDO_NUM_INPUT}
+                    />
+                  ) : (
+                    <span className="block text-center font-mono text-[10.5px] text-muted" title={bando[key]}>
+                      {bando[key] || "—"}
+                    </span>
+                  )}
+                </td>
+              );
+              /** Ô TÍCH (DATA / TRACE) — tích là lưu ngay. Không đủ quyền thì chỉ xem (mờ, không bấm được). */
+              const tickCell = (key: "data" | "trace") => {
+                const allowed = canTickBanDo(p);
+                return (
+                  <td className={`${TD} text-center`} onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isBanDoTicked(bando[key])}
+                      disabled={!allowed}
+                      onChange={(e) => {
+                        const json = stringifyBanDoDetails({ ...bando, [key]: e.target.checked ? TICKED : "" });
+                        setEvalEdits((s) => ({ ...s, [p.id]: json }));
+                        void commitEvaluation(p, json);
+                      }}
+                      title={
+                        allowed
+                          ? `${key.toUpperCase()}: tích là lưu ngay`
+                          : "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới tích được"
+                      }
+                      className="h-3.5 w-3.5 cursor-pointer accent-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </td>
+                );
+              };
 
               return (
                 <tr
@@ -964,44 +1014,54 @@ export default function ProjectsPage() {
                   </td>
                   {isBanDoMode ? (
                     <>
-                      {(["riegl", "qlcl", "data", "analysis", "trace", "section"] as const).map((key) => (
-                        <td key={key} className={`${TD} align-top p-0.5 text-center`} onClick={(e) => e.stopPropagation()}>
-                          {canEditBanDoCols ? (
+                      {/* VÙNG — chữ tự do, gợi ý các vùng đã dùng (datalist đặt dưới bảng). */}
+                      <td className={`${TD} align-top p-0.5`} onClick={(e) => e.stopPropagation()}>
+                        {canEditBanDoCols ? (
+                          <input
+                            type="text"
+                            list="bando-vung-list"
+                            value={bando.vung}
+                            onChange={(e) => draftBando({ ...bando, vung: e.target.value })}
+                            onBlur={() => saveEvaluation(p)}
+                            onKeyDown={bandoKeys}
+                            placeholder="Vùng"
+                            title="Vùng / khu vực của dự án — rời ô (hoặc Enter) là tự lưu"
+                            className="h-6 w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[10.5px] text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white"
+                          />
+                        ) : (
+                          <span className="block truncate text-[10.5px] text-muted" title={bando.vung}>
+                            {bando.vung || "—"}
+                          </span>
+                        )}
+                      </td>
+                      {numCell("riegl")}
+                      {numCell("qlcl")}
+                      {tickCell("data")}
+                      {/* ANALYSIS — chỉ gõ SỐ, đơn vị "ha" có sẵn cạnh ô; mọi người Phòng Bản đồ nhập được. */}
+                      <td className={`${TD} align-top p-0.5 text-center`} onClick={(e) => e.stopPropagation()}>
+                        {canEditBanDoCols ? (
+                          <span className="flex items-center gap-0.5">
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={bando[key] || ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                const newDetails = { ...bando, [key]: val };
-                                const jsonStr = stringifyBanDoDetails(newDetails);
-                                setEvalEdits((s) => ({ ...s, [p.id]: jsonStr }));
-                              }}
+                              value={analysisNumber(bando.analysis)}
+                              onChange={(e) => draftBando({ ...bando, analysis: analysisNumber(e.target.value) })}
                               onBlur={() => saveEvaluation(p)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  (e.target as HTMLInputElement).blur();
-                                }
-                                if (e.key === "Escape") {
-                                  setEvalEdits((s) => {
-                                    const n = { ...s };
-                                    delete n[p.id];
-                                    return n;
-                                  });
-                                }
-                              }}
+                              onKeyDown={bandoKeys}
                               placeholder="0"
-                              title="Nhập số"
-                              className="h-6 w-full rounded border border-transparent bg-transparent px-0.5 py-0.5 text-center text-[10.5px] font-mono text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white"
+                              title="Nhập SỐ hecta (đơn vị ha có sẵn) — rời ô (hoặc Enter) là tự lưu"
+                              className={`${BANDO_NUM_INPUT} min-w-0`}
                             />
-                          ) : (
-                            <span className="text-muted text-[10.5px] font-mono text-center block" title={bando[key] || ""}>
-                              {bando[key] || "—"}
-                            </span>
-                          )}
-                        </td>
-                      ))}
+                            <span className="shrink-0 text-[9px] text-muted">ha</span>
+                          </span>
+                        ) : (
+                          <span className="block text-center font-mono text-[10.5px] text-muted">
+                            {analysisNumber(bando.analysis) ? `${analysisNumber(bando.analysis)} ha` : "—"}
+                          </span>
+                        )}
+                      </td>
+                      {tickCell("trace")}
+                      {numCell("section")}
                       <td className={`${TD} align-top p-0.5`} onClick={(e) => e.stopPropagation()}>
                         {canEditBanDoCols ? (
                           <input
@@ -1191,6 +1251,14 @@ export default function ProjectsPage() {
           </tbody>
         </table>
       </div>
+      {/* Gợi ý cho ô VÙNG (Phòng Bản đồ) — datalist phải nằm ngoài <table>. */}
+      {isBanDoMode && (
+        <datalist id="bando-vung-list">
+          {vungOptions.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
+      )}
 
       <p className="mt-2 text-[11px] text-muted">Bấm vào một hàng để xem chi tiết dự án.</p>
 
