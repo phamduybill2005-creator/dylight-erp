@@ -17,6 +17,7 @@ import { dateLocal, todayLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept } from "@/lib/groups";
 import { isSeniorManagerUp } from "@/lib/roles";
+import { summarizeTimesheetProject } from "@/lib/mobile-view-models";
 import type { Timesheet, Project, User, Department } from "@/lib/types";
 
 /** Thứ 2 của tuần chứa ngày d (YYYY-MM-DD), giờ địa phương. */
@@ -59,6 +60,7 @@ export default function TimesheetPage() {
       return [];
     }
   });
+  const [expandedMobileProject, setExpandedMobileProject] = useState<number | null>(null);
 
   useEffect(() => {
     const syncPinned = () => {
@@ -424,13 +426,68 @@ export default function TimesheetPage() {
         </p>
       )}
 
+      {/* Điện thoại: ưu tiên tổng giờ/công, chạm để xem chi tiết từng ngày. */}
+      <section className="mt-3 space-y-2 lg:hidden" aria-label="Tiến độ dự án trên điện thoại">
+        {rowProjects.length === 0 ? (
+          <p className="rounded-xl2 border border-line bg-white px-4 py-8 text-center text-sm text-muted shadow-card">
+            {hiddenEmptyCount > 0
+              ? `Chưa có dự án nào được nhập giờ trong ${viewPeriod === "week" ? "tuần" : "tháng"} này.`
+              : "Chưa có dự án nào."}
+          </p>
+        ) : rowProjects.map((project, index) => {
+          const summary = summarizeTimesheetProject(project.id, days, cellHours);
+          const open = expandedMobileProject === project.id;
+          const pinned = pinnedIds.includes(project.id);
+          return (
+            <article key={project.id} className={`overflow-hidden rounded-xl border bg-white shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
+              <div className="flex items-start gap-2 p-3">
+                <span className="pt-1 font-mono text-xs font-bold text-slate-400">{index + 1}</span>
+                <button type="button" onClick={() => togglePin(project.id)} className="flex h-11 w-9 shrink-0 items-start justify-center pt-1" aria-label={pinned ? "Bỏ ghim dự án" : "Ghim dự án"}>
+                  {pinned ? <StarIconSolid className="h-5 w-5 text-amber" /> : <StarIconOutline className="h-5 w-5 text-slate-300" />}
+                </button>
+                <Link href={`/projects/${project.id}`} className="min-w-0 flex-1 py-0.5">
+                  <span className="block font-mono text-xs font-bold text-bad">{project.code}</span>
+                  <span className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-ink">{project.name}</span>
+                </Link>
+                <div className="shrink-0 text-right">
+                  <p className="text-lg font-extrabold text-steel tnum">{num1(summary.totalHours)}h</p>
+                  <p className="text-xs font-semibold text-muted tnum">{num1(summary.workDays)} công</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setExpandedMobileProject(open ? null : project.id)} className="flex min-h-11 w-full items-center justify-between border-t border-line bg-paper/60 px-3 text-xs font-semibold text-steel" aria-expanded={open}>
+                <span>{open ? "Ẩn chi tiết" : `Xem ${summary.workedDays.length} ngày có giờ`}</span>
+                <ChevronRightIcon className={`h-4 w-4 transition-transform ${open ? "rotate-90" : ""}`} />
+              </button>
+              {open && (
+                <div className="divide-y divide-line px-3">
+                  {summary.workedDays.length === 0 ? (
+                    <p className="py-3 text-center text-xs text-muted">Dự án chưa có giờ trong kỳ này.</p>
+                  ) : summary.workedDays.map((entry) => (
+                    <div key={entry.date} className="flex min-h-11 items-center justify-between text-sm">
+                      <span className="text-slate-600">{new Date(`${entry.date}T00:00:00`).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}</span>
+                      <span className="font-bold text-ink tnum">{num1(entry.hours)} giờ</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+          );
+        })}
+        {rowProjects.length > 0 && (
+          <div className="flex items-center justify-between rounded-xl bg-teal-700 px-4 py-3 text-white shadow-card">
+            <span className="text-sm font-bold">Tổng trong kỳ</span>
+            <span className="font-extrabold tnum">{num1(grandTotal)} giờ · {num1(grandTotal / 8)} công</span>
+          </div>
+        )}
+      </section>
+
       {/* Lưới Dự án × Ngày — CHỈ ĐỌC */}
       {(() => {
         const isMonth = viewPeriod === "month";
         const totalRightOffset = isMonth ? "right-[40px]" : "right-[50px]";
         const totalColClass = isMonth ? "w-[40px] min-w-[40px]" : "w-[50px] min-w-[50px]";
         return (
-          <div className="mt-3 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
+          <div className="mt-3 hidden overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card lg:block">
             <table className={`w-full border-collapse text-[11px] table-fixed ${isMonth ? "min-w-[1200px]" : "min-w-[850px]"}`}>
               <colgroup>
                 <col className={isMonth ? "w-[180px] lg:w-[210px]" : "w-[260px]"} />

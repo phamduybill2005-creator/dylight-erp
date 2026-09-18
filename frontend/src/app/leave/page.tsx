@@ -67,6 +67,7 @@ export default function LeavePage() {
   const [submitError, setSubmitError] = useState<string | null>(null);   // lỗi backend trả về (VD quá hạn 19h)
   const [saving, setSaving] = useState(false);
   const [deciding, setDeciding] = useState<number | null>(null);
+  const [requestFormOpen, setRequestFormOpen] = useState(false);
 
   useEffect(() => {
     api.me()
@@ -96,6 +97,7 @@ export default function LeavePage() {
         : leaveType;
       await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: finalType, reason: reason || null });
       setFromDate(""); setToDate(""); setLeaveType("FULL"); setLeaveCategory("LEAVE"); setLateSlot("MORNING"); setReason("");
+      setRequestFormOpen(false);
       const list = await api.myLeaves();
       setMine(list);
     } catch (err) {
@@ -169,8 +171,12 @@ export default function LeavePage() {
         </Link>
       </header>
 
+      <button type="button" onClick={() => setRequestFormOpen((open) => !open)} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-steel px-4 text-sm font-bold text-white shadow-card lg:hidden" aria-expanded={requestFormOpen}>
+        <PaperAirplaneIcon className="h-4 w-4" /> {requestFormOpen ? "Đóng biểu mẫu" : "Tạo đơn mới"}
+      </button>
+
       {/* Form xin nghỉ / báo đi muộn */}
-      <form onSubmit={submit} className="mt-4 rounded-xl2 border border-line bg-white p-4 shadow-card">
+      <form onSubmit={submit} className={`${requestFormOpen ? "block" : "hidden"} mt-3 rounded-xl2 border border-line bg-white p-4 shadow-card lg:mt-4 lg:block`}>
         <h2 className="text-sm font-bold text-ink">Gửi đơn xin nghỉ</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div>
@@ -245,7 +251,22 @@ export default function LeavePage() {
 
       {/* Đơn của tôi */}
       <h2 className="mt-6 mb-2 text-sm font-bold text-ink">Đơn của tôi</h2>
-      <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+      <div className="space-y-2 lg:hidden">
+        {shownMine.length === 0 ? <p className="rounded-xl border border-line bg-white p-4 text-center text-sm text-muted">Chưa có đơn nào.</p> : shownMine.map((leave) => {
+          const approverName = leave.decided_by_name || (leave.decided_by_id ? users.find((u) => u.id === leave.decided_by_id)?.full_name : null);
+          return (
+            <article key={leave.id} className="rounded-xl border border-line bg-white p-3 shadow-card">
+              <div className="flex items-start justify-between gap-2">
+                <div><p className="text-sm font-bold text-ink">{formatDate(leave.from_date)} → {formatDate(leave.to_date)}</p><div className="mt-1 text-xs text-steel">{formatDaysDisplay(leave)}</div></div>
+                <StatusBadge s={leave.status} />
+              </div>
+              <p className="mt-3 text-sm text-slate-700">{leave.reason || "Không ghi lý do"}</p>
+              <p className="mt-2 text-[11px] text-muted">{approverName ? `Người duyệt: ${approverName}` : leave.status === "PENDING" ? "Đang chờ duyệt" : "Chưa có thông tin người duyệt"}</p>
+            </article>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
@@ -301,7 +322,16 @@ export default function LeavePage() {
             Đơn tôi đã duyệt{" "}
             <span className="font-normal text-muted">({approvedByMe.length})</span>
           </h2>
-          <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+          <div className="space-y-2 lg:hidden">
+            {approvedByMe.length === 0 ? <p className="rounded-xl border border-line bg-white p-4 text-center text-sm text-muted">Bạn chưa duyệt đơn nào.</p> : approvedByMe.map((leave) => (
+              <article key={leave.id} className="rounded-xl border border-line bg-white p-3 shadow-card">
+                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-ink">{leave.user_name || "—"}</p><p className="mt-1 text-xs text-muted">{formatDate(leave.from_date)} → {formatDate(leave.to_date)}</p></div><div className="text-xs font-semibold text-steel">{formatDaysDisplay(leave)}</div></div>
+                <p className="mt-3 text-sm text-slate-700">{leave.reason || "Không ghi lý do"}</p>
+                <p className="mt-2 text-[11px] text-muted">Duyệt lúc: {leave.decided_at ? formatDate(leave.decided_at) : "—"}</p>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
             <table className="w-full min-w-[720px] border-collapse text-sm">
               <thead>
                 <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
@@ -347,7 +377,19 @@ export default function LeavePage() {
           <div className="mb-3">
             <FilterBar show={{ dept: true }} value={filters} onChange={setFilters} />
           </div>
-          <div className="overflow-x-auto rounded-xl2 border border-line bg-white shadow-card">
+          <div className="space-y-2 lg:hidden">
+            {shownPending.length === 0 ? <p className="rounded-xl border border-line bg-white p-4 text-center text-sm text-muted">{pending.length === 0 ? "Không có đơn nào chờ duyệt." : "Không có đơn khớp bộ lọc."}</p> : shownPending.map((leave) => (
+              <article key={leave.id} className="rounded-xl border border-line bg-white p-3 shadow-card">
+                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-ink">{leave.user_name || "—"}</p><p className="mt-1 text-xs text-muted">{formatDate(leave.from_date)} → {formatDate(leave.to_date)}</p></div><div className="text-xs font-semibold text-steel">{formatDaysDisplay(leave)}</div></div>
+                <p className="mt-3 text-sm text-slate-700">{leave.reason || "Không ghi lý do"}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button onClick={() => decide(leave.id, "APPROVED")} disabled={deciding === leave.id} className="min-h-11 rounded-lg bg-ok/10 px-3 text-xs font-bold text-ok disabled:opacity-50">Duyệt</button>
+                  <button onClick={() => decide(leave.id, "REJECTED")} disabled={deciding === leave.id} className="min-h-11 rounded-lg bg-bad/10 px-3 text-xs font-bold text-bad disabled:opacity-50">Từ chối</button>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">

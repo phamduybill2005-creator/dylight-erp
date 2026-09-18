@@ -28,6 +28,7 @@ import { parseBanDoDetails, isBanDoTicked, analysisNumber } from "@/lib/bando-de
 import { formatVND, computeAutoStatus } from "@/lib/format";
 import { pickJpyRate, computeRevenueVnd, parseJpyInput } from "@/lib/revenue";
 import type { Project, User, Timesheet } from "@/lib/types";
+import { revenueMobileFacts } from "@/lib/mobile-view-models";
 
 /** Số giờ -> "X,X ngày" (8 giờ = 1 ngày). */
 function hoursToDays(h: number): string {
@@ -502,8 +503,45 @@ export default function RevenuePage() {
 
       <p className="mt-2 text-xs text-muted">Tìm thấy: <b className="text-ink">{rows.length}</b> dự án</p>
 
+      <section className="mt-3 space-y-2 lg:hidden" aria-label="Doanh thu dự án trên điện thoại">
+        {loading ? (
+          <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Đang tải…</p>
+        ) : rows.length === 0 ? (
+          <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Không tìm thấy dự án nào khớp với bộ lọc.</p>
+        ) : rows.map((project, index) => {
+          const revenue = revenueOf(project);
+          const facts = revenueMobileFacts(project, revenue);
+          const pinned = pinnedIds.includes(project.id);
+          return (
+            <article key={project.id} onClick={() => router.push(`/projects/${project.id}`)} className={`cursor-pointer rounded-xl border bg-white p-3 shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
+              <div className="flex items-start gap-2">
+                <span className="pt-1 font-mono text-xs font-bold text-slate-400">{index + 1}</span>
+                <button type="button" onClick={(event) => { event.stopPropagation(); togglePin(project.id); }} className="flex h-11 w-9 shrink-0 items-start justify-center pt-1" aria-label={pinned ? "Bỏ ghim dự án" : "Ghim dự án"}>
+                  {pinned ? <StarIconSolid className="h-5 w-5 text-amber" /> : <StarIconOutline className="h-5 w-5 text-slate-300" />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-xs font-bold text-bad">{project.code}</p>
+                  <h2 className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug text-ink">{project.name}</h2>
+                </div>
+              </div>
+              <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Doanh thu</p>
+                <p className="mt-0.5 text-xl font-extrabold text-emerald-800 tnum">{facts.revenue > 0 ? formatVND(facts.revenue) : "—"}</p>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Giờ thực tế</p><p className="mt-0.5 font-bold text-ink tnum">{facts.actualHours.toLocaleString("vi-VN")}h</p></div>
+                <div className="rounded-lg bg-paper px-2.5 py-2" onClick={(event) => event.stopPropagation()}>
+                  <p className="text-[10px] text-muted">Giờ khách hàng</p>
+                  {isDirectorUser ? cellInput(project, "client_hours", { align: "text-left", title: "Nhập số giờ khách hàng" }) : <p className="mt-0.5 font-bold text-ink tnum">{facts.clientHours.toLocaleString("vi-VN")}h</p>}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </section>
+
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
-      <div className="mt-3 max-h-[calc(100vh-200px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card">
+      <div className="mt-3 hidden max-h-[calc(100vh-200px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
         <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1200px]" : "min-w-[920px]"}`}>
           <colgroup>
             <col className="w-[40px]" />   {/* STT */}

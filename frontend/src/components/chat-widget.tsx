@@ -105,7 +105,7 @@ function isManageableGroup(conv: Conversation | null): boolean {
   return !!conv && conv.type === "GROUP" && (conv.project_id == null);
 }
 
-export default function ChatWidget() {
+export default function ChatWidget({ triggerPlacement = "floating" }: { triggerPlacement?: "floating" | "header" }) {
   const [me, setMe] = useState<User | null>(null);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -500,9 +500,11 @@ export default function ChatWidget() {
       <button
         onClick={openPanel}
         aria-label="Tin nhắn"
-        className="fixed bottom-40 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-steel text-white shadow-fab lg:bottom-24 lg:right-6"
+        className={triggerPlacement === "header"
+          ? "relative flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
+          : "fixed bottom-40 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-steel text-white shadow-fab lg:bottom-24 lg:right-6"}
       >
-        <ChatBubbleLeftRightIcon className="h-6 w-6" />
+        <ChatBubbleLeftRightIcon className={triggerPlacement === "header" ? "h-5 w-5" : "h-6 w-6"} />
         {unread > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-bad px-1 text-[10px] font-bold text-white">
             {unread > 99 ? "99+" : unread}

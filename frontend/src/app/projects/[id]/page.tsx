@@ -461,15 +461,15 @@ export default function ProjectDetailPage() {
 
       {/* Thông tin chung dự án */}
       <div className="rounded-xl2 bg-white p-4 lg:p-6 shadow-card border border-line/50">
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
             <span className="font-mono text-sm font-bold text-bad">{project.code}</span>
-            <h1 className="text-base lg:text-xl font-bold text-ink leading-tight">{project.name}</h1>
+            <h1 className="break-words text-lg font-bold leading-snug text-ink lg:text-xl">{project.name}</h1>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:shrink-0 lg:justify-end">
             <button
               onClick={openProjectChat}
-              className="inline-flex items-center gap-1 rounded-xl2 bg-steel px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-card hover:bg-ink transition-colors"
+              className="inline-flex min-h-11 items-center gap-1 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow-card hover:bg-ink transition-colors"
             >
               <ChatBubbleLeftRightIcon className="h-4 w-4" />
               Chat dự án
@@ -477,7 +477,7 @@ export default function ProjectDetailPage() {
             <button
               onClick={() => setArchiveModal(true)}
               title="Thùng rác & Khôi phục"
-              className="inline-flex items-center gap-1 rounded-xl2 border border-amber-500/40 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-500 hover:text-white transition-colors cursor-pointer shadow-sm"
+              className="inline-flex min-h-11 items-center gap-1 rounded-xl2 border border-amber-500/40 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-500 hover:text-white transition-colors cursor-pointer shadow-sm"
             >
               <ArchiveBoxIcon className="h-4 w-4 text-amber-600" />
               Thùng rác
@@ -486,7 +486,7 @@ export default function ProjectDetailPage() {
               <button
                 onClick={handleDeleteProject}
                 title="Xoá dự án"
-                className="inline-flex items-center gap-1 rounded-xl2 border border-bad/40 bg-bad/10 px-2.5 py-1.5 text-[11px] font-semibold text-bad hover:bg-bad hover:text-white transition-colors"
+                className="inline-flex min-h-11 items-center gap-1 rounded-xl2 border border-bad/40 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad hover:bg-bad hover:text-white transition-colors"
               >
                 <TrashIcon className="h-4 w-4" />
                 Xoá dự án
@@ -496,7 +496,7 @@ export default function ProjectDetailPage() {
               <button
                 onClick={() => setMembersModal(true)}
                 title="Sửa thông tin dự án"
-                className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer shadow-sm"
+                className="inline-flex min-h-11 items-center gap-1 rounded-xl2 border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer shadow-sm"
               >
                 <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
                 Sửa dự án
@@ -507,7 +507,7 @@ export default function ProjectDetailPage() {
                 value={project.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
                 title="Ép trạng thái dự án (giữ nguyên, không tự tính lại theo tiến độ)"
-                className={`cursor-pointer rounded-full border-0 px-2.5 py-1 text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber ${PROJECT_STATUS[project.status]?.cls}`}
+                className={`min-h-11 cursor-pointer rounded-xl2 border-0 px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-amber ${PROJECT_STATUS[project.status]?.cls}`}
               >
                 <option value="PLANNING">Chuẩn bị</option>
                 <option value="IN_PROGRESS">Đang làm</option>
@@ -526,7 +526,7 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-4 text-xs text-muted">
+        <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2 text-xs text-muted sm:grid-cols-2 lg:grid-cols-3">
           {project.location && (
             <p className="flex items-center gap-1.5">
               <MapPinIcon className="h-4 w-4 text-muted/80" />
@@ -563,7 +563,7 @@ export default function ProjectDetailPage() {
             </p>
           )}
           {project.start_date && (
-            <p className="flex items-center gap-1.5 col-span-2">
+            <p className="flex flex-wrap items-center gap-1.5 sm:col-span-2">
               <CalendarDaysIcon className="h-4 w-4 text-muted/80" />
               Ngày khởi công: <span className="font-medium text-ink">{formatDate(project.start_date)}</span>
               {project.end_date && ` — Hoàn thành: ${formatDate(project.end_date)}`}
@@ -684,7 +684,7 @@ export default function ProjectDetailPage() {
               onHoursChange={() => loadData(true)}
             />
 
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-semibold text-muted uppercase">Nhật ký tiến độ ({progressLogs.length})</h3>
               <button
                 onClick={openCreateProgress}
@@ -890,12 +890,12 @@ export default function ProjectDetailPage() {
       {/* Modal Cập nhật thành viên dự án */}
       <AnimatePresence>
         {membersModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl2 bg-white p-5 shadow-card"
+              className="max-h-[100dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 shadow-card sm:max-h-[90vh] sm:rounded-xl2 sm:p-5"
             >
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h3 className="text-sm font-bold text-ink flex items-center gap-1.5">
@@ -930,7 +930,7 @@ export default function ProjectDetailPage() {
                     className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold text-muted">Ngày bắt đầu</label>
                     <input
@@ -978,7 +978,7 @@ export default function ProjectDetailPage() {
                     )}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold text-muted">GEO担当 — phía Nhật</label>
                     <PersonPicker

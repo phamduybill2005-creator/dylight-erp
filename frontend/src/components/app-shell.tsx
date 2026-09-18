@@ -6,7 +6,7 @@
 //    (mục đang mở tự cuộn vào giữa). Không còn thanh 3-4 mục dưới đáy như trước.
 // Menu thay đổi theo 3 tầng vai trò (Giám đốc / Quản lý / Nhân viên).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -24,6 +24,8 @@ import {
   TableCellsIcon,
   BanknotesIcon,
   EyeIcon,
+  Squares2X2Icon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { api, previewRole, tokenStore } from "@/lib/api";
 import { roleTier, canSeeRevenue, ROLE_LABEL } from "@/lib/roles";
@@ -33,6 +35,7 @@ import ChatWidget from "./chat-widget";
 import AccountMenu from "./account-menu";
 import DeadlineAlert from "./deadline-alert";
 import EvaluationAlert from "./evaluation-alert";
+import { buildMobileNavigation } from "@/lib/mobile-navigation";
 
 type IconType = React.ComponentType<{ className?: string }>;
 type NavLink = { href: string; label: string; icon: IconType };
@@ -53,7 +56,7 @@ function deskNav(user: User | null): NavLink[] {
     }
     items.push(
       { href: "/work-schedule", label: "Lịch làm việc", icon: CalendarIcon },
-      { href: "/attendance", label: "Tổng hợp", icon: ClockIcon },
+      { href: "/attendance", label: "Chấm công", icon: ClockIcon },
       { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
       { href: "/evaluations", label: "Đánh giá", icon: StarIcon },
       { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
@@ -72,11 +75,11 @@ function deskNav(user: User | null): NavLink[] {
   }
   items.push(
     { href: "/work-schedule", label: "Lịch làm việc", icon: CalendarIcon },
-    { href: "/attendance", label: "Tổng hợp", icon: ClockIcon },
+    { href: "/attendance", label: "Chấm công", icon: ClockIcon },
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
     { href: "/evaluations", label: "Đánh giá", icon: StarIcon },
-    { href: "/employees", label: "Profile", icon: UsersIcon },
+    { href: "/employees", label: "Nhân sự", icon: UsersIcon },
     { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
   );
   return items;
@@ -92,6 +95,7 @@ export default function AppShell({
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(api.cachedUser());
+  const [moreOpen, setMoreOpen] = useState(false);
   const tier = roleTier(user?.role);
   // Đang XEM GIAO DIỆN với vai trò khác? Đọc sau khi mount (sessionStorage không có khi render phía máy chủ).
   const [previewing, setPreviewing] = useState<Role | null>(null);
@@ -118,17 +122,9 @@ export default function AppShell({
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href.split("?")[0]);
 
-  // Điện thoại: đổi trang -> cuộn mục đang mở vào giữa dải menu (không cuộn trang dọc).
-  const mobileNavRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = mobileNavRef.current?.querySelector<HTMLElement>('[data-active="true"]');
-    if (!el || !mobileNavRef.current) return;
-    const box = mobileNavRef.current;
-    // Gán scrollLeft trực tiếp (scrollTo({behavior:"smooth"}) bị bỏ qua trên một số trình duyệt di động).
-    const r = el.getBoundingClientRect();
-    const b = box.getBoundingClientRect();
-    box.scrollLeft = box.scrollLeft + (r.left - b.left) - (box.clientWidth - r.width) / 2;
-  }, [pathname]);
+  useEffect(() => setMoreOpen(false), [pathname]);
+
+  const mobileNavigation = buildMobileNavigation(deskNav(user), pathname);
 
   return (
     <div className="min-h-screen bg-paper flex flex-col">
@@ -165,32 +161,12 @@ export default function AppShell({
           </nav>
 
           {/* RIGHT: User Account Menu & Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
+            <ChatWidget triggerPlacement="header" />
+            <NotificationsBell triggerPlacement="header" />
             <AccountMenu user={user} onLogout={logout} variant="topbar" />
           </div>
         </div>
-
-        {/* ĐIỆN THOẠI: menu ĐẦY ĐỦ như máy tính, dải cuộn ngang dưới tiêu đề */}
-        <nav aria-label="Menu" className="border-t border-white/10 lg:hidden">
-          <div ref={mobileNavRef} className="no-scrollbar flex gap-1 overflow-x-auto px-2 py-1.5">
-            {deskNav(user).map((item) => {
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  data-active={active ? "true" : undefined}
-                  className={`flex min-w-[4.5rem] shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 text-[10px] font-semibold transition-colors ${
-                    active ? "bg-gradient-to-r from-amber to-amber-deep text-white shadow-sm shadow-amber/30" : "text-white/75 active:bg-white/10"
-                  }`}
-                >
-                  <item.icon className={`h-5 w-5 ${active ? "text-white" : "text-white/70"}`} />
-                  <span className="whitespace-nowrap">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
       </header>
 
       {/* Thanh báo: Giám đốc / Quản trị đang XEM GIAO DIỆN với vai trò khác (chỉ đổi giao diện) */}
@@ -217,13 +193,53 @@ export default function AppShell({
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="flex-1 w-full px-3 sm:px-4 lg:px-6 pb-8 pt-4"
+        className="flex-1 w-full px-3 sm:px-4 lg:px-6 pb-24 lg:pb-8 pt-4"
       >
         <div className={`mx-auto w-full ${maxWidthClass}`}>{children}</div>
       </motion.main>
 
-      <NotificationsBell />
-      <ChatWidget />
+      <nav aria-label="Điều hướng chính" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur lg:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-5">
+          {mobileNavigation.primary.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link key={item.href} href={item.href} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold ${active ? "text-steel" : "text-slate-500"}`}>
+                <item.icon className={`h-5 w-5 ${active ? "text-amber-deep" : "text-slate-500"}`} />
+                <span className="max-w-full truncate">{item.href === "/work-schedule" ? "Lịch" : item.label}</span>
+              </Link>
+            );
+          })}
+          <button type="button" onClick={() => setMoreOpen(true)} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold ${mobileNavigation.moreActive ? "text-steel" : "text-slate-500"}`} aria-expanded={moreOpen}>
+            <Squares2X2Icon className={`h-5 w-5 ${mobileNavigation.moreActive ? "text-amber-deep" : "text-slate-500"}`} />
+            <span>Thêm</span>
+          </button>
+        </div>
+      </nav>
+
+      {moreOpen && (
+        <div className="fixed inset-0 z-50 flex items-end bg-ink/45 lg:hidden" onClick={() => setMoreOpen(false)}>
+          <section className="w-full rounded-t-3xl bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" onClick={(event) => event.stopPropagation()} aria-label="Các chức năng khác">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold text-ink">Các chức năng khác</h2>
+              <button type="button" onClick={() => setMoreOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-full bg-paper text-muted" aria-label="Đóng menu">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {mobileNavigation.secondary.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link key={item.href} href={item.href} className={`flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border px-2 py-3 text-center text-xs font-semibold ${active ? "border-amber bg-amber/10 text-ink" : "border-line bg-paper text-slate-600"}`}>
+                    <item.icon className={`h-6 w-6 ${active ? "text-amber-deep" : "text-steel"}`} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
       <DeadlineAlert user={user} />
       <EvaluationAlert user={user} />
     </div>

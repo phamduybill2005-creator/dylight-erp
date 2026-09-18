@@ -29,6 +29,7 @@ import {
 import type { Project, User, ProjectStatus, Timesheet } from "@/lib/types";
 import { useEscapeKey } from "@/lib/use-escape-key";
 import { formatVND } from "@/lib/format";
+import { projectMobileFacts } from "@/lib/mobile-view-models";
 
 const PROJECT_STATUS: Record<string, { label: string; cls: string }> = {
   PLANNING: { label: "Chuẩn bị", cls: "bg-line text-muted" },
@@ -791,7 +792,56 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      <div className="mt-3 overflow-auto rounded-xl2 border border-line bg-white shadow-card max-h-[calc(100vh-280px)]">
+      <section className="mt-3 space-y-2 lg:hidden" aria-label="Danh sách dự án trên điện thoại">
+        {displayProjects.length === 0 ? (
+          <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Không tìm thấy dự án nào khớp với bộ lọc.</p>
+        ) : displayProjects.map((project, index) => {
+          const facts = projectMobileFacts(project);
+          const status = computeAutoStatus(project);
+          const statusView = PROJECT_STATUS[status] ?? PROJECT_STATUS.PLANNING;
+          const pinned = pinnedIds.includes(project.id);
+          const bando = isBanDoMode ? parseBanDoDetails(project.evaluation) : null;
+          return (
+            <article key={project.id} onClick={() => router.push(`/projects/${project.id}`)} className={`cursor-pointer rounded-xl border bg-white p-3 shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
+              <div className="flex items-start gap-2">
+                <span className="pt-1 font-mono text-xs font-bold text-slate-400">{index + 1}</span>
+                <button type="button" onClick={(event) => { event.stopPropagation(); togglePin(project.id); }} className="flex h-11 w-9 shrink-0 items-start justify-center pt-1" aria-label={pinned ? "Bỏ ghim dự án" : "Ghim dự án"}>
+                  {pinned ? <StarIconSolid className="h-5 w-5 text-amber" /> : <StarIconOutline className="h-5 w-5 text-slate-300" />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-xs font-bold text-bad">{project.code}</p>
+                  <h2 className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug text-ink">{project.name}</h2>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusView.cls}`}>{statusView.label}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg bg-paper px-2.5 py-2">
+                  <p className="text-[10px] text-muted">Phụ trách</p>
+                  <p className="mt-0.5 truncate font-semibold text-ink">{facts.owner}</p>
+                </div>
+                <div className="rounded-lg bg-paper px-2.5 py-2">
+                  <p className="text-[10px] text-muted">Hạn hoàn thành</p>
+                  <p className="mt-0.5 font-semibold text-ink">{facts.deadline ? dm(facts.deadline) : "Chưa đặt"}</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="mb-1 flex items-center justify-between text-[11px]"><span className="text-muted">Tiến độ</span><b className="text-steel tnum">{facts.progress}%</b></div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-teal-600" style={{ width: `${facts.progress}%` }} /></div>
+              </div>
+              {bando && (
+                <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-semibold">
+                  <span className={`rounded-full px-2 py-1 ${isBanDoTicked(bando.data) ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-400"}`}>DATA {isBanDoTicked(bando.data) ? "✓" : "—"}</span>
+                  <span className={`rounded-full px-2 py-1 ${isBanDoTicked(bando.trace) ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-400"}`}>TRACE {isBanDoTicked(bando.trace) ? "✓" : "—"}</span>
+                  {bando.vung && <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">Vùng {bando.vung}</span>}
+                </div>
+              )}
+              {showRevenue && Number(project.revenue || 0) > 0 && <p className="mt-3 text-right text-sm font-extrabold text-emerald-700 tnum">{formatVND(Number(project.revenue))}</p>}
+            </article>
+          );
+        })}
+      </section>
+
+      <div className="mt-3 hidden overflow-auto rounded-xl2 border border-line bg-white shadow-card max-h-[calc(100vh-280px)] lg:block">
         {/* Bề rộng cột CỐ ĐỊNH: Tên dự án rộng nhất (co 1/2 đối với Phòng Bản đồ), 6 cột nhập số thu gọn + cột TIÊU ĐỀ lớn nhất trong 7 cột. */}
         <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1200px]" : "min-w-[1280px]"}`}>
           {isBanDoMode ? (

@@ -543,7 +543,7 @@ export default function AttendancePage() {
             <button
               onClick={exportExcel}
               disabled={exporting}
-              className="flex items-center gap-1.5 rounded-xl2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer"
+              className="hidden items-center gap-1.5 rounded-xl2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer sm:flex"
               title={`Xuất file Excel tháng ${summaryPeriod}`}
             >
               <ArrowDownTrayIcon className={`h-3.5 w-3.5 ${exporting ? "animate-bounce" : ""}`} />

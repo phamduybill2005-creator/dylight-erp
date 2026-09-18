@@ -668,7 +668,32 @@ export default function EvaluationsPage() {
               {overviewLoading ? "Đang tải…" : selDept ? `Không có ai thuộc ${selDept}.` : "Chưa có nhân sự nào."}
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl2 bg-white shadow-card">
+            <>
+            <div className="space-y-2 lg:hidden">
+              {rows.map((r, i) => (
+                <article key={r.user_id} className="overflow-hidden rounded-xl border border-line bg-white shadow-card">
+                  <button type="button" onClick={() => toggleProjects(r.user_id)} className="flex min-h-16 w-full items-center gap-2 px-3 py-2.5 text-left" aria-expanded={openUid === r.user_id}>
+                    <span className="w-5 shrink-0 text-right font-mono text-xs font-bold text-slate-400">{i + 1}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-ink">{r.full_name}</span>
+                      <span className="block truncate text-[10px] text-muted">{ROLE_LABEL[r.role] || "Nhân viên"}{r.department ? ` · ${r.department}` : ""}</span>
+                    </span>
+                    <ChevronRightIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${openUid === r.user_id ? "rotate-90" : ""}`} />
+                  </button>
+                  <div className="grid grid-cols-3 border-y border-line bg-paper/60 text-center">
+                    <div className="px-2 py-2"><p className="text-[9px] text-muted">Office</p><p className="text-sm font-bold text-ink tnum">{r.office_hours.toFixed(1)}h</p></div>
+                    <div className="border-x border-line px-2 py-2"><p className="text-[9px] text-muted">Dự án</p><p className="text-sm font-bold text-steel tnum">{r.project_hours.toFixed(1)}h</p></div>
+                    <div className="px-2 py-2"><p className="text-[9px] text-muted">Đi muộn</p><p className={`text-sm font-bold tnum ${r.late_days > 0 ? "text-bad" : "text-ink"}`}>{r.late_days}</p></div>
+                  </div>
+                  <div className="flex min-h-14 items-center justify-between gap-2 px-3 py-2">
+                    <span className="text-xs font-semibold text-muted">Đánh giá tháng</span>
+                    <RateStars value={r.my_rating ?? 0} busy={ratingUid === r.user_id} onRate={(n) => rateUser(r.user_id, n)} />
+                  </div>
+                  {openUid === r.user_id && <div className="border-t border-line bg-paper/60 px-3 py-2"><ProjectHoursDetail data={projHours[`${r.user_id}:${selMonth}`]} month={selMonth} /></div>}
+                </article>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto rounded-xl2 bg-white shadow-card lg:block">
               <table className="w-full min-w-[640px] text-xs">
                 <thead>
                   <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
@@ -734,6 +759,7 @@ export default function EvaluationsPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </section>
 

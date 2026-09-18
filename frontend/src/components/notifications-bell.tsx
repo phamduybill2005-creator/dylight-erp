@@ -26,7 +26,7 @@ const TARGETS_MANAGER = [
 const fmt = (iso: string) =>
   new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
-export default function NotificationsBell() {
+export default function NotificationsBell({ triggerPlacement = "floating" }: { triggerPlacement?: "floating" | "header" }) {
   const [me, setMe] = useState<User | null>(null);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -180,9 +180,11 @@ export default function NotificationsBell() {
       <button
         onClick={openPanel}
         aria-label="Thông báo"
-        className="fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-ink text-white shadow-fab lg:bottom-6 lg:right-6"
+        className={triggerPlacement === "header"
+          ? "relative flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
+          : "fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-ink text-white shadow-fab lg:bottom-6 lg:right-6"}
       >
-        <EnvelopeIcon className="h-6 w-6" />
+        <EnvelopeIcon className={triggerPlacement === "header" ? "h-5 w-5" : "h-6 w-6"} />
         {unread > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-bad px-1 text-[10px] font-bold text-white">
             {unread > 99 ? "99+" : unread}

@@ -174,6 +174,7 @@ export default function WorkSchedulePage() {
   // Ghi chú tạm thời cho các ô
   const [cellNotes, setCellNotes] = useState<Record<string, string>>({});
   const [noteInput, setNoteInput] = useState("");
+  const [expandedMobileUser, setExpandedMobileUser] = useState<number | null>(null);
 
   // Modal Đăng ký lịch sinh viên
   const [studentModalOpen, setStudentModalOpen] = useState(false);
@@ -515,7 +516,18 @@ export default function WorkSchedulePage() {
       </div>
 
       {/* ==================== CHÚ THÍCH 5 KIỂU (Y HỆT ẢNH MẪU) ==================== */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs">
+      <details className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xs lg:hidden">
+        <summary className="cursor-pointer text-sm font-bold text-ink">Chú thích trạng thái</summary>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {SCHEDULE_TYPES.map((item) => (
+            <div key={item.key} className="flex items-center gap-2 text-xs text-slate-700">
+              <span className={`h-4 w-6 rounded border ${item.bgClass} ${item.borderClass}`} />
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </details>
+      <div className="mt-3 hidden flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs lg:flex">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-bold uppercase tracking-wider text-muted mr-1">
             Chú thích:
@@ -590,9 +602,52 @@ export default function WorkSchedulePage() {
         </div>
       </div>
 
+      <section className="mt-3 space-y-2 lg:hidden" aria-label="Lịch làm việc trên điện thoại">
+        {loading ? (
+          <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Đang tải lịch làm việc…</p>
+        ) : filteredUsers.length === 0 ? (
+          <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Không tìm thấy nhân viên nào phù hợp.</p>
+        ) : filteredUsers.map((user, index) => {
+          const events = daysList.flatMap((day) => {
+            const leave = getApprovedLeave(user.id, day.dateStr);
+            const note = cellNotes[`${user.id}_${day.dateStr}`];
+            return leave || note ? [{ day, leave, note }] : [];
+          });
+          const open = expandedMobileUser === user.id;
+          return (
+            <article key={user.id} className="overflow-hidden rounded-xl border border-line bg-white shadow-card">
+              <button type="button" onClick={() => setExpandedMobileUser(open ? null : user.id)} className="flex min-h-16 w-full items-center gap-3 px-3 py-2.5 text-left" aria-expanded={open}>
+                <span className="font-mono text-xs font-bold text-slate-400">{index + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-ink">{user.full_name}</span>
+                  <span className="block truncate text-[11px] text-muted">{user.department || "Chưa phân phòng ban"}</span>
+                </span>
+                <span className="shrink-0 text-right text-[11px] font-semibold text-steel">{events.length > 0 ? `${events.length} thay đổi` : "Bình thường"}</span>
+                <ChevronRightIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? "rotate-90" : ""}`} />
+              </button>
+              {open && (
+                <div className="max-h-[55vh] divide-y divide-line overflow-y-auto border-t border-line px-3">
+                  {daysList.map((day) => {
+                    const leave = getApprovedLeave(user.id, day.dateStr);
+                    const note = cellNotes[`${user.id}_${day.dateStr}`];
+                    const type = leave ? getScheduleType(leave.leave_type) : null;
+                    return (
+                      <button key={day.dateStr} type="button" onClick={() => { setSelectedCell({ user, dateStr: day.dateStr, dayNum: day.dayNum, dayOfWeek: day.dayOfWeek, leave }); setNoteInput(note || ""); }} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left">
+                        <span className="text-xs font-semibold text-slate-600">{DAY_NAMES_VI[day.dayOfWeek]}, {formatDate(day.dateStr)}</span>
+                        <span className={`max-w-[48%] truncate rounded-full px-2 py-1 text-[10px] font-bold ${type ? `${type.bgClass} ${type.textClass}` : note ? "bg-amber/15 text-amber-deep" : "bg-slate-100 text-slate-400"}`}>{type?.label || note || "Làm bình thường"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </section>
+
       {/* ==================== BẢNG LỊCH LÀM VIỆC ==================== */}
       {/* Bảng tháng có 31 cột: giữ độ rộng tối thiểu để chữ không chồng lên nhau trên điện thoại. */}
-      <div className="mt-2.5 rounded-xl border border-slate-300 bg-white shadow-card overflow-hidden">
+      <div className="mt-2.5 hidden rounded-xl border border-slate-300 bg-white shadow-card overflow-hidden lg:block">
         {loading ? (
           <div className="flex min-h-[350px] flex-col items-center justify-center gap-2">
             <div className="h-7 w-7 animate-spin rounded-full border-3 border-steel border-t-amber" />
