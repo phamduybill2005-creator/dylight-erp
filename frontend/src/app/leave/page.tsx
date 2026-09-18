@@ -4,18 +4,19 @@
 // Quản lý trở lên (isManagerUp) thấy thêm danh sách đơn chờ duyệt toàn công ty,
 // duyệt/từ chối trực tiếp. Không có màn chặn quyền: ai cũng vào được.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   CalendarDaysIcon, PaperAirplaneIcon, CheckIcon, XMarkIcon, TableCellsIcon,
+  ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
 
 // Danh sách LÝ DO nghỉ phép cố định — người xin nghỉ chỉ được chọn 1 trong các mục này.
@@ -47,6 +48,32 @@ function StatusBadge({ s }: { s: LeaveStatus }) {
   );
 }
 
+function mondayOf(d: string): string {
+  const dt = new Date(`${d}T00:00:00`);
+  const day = dt.getDay();
+  const diff = dt.getDate() - day + (day === 0 ? -6 : 1);
+  dt.setDate(diff);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function addDays(d: string, n: number): string {
+  const dt = new Date(`${d}T00:00:00`);
+  dt.setDate(dt.getDate() + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function prevMonth(m: string): string {
+  const [y, mon] = m.split("-").map(Number);
+  const d = new Date(y, mon - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function nextMonth(m: string): string {
+  const [y, mon] = m.split("-").map(Number);
+  const d = new Date(y, mon, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default function LeavePage() {
   const router = useRouter();
   const [me, setMe] = useState<User | null>(api.cachedUser());
@@ -57,6 +84,18 @@ export default function LeavePage() {
   const [approvedByMe, setApprovedByMe] = useState<LeaveRequest[]>([]);   // đơn CHÍNH TÔI đã duyệt
   const [users, setUsers] = useState<User[]>([]);   // để ánh xạ nhân viên -> phòng ban khi lọc
   const [filters, setFilters] = useStickyState<Filters>("leave.filters", NO_FILTERS);
+
+  // --- Quản lý xem tất cả đơn đã duyệt: theo Tuần hoặc Tháng ---
+  const [approvedViewMode, setApprovedViewMode] = useStickyState<"week" | "month">("leave.approvedViewMode", "week");
+  const [approvedWeekStart, setApprovedWeekStart] = useStickyState("leave.approvedWeekStart", mondayOf(todayLocal()));
+  const [approvedMonthStr, setApprovedMonthStr] = useStickyState("leave.approvedMonth", todayLocal().slice(0, 7)); // YYYY-MM
+  const [allApproved, setAllApproved] = useState<LeaveRequest[]>([]);
+  const [loadingApproved, setLoadingApproved] = useState(false);
+
+  // Bộ lọc cho mục tất cả đơn đã duyệt
+  const [approvedSearch, setApprovedSearch] = useState("");
+  const [approvedDept, setApprovedDept] = useState("");
+  const [approvedScope, setApprovedScope] = useState<"all" | "mine">("all");
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -69,17 +108,32 @@ export default function LeavePage() {
   const [deciding, setDeciding] = useState<number | null>(null);
   const [requestFormOpen, setRequestFormOpen] = useState(false);
 
+  const loadApprovedLeaves = useCallback(() => {
+    setLoadingApproved(true);
+    const params = approvedViewMode === "week"
+      ? { from_date: approvedWeekStart, to_date: addDays(approvedWeekStart, 6) }
+      : { month: approvedMonthStr };
+    api.approvedLeaves(params)
+      .then(setAllApproved)
+      .catch(() => setAllApproved([]))
+      .finally(() => setLoadingApproved(false));
+  }, [approvedViewMode, approvedWeekStart, approvedMonthStr]);
+
+  useEffect(() => {
+    loadApprovedLeaves();
+  }, [loadApprovedLeaves]);
+
   useEffect(() => {
     api.me()
       .then((u) => {
         setMe(u);
         const tasks: Promise<unknown>[] = [
           api.myLeaves().then(setMine).catch(() => {}),
+          api.users().then(setUsers).catch(() => {}),   // cho bộ lọc phòng ban
         ];
         if (isManagerUp(u.role)) {
           tasks.push(api.leaveList("PENDING").then(setPending).catch(() => {}));
           tasks.push(api.leavesDecidedByMe().then(setApprovedByMe).catch(() => {}));
-          api.users().then(setUsers).catch(() => {});   // cho bộ lọc phòng ban
         }
         Promise.all(tasks).finally(() => setLoading(false));
       })
@@ -117,6 +171,7 @@ export default function LeavePage() {
         api.leavesDecidedByMe().catch(() => approvedByMe),   // vừa duyệt -> hiện ngay bên dưới
       ]);
       setPending(p); setMine(m); setApprovedByMe(a);
+      loadApprovedLeaves();
     } catch { /* noop */ } finally { setDeciding(null); }
   }
 
@@ -142,6 +197,32 @@ export default function LeavePage() {
   const shownMine = mine.filter(
     (l) => l.source !== "SCHEDULE" && !l.reason?.startsWith("Đi học")
   );
+
+  // Danh sách phòng ban duy nhất để lọc
+  const distinctDepts = useMemo(() => {
+    const set = new Set<string>();
+    users.forEach((u) => {
+      splitDepts(u.department).forEach((d) => d && set.add(d));
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [users]);
+
+  // Danh sách tất cả đơn đã duyệt sau khi lọc
+  const approvedWeekEnd = addDays(approvedWeekStart, 6);
+  const shownApproved = allApproved.filter((l) => {
+    if (l.source === "SCHEDULE" || l.reason?.startsWith("Đi học")) return false;
+    if (approvedScope === "mine" && l.decided_by_id !== me.id) return false;
+    const userDept = deptOfUser(l.user_id);
+    if (approvedDept && !splitDepts(userDept).includes(approvedDept)) return false;
+    if (approvedSearch.trim()) {
+      const q = approvedSearch.trim().toLowerCase();
+      const matchName = (l.user_name || "").toLowerCase().includes(q);
+      const matchReason = (l.reason || "").toLowerCase().includes(q);
+      const matchApprover = (l.decided_by_name || "").toLowerCase().includes(q);
+      if (!matchName && !matchReason && !matchApprover) return false;
+    }
+    return true;
+  });
 
   const formatDaysDisplay = (l: LeaveRequest) => {
     if (l.leave_type === "LATE_MORNING" || l.leave_type === "LATE") {
@@ -315,61 +396,6 @@ export default function LeavePage() {
         </table>
       </div>
 
-      {/* Đơn CHÍNH TÔI đã duyệt — chỉ hiện với người có quyền duyệt */}
-      {canApprove && (
-        <>
-          <h2 className="mt-6 mb-2 text-sm font-bold text-ink">
-            Đơn tôi đã duyệt{" "}
-            <span className="font-normal text-muted">({approvedByMe.length})</span>
-          </h2>
-          <div className="space-y-2 lg:hidden">
-            {approvedByMe.length === 0 ? <p className="rounded-xl border border-line bg-white p-4 text-center text-sm text-muted">Bạn chưa duyệt đơn nào.</p> : approvedByMe.map((leave) => (
-              <article key={leave.id} className="rounded-xl border border-line bg-white p-3 shadow-card">
-                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-ink">{leave.user_name || "—"}</p><p className="mt-1 text-xs text-muted">{formatDate(leave.from_date)} → {formatDate(leave.to_date)}</p></div><div className="text-xs font-semibold text-steel">{formatDaysDisplay(leave)}</div></div>
-                <p className="mt-3 text-sm text-slate-700">{leave.reason || "Không ghi lý do"}</p>
-                <p className="mt-2 text-[11px] text-muted">Duyệt lúc: {leave.decided_at ? formatDate(leave.decided_at) : "—"}</p>
-              </article>
-            ))}
-          </div>
-          <div className="hidden overflow-x-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
-              <thead>
-                <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
-                  <th className="border border-line px-3 py-2">Nhân viên</th>
-                  <th className="border border-line px-3 py-2">Từ ngày</th>
-                  <th className="border border-line px-3 py-2">Đến ngày</th>
-                  <th className="border border-line px-3 py-2 text-right">Lịch làm / Số ngày</th>
-                  <th className="border border-line px-3 py-2">Lý do</th>
-                  <th className="border border-line px-3 py-2">Duyệt lúc</th>
-                </tr>
-              </thead>
-              <tbody>
-                {approvedByMe.length === 0 ? (
-                  <tr>
-                    <td className="border border-line px-3 py-6 text-center text-xs text-muted" colSpan={6}>
-                      Bạn chưa duyệt đơn nào.
-                    </td>
-                  </tr>
-                ) : (
-                  approvedByMe.map((l) => (
-                    <tr key={l.id} className="text-xs hover:bg-paper/60">
-                      <td className="border border-line px-3 py-2 font-semibold text-ink">{l.user_name || "—"}</td>
-                      <td className="border border-line px-3 py-2 text-muted">{formatDate(l.from_date)}</td>
-                      <td className="border border-line px-3 py-2 text-muted">{formatDate(l.to_date)}</td>
-                      <td className="border border-line px-3 py-2 text-right">{formatDaysDisplay(l)}</td>
-                      <td className="border border-line px-3 py-2 text-muted">{l.reason || "—"}</td>
-                      <td className="border border-line px-3 py-2 text-muted">
-                        {l.decided_at ? formatDate(l.decided_at) : "—"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
       {/* Đơn chờ duyệt toàn công ty — Quản lý trở lên */}
       {canApprove && (
         <>
@@ -428,6 +454,359 @@ export default function LeavePage() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TẤT CẢ CÁC ĐƠN ĐÃ DUYỆT (XEM THEO TUẦN VÀ THÁNG)                         */}
+      {/* ========================================================================= */}
+      <section className="mt-8 rounded-xl2 border border-line bg-white p-4 shadow-card lg:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
+              <CheckIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm lg:text-base font-bold text-ink">Tất cả các đơn đã duyệt</h2>
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200/60">
+                  {shownApproved.length} đơn
+                </span>
+              </div>
+              <p className="text-[11px] text-muted">
+                {approvedViewMode === "week"
+                  ? `Tuần từ ${formatDate(approvedWeekStart)} đến ${formatDate(approvedWeekEnd)}`
+                  : `Tháng ${approvedMonthStr.slice(5, 7)}/${approvedMonthStr.slice(0, 4)}`}
+              </p>
+            </div>
+          </div>
+
+          {/* Nút chuyển chế độ xem: Theo tuần / Theo tháng */}
+          <div className="inline-flex items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold shadow-inner self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setApprovedViewMode("week")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all duration-150 ${
+                approvedViewMode === "week"
+                  ? "bg-white text-ink shadow-sm font-bold"
+                  : "text-slate-500 hover:text-ink"
+              }`}
+            >
+              <CalendarDaysIcon className="h-3.5 w-3.5 text-steel" />
+              Theo tuần
+            </button>
+            <button
+              type="button"
+              onClick={() => setApprovedViewMode("month")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all duration-150 ${
+                approvedViewMode === "month"
+                  ? "bg-white text-ink shadow-sm font-bold"
+                  : "text-slate-500 hover:text-ink"
+              }`}
+            >
+              <TableCellsIcon className="h-3.5 w-3.5 text-steel" />
+              Theo tháng
+            </button>
+          </div>
+        </div>
+
+        {/* Thanh điều hướng thời gian và bộ lọc */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2.5 rounded-xl bg-slate-50/80 border border-slate-200/70 p-2.5">
+          {approvedViewMode === "week" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setApprovedWeekStart(addDays(approvedWeekStart, -7))}
+                className="flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                title="Tuần trước"
+              >
+                <ChevronLeftIcon className="h-4 w-4 text-slate-500" />
+                <span className="hidden sm:inline">Tuần trước</span>
+              </button>
+              <span className="rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm">
+                Tuần {formatDate(approvedWeekStart)} – {formatDate(approvedWeekEnd)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setApprovedWeekStart(addDays(approvedWeekStart, 7))}
+                className="flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                title="Tuần sau"
+              >
+                <span className="hidden sm:inline">Tuần sau</span>
+                <ChevronRightIcon className="h-4 w-4 text-slate-500" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setApprovedWeekStart(mondayOf(todayLocal()))}
+                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-slate-50 transition shadow-sm"
+              >
+                Tuần này
+              </button>
+              <input
+                type="date"
+                value={approvedWeekStart}
+                onChange={(e) => e.target.value && setApprovedWeekStart(mondayOf(e.target.value))}
+                className="rounded-lg border border-line bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-steel shadow-sm"
+                title="Chọn ngày để nhảy đến tuần đó"
+              />
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setApprovedMonthStr(prevMonth(approvedMonthStr))}
+                className="flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                title="Tháng trước"
+              >
+                <ChevronLeftIcon className="h-4 w-4 text-slate-500" />
+                <span className="hidden sm:inline">Tháng trước</span>
+              </button>
+              <span className="rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm">
+                Tháng {approvedMonthStr.slice(5, 7)} / {approvedMonthStr.slice(0, 4)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setApprovedMonthStr(nextMonth(approvedMonthStr))}
+                className="flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                title="Tháng sau"
+              >
+                <span className="hidden sm:inline">Tháng sau</span>
+                <ChevronRightIcon className="h-4 w-4 text-slate-500" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setApprovedMonthStr(todayLocal().slice(0, 7))}
+                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-slate-50 transition shadow-sm"
+              >
+                Tháng này
+              </button>
+              <input
+                type="month"
+                value={approvedMonthStr}
+                onChange={(e) => e.target.value && setApprovedMonthStr(e.target.value)}
+                className="rounded-lg border border-line bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-steel shadow-sm"
+                title="Chọn tháng"
+              />
+            </div>
+          )}
+
+          {/* Bộ lọc phòng ban & tìm kiếm */}
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <div className="relative flex-1 sm:w-56">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Tìm tên, lý do, người duyệt..."
+                value={approvedSearch}
+                onChange={(e) => setApprovedSearch(e.target.value)}
+                className="w-full rounded-lg border border-line bg-white pl-8 pr-3 py-1.5 text-xs outline-none focus:border-steel shadow-sm placeholder:text-slate-400"
+              />
+            </div>
+            {distinctDepts.length > 0 && (
+              <select
+                value={approvedDept}
+                onChange={(e) => setApprovedDept(e.target.value)}
+                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs outline-none focus:border-steel font-medium text-slate-700 shadow-sm"
+              >
+                <option value="">Tất cả phòng ban</option>
+                {distinctDepts.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
+            {canApprove && (
+              <select
+                value={approvedScope}
+                onChange={(e) => setApprovedScope(e.target.value as "all" | "mine")}
+                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs outline-none focus:border-steel font-medium text-slate-700 shadow-sm"
+              >
+                <option value="all">Tất cả người duyệt</option>
+                <option value="mine">Chính tôi duyệt</option>
+              </select>
+            )}
+          </div>
+        </div>
+
+        {/* Nội dung danh sách đơn đã duyệt */}
+        {loadingApproved ? (
+          <div className="flex min-h-[160px] items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-steel border-t-amber" />
+          </div>
+        ) : shownApproved.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center">
+            <CalendarDaysIcon className="mx-auto h-8 w-8 text-slate-400" />
+            <p className="mt-2 text-sm font-semibold text-slate-700">
+              {allApproved.length === 0
+                ? (approvedViewMode === "week"
+                    ? `Không có đơn nghỉ phép nào đã duyệt trong tuần ${formatDate(approvedWeekStart)} – ${formatDate(approvedWeekEnd)}.`
+                    : `Không có đơn nghỉ phép nào đã duyệt trong tháng ${approvedMonthStr.slice(5, 7)}/${approvedMonthStr.slice(0, 4)}.`)
+                : "Không tìm thấy đơn nghỉ phép nào khớp với bộ lọc."}
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              {allApproved.length === 0
+                ? "Dùng các nút điều hướng hoặc chọn tuần/tháng khác để xem lịch sử."
+                : "Thử xóa ô tìm kiếm hoặc chọn lại phòng ban."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Mobile View: Cards */}
+            <div className="mt-3 space-y-2 lg:hidden">
+              {shownApproved.map((leave) => {
+                const userDept = deptOfUser(leave.user_id);
+                const approverName = leave.decided_by_name || (leave.decided_by_id ? users.find((u) => u.id === leave.decided_by_id)?.full_name : null);
+                return (
+                  <article key={leave.id} className="rounded-xl border border-line bg-white p-3.5 shadow-sm transition hover:shadow-md">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-bold text-ink">{leave.user_name || "—"}</p>
+                          {userDept && (
+                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                              {userDept}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-muted">
+                          {formatDate(leave.from_date)} → {formatDate(leave.to_date)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <StatusBadge s={leave.status} />
+                        <div className="mt-1 text-xs font-semibold text-steel">
+                          {formatDaysDisplay(leave)}
+                        </div>
+                      </div>
+                    </div>
+                    {leave.reason && (
+                      <p className="mt-2.5 rounded-md bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700">
+                        <b className="font-semibold text-slate-900">Lý do:</b> {leave.reason}
+                      </p>
+                    )}
+                    <div className="mt-2.5 flex items-center justify-between border-t border-line/60 pt-2 text-[11px] text-muted">
+                      <span>Người duyệt: <b className="font-semibold text-slate-700">{approverName || "Đã duyệt"}</b></span>
+                      <span>{leave.decided_at ? formatDate(leave.decided_at) : "—"}</span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            {/* Desktop View: Table */}
+            <div className="mt-4 hidden overflow-x-auto rounded-xl border border-line bg-white shadow-sm lg:block">
+              <table className="w-full min-w-[760px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-50/80 text-left text-[11px] uppercase tracking-wide text-slate-600 font-semibold border-b border-line">
+                    <th className="px-3.5 py-2.5">Nhân viên</th>
+                    <th className="px-3.5 py-2.5">Phòng ban</th>
+                    <th className="px-3.5 py-2.5">Từ ngày</th>
+                    <th className="px-3.5 py-2.5">Đến ngày</th>
+                    <th className="px-3.5 py-2.5 text-right">Lịch làm / Ca nghỉ</th>
+                    <th className="px-3.5 py-2.5">Lý do</th>
+                    <th className="px-3.5 py-2.5">Người duyệt</th>
+                    <th className="px-3.5 py-2.5">Thời gian duyệt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {shownApproved.map((l) => {
+                    const userDept = deptOfUser(l.user_id);
+                    const approverName = l.decided_by_name || (l.decided_by_id ? users.find((u) => u.id === l.decided_by_id)?.full_name : null);
+                    return (
+                      <tr key={l.id} className="text-xs transition-colors hover:bg-slate-50/70">
+                        <td className="px-3.5 py-2.5 font-bold text-ink whitespace-nowrap">
+                          {l.user_name || "—"}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-slate-600 whitespace-nowrap">
+                          {userDept ? (
+                            <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                              {userDept}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap font-medium">{formatDate(l.from_date)}</td>
+                        <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap font-medium">{formatDate(l.to_date)}</td>
+                        <td className="px-3.5 py-2.5 text-right whitespace-nowrap font-semibold text-slate-800">
+                          {formatDaysDisplay(l)}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-slate-700 max-w-xs truncate">
+                          {l.reason ? (
+                            <span className="inline-block rounded bg-amber/10 px-2 py-0.5 text-[11px] font-semibold text-amber-deep">
+                              {l.reason}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                          {approverName ? (
+                            <span className="font-semibold text-slate-800 text-xs">{approverName}</span>
+                          ) : (
+                            <span className="text-xs text-muted italic">Đã duyệt</span>
+                          )}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-muted whitespace-nowrap">
+                          {l.decided_at ? formatDate(l.decided_at) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* Đơn CHÍNH TÔI đã duyệt — chỉ hiện với người có quyền duyệt */}
+      {canApprove && (
+        <>
+          <h2 className="mt-8 mb-2 text-sm font-bold text-ink">
+            Đơn tôi đã duyệt{" "}
+            <span className="font-normal text-muted">({approvedByMe.length})</span>
+          </h2>
+          <div className="space-y-2 lg:hidden">
+            {approvedByMe.length === 0 ? <p className="rounded-xl border border-line bg-white p-4 text-center text-sm text-muted">Bạn chưa duyệt đơn nào.</p> : approvedByMe.map((leave) => (
+              <article key={leave.id} className="rounded-xl border border-line bg-white p-3 shadow-card">
+                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-ink">{leave.user_name || "—"}</p><p className="mt-1 text-xs text-muted">{formatDate(leave.from_date)} → {formatDate(leave.to_date)}</p></div><div className="text-xs font-semibold text-steel">{formatDaysDisplay(leave)}</div></div>
+                <p className="mt-3 text-sm text-slate-700">{leave.reason || "Không ghi lý do"}</p>
+                <p className="mt-2 text-[11px] text-muted">Duyệt lúc: {leave.decided_at ? formatDate(leave.decided_at) : "—"}</p>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
+            <table className="w-full min-w-[720px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
+                  <th className="border border-line px-3 py-2">Nhân viên</th>
+                  <th className="border border-line px-3 py-2">Từ ngày</th>
+                  <th className="border border-line px-3 py-2">Đến ngày</th>
+                  <th className="border border-line px-3 py-2 text-right">Lịch làm / Số ngày</th>
+                  <th className="border border-line px-3 py-2">Lý do</th>
+                  <th className="border border-line px-3 py-2">Duyệt lúc</th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvedByMe.length === 0 ? (
+                  <tr>
+                    <td className="border border-line px-3 py-6 text-center text-xs text-muted" colSpan={6}>
+                      Bạn chưa duyệt đơn nào.
+                    </td>
+                  </tr>
+                ) : (
+                  approvedByMe.map((l) => (
+                    <tr key={l.id} className="text-xs hover:bg-paper/60">
+                      <td className="border border-line px-3 py-2 font-semibold text-ink">{l.user_name || "—"}</td>
+                      <td className="border border-line px-3 py-2 text-muted">{formatDate(l.from_date)}</td>
+                      <td className="border border-line px-3 py-2 text-muted">{formatDate(l.to_date)}</td>
+                      <td className="border border-line px-3 py-2 text-right">{formatDaysDisplay(l)}</td>
+                      <td className="border border-line px-3 py-2 text-muted">{l.reason || "—"}</td>
+                      <td className="border border-line px-3 py-2 text-muted">
+                        {l.decided_at ? formatDate(l.decided_at) : "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

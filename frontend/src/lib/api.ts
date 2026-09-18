@@ -427,6 +427,15 @@ export const api = {
   myLeaves: () => request<LeaveRequest[]>("/leave/me"),
   /** Đơn nghỉ do CHÍNH TÔI duyệt (chỉ quản lý trở lên gọi được). */
   leavesDecidedByMe: () => request<LeaveRequest[]>("/leave/decided-by-me"),
+  /** Tất cả các đơn nghỉ phép đã duyệt toàn công ty (xem theo tuần/tháng). */
+  approvedLeaves: (params?: { from_date?: string; to_date?: string; month?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.from_date) sp.set("from_date", params.from_date);
+    if (params?.to_date) sp.set("to_date", params.to_date);
+    if (params?.month) sp.set("month", params.month);
+    const qs = sp.toString();
+    return request<LeaveRequest[]>(`/leave/approved${qs ? `?${qs}` : ""}`);
+  },
   leaveList: (status?: string) => request<LeaveRequest[]>(`/leave${status ? `?status=${status}` : ""}`),
   decideLeave: (id: number, status: "APPROVED" | "REJECTED") =>
     request<LeaveRequest>(`/leave/${id}/decide`, { method: "POST", body: JSON.stringify({ status }) }),

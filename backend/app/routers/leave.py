@@ -88,6 +88,52 @@ def leaves_decided_by_me(
     )
 
 
+@router.get("/approved", response_model=list[LeaveOut])
+def get_all_approved_leaves(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    month: str | None = None,  # Định dạng YYYY-MM
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Tất cả các đơn nghỉ phép đã duyệt toàn công ty.
+    Hỗ trợ lọc theo khoảng ngày (from_date, to_date) hoặc theo tháng (month=YYYY-MM).
+    Chỉ lấy các đơn tạo trong mục Nghỉ phép (loại bỏ đơn đăng ký lịch sinh viên) từ T9/2026 trở đi.
+    """
+    from sqlalchemy import or_
+    MIN_DATE = date(2026, 9, 1)
+    q = db.query(LeaveRequest).filter(
+        LeaveRequest.company_id == current.company_id,
+        LeaveRequest.status == LeaveStatus.APPROVED,
+        LeaveRequest.from_date >= MIN_DATE,
+        or_(LeaveRequest.source == "LEAVE", LeaveRequest.source.is_(None)),
+        LeaveRequest.source != "SCHEDULE",
+    )
+
+    if month:
+        try:
+            parts = month.split("-")
+            y, m = int(parts[0]), int(parts[1])
+            _, last_day = calendar.monthrange(y, m)
+            m_start = date(y, m, 1)
+            m_end = date(y, m, last_day)
+            q = q.filter(LeaveRequest.from_date <= m_end, LeaveRequest.to_date >= m_start)
+        except Exception:
+            pass
+    elif from_date and to_date:
+        q = q.filter(LeaveRequest.from_date <= to_date, LeaveRequest.to_date >= from_date)
+    elif from_date:
+        q = q.filter(LeaveRequest.to_date >= from_date)
+    elif to_date:
+        q = q.filter(LeaveRequest.from_date <= to_date)
+
+    return q.order_by(
+        LeaveRequest.from_date.desc(),
+        func.coalesce(LeaveRequest.decided_at, LeaveRequest.created_at).desc(),
+        LeaveRequest.id.desc(),
+    ).all()
+
+
 @router.get("", response_model=list[LeaveOut])
 def list_leaves(
     status: LeaveStatus | None = None,
