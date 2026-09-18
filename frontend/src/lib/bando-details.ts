@@ -60,18 +60,16 @@ export function isBanDoTicked(v: string | null | undefined): boolean {
   return t !== "" && t !== "0" && t !== "false";
 }
 
-/** Màu nền/viền cho cả ô DATA / TRACE trong bảng Dự án. */
-export function tickCellClass(ticked: boolean): string {
-  return ticked
-    ? "border-transparent bg-transparent"
-    : "border-slate-200 bg-slate-50/70 text-slate-400";
+/** Giữ nguyên nền/chữ/viền của cả ô DATA / TRACE trong bảng Dự án. */
+export function tickCellClass(_ticked: boolean): string {
+  return "";
 }
 
-/** Màu riêng của checkbox, để ô chưa tích vẫn nhạt nhưng dễ bấm. */
+/** Chỉ làm mờ viền riêng của checkbox chưa tích. */
 export function tickInputClass(ticked: boolean): string {
   return ticked
     ? "border-transparent bg-teal-700"
-    : "border-slate-300 bg-white";
+    : "border-slate-300/70 bg-white";
 }
 
 /** Analysis chỉ lưu SỐ (đơn vị "ha" hiện cố định cạnh ô): "28.5 ha" -> "28.5",

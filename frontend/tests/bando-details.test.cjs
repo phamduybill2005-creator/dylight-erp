@@ -13,7 +13,7 @@ vm.runInNewContext(ts.transpileModule(
 ).outputText, { exports: moduleExports });
 const {
   EMPTY_BANDO, TICKED, parseBanDoDetails, stringifyBanDoDetails, isBanDoTicked, analysisNumber,
-  tickCellClass,
+  tickCellClass, tickInputClass,
 } = moduleExports;
 // Object tạo trong vm mang prototype của realm khác -> trải ra object của test trước khi so sánh sâu.
 const plain = (o) => ({ ...o });
@@ -62,10 +62,14 @@ test("analysisNumber: bỏ chữ 'ha' và khoảng trắng, phẩy -> chấm", (
   assert.equal(analysisNumber(null), "");
 });
 
-test("tickCellClass: cả ô DATA/TRACE chưa tích được làm mờ như bảng mẫu", () => {
-  assert.match(tickCellClass(false), /bg-slate-50/);
-  assert.match(tickCellClass(false), /text-slate-400/);
-  assert.match(tickCellClass(false), /border-slate-200/);
-  assert.match(tickCellClass(true), /bg-transparent/);
-  assert.doesNotMatch(tickCellClass(true), /bg-slate-50/);
+test("tickCellClass: giữ nguyên toàn bộ ô DATA/TRACE", () => {
+  assert.equal(tickCellClass(false), "");
+  assert.equal(tickCellClass(true), "");
+});
+
+test("tickInputClass: chỉ viền checkbox chưa tích được làm mờ", () => {
+  assert.match(tickInputClass(false), /border-slate-300\/70/);
+  assert.match(tickInputClass(false), /bg-white/);
+  assert.match(tickInputClass(true), /bg-teal-700/);
+  assert.doesNotMatch(tickInputClass(false), /bg-slate-50/);
 });
