@@ -587,9 +587,14 @@ class Attendance(Base):
 
     @property
     def is_late(self) -> bool:
-        """Đi trễ nếu giờ VÀO muộn hơn giờ làm CƠ SỞ của nhân viên (work_start "HH:MM").
-        Nhân viên chưa đặt riêng thì dùng mốc chung của công ty (config WORK_START_HOUR).
-        Đúng giờ (bằng mốc) KHÔNG tính muộn. Cho phép cấp cao đè trạng thái (is_late_override)."""
+        """Đi trễ nếu giờ vào muộn hơn giờ bắt đầu của ca tương ứng.
+
+        ``work_start`` riêng của nhân viên luôn được ưu tiên. Khi chưa đặt giờ
+        riêng, mốc mặc định là ca sáng (``WORK_START_HOUR``); các lượt chấm từ
+        mốc ca chiều trở đi dùng ``AFTERNOON_START_MIN`` để người làm ca chiều
+        không bị tính trễ theo mốc 08:00.
+        Đúng giờ (bằng mốc) không tính muộn. Cấp cao vẫn có thể đè trạng thái.
+        """
         if self.is_late_override is not None:
             return self.is_late_override
         if not self.check_in:
@@ -597,6 +602,7 @@ class Attendance(Base):
         if self.work_date.weekday() == 6:  # 6 = Chủ Nhật
             return False
         from app.config import settings
+        check_in_min = self.check_in.hour * 60 + self.check_in.minute
         start_min = settings.WORK_START_HOUR * 60
         ws = getattr(self.user, "work_start", None) if self.user else None
         if ws:
@@ -605,7 +611,11 @@ class Attendance(Base):
                 start_min = int(hh) * 60 + int(mm)
             except (ValueError, TypeError):
                 pass
-        return self.check_in.hour * 60 + self.check_in.minute > start_min
+        else:
+            afternoon_start = getattr(settings, "AFTERNOON_START_MIN", 13 * 60 + 30)
+            if check_in_min >= afternoon_start:
+                start_min = afternoon_start
+        return check_in_min > start_min
 
     @property
     def work_credit(self) -> Decimal:
