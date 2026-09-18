@@ -5,6 +5,7 @@ import calendar
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit import log_activity
@@ -142,7 +143,11 @@ def get_schedule_leaves(
     elif from_date and to_date:
         q = q.filter(LeaveRequest.from_date <= to_date, LeaveRequest.to_date >= from_date)
 
-    return q.order_by(LeaveRequest.from_date.asc()).all()
+    return q.order_by(
+        LeaveRequest.from_date.asc(),
+        func.coalesce(LeaveRequest.decided_at, LeaveRequest.created_at).desc(),
+        LeaveRequest.id.desc(),
+    ).all()
 
 
 @router.post("/{leave_id}/decide", response_model=LeaveOut)
@@ -231,7 +236,12 @@ def save_student_week_schedule(
         )
         .all()
     )
-    existing_map = {l.from_date: l for l in existing_leaves if l.from_date == l.to_date}
+    # Ưu tiên đơn source="SCHEDULE" cho lịch sinh viên nếu ngày đó có nhiều đơn
+    existing_map = {}
+    for l in existing_leaves:
+        if l.from_date == l.to_date:
+            if l.from_date not in existing_map or l.source == "SCHEDULE":
+                existing_map[l.from_date] = l
 
     results: list[LeaveRequest] = []
 

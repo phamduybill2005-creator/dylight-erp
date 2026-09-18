@@ -13,6 +13,7 @@ import {
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { dateLocal, formatDate } from "@/lib/format";
+import { resolveLatestApprovedLeave } from "@/lib/schedule-helpers";
 import type { LeaveRequest, StudentDaySchedule, StudentShift, User } from "@/lib/types";
 
 interface StudentScheduleModalProps {
@@ -149,14 +150,8 @@ export default function StudentScheduleModal({
     const initialMap: Record<string, { shift: StudentShift; reason: string }> = {};
 
     weekDays.forEach((w) => {
-      // Tìm đơn nghỉ phép trong ngày này
-      const leave = existingLeaves.find(
-        (l) =>
-          l.user_id === selectedUserId &&
-          l.status === "APPROVED" &&
-          l.from_date <= w.dateStr &&
-          l.to_date >= w.dateStr
-      );
+      // Tìm đơn nghỉ phép trong ngày này - ưu tiên đơn được duyệt sau cùng
+      const leave = resolveLatestApprovedLeave(existingLeaves, selectedUserId, w.dateStr);
 
       if (!leave) {
         initialMap[w.dateStr] = { shift: "ALL_DAY", reason: "" };

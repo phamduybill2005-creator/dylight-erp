@@ -35,6 +35,7 @@ import { normalizeDept } from "@/lib/groups";
 import StudentScheduleModal from "@/components/student-schedule-modal";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
+import { getApprovedLeavesForDate, resolveLatestApprovedLeave } from "@/lib/schedule-helpers";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, User } from "@/lib/types";
 
@@ -169,6 +170,7 @@ export default function WorkSchedulePage() {
     dayNum: number;
     dayOfWeek: number;
     leave?: LeaveRequest;
+    allLeaves?: LeaveRequest[];
   } | null>(null);
 
   // Ghi chú tạm thời cho các ô
@@ -318,15 +320,14 @@ export default function WorkSchedulePage() {
     setCurrentDate(new Date());
   };
 
-  // Tra cứu đơn nghỉ ĐÃ DUYỆT của 1 nhân viên trong 1 ngày cụ thể (chỉ từ tháng 9/2026)
+  // Tra cứu danh sách đơn nghỉ ĐÃ DUYỆT của 1 nhân viên trong 1 ngày (được duyệt sau cùng đứng đầu)
+  const getApprovedLeaves = (userId: number, dateStr: string): LeaveRequest[] => {
+    return getApprovedLeavesForDate(leaves, userId, dateStr);
+  };
+
+  // Tra cứu đơn nghỉ ĐÃ DUYỆT sau cùng của 1 nhân viên trong 1 ngày cụ thể (chỉ từ tháng 9/2026)
   const getApprovedLeave = (userId: number, dateStr: string): LeaveRequest | undefined => {
-    if (dateStr < "2026-09-01") return undefined;
-    return leaves.find((l) => {
-      if (l.user_id !== userId) return false;
-      if (l.status !== "APPROVED") return false;
-      if (l.from_date < "2026-09-01") return false;
-      return l.from_date <= dateStr && l.to_date >= dateStr;
-    });
+    return resolveLatestApprovedLeave(leaves, userId, dateStr);
   };
 
   // Danh sách phòng ban: DÙNG 4 PHÒNG CHUẨN như các mục khác. Trước đây lấy
@@ -370,8 +371,22 @@ export default function WorkSchedulePage() {
     setDeletingLeave(true);
     try {
       await api.deleteLeave(leaveId);
-      setLeaves((prev) => prev.filter((l) => l.id !== leaveId));
-      setSelectedCell(null);
+      setLeaves((prev) => {
+        const next = prev.filter((l) => l.id !== leaveId);
+        if (selectedCell) {
+          const remaining = getApprovedLeavesForDate(next, selectedCell.user.id, selectedCell.dateStr);
+          if (remaining.length > 0) {
+            setSelectedCell({
+              ...selectedCell,
+              leave: remaining[0],
+              allLeaves: remaining,
+            });
+          } else {
+            setSelectedCell(null);
+          }
+        }
+        return next;
+      });
     } catch (e: any) {
       alert(e?.message || "Không thể xóa đơn nghỉ này.");
     } finally {
@@ -628,11 +643,12 @@ export default function WorkSchedulePage() {
               {open && (
                 <div className="max-h-[55vh] divide-y divide-line overflow-y-auto border-t border-line px-3">
                   {daysList.map((day) => {
-                    const leave = getApprovedLeave(user.id, day.dateStr);
+                    const matchingLeaves = getApprovedLeaves(user.id, day.dateStr);
+                    const leave = matchingLeaves[0];
                     const note = cellNotes[`${user.id}_${day.dateStr}`];
                     const type = leave ? getScheduleType(leave.leave_type) : null;
                     return (
-                      <button key={day.dateStr} type="button" onClick={() => { setSelectedCell({ user, dateStr: day.dateStr, dayNum: day.dayNum, dayOfWeek: day.dayOfWeek, leave }); setNoteInput(note || ""); }} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left">
+                      <button key={day.dateStr} type="button" onClick={() => { setSelectedCell({ user, dateStr: day.dateStr, dayNum: day.dayNum, dayOfWeek: day.dayOfWeek, leave, allLeaves: matchingLeaves }); setNoteInput(note || ""); }} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left">
                         <span className="text-xs font-semibold text-slate-600">{DAY_NAMES_VI[day.dayOfWeek]}, {formatDate(day.dateStr)}</span>
                         <span className={`max-w-[48%] truncate rounded-full px-2 py-1 text-[10px] font-bold ${type ? `${type.bgClass} ${type.textClass}` : note ? "bg-amber/15 text-amber-deep" : "bg-slate-100 text-slate-400"}`}>{type?.label || note || "Làm bình thường"}</span>
                       </button>
@@ -750,9 +766,10 @@ export default function WorkSchedulePage() {
                         const isSaturday = d.dayOfWeek === 6;
                         const isSunday = d.dayOfWeek === 0;
                         const isToday = d.dateStr === today;
-                        const leave = getApprovedLeave(user.id, d.dateStr);
+                        const matchingLeaves = getApprovedLeaves(user.id, d.dateStr);
+                        const leave = matchingLeaves[0];
 
-                        // TRƯỜNG HỢP 1: Có đơn nghỉ phép ĐÃ ĐƯỢC DUYỆT -> Tô đúng 1 trong 5 màu
+                        // TRƯỜNG HỢP 1: Có đơn nghỉ phép ĐÃ ĐƯỢC DUYỆT -> Tô đúng 1 trong 5 màu (ưu tiên đơn duyệt sau cùng)
                         if (leave) {
                           const schedType = getScheduleType(leave.leave_type);
                           const reasonText = (leave.reason || schedType.label).toUpperCase();
@@ -767,10 +784,11 @@ export default function WorkSchedulePage() {
                                   dayNum: d.dayNum,
                                   dayOfWeek: d.dayOfWeek,
                                   leave,
+                                  allLeaves: matchingLeaves,
                                 });
                               }}
                               className={`border border-slate-300 p-0 text-center cursor-pointer transition-all hover:brightness-95 ${schedType.bgClass} ${schedType.textClass}`}
-                              title={`${user.full_name} - ${formatDate(d.dateStr)}\n${schedType.label}: ${leave.reason || "Không ghi lý do"}\n(Đơn đã được duyệt)`}
+                              title={`${user.full_name} - ${formatDate(d.dateStr)}\n${schedType.label}: ${leave.reason || "Không ghi lý do"}\n(Đơn được duyệt sau cùng${matchingLeaves.length > 1 ? ` — có thêm ${matchingLeaves.length - 1} lịch khác` : ""})`}
                             >
                               <div className="h-7 sm:h-8 w-full flex items-center justify-center p-0.5 overflow-hidden">
                                 <span className="text-[9px] font-bold uppercase tracking-tight truncate max-w-[98%] leading-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]">
@@ -852,6 +870,13 @@ export default function WorkSchedulePage() {
             {/* Nếu ô này có đơn nghỉ phép ĐÃ ĐƯỢC DUYỆT */}
             {selectedCell.leave ? (
               <div className="mt-4 space-y-3 text-xs">
+                {selectedCell.allLeaves && selectedCell.allLeaves.length > 1 && (
+                  <div className="flex items-center gap-1.5 rounded-lg border border-amber/30 bg-amber/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-900">
+                    <span className="flex h-2 w-2 shrink-0 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Ngày này có {selectedCell.allLeaves.length} lịch — hiển thị lịch được duyệt sau cùng</span>
+                  </div>
+                )}
+
                 <div className="rounded-lg border border-line bg-paper p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-muted">Phân loại:</span>
@@ -868,7 +893,7 @@ export default function WorkSchedulePage() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted">Trạng thái:</span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-ok/10 px-2 py-0.5 text-[10px] font-bold text-ok">
-                      <CheckCircleIcon className="h-3 w-3" /> Đã được duyệt
+                      <CheckCircleIcon className="h-3 w-3" /> Đã được duyệt (Mới nhất)
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -877,7 +902,56 @@ export default function WorkSchedulePage() {
                       {formatDate(selectedCell.leave.from_date)} → {formatDate(selectedCell.leave.to_date)}
                     </span>
                   </div>
+                  {selectedCell.leave.source && (
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted">Nguồn lịch:</span>
+                      <span className="text-slate-600 font-medium">
+                        {selectedCell.leave.source === "SCHEDULE" ? "Đăng ký lịch tuần sinh viên" : "Đơn xin nghỉ phép"}
+                      </span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Nếu có các đơn khác / lớp dưới */}
+                {selectedCell.allLeaves && selectedCell.allLeaves.length > 1 && (
+                  <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50/80 p-2.5">
+                    <div className="text-[11px] font-bold text-slate-700">
+                      Lịch cũ hơn / lớp dưới ({selectedCell.allLeaves.length - 1} lịch):
+                    </div>
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                      {selectedCell.allLeaves.slice(1).map((other) => {
+                        const otherType = getScheduleType(other.leave_type);
+                        return (
+                          <div
+                            key={other.id}
+                            className="flex items-center justify-between gap-2 rounded border border-line bg-white p-2 text-[11px]"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-ink flex items-center gap-1">
+                                <span className={`inline-block h-2 w-2 rounded-full ${otherType.bgClass}`} />
+                                {otherType.label}
+                                <span className="text-muted font-normal truncate">({other.reason || "Không ghi lý do"})</span>
+                              </div>
+                              <div className="text-[10px] text-muted">
+                                {other.source === "SCHEDULE" ? "Lịch tuần" : "Đơn nghỉ phép"} • {formatDate(other.from_date)}
+                              </div>
+                            </div>
+                            {me && (isManagerUp(me.role) || me.role === "ADMIN" || me.id === other.user_id) && (
+                              <button
+                                onClick={() => handleDeleteLeave(other.id)}
+                                disabled={deletingLeave}
+                                className="shrink-0 rounded bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-100 transition border border-rose-200"
+                                title="Xóa lịch lớp dưới này"
+                              >
+                                Xóa
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between pt-2 border-t border-line">
                   {me && (isManagerUp(me.role) || me.role === "ADMIN" || me.id === selectedCell.leave.user_id) ? (
