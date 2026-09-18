@@ -60,6 +60,13 @@ export function isBanDoTicked(v: string | null | undefined): boolean {
   return t !== "" && t !== "0" && t !== "false";
 }
 
+/** Màu viền cho ô checkbox DATA / TRACE trong bảng Dự án. */
+export function tickCellClass(ticked: boolean): string {
+  return ticked
+    ? "border-transparent bg-teal-700"
+    : "border-slate-200 bg-white";
+}
+
 /** Analysis chỉ lưu SỐ (đơn vị "ha" hiện cố định cạnh ô): "28.5 ha" -> "28.5",
  *  "36ha" -> "36", "3,2ha" -> "3.2". Dùng cho cả giá trị cũ lẫn lúc đang gõ. */
 export function analysisNumber(v: string | null | undefined): string {

@@ -13,6 +13,7 @@ vm.runInNewContext(ts.transpileModule(
 ).outputText, { exports: moduleExports });
 const {
   EMPTY_BANDO, TICKED, parseBanDoDetails, stringifyBanDoDetails, isBanDoTicked, analysisNumber,
+  tickCellClass,
 } = moduleExports;
 // Object tạo trong vm mang prototype của realm khác -> trải ra object của test trước khi so sánh sâu.
 const plain = (o) => ({ ...o });
@@ -59,4 +60,11 @@ test("analysisNumber: bỏ chữ 'ha' và khoảng trắng, phẩy -> chấm", (
   assert.equal(analysisNumber(""), "");
   assert.equal(analysisNumber("abc"), "");
   assert.equal(analysisNumber(null), "");
+});
+
+test("tickCellClass: chỉ ô DATA/TRACE chưa tích có viền mờ", () => {
+  assert.match(tickCellClass(false), /border-slate-200/);
+  assert.match(tickCellClass(false), /bg-white/);
+  assert.match(tickCellClass(true), /border-transparent/);
+  assert.doesNotMatch(tickCellClass(true), /border-slate-200/);
 });

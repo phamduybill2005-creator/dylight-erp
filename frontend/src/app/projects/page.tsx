@@ -21,6 +21,7 @@ import {
   PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept, isBanDoUser, isBanDoView,
 } from "@/lib/groups";
 import { resolveDoscoLead } from "@/lib/project-lead";
+import { tickCellClass } from "@/lib/bando-details";
 import {
   parseBanDoDetails, stringifyBanDoDetails, isBanDoTicked, analysisNumber, TICKED,
   type BanDoDetails,
@@ -937,11 +938,12 @@ export default function ProjectsPage() {
               /** Ô TÍCH (DATA / TRACE) — tích là lưu ngay. Không đủ quyền thì chỉ xem (mờ, không bấm được). */
               const tickCell = (key: "data" | "trace") => {
                 const allowed = canEditBanDo(p);
+                const ticked = isBanDoTicked(bando[key]);
                 return (
                   <td className={`${TD} text-center`} onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
-                      checked={isBanDoTicked(bando[key])}
+                      checked={ticked}
                       disabled={!allowed}
                       onChange={(e) => {
                         const json = stringifyBanDoDetails({ ...bando, [key]: e.target.checked ? TICKED : "" });
@@ -953,7 +955,7 @@ export default function ProjectsPage() {
                           ? `${key.toUpperCase()}: tích là lưu ngay`
                           : "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới tích được"
                       }
-                      className="h-3.5 w-3.5 cursor-pointer accent-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      className={`h-3.5 w-3.5 cursor-pointer rounded border ${tickCellClass(ticked)} accent-teal-700 disabled:cursor-not-allowed disabled:opacity-60`}
                     />
                   </td>
                 );
