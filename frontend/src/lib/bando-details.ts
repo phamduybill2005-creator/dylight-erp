@@ -69,7 +69,7 @@ export function tickCellClass(_ticked: boolean): string {
 export function tickInputClass(ticked: boolean): string {
   return ticked
     ? "border-transparent bg-teal-700"
-    : "border-slate-300/70 bg-white";
+    : "appearance-none border-slate-200 bg-white";
 }
 
 /** Analysis chỉ lưu SỐ (đơn vị "ha" hiện cố định cạnh ô): "28.5 ha" -> "28.5",

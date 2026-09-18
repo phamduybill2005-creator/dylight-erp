@@ -68,7 +68,8 @@ test("tickCellClass: giữ nguyên toàn bộ ô DATA/TRACE", () => {
 });
 
 test("tickInputClass: chỉ viền checkbox chưa tích được làm mờ", () => {
-  assert.match(tickInputClass(false), /border-slate-300\/70/);
+  assert.match(tickInputClass(false), /appearance-none/);
+  assert.match(tickInputClass(false), /border-slate-200/);
   assert.match(tickInputClass(false), /bg-white/);
   assert.match(tickInputClass(true), /bg-teal-700/);
   assert.doesNotMatch(tickInputClass(false), /bg-slate-50/);
