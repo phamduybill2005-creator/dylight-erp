@@ -8,7 +8,7 @@
 //   4. Nghỉ chiều (Tím thạch anh: #7c3aed)
 //   5. Nghỉ cả ngày (Đỏ hoa hồng trầm: #e11d48)
 // - Ngày không có đơn: bảng trắng sạch sẽ.
-// - Chế độ Tháng: hiển thị FULL cả tháng vừa khít màn hình (không cần thanh cuộn ngang).
+// - Chế độ Tháng: giữ cột ngày đủ rộng và cho phép cuộn ngang trên màn hình nhỏ.
 // - Chế độ Tuần: 7 ngày rộng rãi, thoáng đãng.
 // - Chỉ hiển thị nhân viên đang làm việc.
 
@@ -145,7 +145,7 @@ export default function WorkSchedulePage() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Chế độ xem: "MONTH" (Theo tháng - full màn hình không scroll ngang) hoặc "WEEK" (Theo tuần)
+  // Chế độ xem: "MONTH" (Theo tháng) hoặc "WEEK" (Theo tuần)
   const [viewMode, setViewMode] = useStickyState<"MONTH" | "WEEK">("schedule.viewMode", "MONTH");
 
   // Thời gian đang chọn — NHỚ qua F5: sessionStorage chỉ giữ chuỗi nên lưu "YYYY-MM-DD",
@@ -591,7 +591,7 @@ export default function WorkSchedulePage() {
       </div>
 
       {/* ==================== BẢNG LỊCH LÀM VIỆC ==================== */}
-      {/* w-full table-fixed: Hiển thị full cả tháng KHÔNG CẦN KÉO NGANG */}
+      {/* Bảng tháng có 31 cột: giữ độ rộng tối thiểu để chữ không chồng lên nhau trên điện thoại. */}
       <div className="mt-2.5 rounded-xl border border-slate-300 bg-white shadow-card overflow-hidden">
         {loading ? (
           <div className="flex min-h-[350px] flex-col items-center justify-center gap-2">
@@ -599,8 +599,8 @@ export default function WorkSchedulePage() {
             <p className="text-xs text-muted">Đang tải lịch làm việc…</p>
           </div>
         ) : (
-          <div className="w-full overflow-hidden">
-            <table className="w-full table-fixed border-collapse text-xs select-none">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[1120px] table-fixed border-collapse text-xs select-none">
               {/* Tiêu đề các cột */}
               <thead>
                 <tr className="bg-slate-100/90 text-slate-700">
@@ -629,7 +629,7 @@ export default function WorkSchedulePage() {
                     return (
                       <th
                         key={d.dateStr}
-                        className={`border border-slate-300 p-0 text-center font-semibold transition-colors ${headerBg}`}
+                        className={`w-[30px] min-w-[30px] border border-slate-300 p-0 text-center font-semibold transition-colors ${headerBg}`}
                         title={`${FULL_DAY_NAMES_VI[d.dayOfWeek]}, ${formatDate(d.dateStr)}`}
                       >
                         <div className="flex flex-col items-center justify-center py-1">

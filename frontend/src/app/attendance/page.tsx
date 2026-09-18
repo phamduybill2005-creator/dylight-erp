@@ -469,12 +469,12 @@ export default function AttendancePage() {
 
   return (
     <AppShell>
-      <header className="flex items-center justify-between rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
         <div className="flex items-center gap-2">
           <UsersIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
           <h1 className="text-base font-bold lg:text-xl">Bảng chấm công</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             onClick={exportExcel}
             disabled={exporting}

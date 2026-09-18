@@ -272,8 +272,8 @@ export default function AttendanceMachinePage() {
           {mapMsg && <p className="mt-2 text-[11px] font-medium text-ink">{mapMsg}</p>}
 
           {persons && persons.length > 0 && (
-            <div className="mt-3 overflow-hidden rounded-lg border border-line">
-              <table className="w-full text-left text-xs">
+            <div className="mt-3 overflow-x-auto rounded-lg border border-line">
+              <table className="w-full min-w-[520px] text-left text-xs">
                 <thead className="bg-paper text-[11px] text-muted">
                   <tr>
                     <th className="px-3 py-2 font-semibold">Mã Yunatt</th>

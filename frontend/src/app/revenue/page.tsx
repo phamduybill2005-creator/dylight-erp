@@ -453,7 +453,7 @@ export default function RevenuePage() {
         </div>
 
         {/* Cột phải: thẻ tổng doanh thu */}
-        <div className="flex items-center gap-4 rounded-xl2 border border-line bg-white px-5 py-3 shadow-card">
+        <div className="flex w-full min-w-0 max-w-full flex-wrap items-center gap-3 rounded-xl2 border border-line bg-white px-3 py-2 shadow-card sm:w-auto sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-3">
           <div>
             <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted">Tổng doanh thu (VNĐ)</span>
             <span className="block text-xl font-extrabold text-emerald-700 tnum">{formatVND(tong)}</span>

@@ -431,11 +431,11 @@ export default function TimesheetPage() {
         const totalColClass = isMonth ? "w-[40px] min-w-[40px]" : "w-[50px] min-w-[50px]";
         return (
           <div className="mt-3 overflow-auto max-h-[calc(100vh-340px)] rounded-xl2 border border-line bg-white shadow-card">
-            <table className={`w-full border-collapse text-[11px] table-fixed ${isMonth ? "min-w-0" : "min-w-[850px]"}`}>
+            <table className={`w-full border-collapse text-[11px] table-fixed ${isMonth ? "min-w-[1200px]" : "min-w-[850px]"}`}>
               <colgroup>
                 <col className={isMonth ? "w-[180px] lg:w-[210px]" : "w-[260px]"} />
                 {days.map((d) => (
-                  <col key={d} className={isMonth ? "w-auto" : "w-[54px]"} />
+                  <col key={d} className={isMonth ? "w-[30px] min-w-[30px]" : "w-[54px]"} />
                 ))}
                 <col className={totalColClass} />
                 <col className={totalColClass} />
