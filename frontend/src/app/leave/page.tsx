@@ -110,11 +110,17 @@ export default function LeavePage() {
 
   const loadApprovedLeaves = useCallback(() => {
     setLoadingApproved(true);
+    const safeStart = approvedWeekStart && typeof approvedWeekStart === "string" && approvedWeekStart.includes("-")
+      ? approvedWeekStart
+      : mondayOf(todayLocal());
+    const safeMonth = approvedMonthStr && typeof approvedMonthStr === "string" && approvedMonthStr.includes("-")
+      ? approvedMonthStr
+      : todayLocal().slice(0, 7);
     const params = approvedViewMode === "week"
-      ? { from_date: approvedWeekStart, to_date: addDays(approvedWeekStart, 6) }
-      : { month: approvedMonthStr };
+      ? { from_date: safeStart, to_date: addDays(safeStart, 6) }
+      : { month: safeMonth };
     api.approvedLeaves(params)
-      .then(setAllApproved)
+      .then((data) => setAllApproved(Array.isArray(data) ? data : []))
       .catch(() => setAllApproved([]))
       .finally(() => setLoadingApproved(false));
   }, [approvedViewMode, approvedWeekStart, approvedMonthStr]);
@@ -122,6 +128,15 @@ export default function LeavePage() {
   useEffect(() => {
     loadApprovedLeaves();
   }, [loadApprovedLeaves]);
+
+  // Danh sách phòng ban duy nhất để lọc (phải đặt trước mọi lệnh return để tuân thủ Hook Rules của React)
+  const distinctDepts = useMemo(() => {
+    const set = new Set<string>();
+    (users || []).forEach((u) => {
+      splitDepts(u.department).forEach((d) => d && set.add(d));
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [users]);
 
   useEffect(() => {
     api.me()
@@ -187,34 +202,33 @@ export default function LeavePage() {
     me.role === "MANAGER";
 
   // Lọc đơn chờ duyệt theo PHÒNG BAN của người xin nghỉ (ánh xạ qua danh sách nhân sự).
-  const deptOfUser = (uid: number) => users.find((u) => u.id === uid)?.department;
-  const shownPending = pending.filter(
+  const deptOfUser = (uid: number) => (users || []).find((u) => u.id === uid)?.department;
+  const shownPending = (pending || []).filter(
     (l) => (!filters.dept || splitDepts(deptOfUser(l.user_id)).includes(filters.dept)) &&
       l.source !== "SCHEDULE" && !l.reason?.startsWith("Đi học")
   );
 
   // Chỉ hiển thị đơn được tạo và gửi trong mục Nghỉ phép (loại bỏ đơn đăng ký lịch làm việc theo tuần của sinh viên)
-  const shownMine = mine.filter(
+  const shownMine = (mine || []).filter(
     (l) => l.source !== "SCHEDULE" && !l.reason?.startsWith("Đi học")
   );
 
-  // Danh sách phòng ban duy nhất để lọc
-  const distinctDepts = useMemo(() => {
-    const set = new Set<string>();
-    users.forEach((u) => {
-      splitDepts(u.department).forEach((d) => d && set.add(d));
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [users]);
-
   // Danh sách tất cả đơn đã duyệt sau khi lọc
-  const approvedWeekEnd = addDays(approvedWeekStart, 6);
-  const shownApproved = allApproved.filter((l) => {
+  const safeWeekStart = approvedWeekStart && typeof approvedWeekStart === "string" && approvedWeekStart.includes("-")
+    ? approvedWeekStart
+    : mondayOf(todayLocal());
+  const approvedWeekEnd = addDays(safeWeekStart, 6);
+  const safeMonthStr = approvedMonthStr && typeof approvedMonthStr === "string" && approvedMonthStr.includes("-")
+    ? approvedMonthStr
+    : todayLocal().slice(0, 7);
+
+  const shownApproved = (allApproved || []).filter((l) => {
+    if (!l) return false;
     if (l.source === "SCHEDULE" || l.reason?.startsWith("Đi học")) return false;
-    if (approvedScope === "mine" && l.decided_by_id !== me.id) return false;
+    if (approvedScope === "mine" && l.decided_by_id !== me?.id) return false;
     const userDept = deptOfUser(l.user_id);
     if (approvedDept && !splitDepts(userDept).includes(approvedDept)) return false;
-    if (approvedSearch.trim()) {
+    if (approvedSearch && approvedSearch.trim()) {
       const q = approvedSearch.trim().toLowerCase();
       const matchName = (l.user_name || "").toLowerCase().includes(q);
       const matchReason = (l.reason || "").toLowerCase().includes(q);
@@ -478,8 +492,8 @@ export default function LeavePage() {
               </div>
               <p className="text-[11px] text-muted">
                 {approvedViewMode === "week"
-                  ? `Tuần từ ${formatDate(approvedWeekStart)} đến ${formatDate(approvedWeekEnd)}`
-                  : `Tháng ${approvedMonthStr.slice(5, 7)}/${approvedMonthStr.slice(0, 4)}`}
+                  ? `Tuần từ ${formatDate(safeWeekStart)} đến ${formatDate(approvedWeekEnd)}`
+                  : `Tháng ${safeMonthStr.slice(5, 7)}/${safeMonthStr.slice(0, 4)}`}
               </p>
             </div>
           </div>
@@ -519,7 +533,7 @@ export default function LeavePage() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setApprovedWeekStart(addDays(approvedWeekStart, -7))}
+                onClick={() => setApprovedWeekStart(addDays(safeWeekStart, -7))}
                 className="flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
                 title="Tuần trước"
               >
@@ -527,11 +541,11 @@ export default function LeavePage() {
                 <span className="hidden sm:inline">Tuần trước</span>
               </button>
               <span className="rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm">
-                Tuần {formatDate(approvedWeekStart)} – {formatDate(approvedWeekEnd)}
+                Tuần {formatDate(safeWeekStart)} – {formatDate(approvedWeekEnd)}
               </span>
               <button
                 type="button"
-                onClick={() => setApprovedWeekStart(addDays(approvedWeekStart, 7))}
+                onClick={() => setApprovedWeekStart(addDays(safeWeekStart, 7))}
                 className="flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
                 title="Tuần sau"
               >
@@ -547,7 +561,7 @@ export default function LeavePage() {
               </button>
               <input
                 type="date"
-                value={approvedWeekStart}
+                value={safeWeekStart}
                 onChange={(e) => e.target.value && setApprovedWeekStart(mondayOf(e.target.value))}
                 className="rounded-lg border border-line bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-steel shadow-sm"
                 title="Chọn ngày để nhảy đến tuần đó"
@@ -557,7 +571,7 @@ export default function LeavePage() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setApprovedMonthStr(prevMonth(approvedMonthStr))}
+                onClick={() => setApprovedMonthStr(prevMonth(safeMonthStr))}
                 className="flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
                 title="Tháng trước"
               >
@@ -565,11 +579,11 @@ export default function LeavePage() {
                 <span className="hidden sm:inline">Tháng trước</span>
               </button>
               <span className="rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm">
-                Tháng {approvedMonthStr.slice(5, 7)} / {approvedMonthStr.slice(0, 4)}
+                Tháng {safeMonthStr.slice(5, 7)} / {safeMonthStr.slice(0, 4)}
               </span>
               <button
                 type="button"
-                onClick={() => setApprovedMonthStr(nextMonth(approvedMonthStr))}
+                onClick={() => setApprovedMonthStr(nextMonth(safeMonthStr))}
                 className="flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
                 title="Tháng sau"
               >
@@ -585,7 +599,7 @@ export default function LeavePage() {
               </button>
               <input
                 type="month"
-                value={approvedMonthStr}
+                value={safeMonthStr}
                 onChange={(e) => e.target.value && setApprovedMonthStr(e.target.value)}
                 className="rounded-lg border border-line bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-steel shadow-sm"
                 title="Chọn tháng"
@@ -641,8 +655,8 @@ export default function LeavePage() {
             <p className="mt-2 text-sm font-semibold text-slate-700">
               {allApproved.length === 0
                 ? (approvedViewMode === "week"
-                    ? `Không có đơn nghỉ phép nào đã duyệt trong tuần ${formatDate(approvedWeekStart)} – ${formatDate(approvedWeekEnd)}.`
-                    : `Không có đơn nghỉ phép nào đã duyệt trong tháng ${approvedMonthStr.slice(5, 7)}/${approvedMonthStr.slice(0, 4)}.`)
+                    ? `Không có đơn nghỉ phép nào đã duyệt trong tuần ${formatDate(safeWeekStart)} – ${formatDate(approvedWeekEnd)}.`
+                    : `Không có đơn nghỉ phép nào đã duyệt trong tháng ${safeMonthStr.slice(5, 7)}/${safeMonthStr.slice(0, 4)}.`)
                 : "Không tìm thấy đơn nghỉ phép nào khớp với bộ lọc."}
             </p>
             <p className="mt-1 text-xs text-muted">
