@@ -94,9 +94,9 @@ def get_all_approved_leaves(
     to_date: date | None = None,
     month: str | None = None,  # Định dạng YYYY-MM
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
 ):
-    """Tất cả các đơn nghỉ phép đã duyệt toàn công ty.
+    """Tất cả các đơn nghỉ phép đã duyệt toàn công ty (Chỉ dành cho Giám đốc và Admin).
     Hỗ trợ lọc theo khoảng ngày (from_date, to_date) hoặc theo tháng (month=YYYY-MM).
     Chỉ lấy các đơn tạo trong mục Nghỉ phép (loại bỏ đơn đăng ký lịch sinh viên) từ T9/2026 trở đi.
     """

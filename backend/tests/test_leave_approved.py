@@ -53,13 +53,30 @@ class LeaveApprovedTests(unittest.TestCase):
             hashed_password="unused",
             department="Ban Quản lý",
         )
-        self.db.add_all([self.user, self.approver])
+        self.director = User(
+            company_id=self.company.id,
+            email="director@example.com",
+            full_name="Lê Giám Đốc",
+            role=UserRole.DIRECTOR,
+            hashed_password="unused",
+            department="Ban Giám đốc",
+        )
+        self.admin = User(
+            company_id=self.company.id,
+            email="admin@example.com",
+            full_name="Admin Hệ Thống",
+            role=UserRole.ADMIN,
+            hashed_password="unused",
+            department="Hệ thống",
+        )
+        self.db.add_all([self.user, self.approver, self.director, self.admin])
         self.db.commit()
 
+        self.current_user = self.director
         self.app = FastAPI()
         self.app.include_router(leave.router)
         self.app.dependency_overrides[get_db] = lambda: self.db
-        self.app.dependency_overrides[get_current_user] = lambda: self.user
+        self.app.dependency_overrides[get_current_user] = lambda: self.current_user
         self.client = TestClient(self.app)
 
     def tearDown(self):
@@ -203,6 +220,28 @@ class LeaveApprovedTests(unittest.TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["reason"], "ỐM ĐAU")
 
+    def test_role_permissions_approved_leaves(self):
+        # Nhân viên (FIELD_STAFF) -> 403 Forbidden
+        self.app.dependency_overrides[get_current_user] = lambda: self.user
+        resp_staff = self.client.get("/leave/approved")
+        self.assertEqual(resp_staff.status_code, 403)
+
+        # Quản lý (MANAGER) -> 403 Forbidden
+        self.app.dependency_overrides[get_current_user] = lambda: self.approver
+        resp_mgr = self.client.get("/leave/approved")
+        self.assertEqual(resp_mgr.status_code, 403)
+
+        # Giám đốc (DIRECTOR) -> 200 OK
+        self.app.dependency_overrides[get_current_user] = lambda: self.director
+        resp_dir = self.client.get("/leave/approved")
+        self.assertEqual(resp_dir.status_code, 200)
+
+        # Admin (ADMIN) -> 200 OK
+        self.app.dependency_overrides[get_current_user] = lambda: self.admin
+        resp_admin = self.client.get("/leave/approved")
+        self.assertEqual(resp_admin.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
+

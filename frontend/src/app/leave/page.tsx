@@ -15,7 +15,7 @@ import {
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
-import { isManagerUp } from "@/lib/roles";
+import { isManagerUp, isDirector } from "@/lib/roles";
 import { formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
 
@@ -109,6 +109,7 @@ export default function LeavePage() {
   const [requestFormOpen, setRequestFormOpen] = useState(false);
 
   const loadApprovedLeaves = useCallback(() => {
+    if (!me || !isDirector(me.role)) return;
     setLoadingApproved(true);
     const safeStart = approvedWeekStart && typeof approvedWeekStart === "string" && approvedWeekStart.includes("-")
       ? approvedWeekStart
@@ -123,11 +124,13 @@ export default function LeavePage() {
       .then((data) => setAllApproved(Array.isArray(data) ? data : []))
       .catch(() => setAllApproved([]))
       .finally(() => setLoadingApproved(false));
-  }, [approvedViewMode, approvedWeekStart, approvedMonthStr]);
+  }, [me, approvedViewMode, approvedWeekStart, approvedMonthStr]);
 
   useEffect(() => {
-    loadApprovedLeaves();
-  }, [loadApprovedLeaves]);
+    if (me && isDirector(me.role)) {
+      loadApprovedLeaves();
+    }
+  }, [me, loadApprovedLeaves]);
 
   // Danh sách phòng ban duy nhất để lọc (phải đặt trước mọi lệnh return để tuân thủ Hook Rules của React)
   const distinctDepts = useMemo(() => {
@@ -475,9 +478,10 @@ export default function LeavePage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TẤT CẢ CÁC ĐƠN ĐÃ DUYỆT (XEM THEO TUẦN VÀ THÁNG)                         */}
+      {/* TẤT CẢ CÁC ĐƠN ĐÃ DUYỆT (CHỈ HIỂN THỊ CHO GIÁM ĐỐC / ADMIN)              */}
       {/* ========================================================================= */}
-      <section className="mt-8 rounded-xl2 border border-line bg-white p-4 shadow-card lg:p-6">
+      {isDirector(me.role) && (
+        <section className="mt-8 rounded-xl2 border border-line bg-white p-4 shadow-card lg:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
@@ -770,7 +774,8 @@ export default function LeavePage() {
             </div>
           </>
         )}
-      </section>
+        </section>
+      )}
 
       {/* Đơn CHÍNH TÔI đã duyệt — chỉ hiện với người có quyền duyệt */}
       {canApprove && (
