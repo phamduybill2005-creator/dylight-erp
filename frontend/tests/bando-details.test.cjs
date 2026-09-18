@@ -62,9 +62,10 @@ test("analysisNumber: bỏ chữ 'ha' và khoảng trắng, phẩy -> chấm", (
   assert.equal(analysisNumber(null), "");
 });
 
-test("tickCellClass: chỉ ô DATA/TRACE chưa tích có viền mờ", () => {
+test("tickCellClass: cả ô DATA/TRACE chưa tích được làm mờ như bảng mẫu", () => {
+  assert.match(tickCellClass(false), /bg-slate-50/);
+  assert.match(tickCellClass(false), /text-slate-400/);
   assert.match(tickCellClass(false), /border-slate-200/);
-  assert.match(tickCellClass(false), /bg-white/);
-  assert.match(tickCellClass(true), /border-transparent/);
-  assert.doesNotMatch(tickCellClass(true), /border-slate-200/);
+  assert.match(tickCellClass(true), /bg-transparent/);
+  assert.doesNotMatch(tickCellClass(true), /bg-slate-50/);
 });
