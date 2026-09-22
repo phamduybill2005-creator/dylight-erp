@@ -805,8 +805,8 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* ĐIỆN THOẠI: mỗi dự án 1 THẺ, hiện ĐỦ các cột của bảng máy tính (chỉ xem — muốn sửa
-          thì mở dự án hoặc dùng máy tính). Thứ tự khối giống thứ tự cột: mã/tên/nhóm/trạng thái →
+      {/* ĐIỆN THOẠI: mỗi dự án 1 THẺ, hiện ĐỦ các cột của bảng máy tính. Riêng 7 trường
+          Phòng Bản đồ có thể sửa trực tiếp khi tài khoản đủ quyền. Thứ tự khối giống thứ tự cột: mã/tên/nhóm/trạng thái →
           GEO担当 + Chủ trì → Time in/out/due → Manual/Real time → (Bản đồ) → Ghi chú → Tiến độ → Doanh thu. */}
       <section className="mt-3 space-y-2 lg:hidden" aria-label="Danh sách dự án trên điện thoại">
         {displayProjects.length === 0 ? (
@@ -818,10 +818,27 @@ export default function ProjectsPage() {
           const pinned = pinnedIds.includes(project.id);
           // Dữ liệu Bản đồ nằm trong JSON của ô Ghi chú: hiện khối Bản đồ khi đang xem Phòng Bản đồ
           // HOẶC dự án có sẵn dữ liệu dạng này (đỡ hiện nguyên chuỗi JSON như ô Nội dung).
-          const bando = parseBanDoDetails(project.evaluation);
-          const showBando = isBanDoMode || (project.evaluation || "").trim().startsWith("{");
+          const shownEvaluation = evalEdits[project.id] !== undefined ? evalEdits[project.id] : project.evaluation;
+          const bando = parseBanDoDetails(shownEvaluation);
+          const showBando = isBanDoMode || (shownEvaluation || "").trim().startsWith("{");
           const analysisHa = analysisNumber(bando.analysis);
           const revenue = revenueOf(project);
+          const allowedBandoEdit = canEditBanDo(project);
+          const draftMobileBando = (next: BanDoDetails) =>
+            setEvalEdits((current) => ({ ...current, [project.id]: stringifyBanDoDetails(next) }));
+          const mobileBandoKeys = (event: KeyboardEvent<HTMLInputElement>) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+            if (event.key === "Escape") {
+              setEvalEdits((current) => {
+                const next = { ...current };
+                delete next[project.id];
+                return next;
+              });
+            }
+          };
           const tick = (label: string, v: string) => (
             <span className={`rounded-full px-2 py-1 ${isBanDoTicked(v) ? "bg-teal-600 text-white" : "bg-white text-slate-400 ring-1 ring-slate-200"}`}>
               {label} {isBanDoTicked(v) ? "✓" : "—"}
@@ -871,22 +888,148 @@ export default function ProjectsPage() {
                 />
               </dl>
 
-              {/* Khối Phòng Bản đồ: 4 ô số + 2 ô tích + Vùng — đủ 7 cột như bảng */}
+              {/* Khối Phòng Bản đồ: đủ quyền thì nhập trực tiếp; còn lại giữ chế độ chỉ xem. */}
               {showBando && (
-                <div className="mt-2 rounded-lg border border-teal-100 bg-teal-50/60 p-2">
-                  <dl className="grid grid-cols-4 gap-1.5 text-center">
-                    {([["RIEGL", bando.riegl], ["QLCL", bando.qlcl], ["Analysis", analysisHa ? `${analysisHa} ha` : ""], ["Section", bando.section]] as const).map(([label, v]) => (
-                      <div key={label} className="rounded-md bg-white px-1 py-1.5">
-                        <dt className="text-[9px] font-bold uppercase text-teal-800">{label}</dt>
-                        <dd className={`mt-0.5 font-mono text-xs ${v ? "font-semibold text-ink" : "text-slate-300"}`}>{v || "—"}</dd>
+                <div
+                  data-testid="mobile-bando-editor"
+                  className="mt-2 rounded-lg border border-teal-100 bg-teal-50/60 p-2"
+                  onClick={(event) => {
+                    if (allowedBandoEdit) event.stopPropagation();
+                  }}
+                >
+                  {allowedBandoEdit ? (
+                    <>
+                      <div className="grid grid-cols-4 gap-1.5 text-center">
+                        <label className="min-w-0 rounded-md bg-white px-1 py-1.5">
+                          <span className="block text-[9px] font-bold uppercase text-teal-800">RIEGL</span>
+                          <input
+                            data-bando-field="riegl"
+                            type="text"
+                            inputMode="decimal"
+                            value={bando.riegl}
+                            onChange={(event) => draftMobileBando({ ...bando, riegl: event.target.value })}
+                            onBlur={() => saveEvaluation(project)}
+                            onKeyDown={mobileBandoKeys}
+                            placeholder="—"
+                            aria-label="RIEGL"
+                            className="mt-0.5 h-7 w-full min-w-0 rounded border border-slate-200 bg-white px-1 text-center font-mono text-xs font-semibold text-ink outline-none focus:border-teal-600"
+                          />
+                        </label>
+                        <label className="min-w-0 rounded-md bg-white px-1 py-1.5">
+                          <span className="block text-[9px] font-bold uppercase text-teal-800">QLCL</span>
+                          <input
+                            data-bando-field="qlcl"
+                            type="text"
+                            inputMode="decimal"
+                            value={bando.qlcl}
+                            onChange={(event) => draftMobileBando({ ...bando, qlcl: event.target.value })}
+                            onBlur={() => saveEvaluation(project)}
+                            onKeyDown={mobileBandoKeys}
+                            placeholder="—"
+                            aria-label="QLCL"
+                            className="mt-0.5 h-7 w-full min-w-0 rounded border border-slate-200 bg-white px-1 text-center font-mono text-xs font-semibold text-ink outline-none focus:border-teal-600"
+                          />
+                        </label>
+                        <label className="min-w-0 rounded-md bg-white px-1 py-1.5">
+                          <span className="block text-[9px] font-bold uppercase text-teal-800">Analysis</span>
+                          <span className="mt-0.5 flex h-7 items-center rounded border border-slate-200 bg-white px-1 focus-within:border-teal-600">
+                            <input
+                              data-bando-field="analysis"
+                              type="text"
+                              inputMode="decimal"
+                              value={analysisHa}
+                              onChange={(event) => draftMobileBando({ ...bando, analysis: analysisNumber(event.target.value) })}
+                              onBlur={() => saveEvaluation(project)}
+                              onKeyDown={mobileBandoKeys}
+                              placeholder="—"
+                              aria-label="Analysis"
+                              className="w-full min-w-0 bg-transparent text-center font-mono text-xs font-semibold text-ink outline-none"
+                            />
+                            <span className="shrink-0 text-[9px] text-muted">ha</span>
+                          </span>
+                        </label>
+                        <label className="min-w-0 rounded-md bg-white px-1 py-1.5">
+                          <span className="block text-[9px] font-bold uppercase text-teal-800">Section</span>
+                          <input
+                            data-bando-field="section"
+                            type="text"
+                            inputMode="decimal"
+                            value={bando.section}
+                            onChange={(event) => draftMobileBando({ ...bando, section: event.target.value })}
+                            onBlur={() => saveEvaluation(project)}
+                            onKeyDown={mobileBandoKeys}
+                            placeholder="—"
+                            aria-label="Section"
+                            className="mt-0.5 h-7 w-full min-w-0 rounded border border-slate-200 bg-white px-1 text-center font-mono text-xs font-semibold text-ink outline-none focus:border-teal-600"
+                          />
+                        </label>
                       </div>
-                    ))}
-                  </dl>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
-                    {tick("DATA", bando.data)}
-                    {tick("TRACE", bando.trace)}
-                    <span className="rounded-full bg-white px-2 py-1 text-slate-600 ring-1 ring-slate-200">Vùng: {bando.vung || "—"}</span>
-                  </div>
+                      <div className="mt-1.5 grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-1.5 text-[10px] font-semibold">
+                        <label className={`flex h-8 items-center gap-1.5 rounded-full px-2 ring-1 ${isBanDoTicked(bando.data) ? "bg-teal-600 text-white ring-teal-600" : "bg-white text-slate-500 ring-slate-200"}`}>
+                          <input
+                            data-bando-field="data"
+                            type="checkbox"
+                            checked={isBanDoTicked(bando.data)}
+                            onChange={(event) => {
+                              const json = stringifyBanDoDetails({ ...bando, data: event.target.checked ? TICKED : "" });
+                              setEvalEdits((current) => ({ ...current, [project.id]: json }));
+                              void commitEvaluation(project, json);
+                            }}
+                            aria-label="DATA"
+                            className="h-3.5 w-3.5 rounded accent-teal-700"
+                          />
+                          DATA
+                        </label>
+                        <label className={`flex h-8 items-center gap-1.5 rounded-full px-2 ring-1 ${isBanDoTicked(bando.trace) ? "bg-teal-600 text-white ring-teal-600" : "bg-white text-slate-500 ring-slate-200"}`}>
+                          <input
+                            data-bando-field="trace"
+                            type="checkbox"
+                            checked={isBanDoTicked(bando.trace)}
+                            onChange={(event) => {
+                              const json = stringifyBanDoDetails({ ...bando, trace: event.target.checked ? TICKED : "" });
+                              setEvalEdits((current) => ({ ...current, [project.id]: json }));
+                              void commitEvaluation(project, json);
+                            }}
+                            aria-label="TRACE"
+                            className="h-3.5 w-3.5 rounded accent-teal-700"
+                          />
+                          TRACE
+                        </label>
+                        <label className="flex h-8 min-w-0 items-center gap-1 rounded-full bg-white px-2 text-slate-600 ring-1 ring-slate-200">
+                          <span className="shrink-0">Vùng:</span>
+                          <input
+                            data-bando-field="vung"
+                            type="text"
+                            list="bando-vung-list"
+                            value={bando.vung}
+                            onChange={(event) => draftMobileBando({ ...bando, vung: event.target.value })}
+                            onBlur={() => saveEvaluation(project)}
+                            onKeyDown={mobileBandoKeys}
+                            placeholder="—"
+                            aria-label="Vùng"
+                            className="w-full min-w-0 bg-transparent text-xs font-semibold text-ink outline-none"
+                          />
+                        </label>
+                      </div>
+                      <p className="mt-1.5 text-[9px] text-teal-800/70">Rời ô hoặc bấm Enter để lưu.</p>
+                    </>
+                  ) : (
+                    <>
+                      <dl className="grid grid-cols-4 gap-1.5 text-center">
+                        {([["RIEGL", bando.riegl], ["QLCL", bando.qlcl], ["Analysis", analysisHa ? `${analysisHa} ha` : ""], ["Section", bando.section]] as const).map(([label, value]) => (
+                          <div key={label} className="rounded-md bg-white px-1 py-1.5">
+                            <dt className="text-[9px] font-bold uppercase text-teal-800">{label}</dt>
+                            <dd className={`mt-0.5 font-mono text-xs ${value ? "font-semibold text-ink" : "text-slate-300"}`}>{value || "—"}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
+                        {tick("DATA", bando.data)}
+                        {tick("TRACE", bando.trace)}
+                        <span className="rounded-full bg-white px-2 py-1 text-slate-600 ring-1 ring-slate-200">Vùng: {bando.vung || "—"}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

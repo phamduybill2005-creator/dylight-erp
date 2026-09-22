@@ -10,6 +10,7 @@ const workSchedule = read("app/work-schedule/page.tsx");
 const attendanceMachine = read("app/attendance-machine/page.tsx");
 const attendance = read("app/attendance/page.tsx");
 const revenue = read("app/revenue/page.tsx");
+const projects = read("app/projects/page.tsx");
 
 test("bảng Tiến độ tháng giữ độ rộng ngày và cuộn ngang trên điện thoại", () => {
   assert.match(timesheet, /isMonth \? "min-w-\[1200px\]" : "min-w-\[850px\]"/);
@@ -43,4 +44,14 @@ test("khung tỷ giá Doanh thu nằm trên một hàng ở điện thoại", ()
   assert.match(revenue, /data-testid="revenue-rate-toolbar"/);
   assert.match(revenue, /flex-nowrap/);
   assert.match(revenue, /sm:hidden">JPY</);
+});
+
+test("thẻ dự án Phòng Bản đồ cho phép sửa đủ 7 trường trên điện thoại", () => {
+  assert.match(projects, /data-testid="mobile-bando-editor"/);
+  for (const field of ["vung", "riegl", "qlcl", "analysis", "section", "data", "trace"]) {
+    assert.match(projects, new RegExp(`data-bando-field="${field}"`));
+  }
+  assert.match(projects, /canEditBanDo\(project\)/);
+  assert.match(projects, /onBlur=\{\(\) => saveEvaluation\(project\)\}/);
+  assert.match(projects, /void commitEvaluation\(project, json\)/);
 });
