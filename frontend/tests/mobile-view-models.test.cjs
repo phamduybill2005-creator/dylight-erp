@@ -21,20 +21,44 @@ test("timesheet mobile summary exposes total hours and only worked days", () => 
   });
 });
 
-test("project mobile facts prioritize owner, deadline and progress", () => {
+test("project mobile facts cover every desktop column: people, three dates, hours, progress", () => {
   const { projectMobileFacts } = loadTypeScript("src/lib/mobile-view-models.ts");
 
   assert.deepEqual(projectMobileFacts({
+    geo_manager: "寺崎",
     dosco_manager: "N.V.CUONG",
     lead_name: "Fallback",
+    start_date: "2026-09-16",
+    end_date: null,
     internal_deadline: "2026-09-25",
-    end_date: "2026-09-30",
+    manual_hours: "16.00",
+    total_hours: 102.4,
+    total_days: 12.8,
     progress_percent: 67.4,
   }), {
     owner: "N.V.CUONG",
-    deadline: "2026-09-25",
+    geo: "寺崎",
+    startDate: "2026-09-16",
+    endDate: null,
+    internalDeadline: "2026-09-25",
+    manualHours: 16,
+    manualDays: 2,
+    realHours: 102.4,
+    realDays: 12.8,
     progress: 67,
   });
+});
+
+test("project mobile facts fall back to lead name and use the filtered month's hours for real time", () => {
+  const { projectMobileFacts } = loadTypeScript("src/lib/mobile-view-models.ts");
+
+  const facts = projectMobileFacts({ lead_name: "Fallback", total_hours: 100, total_days: 12.5 }, 20.04);
+  assert.equal(facts.owner, "Fallback");
+  assert.equal(facts.realHours, 20);
+  assert.equal(facts.realDays, 2.5);
+  assert.equal(facts.manualHours, 0);
+  assert.equal(facts.geo, null);
+  assert.equal(projectMobileFacts({}).owner, "Chưa phân công");
 });
 
 test("revenue mobile facts expose revenue before supporting hours", () => {

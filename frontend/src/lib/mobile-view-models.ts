@@ -18,17 +18,38 @@ export function summarizeTimesheetProject(
 }
 
 type ProjectMobileInput = {
+  geo_manager?: string | null;
   dosco_manager?: string | null;
   lead_name?: string | null;
-  internal_deadline?: string | null;
+  start_date?: string | null;
   end_date?: string | null;
+  internal_deadline?: string | null;
+  manual_hours?: number | string | null;
+  total_hours?: number | string | null;
+  total_days?: number | string | null;
   progress_percent?: number | null;
 };
 
-export function projectMobileFacts(project: ProjectMobileInput) {
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/** Số liệu cho THẺ DỰ ÁN trên điện thoại — đủ các cột của bảng máy tính (người phụ trách
+ *  2 phía, 3 mốc Time in/out/due, Manual time, Real time, % tiến độ).
+ *  `monthHours`: tổng giờ nhập trong THÁNG đang lọc — có truyền thì Real time lấy số này
+ *  (như cột Real time của bảng khi lọc tháng); không truyền thì lấy tổng của dự án. */
+export function projectMobileFacts(project: ProjectMobileInput, monthHours?: number | null) {
+  const manualHours = finiteNumber(project.manual_hours);
+  const realHours = monthHours != null ? round1(monthHours) : round1(finiteNumber(project.total_hours));
+  const realDays = monthHours != null ? round1(realHours / 8) : round1(finiteNumber(project.total_days));
   return {
     owner: project.dosco_manager || project.lead_name || "Chưa phân công",
-    deadline: project.internal_deadline || project.end_date || null,
+    geo: project.geo_manager || null,
+    startDate: project.start_date || null,
+    endDate: project.end_date || null,
+    internalDeadline: project.internal_deadline || null,
+    manualHours,
+    manualDays: round1(manualHours / 8),
+    realHours,
+    realDays,
     progress: Math.max(0, Math.min(100, Math.round(project.progress_percent ?? 0))),
   };
 }

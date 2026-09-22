@@ -4,7 +4,7 @@
 // có dòng tổng cộng. Cột tài chính (Giá trị HĐ / Chi phí / Lãi-lỗ) chỉ hiện cho
 // Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
 import { useRevenueCalc } from "@/lib/revenue";
 import { useRouter } from "next/navigation";
@@ -140,6 +140,19 @@ const BANDO_NUM_INPUT =
   "h-6 w-full rounded border border-transparent bg-transparent px-0.5 py-0.5 text-center text-[10.5px] font-mono text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white";
 /** Ai được sửa 7 cột Bản đồ — hiện ở tooltip tiêu đề cột. */
 const BANDO_EDIT_HINT = "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới sửa được";
+
+/** Ô thông tin trên THẺ DỰ ÁN điện thoại: nhãn mờ ở trên, giá trị đậm ở dưới (1 cột của bảng máy tính). */
+function MobileFact({ label, value, sub, className = "" }: { label: string; value: ReactNode; sub?: string; className?: string }) {
+  return (
+    <div className={`min-w-0 rounded-lg bg-paper px-2.5 py-2 ${className}`}>
+      <dt className="text-[10px] text-muted">{label}</dt>
+      <dd className="mt-0.5 truncate text-xs font-semibold text-ink">
+        {value}
+        {sub && <span className="ml-1 font-mono text-[10px] font-normal text-muted">{sub}</span>}
+      </dd>
+    </div>
+  );
+}
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -792,17 +805,31 @@ export default function ProjectsPage() {
         )}
       </div>
 
+      {/* ĐIỆN THOẠI: mỗi dự án 1 THẺ, hiện ĐỦ các cột của bảng máy tính (chỉ xem — muốn sửa
+          thì mở dự án hoặc dùng máy tính). Thứ tự khối giống thứ tự cột: mã/tên/nhóm/trạng thái →
+          GEO担当 + Chủ trì → Time in/out/due → Manual/Real time → (Bản đồ) → Ghi chú → Tiến độ → Doanh thu. */}
       <section className="mt-3 space-y-2 lg:hidden" aria-label="Danh sách dự án trên điện thoại">
         {displayProjects.length === 0 ? (
           <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Không tìm thấy dự án nào khớp với bộ lọc.</p>
         ) : displayProjects.map((project, index) => {
-          const facts = projectMobileFacts(project);
+          const facts = projectMobileFacts(project, filterMonth ? (monthHoursByProject[project.id] || 0) : null);
           const status = computeAutoStatus(project);
           const statusView = PROJECT_STATUS[status] ?? PROJECT_STATUS.PLANNING;
           const pinned = pinnedIds.includes(project.id);
-          const bando = isBanDoMode ? parseBanDoDetails(project.evaluation) : null;
+          // Dữ liệu Bản đồ nằm trong JSON của ô Ghi chú: hiện khối Bản đồ khi đang xem Phòng Bản đồ
+          // HOẶC dự án có sẵn dữ liệu dạng này (đỡ hiện nguyên chuỗi JSON như ô Nội dung).
+          const bando = parseBanDoDetails(project.evaluation);
+          const showBando = isBanDoMode || (project.evaluation || "").trim().startsWith("{");
+          const analysisHa = analysisNumber(bando.analysis);
+          const revenue = revenueOf(project);
+          const tick = (label: string, v: string) => (
+            <span className={`rounded-full px-2 py-1 ${isBanDoTicked(v) ? "bg-teal-600 text-white" : "bg-white text-slate-400 ring-1 ring-slate-200"}`}>
+              {label} {isBanDoTicked(v) ? "✓" : "—"}
+            </span>
+          );
           return (
             <article key={project.id} onClick={() => router.push(`/projects/${project.id}`)} className={`cursor-pointer rounded-xl border bg-white p-3 shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
+              {/* Hàng đầu: STT · ghim · Mã QL / Tên / Nhóm · Trạng thái */}
               <div className="flex items-start gap-2">
                 <span className="pt-1 font-mono text-xs font-bold text-slate-400">{index + 1}</span>
                 <button type="button" onClick={(event) => { event.stopPropagation(); togglePin(project.id); }} className="flex h-11 w-9 shrink-0 items-start justify-center pt-1" aria-label={pinned ? "Bỏ ghim dự án" : "Ghim dự án"}>
@@ -811,31 +838,82 @@ export default function ProjectsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="font-mono text-xs font-bold text-bad">{project.code}</p>
                   <h2 className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug text-ink">{project.name}</h2>
+                  <p className="mt-0.5 truncate text-[11px] text-muted" title={groupLabel(project.group_name)}>
+                    Nhóm: <span className="font-semibold text-slate-600">{groupLabel(project.group_name) || "—"}</span>
+                  </p>
                 </div>
                 <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusView.cls}`}>{statusView.label}</span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg bg-paper px-2.5 py-2">
-                  <p className="text-[10px] text-muted">Phụ trách</p>
-                  <p className="mt-0.5 truncate font-semibold text-ink">{facts.owner}</p>
+
+              {/* Người phụ trách 2 phía */}
+              <dl className="mt-3 grid grid-cols-2 gap-2">
+                <MobileFact label="GEO担当 (phía Nhật)" value={facts.geo || "—"} />
+                <MobileFact
+                  label="Chủ trì (DOSCO担当)"
+                  value={<span className="inline-flex items-center gap-1"><StarIconSolid className="h-3 w-3 shrink-0 text-amber" />{facts.owner}</span>}
+                />
+              </dl>
+
+              {/* 3 mốc thời gian đúng như bảng: Time in / Time out / Time due */}
+              <dl className="mt-2 grid grid-cols-3 gap-2">
+                <MobileFact label="Time in" value={dm(facts.startDate)} />
+                <MobileFact label="Time out" value={dm(facts.endDate)} />
+                <MobileFact label="Time due" value={dm(facts.internalDeadline)} />
+              </dl>
+
+              {/* Giờ công: nhập tay và thực tế (có lọc tháng thì Real time là giờ nhập trong tháng đó) */}
+              <dl className="mt-2 grid grid-cols-2 gap-2">
+                <MobileFact label="Manual time" value={`${facts.manualDays.toLocaleString("vi-VN")} ngày`} sub={`(${facts.manualHours}h)`} />
+                <MobileFact
+                  label={filterMonth ? `Real time · tháng ${Number(filterMonth.slice(5, 7))}` : "Real time"}
+                  value={<span className={filterMonth ? "text-emerald-700" : ""}>{facts.realDays.toLocaleString("vi-VN")} ngày</span>}
+                  sub={`(${facts.realHours}h)`}
+                />
+              </dl>
+
+              {/* Khối Phòng Bản đồ: 4 ô số + 2 ô tích + Vùng — đủ 7 cột như bảng */}
+              {showBando && (
+                <div className="mt-2 rounded-lg border border-teal-100 bg-teal-50/60 p-2">
+                  <dl className="grid grid-cols-4 gap-1.5 text-center">
+                    {([["RIEGL", bando.riegl], ["QLCL", bando.qlcl], ["Analysis", analysisHa ? `${analysisHa} ha` : ""], ["Section", bando.section]] as const).map(([label, v]) => (
+                      <div key={label} className="rounded-md bg-white px-1 py-1.5">
+                        <dt className="text-[9px] font-bold uppercase text-teal-800">{label}</dt>
+                        <dd className={`mt-0.5 font-mono text-xs ${v ? "font-semibold text-ink" : "text-slate-300"}`}>{v || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
+                    {tick("DATA", bando.data)}
+                    {tick("TRACE", bando.trace)}
+                    <span className="rounded-full bg-white px-2 py-1 text-slate-600 ring-1 ring-slate-200">Vùng: {bando.vung || "—"}</span>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-paper px-2.5 py-2">
-                  <p className="text-[10px] text-muted">Hạn hoàn thành</p>
-                  <p className="mt-0.5 font-semibold text-ink">{facts.deadline ? dm(facts.deadline) : "Chưa đặt"}</p>
-                </div>
-              </div>
+              )}
+
+              {/* Ghi chú (Bản đồ) / Nội dung (phòng khác) */}
+              {bando.tieu_de && (
+                <p className="mt-2 text-xs leading-snug text-ink">
+                  <span className="text-muted">{showBando ? "Ghi chú" : "Nội dung"}: </span>{bando.tieu_de}
+                </p>
+              )}
+
+              {/* Tiến độ */}
               <div className="mt-3">
                 <div className="mb-1 flex items-center justify-between text-[11px]"><span className="text-muted">Tiến độ</span><b className="text-steel tnum">{facts.progress}%</b></div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-teal-600" style={{ width: `${facts.progress}%` }} /></div>
               </div>
-              {bando && (
-                <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-semibold">
-                  <span className={`rounded-full px-2 py-1 ${isBanDoTicked(bando.data) ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-400"}`}>DATA {isBanDoTicked(bando.data) ? "✓" : "—"}</span>
-                  <span className={`rounded-full px-2 py-1 ${isBanDoTicked(bando.trace) ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-400"}`}>TRACE {isBanDoTicked(bando.trace) ? "✓" : "—"}</span>
-                  {bando.vung && <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">Vùng {bando.vung}</span>}
+
+              {/* Doanh thu — cùng công thức và cùng quyền xem với cột Doanh thu của bảng */}
+              {showRevenue && (
+                <div className="mt-2 flex items-center justify-between border-t border-line pt-2 text-xs">
+                  <span className="text-muted">Doanh thu</span>
+                  {revenue > 0 ? (
+                    <b className="text-sm font-extrabold text-emerald-700 tnum">{formatVND(revenue)}</b>
+                  ) : (
+                    <span className="text-muted">— (chưa có Time khách hàng / đơn giá)</span>
+                  )}
                 </div>
               )}
-              {showRevenue && Number(project.revenue || 0) > 0 && <p className="mt-3 text-right text-sm font-extrabold text-emerald-700 tnum">{formatVND(Number(project.revenue))}</p>}
             </article>
           );
         })}
