@@ -470,7 +470,8 @@ export default function ProjectTimesheet({
         <table className="w-full min-w-[850px] table-fixed border-collapse text-xs">
           <colgroup>
             <col className="w-[45px]" />
-            <col className="w-[320px]" />
+            {/* Cột tên DÍNH TRÁI khi kéo ngang: điện thoại chỉ lấy 42% bề rộng màn hình để còn chỗ thấy ô ngày. */}
+            <col className="w-[320px] max-lg:w-[42vw]" />
             <col className="w-[92px]" />
             {days.map((d) => (
               <col key={d} className="w-[54px]" />
@@ -480,7 +481,9 @@ export default function ProjectTimesheet({
           <thead>
             <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-[10px] uppercase tracking-wide text-white">
               <th className="px-2 py-2 text-center font-semibold border-r border-slate-600">STT</th>
-              <th className="sticky left-0 z-10 px-2 py-2 text-left font-semibold">TÊN HẠNG MỤC</th>
+              {/* Ô dính phải có NỀN ĐỤC riêng (hàng dùng gradient nên không kế thừa được), nếu không
+                  các cột ngày trôi bên dưới sẽ lộ ra khi kéo ngang. */}
+              <th className="sticky left-0 z-10 border-r border-slate-600 bg-slate-700 px-2 py-2 text-left font-semibold">TÊN HẠNG MỤC</th>
               <th className="px-1 py-2 text-center font-semibold">
                 <div>Trạng thái</div>
               </th>
@@ -513,7 +516,7 @@ export default function ProjectTimesheet({
                 return (
                   <React.Fragment key={g.id}>
                     {/* DÒNG NHÓM HẠNG MỤC LỚN */}
-                    <tr className="border-y-2 border-indigo-100 bg-gradient-to-r from-indigo-50/90 to-sky-50/70 hover:from-indigo-100/70 hover:to-sky-100/50 transition-all">
+                    <tr className="group border-y-2 border-indigo-100 bg-gradient-to-r from-indigo-50/90 to-sky-50/70 hover:from-indigo-100/70 hover:to-sky-100/50 transition-all">
                       <td className="px-2 py-2 text-center text-[11px] font-bold text-ink">
                         <button
                           type="button"
@@ -531,7 +534,8 @@ export default function ProjectTimesheet({
                           />
                         </button>
                       </td>
-                      <td className="sticky left-0 z-10 px-2 py-2 bg-inherit">
+                      {/* Nền đục cùng tông với gradient của hàng (bg-inherit không kế thừa được gradient). */}
+                      <td className="sticky left-0 z-10 border-r border-indigo-100 bg-indigo-50 px-2 py-2 group-hover:bg-indigo-100">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-bold text-slate-900 text-xs tracking-tight">
                             {g.name}
@@ -581,22 +585,25 @@ export default function ProjectTimesheet({
                         return (
                           <React.Fragment key={c.id}>
                             {/* DÒNG TIÊU ĐỀ ĐẦU VIỆC CON */}
-                            <tr className={`border-t border-line/50 ${isMultiple ? "bg-slate-50/90 font-medium" : "bg-white"} transition-colors`}>
+                            {/* Nền hàng phải ĐỤC (không /90) để ô tên dính trái kế thừa được nền đục. */}
+                            <tr className={`border-t border-line/50 ${isMultiple ? "bg-slate-50 font-medium" : "bg-white"} transition-colors`}>
                               <td className="px-2 py-2 text-[11px] font-bold text-center text-slate-700 bg-slate-100/50">
                                 {gi + 1}.{ci + 1}
                               </td>
-                              <td className="sticky left-0 z-10 px-2 py-1.5 pl-3 bg-inherit">
+                              <td className="sticky left-0 z-10 border-r border-line/60 bg-inherit px-2 py-1.5 pl-3">
                                 <div className="flex flex-col">
                                   <div className="flex items-center justify-between gap-1">
                                     <span className="font-semibold text-ink text-xs">{c.name}</span>
                                     {/* Nút thêm nhân sự tham gia */}
                                     <button
                                       onClick={() => setAddingWorkerForItemId(addingWorkerForItemId === c.id ? null : c.id)}
-                                      className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-steel hover:bg-paper hover:text-ink transition"
+                                      className="inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-steel hover:bg-paper hover:text-ink transition"
                                       title="Thêm nhân sự cùng làm đầu việc này để tách giờ"
+                                      aria-label="Thêm người"
                                     >
                                       <UserPlusIcon className="h-3 w-3" />
-                                      <span>+ Thêm người</span>
+                                      {/* Điện thoại: cột tên hẹp -> chỉ giữ icon, chữ ẩn. */}
+                                      <span className="max-lg:hidden">+ Thêm người</span>
                                     </button>
                                   </div>
 
@@ -706,9 +713,9 @@ export default function ProjectTimesheet({
                               const isMainAssignee = c.assignee_id === w.id;
 
                               return (
-                                <tr key={w.id} className="border-t border-line/30 bg-white/70 hover:bg-amber-50/40 text-[11px] transition-colors">
+                                <tr key={w.id} className="border-t border-line/30 bg-white hover:bg-amber-50 text-[11px] transition-colors">
                                   <td className="text-center text-slate-300 text-[10px]">•</td>
-                                  <td className="sticky left-0 z-10 px-2 py-1 pl-6 bg-inherit">
+                                  <td className="sticky left-0 z-10 border-r border-line/60 bg-inherit px-2 py-1 pl-6">
                                     <div className="flex items-center justify-between gap-1 text-ink/90">
                                       <div className="flex items-center gap-1.5 truncate">
                                         <UserCircleIcon className="h-3.5 w-3.5 shrink-0 text-steel" />
@@ -828,8 +835,9 @@ export default function ProjectTimesheet({
           </tbody>
           {parents.length > 0 && (
             <tfoot>
-              <tr className="bg-ink/10 font-bold text-ink">
-                <td colSpan={2} className="sticky left-0 z-10 border border-line bg-ink/10 px-3 py-2 text-right">
+              <tr className="bg-slate-200 font-bold text-ink">
+                {/* Nền đục (slate-200 ≈ ink/10 trên nền trắng) để ô dính không bị cột ngày lộ qua. */}
+                <td colSpan={2} className="sticky left-0 z-10 border border-line bg-slate-200 px-3 py-2 text-right">
                   Tổng giờ ngày
                 </td>
                 <td className="border border-line" />
