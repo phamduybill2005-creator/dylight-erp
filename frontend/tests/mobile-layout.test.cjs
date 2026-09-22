@@ -38,3 +38,9 @@ test("khung Lịch làm việc trên điện thoại chỉ dùng hai hàng gọn
   assert.match(workSchedule, />Lịch SV</);
   assert.match(workSchedule, />Xuất</);
 });
+
+test("khung tỷ giá Doanh thu nằm trên một hàng ở điện thoại", () => {
+  assert.match(revenue, /data-testid="revenue-rate-toolbar"/);
+  assert.match(revenue, /flex-nowrap/);
+  assert.match(revenue, /sm:hidden">JPY</);
+});
