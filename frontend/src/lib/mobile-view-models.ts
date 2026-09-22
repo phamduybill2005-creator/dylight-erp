@@ -1,5 +1,10 @@
 export type WorkedDay = { date: string; hours: number };
 
+/** Khóa ô (dự án × ngày) trong Map giờ của trang Tiến độ — DÙNG CHUNG cho bảng máy tính
+ *  và thẻ điện thoại. Trước đây hai nơi dùng 2 định dạng khác nhau ("id:ngày" / "id|ngày")
+ *  nên thẻ điện thoại tra không trúng, luôn ra 0h. */
+export const timesheetCellKey = (projectId: number, date: string) => `${projectId}:${date}`;
+
 export function summarizeTimesheetProject(
   projectId: number,
   days: string[],
@@ -9,7 +14,7 @@ export function summarizeTimesheetProject(
   let totalHours = 0;
 
   for (const date of days) {
-    const value = hours.get(`${projectId}|${date}`) ?? 0;
+    const value = hours.get(timesheetCellKey(projectId, date)) ?? 0;
     totalHours += value;
     if (value > 0) workedDays.push({ date, hours: value });
   }

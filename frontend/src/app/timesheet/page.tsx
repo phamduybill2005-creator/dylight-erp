@@ -17,7 +17,7 @@ import { dateLocal, todayLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept } from "@/lib/groups";
 import { isSeniorManagerUp } from "@/lib/roles";
-import { summarizeTimesheetProject } from "@/lib/mobile-view-models";
+import { summarizeTimesheetProject, timesheetCellKey } from "@/lib/mobile-view-models";
 import type { Timesheet, Project, User, Department } from "@/lib/types";
 
 /** Thứ 2 của tuần chứa ngày d (YYYY-MM-DD), giờ địa phương. */
@@ -173,7 +173,8 @@ export default function TimesheetPage() {
     });
   }, [entries, viewScope, me?.id, selectedDept, projects]);
 
-  const key = (pid: number, d: string) => `${pid}:${d}`;
+  // Khóa ô dùng CHUNG với thẻ điện thoại (summarizeTimesheetProject) — không tự định nghĩa riêng.
+  const key = timesheetCellKey;
 
   // Tính tổng giờ cho mỗi ô (project × day)
   const cellHours = useMemo(() => {

@@ -3,13 +3,16 @@ const assert = require("node:assert/strict");
 const { loadTypeScript } = require("./helpers/load-typescript.cjs");
 
 test("timesheet mobile summary exposes total hours and only worked days", () => {
-  const { summarizeTimesheetProject } = loadTypeScript("src/lib/mobile-view-models.ts");
+  const { summarizeTimesheetProject, timesheetCellKey } = loadTypeScript("src/lib/mobile-view-models.ts");
   const days = ["2026-09-14", "2026-09-15", "2026-09-16"];
+  // Dựng Map bằng đúng hàm khóa dùng chung với bảng máy tính — test cũ tự ghép "17|ngày"
+  // nên vẫn xanh trong khi trang thật tra không trúng.
   const hours = new Map([
-    ["17|2026-09-14", 3],
-    ["17|2026-09-15", 0],
-    ["17|2026-09-16", 5.5],
+    [timesheetCellKey(17, "2026-09-14"), 3],
+    [timesheetCellKey(17, "2026-09-15"), 0],
+    [timesheetCellKey(17, "2026-09-16"), 5.5],
   ]);
+  assert.equal(timesheetCellKey(17, "2026-09-14"), "17:2026-09-14");
 
   assert.deepEqual(summarizeTimesheetProject(17, days, hours), {
     totalHours: 8.5,
