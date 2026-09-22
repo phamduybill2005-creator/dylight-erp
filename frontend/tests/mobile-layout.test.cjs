@@ -31,3 +31,10 @@ test("các thanh công cụ chấm công và thẻ doanh thu không tràn ngang"
   assert.match(attendance, /<header className="flex flex-wrap items-center justify-between gap-3/);
   assert.match(revenue, /flex w-full min-w-0 max-w-full flex-wrap items-center/);
 });
+
+test("khung Lịch làm việc trên điện thoại chỉ dùng hai hàng gọn", () => {
+  assert.match(workSchedule, /data-testid="work-schedule-toolbar"/);
+  assert.match(workSchedule, /grid grid-cols-\[minmax\(0,1fr\)_auto\]/);
+  assert.match(workSchedule, />Lịch SV</);
+  assert.match(workSchedule, />Xuất</);
+});

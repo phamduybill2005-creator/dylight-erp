@@ -439,94 +439,96 @@ export default function WorkSchedulePage() {
   return (
     <AppShell maxWidthClass="w-full max-w-[100%] px-1 sm:px-3 lg:px-4">
       {/* ==================== HEADER ĐIỀU KHIỂN ==================== */}
-      <div className="flex flex-col gap-3 rounded-xl bg-ink p-3.5 text-white shadow-card md:flex-row md:items-center md:justify-between">
+      <div data-testid="work-schedule-toolbar" className="grid gap-2.5 rounded-xl bg-ink p-3 text-white shadow-card lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-3.5">
         {/* Tiêu đề & Chọn chế độ Tuần / Tháng */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber/20 text-amber">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber/20 text-amber">
               <CalendarDaysIcon className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-base font-bold tracking-tight lg:text-lg">Lịch làm việc</h1>
-              <p className="text-[11px] text-white/70">Theo dõi nghỉ phép & đi muộn đã duyệt</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-bold tracking-tight sm:text-base lg:text-lg">Lịch làm việc</h1>
+              <p className="hidden truncate text-[11px] text-white/70 sm:block">Theo dõi nghỉ phép & đi muộn đã duyệt</p>
             </div>
           </div>
 
           {/* Nút chuyển đổi Theo Tuần / Theo Tháng */}
-          <div className="inline-flex rounded-lg border border-white/20 bg-white/10 p-0.5 ml-0 sm:ml-4">
+          <div className="inline-flex shrink-0 rounded-lg border border-white/20 bg-white/10 p-0.5">
             <button
               onClick={() => setViewMode("MONTH")}
-              className={`rounded-md px-3 py-1 text-xs font-bold transition ${
+              className={`min-h-8 rounded-md px-2.5 py-1 text-[11px] font-bold transition sm:px-3 sm:text-xs ${
                 viewMode === "MONTH"
                   ? "bg-amber text-ink shadow-sm"
                   : "text-white/80 hover:text-white"
               }`}
             >
-              Theo tháng
+              <span className="sm:hidden">Tháng</span><span className="hidden sm:inline">Theo tháng</span>
             </button>
             <button
               onClick={() => setViewMode("WEEK")}
-              className={`rounded-md px-3 py-1 text-xs font-bold transition ${
+              className={`min-h-8 rounded-md px-2.5 py-1 text-[11px] font-bold transition sm:px-3 sm:text-xs ${
                 viewMode === "WEEK"
                   ? "bg-amber text-ink shadow-sm"
                   : "text-white/80 hover:text-white"
               }`}
             >
-              Theo tuần (7 ngày)
+              <span className="sm:hidden">Tuần</span><span className="hidden sm:inline">Theo tuần (7 ngày)</span>
             </button>
           </div>
         </div>
 
         {/* Nút điều hướng thời gian & Xuất Excel */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
           {/* Bộ chuyển thời gian */}
-          <div className="flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2 py-1">
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-lg border border-white/20 bg-white/10 px-1 py-1 sm:gap-1 sm:px-2 lg:flex-none">
             <button
               onClick={prevPeriod}
-              className="rounded p-1 text-white/80 hover:bg-white/20 hover:text-white transition"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white/80 transition hover:bg-white/20 hover:text-white"
               title={viewMode === "MONTH" ? "Tháng trước" : "Tuần trước"}
             >
               <ChevronLeftIcon className="h-4 w-4" />
             </button>
             <button
               onClick={goToToday}
-              className="px-2 py-0.5 text-xs font-semibold text-white hover:underline"
+              className="shrink-0 px-1 py-0.5 text-[11px] font-semibold text-white hover:underline sm:px-2 sm:text-xs"
             >
               Hôm nay
             </button>
             <button
               onClick={nextPeriod}
-              className="rounded p-1 text-white/80 hover:bg-white/20 hover:text-white transition"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white/80 transition hover:bg-white/20 hover:text-white"
               title={viewMode === "MONTH" ? "Tháng sau" : "Tuần sau"}
             >
               <ChevronRightIcon className="h-4 w-4" />
             </button>
-            <span className="ml-1 text-xs font-bold text-amber">{periodLabel}</span>
+            <span className="min-w-0 flex-1 truncate px-0.5 text-right text-[11px] font-bold text-amber sm:ml-1 sm:text-xs">{periodLabel}</span>
           </div>
 
-          {/* Nút Đăng ký lịch sinh viên */}
-          <button
-            onClick={() => {
-              setModalStudentUserId(me?.id);
-              setModalStudentDate(currentDate);
-              setStudentModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 rounded-lg bg-amber px-3 py-1.5 text-xs font-bold text-ink shadow-sm transition hover:bg-amber-deep hover:text-white"
-            title="Đăng ký lịch làm việc linh hoạt theo tuần cho sinh viên"
-          >
-            <AcademicCapIcon className="h-4 w-4" />
-            <span>Đăng ký lịch làm cho sinh viên</span>
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* Nút Đăng ký lịch sinh viên */}
+            <button
+              onClick={() => {
+                setModalStudentUserId(me?.id);
+                setModalStudentDate(currentDate);
+                setStudentModalOpen(true);
+              }}
+              className="flex min-h-9 items-center gap-1 rounded-lg bg-amber px-2 text-[11px] font-bold text-ink shadow-sm transition hover:bg-amber-deep hover:text-white sm:gap-1.5 sm:px-3 sm:text-xs"
+              title="Đăng ký lịch làm việc linh hoạt theo tuần cho sinh viên"
+            >
+              <AcademicCapIcon className="h-4 w-4 shrink-0" />
+              <span className="sm:hidden">Lịch SV</span><span className="hidden sm:inline">Đăng ký lịch sinh viên</span>
+            </button>
 
-          {/* Nút Xuất Excel */}
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
-            title="Xuất bảng Excel"
-          >
-            <ArrowDownTrayIcon className="h-4 w-4 text-emerald-400" />
-            <span>Xuất Excel</span>
-          </button>
+            {/* Nút Xuất Excel */}
+            <button
+              onClick={exportToExcel}
+              className="flex min-h-9 items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2 text-[11px] font-semibold text-white transition hover:bg-white/20 sm:gap-1.5 sm:px-3 sm:text-xs"
+              title="Xuất bảng Excel"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4 shrink-0 text-emerald-400" />
+              <span className="sm:hidden">Xuất</span><span className="hidden sm:inline">Xuất Excel</span>
+            </button>
+          </div>
         </div>
       </div>
 
