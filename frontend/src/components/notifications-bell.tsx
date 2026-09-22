@@ -5,6 +5,7 @@
 //            Quản lý  → nhân viên / 1 người;  Nhân viên → chỉ nhận.
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
@@ -26,7 +27,7 @@ const TARGETS_MANAGER = [
 const fmt = (iso: string) =>
   new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
-export default function NotificationsBell({ triggerPlacement = "floating" }: { triggerPlacement?: "floating" | "header" }) {
+export default function NotificationsBell() {
   const [me, setMe] = useState<User | null>(null);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -177,14 +178,14 @@ export default function NotificationsBell({ triggerPlacement = "floating" }: { t
 
   return (
     <>
+      {/* Nút mở: nằm trong thanh đầu trang. Điện thoại: giữ nguyên trên thanh (không nổi che dữ liệu).
+          Máy tính (lg): tự thành nút NỔI góc dưới-phải như trước, dưới nút Tin nhắn. */}
       <button
         onClick={openPanel}
         aria-label="Thông báo"
-        className={triggerPlacement === "header"
-          ? "relative flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-          : "fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-ink text-white shadow-fab lg:bottom-6 lg:right-6"}
+        className="relative flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white lg:fixed lg:bottom-6 lg:right-6 lg:z-40 lg:h-12 lg:w-12 lg:bg-ink lg:text-white lg:shadow-fab lg:hover:bg-ink/90 lg:hover:text-white"
       >
-        <EnvelopeIcon className={triggerPlacement === "header" ? "h-5 w-5" : "h-6 w-6"} />
+        <EnvelopeIcon className="h-5 w-5 lg:h-6 lg:w-6" />
         {unread > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-bad px-1 text-[10px] font-bold text-white">
             {unread > 99 ? "99+" : unread}
@@ -192,7 +193,8 @@ export default function NotificationsBell({ triggerPlacement = "floating" }: { t
         )}
       </button>
 
-      {open && (
+      {/* Panel đưa ra document.body (portal) để không kẹt trong lớp z-index của thanh đầu trang. */}
+      {open && createPortal(
         <div
           className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-sm"
           onClick={() => { setOpen(false); setCompose(false); }}
@@ -305,7 +307,8 @@ export default function NotificationsBell({ triggerPlacement = "floating" }: { t
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

@@ -7,6 +7,7 @@
 // Style bám design token giống notifications-bell.tsx.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -105,7 +106,7 @@ function isManageableGroup(conv: Conversation | null): boolean {
   return !!conv && conv.type === "GROUP" && (conv.project_id == null);
 }
 
-export default function ChatWidget({ triggerPlacement = "floating" }: { triggerPlacement?: "floating" | "header" }) {
+export default function ChatWidget() {
   const [me, setMe] = useState<User | null>(null);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -497,14 +498,14 @@ export default function ChatWidget({ triggerPlacement = "floating" }: { triggerP
 
   return (
     <>
+      {/* Nút mở: nằm trong thanh đầu trang. Điện thoại: giữ nguyên trên thanh (không nổi che dữ liệu).
+          Máy tính (lg): tự thành nút NỔI góc dưới-phải như trước, nằm trên nút Thông báo. */}
       <button
         onClick={openPanel}
         aria-label="Tin nhắn"
-        className={triggerPlacement === "header"
-          ? "relative flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-          : "fixed bottom-40 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-steel text-white shadow-fab lg:bottom-24 lg:right-6"}
+        className="relative flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white lg:fixed lg:bottom-24 lg:right-6 lg:z-40 lg:h-12 lg:w-12 lg:bg-steel lg:text-white lg:shadow-fab lg:hover:bg-steel/90 lg:hover:text-white"
       >
-        <ChatBubbleLeftRightIcon className={triggerPlacement === "header" ? "h-5 w-5" : "h-6 w-6"} />
+        <ChatBubbleLeftRightIcon className="h-5 w-5 lg:h-6 lg:w-6" />
         {unread > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-bad px-1 text-[10px] font-bold text-white">
             {unread > 99 ? "99+" : unread}
@@ -512,7 +513,9 @@ export default function ChatWidget({ triggerPlacement = "floating" }: { triggerP
         )}
       </button>
 
-      {open && (
+      {/* Panel đưa ra document.body (portal) để không kẹt trong lớp z-index của thanh đầu trang
+          — nếu không, thanh điều hướng dưới đáy trên điện thoại sẽ đè lên panel. */}
+      {open && createPortal(
         <div
           className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-sm"
           onClick={closePanel}
@@ -1002,7 +1005,8 @@ export default function ChatWidget({ triggerPlacement = "floating" }: { triggerP
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

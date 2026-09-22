@@ -160,10 +160,12 @@ export default function AppShell({
             })}
           </nav>
 
-          {/* RIGHT: User Account Menu & Action Buttons */}
+          {/* RIGHT: Tin nhắn + Thông báo + Tài khoản. Điện thoại: 2 nút nằm ngay trên thanh này
+              (theo thiết kế mobile, không nổi che dữ liệu); máy tính: 2 nút tự thành nút NỔI
+              góc dưới-phải như trước (lg:fixed đặt trong từng component). */}
           <div className="flex items-center gap-1 shrink-0">
-            <ChatWidget triggerPlacement="header" />
-            <NotificationsBell triggerPlacement="header" />
+            <ChatWidget />
+            <NotificationsBell />
             <AccountMenu user={user} onLogout={logout} variant="topbar" />
           </div>
         </div>
