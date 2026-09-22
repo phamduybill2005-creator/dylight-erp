@@ -343,6 +343,9 @@ export default function AttendancePage() {
     const today = myRecords.find((r) => r.work_date === todayStr());
     const totalMins = myRecords.reduce((a, r) => a + r.worked_minutes, 0);
     const lateDays = myRecords.filter((r) => r.is_late).length;
+    // NGÀY CÔNG theo CA — cùng công thức với bảng tổng hợp của quản lý (backend tính sẵn
+    // work_credit từng ngày: cả 2 ca = 1, một ca = 0.5), không đếm thô "có chấm là 1 công" nữa.
+    const presentDays = myRecords.reduce((a, r) => a + Number(r.work_credit ?? 0), 0);
 
     return (
       <AppShell>
@@ -372,9 +375,9 @@ export default function AttendancePage() {
 
         {/* Tổng kết tháng */}
         <section className="mt-4 grid grid-cols-3 gap-3 lg:gap-4">
-          <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
+          <div className="rounded-xl2 bg-white p-3 text-center shadow-card" title="Tính theo ca: làm cả sáng và chiều = 1 công, chỉ một ca = 0.5 công">
             <p className="text-[10px] text-muted">Ngày công</p>
-            <p className="mt-1 text-xl font-bold text-ink tnum">{myRecords.filter((r) => r.check_in).length}</p>
+            <p className="mt-1 text-xl font-bold text-ink tnum">{presentDays}</p>
           </div>
           <div className="rounded-xl2 bg-white p-3 text-center shadow-card">
             <p className="text-[10px] text-muted">Tổng giờ</p>
@@ -411,6 +414,11 @@ export default function AttendancePage() {
                     <div>
                       <p className="text-[9px] text-muted">Giờ làm</p>
                       <p className="text-xs font-bold text-steel tnum">{fmtHours(r.worked_minutes)}</p>
+                    </div>
+                    {/* Công của ngày theo ca — để thấy vì sao tổng Ngày công ra số lẻ (0.5). */}
+                    <div title="Cả sáng và chiều = 1, chỉ một ca = 0.5">
+                      <p className="text-[9px] text-muted">Công</p>
+                      <p className="text-xs font-bold text-ink tnum">{Number(r.work_credit ?? 0)}</p>
                     </div>
                   </div>
                 </div>

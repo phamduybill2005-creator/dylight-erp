@@ -458,6 +458,9 @@ class AttendanceOut(BaseModel):
     worked_minutes: int = 0
     is_late: bool = False
     is_late_override: bool | None = None
+    # CÔNG của ngày theo CA (property Attendance.work_credit): cả 2 ca = 1, một ca = 0.5.
+    # Trả cho từng ngày để màn "Chấm công của tôi" cộng ra Ngày công ĐÚNG như bảng tổng hợp.
+    work_credit: float = 0.0
     created_at: datetime
     user_name: str | None = None     # tên người chấm công (điền ở router cho màn quản lý)
 

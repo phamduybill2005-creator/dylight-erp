@@ -222,6 +222,7 @@ export interface Attendance {
   worked_minutes: number;
   is_late: boolean;
   is_late_override?: boolean | null;
+  work_credit?: number;       // CÔNG theo ca của ngày: cả 2 ca = 1, một ca = 0.5 (backend tính)
   created_at: string;
   user_name?: string | null;
 }
