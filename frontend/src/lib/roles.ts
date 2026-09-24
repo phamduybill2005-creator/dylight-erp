@@ -82,10 +82,25 @@ export function isSeniorManagerUp(
 
 /**
  * Nhân sự được CHỈ ĐỊNH RIÊNG xem tab Doanh thu, ngoài cấp lãnh đạo.
- * So khớp theo HỌ TÊN viết hoa (đúng như hiển thị trong hệ thống). Đổi người
- * phụ trách doanh thu thì sửa danh sách này.
+ * So khớp theo HỌ TÊN sau khi chuẩn hoá (normalizeName): không phân biệt hoa/thường,
+ * dấu tiếng Việt, khoảng trắng hay dấu chấm — "N.V.Cường", "N. V. CUONG" đều khớp
+ * "N.V.CUONG". Đổi người phụ trách doanh thu thì sửa danh sách này.
  */
 const REVENUE_EXTRA_NAMES = ["N.V.CUONG", "D.M.QUANG", "H.T.DUC", "L.M.HUNG"];
+
+/** Chuẩn hoá họ tên để so sánh: bỏ dấu tiếng Việt (đ -> d), bỏ khoảng trắng và dấu chấm,
+ *  viết hoa. " N. V. Cường " -> "NVCUONG". */
+export function normalizeName(s: string | null | undefined): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toUpperCase()
+    .replace(/[\s.]/g, "");
+}
+
+const REVENUE_EXTRA_KEYS = REVENUE_EXTRA_NAMES.map(normalizeName);
 
 /**
  * Được xem tab DOANH THU hay không: Giám đốc / Quản trị hệ thống / Quản lý cấp
@@ -103,7 +118,8 @@ export function canSeeRevenue(
 ): boolean {
   if (!u) return false;
   if (isSeniorManagerUp(u)) return true;
-  return REVENUE_EXTRA_NAMES.includes((u.full_name || "").trim().toUpperCase());
+  const key = normalizeName(u.full_name);
+  return key !== "" && REVENUE_EXTRA_KEYS.includes(key);
 }
 
 /** Thứ tự cấp bậc từ CAO đến THẤP (0 = Giám đốc lớn nhất). */

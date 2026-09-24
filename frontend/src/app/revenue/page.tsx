@@ -339,28 +339,17 @@ export default function RevenuePage() {
   const TH = "border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 px-2 py-2";
   const TD = "border border-line align-middle px-2 py-2";
 
-  if (!loading && !isSeniorManagerUp(me)) {
-    return (
-      <AppShell>
-        <div className="mx-auto max-w-md text-center py-16">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 mb-4 shadow-sm">
-            <LockClosedIcon className="h-7 w-7" />
-          </div>
-          <h2 className="text-lg font-bold text-ink">Không có quyền truy cập</h2>
-          <p className="mt-1 text-xs text-muted">
-            Trang Doanh thu chỉ hiển thị cho Quản lý cấp cao, Quản trị hệ thống và Ban Giám đốc.
-          </p>
-        </div>
-      </AppShell>
-    );
-  }
-
   // CHẶN TRUY CẬP THẲNG BẰNG URL: ẩn mục ở menu thôi chưa đủ, ai gõ /revenue
   // vẫn vào được. Dùng CHUNG canSeeRevenue với menu nên không bao giờ lệch.
+  // (Trước đây còn một lớp chặn cũ chỉ cho Quản lý cấp cao trở lên đứng TRƯỚC lớp này,
+  //  làm người trong danh sách chỉ định thấy mục menu nhưng mở trang lại bị từ chối.)
   if (me && !canSeeRevenue(me)) {
     return (
       <AppShell>
         <div className="rounded-xl2 border border-line bg-white p-8 text-center shadow-card">
+          <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <LockClosedIcon className="h-6 w-6" />
+          </div>
           <h1 className="text-base font-bold text-ink">Không có quyền truy cập</h1>
           <p className="mt-1 text-xs text-muted">
             Mục Doanh thu chỉ dành cho Ban Giám đốc, Quản trị hệ thống, Quản lý cấp cao và các
