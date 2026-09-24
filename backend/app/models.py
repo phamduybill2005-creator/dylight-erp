@@ -587,12 +587,15 @@ class Attendance(Base):
 
     @property
     def is_late(self) -> bool:
-        """Đi trễ nếu giờ vào muộn hơn giờ bắt đầu của ca tương ứng.
+        """Đi trễ nếu giờ vào muộn hơn giờ bắt đầu của CA tương ứng.
 
-        ``work_start`` riêng của nhân viên luôn được ưu tiên. Khi chưa đặt giờ
-        riêng, mốc mặc định là ca sáng (``WORK_START_HOUR``); các lượt chấm từ
-        mốc ca chiều trở đi dùng ``AFTERNOON_START_MIN`` để người làm ca chiều
-        không bị tính trễ theo mốc 08:00.
+        - Chấm vào TRƯỚC khi hết ca sáng (``MORNING_END_MIN`` 11:45) = làm ca sáng:
+          so với giờ riêng của nhân viên (``work_start``) nếu có, không thì mốc chung
+          ``WORK_START_HOUR`` (08:00).
+        - Chấm vào SAU 11:45 = làm ca CHIỀU: so với mốc vào ca chiều
+          ``AFTERNOON_START_MIN`` (13:30) — kể cả người có giờ riêng buổi sáng
+          (08:00 / 08:30), nên 13:00 hay 13:30 KHÔNG trễ, 13:31 mới trễ. Người có
+          giờ riêng đã là buổi chiều (vd 14:00) thì so với giờ riêng đó.
         Đúng giờ (bằng mốc) không tính muộn. Cấp cao vẫn có thể đè trạng thái.
         """
         if self.is_late_override is not None:
@@ -603,18 +606,21 @@ class Attendance(Base):
             return False
         from app.config import settings
         check_in_min = self.check_in.hour * 60 + self.check_in.minute
-        start_min = settings.WORK_START_HOUR * 60
+        morning_start = settings.WORK_START_HOUR * 60
         ws = getattr(self.user, "work_start", None) if self.user else None
         if ws:
             try:
                 hh, mm = ws.split(":")
-                start_min = int(hh) * 60 + int(mm)
+                morning_start = int(hh) * 60 + int(mm)
             except (ValueError, TypeError):
                 pass
+        morning_end = getattr(settings, "MORNING_END_MIN", 11 * 60 + 45)
+        afternoon_start = getattr(settings, "AFTERNOON_START_MIN", 13 * 60 + 30)
+        if check_in_min > morning_end:
+            # Ca chiều: giờ riêng chỉ dùng khi bản thân nó là giờ buổi chiều.
+            start_min = morning_start if morning_start > morning_end else afternoon_start
         else:
-            afternoon_start = getattr(settings, "AFTERNOON_START_MIN", 13 * 60 + 30)
-            if check_in_min >= afternoon_start:
-                start_min = afternoon_start
+            start_min = morning_start
         return check_in_min > start_min
 
     @property
