@@ -39,10 +39,12 @@ import { getApprovedLeavesForDate, resolveLatestApprovedLeave } from "@/lib/sche
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, User } from "@/lib/types";
 
-// 5 kiểu hiển thị chuẩn theo yêu cầu: 5 họ màu riêng biệt, không chói mắt, độ tương phản cao dễ nhìn chữ
+// 5 kiểu hiển thị chuẩn: 5 họ màu riêng biệt. Ô tô NỀN NHẠT (màu gốc ~15%) + chữ ĐẬM cùng tông
+// thay cho nền đặc chữ trắng trước đây (nhìn cả bảng bị chói). hexColor giữ màu gốc cho Excel.
 export interface ScheduleType {
   key: string;
-  label: string;
+  label: string;        // chế độ TUẦN (ô rộng): "Nghỉ chiều"
+  shortLabel: string;   // chế độ THÁNG (ô 30px): "Chiều"
   bgClass: string;
   textClass: string;
   borderClass: string;
@@ -53,41 +55,46 @@ const SCHEDULE_TYPES: ScheduleType[] = [
   {
     key: "LATE_MORNING",
     label: "Đi muộn sáng",
-    bgClass: "bg-[#0284c7]", // Xanh biển dịu mát
-    textClass: "text-white font-bold",
-    borderClass: "border-[#0369a1]",
+    shortLabel: "Muộn sáng",
+    bgClass: "bg-[#0284c7]/15", // Xanh biển
+    textClass: "text-[#075985] font-bold",
+    borderClass: "border-[#0284c7]/40",
     hexColor: "#0284c7",
   },
   {
     key: "LATE_AFTERNOON",
     label: "Đi muộn chiều",
-    bgClass: "bg-[#0d9488]", // Xanh ngọc lục bảo sâu
-    textClass: "text-white font-bold",
-    borderClass: "border-[#0f766e]",
+    shortLabel: "Muộn chiều",
+    bgClass: "bg-[#0d9488]/15", // Xanh ngọc
+    textClass: "text-[#115e59] font-bold",
+    borderClass: "border-[#0d9488]/40",
     hexColor: "#0d9488",
   },
   {
     key: "MORNING",
     label: "Nghỉ sáng",
-    bgClass: "bg-[#d97706]", // Vàng hổ phách mật ong ấm (không chói lóa)
-    textClass: "text-white font-bold",
-    borderClass: "border-[#b45309]",
+    shortLabel: "Sáng",
+    bgClass: "bg-[#d97706]/18", // Vàng hổ phách
+    textClass: "text-[#92400e] font-bold",
+    borderClass: "border-[#d97706]/45",
     hexColor: "#d97706",
   },
   {
     key: "AFTERNOON",
     label: "Nghỉ chiều",
-    bgClass: "bg-[#7c3aed]", // Tím thạch anh hoàng hôn sang trọng
-    textClass: "text-white font-bold",
-    borderClass: "border-[#6d28d9]",
+    shortLabel: "Chiều",
+    bgClass: "bg-[#7c3aed]/14", // Tím thạch anh
+    textClass: "text-[#5b21b6] font-bold",
+    borderClass: "border-[#7c3aed]/40",
     hexColor: "#7c3aed",
   },
   {
     key: "FULL",
     label: "Nghỉ cả ngày",
-    bgClass: "bg-[#e11d48]", // Đỏ hoa hồng trầm thanh lịch
-    textClass: "text-white font-bold",
-    borderClass: "border-[#be123c]",
+    shortLabel: "Cả ngày",
+    bgClass: "bg-[#e11d48]/15", // Đỏ hoa hồng
+    textClass: "text-[#9f1239] font-bold",
+    borderClass: "border-[#e11d48]/40",
     hexColor: "#e11d48",
   },
 ];
@@ -774,7 +781,9 @@ export default function WorkSchedulePage() {
                         // TRƯỜNG HỢP 1: Có đơn nghỉ phép ĐÃ ĐƯỢC DUYỆT -> Tô đúng 1 trong 5 màu (ưu tiên đơn duyệt sau cùng)
                         if (leave) {
                           const schedType = getScheduleType(leave.leave_type);
-                          const reasonText = (leave.reason || schedType.label).toUpperCase();
+                          // Ô chỉ ghi LOẠI nghỉ (không ghi lý do): tuần đủ chữ, tháng chữ ngắn.
+                          // Lý do vẫn xem được khi rê chuột (title) hoặc bấm vào ô.
+                          const cellText = viewMode === "WEEK" ? schedType.label : schedType.shortLabel;
 
                           return (
                             <td
@@ -792,9 +801,15 @@ export default function WorkSchedulePage() {
                               className={`border border-slate-300 p-0 text-center cursor-pointer transition-all hover:brightness-95 ${schedType.bgClass} ${schedType.textClass}`}
                               title={`${user.full_name} - ${formatDate(d.dateStr)}\n${schedType.label}: ${leave.reason || "Không ghi lý do"}\n(Đơn được duyệt sau cùng${matchingLeaves.length > 1 ? ` — có thêm ${matchingLeaves.length - 1} lịch khác` : ""})`}
                             >
-                              <div className="h-7 sm:h-8 w-full flex items-center justify-center p-0.5 overflow-hidden">
-                                <span className="text-[9px] font-bold uppercase tracking-tight truncate max-w-[98%] leading-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]">
-                                  {reasonText}
+                              <div className="flex h-7 w-full items-center justify-center overflow-hidden px-0.5 sm:h-8">
+                                <span
+                                  className={
+                                    viewMode === "WEEK"
+                                      ? "truncate text-[10px] font-bold leading-tight"
+                                      : "text-center text-[8px] font-bold leading-[9px]"   // ô 30px: "Cả ngày" xuống 2 dòng
+                                  }
+                                >
+                                  {cellText}
                                 </span>
                               </div>
                             </td>
