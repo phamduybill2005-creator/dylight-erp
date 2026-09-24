@@ -39,8 +39,9 @@ import { getApprovedLeavesForDate, resolveLatestApprovedLeave } from "@/lib/sche
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, User } from "@/lib/types";
 
-// 5 kiểu hiển thị chuẩn: 5 họ màu riêng biệt, nền đặc + chữ trắng (đã thử nền nhạt 15% nhưng
-// người dùng thấy nhạt quá -> giữ màu đặc). hexColor dùng cho Excel.
+// 5 kiểu hiển thị chuẩn: 5 họ màu riêng biệt, nền đặc + chữ trắng, TÔNG TRẦM (độ bão hòa thấp
+// hơn bộ màu Tailwind 600 trước đây vì nhìn cả bảng bị gắt; đã thử nền nhạt 15% thì lại nhạt quá).
+// Độ tương phản chữ trắng trên từng nền >= 3.3:1. hexColor dùng cho Excel — đổi màu thì đổi cả 2 chỗ.
 export interface ScheduleType {
   key: string;
   label: string;        // chế độ TUẦN (ô rộng): "Nghỉ chiều"
@@ -56,46 +57,46 @@ const SCHEDULE_TYPES: ScheduleType[] = [
     key: "LATE_MORNING",
     label: "Đi muộn sáng",
     shortLabel: "Muộn sáng",
-    bgClass: "bg-[#0284c7]", // Xanh biển dịu mát
+    bgClass: "bg-[#4a8fc2]", // Xanh biển xám (thay #0284c7)
     textClass: "text-white font-bold",
-    borderClass: "border-[#0369a1]",
-    hexColor: "#0284c7",
+    borderClass: "border-[#3d7bab]",
+    hexColor: "#4a8fc2",
   },
   {
     key: "LATE_AFTERNOON",
     label: "Đi muộn chiều",
     shortLabel: "Muộn chiều",
-    bgClass: "bg-[#0d9488]", // Xanh ngọc lục bảo sâu
+    bgClass: "bg-[#3d9a8f]", // Xanh ngọc xám (thay #0d9488)
     textClass: "text-white font-bold",
-    borderClass: "border-[#0f766e]",
-    hexColor: "#0d9488",
+    borderClass: "border-[#33857b]",
+    hexColor: "#3d9a8f",
   },
   {
     key: "MORNING",
     label: "Nghỉ sáng",
     shortLabel: "Sáng",
-    bgClass: "bg-[#d97706]", // Vàng hổ phách mật ong ấm
+    bgClass: "bg-[#c27f2f]", // Nâu vàng hổ phách (thay #d97706 — cam gắt)
     textClass: "text-white font-bold",
-    borderClass: "border-[#b45309]",
-    hexColor: "#d97706",
+    borderClass: "border-[#a66a24]",
+    hexColor: "#c27f2f",
   },
   {
     key: "AFTERNOON",
     label: "Nghỉ chiều",
     shortLabel: "Chiều",
-    bgClass: "bg-[#7c3aed]", // Tím thạch anh hoàng hôn
+    bgClass: "bg-[#8a6fcf]", // Tím khói (thay #7c3aed — tím điện)
     textClass: "text-white font-bold",
-    borderClass: "border-[#6d28d9]",
-    hexColor: "#7c3aed",
+    borderClass: "border-[#7559b8]",
+    hexColor: "#8a6fcf",
   },
   {
     key: "FULL",
     label: "Nghỉ cả ngày",
     shortLabel: "Cả ngày",
-    bgClass: "bg-[#e11d48]", // Đỏ hoa hồng trầm
+    bgClass: "bg-[#d65a75]", // Hồng trầm (thay #e11d48 — đỏ gắt)
     textClass: "text-white font-bold",
-    borderClass: "border-[#be123c]",
-    hexColor: "#e11d48",
+    borderClass: "border-[#b8475f]",
+    hexColor: "#d65a75",
   },
 ];
 
