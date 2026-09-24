@@ -39,8 +39,8 @@ import { getApprovedLeavesForDate, resolveLatestApprovedLeave } from "@/lib/sche
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, User } from "@/lib/types";
 
-// 5 kiểu hiển thị chuẩn: 5 họ màu riêng biệt. Ô tô NỀN NHẠT (màu gốc ~15%) + chữ ĐẬM cùng tông
-// thay cho nền đặc chữ trắng trước đây (nhìn cả bảng bị chói). hexColor giữ màu gốc cho Excel.
+// 5 kiểu hiển thị chuẩn: 5 họ màu riêng biệt, nền đặc + chữ trắng (đã thử nền nhạt 15% nhưng
+// người dùng thấy nhạt quá -> giữ màu đặc). hexColor dùng cho Excel.
 export interface ScheduleType {
   key: string;
   label: string;        // chế độ TUẦN (ô rộng): "Nghỉ chiều"
@@ -56,45 +56,45 @@ const SCHEDULE_TYPES: ScheduleType[] = [
     key: "LATE_MORNING",
     label: "Đi muộn sáng",
     shortLabel: "Muộn sáng",
-    bgClass: "bg-[#0284c7]/15", // Xanh biển
-    textClass: "text-[#075985] font-bold",
-    borderClass: "border-[#0284c7]/40",
+    bgClass: "bg-[#0284c7]", // Xanh biển dịu mát
+    textClass: "text-white font-bold",
+    borderClass: "border-[#0369a1]",
     hexColor: "#0284c7",
   },
   {
     key: "LATE_AFTERNOON",
     label: "Đi muộn chiều",
     shortLabel: "Muộn chiều",
-    bgClass: "bg-[#0d9488]/15", // Xanh ngọc
-    textClass: "text-[#115e59] font-bold",
-    borderClass: "border-[#0d9488]/40",
+    bgClass: "bg-[#0d9488]", // Xanh ngọc lục bảo sâu
+    textClass: "text-white font-bold",
+    borderClass: "border-[#0f766e]",
     hexColor: "#0d9488",
   },
   {
     key: "MORNING",
     label: "Nghỉ sáng",
     shortLabel: "Sáng",
-    bgClass: "bg-[#d97706]/18", // Vàng hổ phách
-    textClass: "text-[#92400e] font-bold",
-    borderClass: "border-[#d97706]/45",
+    bgClass: "bg-[#d97706]", // Vàng hổ phách mật ong ấm
+    textClass: "text-white font-bold",
+    borderClass: "border-[#b45309]",
     hexColor: "#d97706",
   },
   {
     key: "AFTERNOON",
     label: "Nghỉ chiều",
     shortLabel: "Chiều",
-    bgClass: "bg-[#7c3aed]/14", // Tím thạch anh
-    textClass: "text-[#5b21b6] font-bold",
-    borderClass: "border-[#7c3aed]/40",
+    bgClass: "bg-[#7c3aed]", // Tím thạch anh hoàng hôn
+    textClass: "text-white font-bold",
+    borderClass: "border-[#6d28d9]",
     hexColor: "#7c3aed",
   },
   {
     key: "FULL",
     label: "Nghỉ cả ngày",
     shortLabel: "Cả ngày",
-    bgClass: "bg-[#e11d48]/15", // Đỏ hoa hồng
-    textClass: "text-[#9f1239] font-bold",
-    borderClass: "border-[#e11d48]/40",
+    bgClass: "bg-[#e11d48]", // Đỏ hoa hồng trầm
+    textClass: "text-white font-bold",
+    borderClass: "border-[#be123c]",
     hexColor: "#e11d48",
   },
 ];
@@ -805,8 +805,8 @@ export default function WorkSchedulePage() {
                                 <span
                                   className={
                                     viewMode === "WEEK"
-                                      ? "truncate text-[10px] font-bold leading-tight"
-                                      : "text-center text-[8px] font-bold leading-[9px]"   // ô 30px: "Cả ngày" xuống 2 dòng
+                                      ? "truncate text-[10px] font-bold leading-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]"
+                                      : "text-center text-[8px] font-bold leading-[9px] drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]"   // ô 30px: "Cả ngày" xuống 2 dòng
                                   }
                                 >
                                   {cellText}
