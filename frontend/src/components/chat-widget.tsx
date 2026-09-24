@@ -6,8 +6,9 @@
 // Sinh động như Zalo: avatar màu, bong bóng mềm, chèn emoji, thả cảm xúc, quản lý nhóm.
 // Style bám design token giống notifications-bell.tsx.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { splitLinks } from "@/lib/linkify";
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -765,7 +766,9 @@ export default function ChatWidget() {
                           {!mine && active.type === "GROUP" && (
                             <Avatar id={m.sender_id} name={senderLabel} size="sm" />
                           )}
-                          <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
+                          {/* min-w-0 ở cả cột lẫn hàng: nếu không, chuỗi không có khoảng trắng (URL dài)
+                              làm flex item phình ra ngoài khung dù đã có break-words. */}
+                          <div className={`flex min-w-0 max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
                             {!mine && active.type === "GROUP" && (
                               <p className="mb-0.5 px-1 text-[10px] font-semibold text-steel">
                                 {senderLabel}
@@ -773,13 +776,29 @@ export default function ChatWidget() {
                             )}
 
                             {/* Bong bóng + nút react + thanh cảm xúc */}
-                            <div className={`relative flex items-center gap-1 ${mine ? "flex-row-reverse" : "flex-row"}`}>
+                            <div className={`relative flex min-w-0 items-center gap-1 ${mine ? "flex-row-reverse" : "flex-row"}`}>
                               <div
-                                className={`whitespace-pre-line break-words rounded-2xl px-3 py-2 text-sm shadow-card ${
+                                className={`min-w-0 whitespace-pre-line break-words [overflow-wrap:anywhere] rounded-2xl px-3 py-2 text-sm shadow-card ${
                                   mine ? "bg-steel text-white" : "bg-white text-ink"
                                 }`}
                               >
-                                {m.body}
+                                {/* URL trong tin nhắn thành link bấm được (mở tab mới). */}
+                                {splitLinks(m.body).map((part, i) =>
+                                  part.type === "link" ? (
+                                    <a
+                                      key={i}
+                                      href={part.value}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className={`underline underline-offset-2 ${mine ? "text-white/90 hover:text-white" : "text-steel hover:text-ink"}`}
+                                    >
+                                      {part.value}
+                                    </a>
+                                  ) : (
+                                    <Fragment key={i}>{part.value}</Fragment>
+                                  ),
+                                )}
                               </div>
 
                               <button

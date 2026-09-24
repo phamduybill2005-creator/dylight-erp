@@ -300,7 +300,7 @@ export default function NotificationsBell() {
                       <p className={`text-sm text-ink ${n.is_read ? "font-medium" : "font-bold"}`}>{n.title}</p>
                       {!n.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber" />}
                     </div>
-                    {n.body && <p className="mt-1 whitespace-pre-line text-xs text-muted">{n.body}</p>}
+                    {n.body && <p className="mt-1 whitespace-pre-line break-words [overflow-wrap:anywhere] text-xs text-muted">{n.body}</p>}
                     <p className="mt-1 text-[10px] text-muted">{nick(n.sender_id, n.sender_name) || "Hệ thống"} · {fmt(n.created_at)}</p>
                   </button>
                 ))
