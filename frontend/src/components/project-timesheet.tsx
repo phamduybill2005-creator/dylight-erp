@@ -193,18 +193,28 @@ export default function ProjectTimesheet({
     [currentUserId]
   );
 
+  /** Đầu việc (hoặc cả nhóm cha) đã tick "Đã xong" -> KHÓA ô nhập giờ cho mọi người để khỏi
+   *  nhập nhầm vào việc đã kết thúc. Muốn sửa giờ thì bỏ tick "Đã xong" trước. */
+  const isItemDone = useCallback(
+    (it: ProjectItem): boolean =>
+      !!it.done_date || !!parents.find((p) => p.id === it.parent_id)?.done_date,
+    [parents]
+  );
+
   const canEditHours = useCallback(
     (uid: number, it: ProjectItem): boolean =>
-      canEditAllHours || (uid === currentUserId && ownsItem(it)),
-    [canEditAllHours, currentUserId, ownsItem]
+      !isItemDone(it) && (canEditAllHours || (uid === currentUserId && ownsItem(it))),
+    [canEditAllHours, currentUserId, ownsItem, isItemDone]
   );
 
   const lockReason = useCallback(
     (uid: number, it: ProjectItem): string =>
-      uid !== currentUserId
+      isItemDone(it)
+        ? "Đầu việc đã tick \"Đã xong\" nên ô giờ bị khóa — bỏ tick \"Đã xong\" nếu cần sửa giờ."
+        : uid !== currentUserId
         ? "Chỉ Giám đốc, Quản trị hệ thống và Quản lý cấp cao mới sửa được giờ của người khác."
         : "Bạn không được giao đầu việc này nên không sửa giờ ở đây được.",
-    [currentUserId]
+    [currentUserId, isItemDone]
   );
 
   const hkey = (uid: number, itemId: number, d: string) => `${uid}:${itemId}:${d}`;
@@ -806,11 +816,13 @@ export default function ProjectTimesheet({
                                             className="h-7 w-full min-w-[32px] bg-transparent text-center text-xs font-bold text-ink outline-none placeholder:text-line/60 focus:bg-white focus:ring-1 focus:ring-amber-500"
                                           />
                                         ) : (
-                                          // KHÓA: không phải giờ của mình / không phải đầu việc của mình.
-                                          // Vẫn cho XEM số, chỉ bỏ ô nhập (backend cũng chặn y hệt).
+                                          // KHÓA: đầu việc đã xong / không phải giờ của mình / không phải đầu việc
+                                          // của mình. Vẫn cho XEM số, chỉ bỏ ô nhập.
                                           <span
                                             title={lockReason(w.id, c)}
-                                            className="block h-7 px-1 py-1.5 tnum text-xs font-bold text-ink/60 cursor-not-allowed"
+                                            className={`block h-7 px-1 py-1.5 tnum text-xs font-bold cursor-not-allowed ${
+                                              isItemDone(c) ? "text-emerald-800/70" : "text-ink/60"
+                                            }`}
                                           >
                                             {v > 0 ? num1(v) : "–"}
                                           </span>
