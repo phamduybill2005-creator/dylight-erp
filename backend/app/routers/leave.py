@@ -12,11 +12,66 @@ from app.audit import log_activity
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.models import LeaveRequest, LeaveStatus, User, UserRole
+from app.notify import leadership_of, notify
 from app.schemas import LeaveCreate, LeaveDecision, LeaveOut, StudentWeekSchedulePayload
 
 router = APIRouter(prefix="/leave", tags=["Nghỉ phép"])
 
 _MANAGER_ROLES = (UserRole.MANAGER, UserRole.DIRECTOR)
+
+# ---------------- Thông báo cho đơn nghỉ ----------------
+_LEAVE_TYPE_VI = {
+    "FULL": "nghỉ cả ngày",
+    "MORNING": "nghỉ buổi sáng",
+    "AFTERNOON": "nghỉ buổi chiều",
+    "LATE": "đi muộn",
+    "LATE_MORNING": "đi muộn buổi sáng",
+    "LATE_AFTERNOON": "đi muộn buổi chiều",
+}
+
+
+def _is_late(rec: LeaveRequest) -> bool:
+    return (rec.leave_type or "").upper().startswith("LATE")
+
+
+def _kind_vi(rec: LeaveRequest) -> str:
+    return _LEAVE_TYPE_VI.get((rec.leave_type or "FULL").upper(), "nghỉ phép")
+
+
+def _when_vi(rec: LeaveRequest) -> str:
+    if rec.from_date == rec.to_date:
+        return f"{rec.from_date:%d/%m/%Y}"
+    return f"{rec.from_date:%d/%m/%Y} – {rec.to_date:%d/%m/%Y}"
+
+
+def _notify_new_leave(db: Session, rec: LeaveRequest, sender: User) -> None:
+    """Có đơn mới -> báo cho Giám đốc / Quản trị hệ thống / Quản lý cấp cao.
+
+    Chỉ 3 cấp này, vì họ là người duyệt. Người gửi đơn không tự nhận thông báo
+    của chính mình (trường hợp lãnh đạo tự xin nghỉ).
+    """
+    recipients = leadership_of(db, rec.company_id, exclude_user_id=rec.user_id)
+    name = rec.user_name or "Nhân sự"
+    viec = "xin đi muộn" if _is_late(rec) else "xin nghỉ phép"
+    dong = [f"{name} {viec}: {_kind_vi(rec)} ({_when_vi(rec)})."]
+    if rec.reason:
+        dong.append(f"Lý do: {rec.reason}")
+    dong.append("Vào mục Nghỉ phép để duyệt đơn.")
+    notify(db, rec.company_id, recipients, f"{name} {viec}", "\n".join(dong),
+           sender_id=sender.id)
+
+
+def _notify_leave_decided(db: Session, rec: LeaveRequest, decider: User) -> None:
+    """Duyệt / từ chối xong -> báo lại cho chính người làm đơn."""
+    if rec.user_id == decider.id:      # tự duyệt đơn của mình thì khỏi tự báo
+        return
+    don = "Đơn đi muộn" if _is_late(rec) else "Đơn nghỉ phép"
+    approved = rec.status == LeaveStatus.APPROVED
+    title = f"{don} đã được duyệt" if approved else f"{don} bị từ chối"
+    ket_qua = "đã được" if approved else "bị"
+    body = (f"{don} của bạn ({_kind_vi(rec)}, {_when_vi(rec)}) "
+            f"{ket_qua} {decider.full_name} {'duyệt' if approved else 'từ chối'}.")
+    notify(db, rec.company_id, [rec.user_id], title, body, sender_id=decider.id)
 
 
 @router.post("", response_model=LeaveOut, status_code=201)
@@ -43,6 +98,7 @@ def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: U
     db.add(rec)
     db.commit()
     db.refresh(rec)
+    _notify_new_leave(db, rec, current)
     return rec
 
 
@@ -215,6 +271,7 @@ def decide_leave(
     db.refresh(rec)
     log_activity(db, current, f"leave.{payload.status.value.lower()}", "leave_request", rec.id,
                  f"{rec.user_name}: {rec.from_date}→{rec.to_date}")
+    _notify_leave_decided(db, rec, current)
     return rec
 
 
