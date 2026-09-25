@@ -32,7 +32,7 @@ export default function AuditPage() {
   // Tự làm mới: người khác vừa thao tác thì dòng nhật ký mới tự hiện lên đầu.
   useAutoRefresh(() => {
     api.auditLogs().then(setLogs).catch(() => {});
-  }, { enabled: !denied && !loading });
+  }, { enabled: !denied && !loading, topics: ["audit"] });
 
   if (denied) {
     return (

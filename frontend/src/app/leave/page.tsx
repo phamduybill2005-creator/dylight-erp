@@ -171,7 +171,7 @@ export default function LeavePage() {
       api.leavesDecidedByMe().then(setApprovedByMe).catch(() => {});
     }
     loadApprovedLeaves(true);
-  }, { enabled: !!me });
+  }, { enabled: !!me, topics: ["leave"] });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

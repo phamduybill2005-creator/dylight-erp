@@ -9,6 +9,7 @@ thông báo hỏng không kéo theo mất dữ liệu thật (giống app/audit.
 """
 from sqlalchemy.orm import Session
 
+from app.events import publish
 from app.deps import is_top_leadership
 from app.models import Notification, User
 
@@ -51,6 +52,8 @@ def notify(
                 title=title, body=body,
             ))
         db.commit()
+        # Đẩy ngay cho các trình duyệt đang mở -> chuông kêu tức thì.
+        publish(company_id, "notification", ids)
         return len(ids)
     except Exception:  # noqa: BLE001
         db.rollback()

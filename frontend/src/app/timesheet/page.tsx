@@ -135,7 +135,7 @@ export default function TimesheetPage() {
   useEffect(() => { loadEntries(); }, [loadEntries]);
 
   // Tự làm mới: người khác vừa khai giờ ở tab Tiến độ dự án thì bảng này tự cộng thêm.
-  useAutoRefresh(loadEntries, { enabled: !!me });
+  useAutoRefresh(loadEntries, { enabled: !!me, topics: ["timesheet"] });
 
   // Danh sách phòng ban để lọc
   const deptOptions = useMemo(() => {

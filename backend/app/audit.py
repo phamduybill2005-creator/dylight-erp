@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.events import publish
 from app.models import ActivityLog, User
 
 ACTION_LABELS: dict[str, str] = {
@@ -108,5 +109,6 @@ def log_activity(
             entity_type=entity_type, entity_id=entity_id, detail=detail,
         ))
         db.commit()
+        publish(user.company_id, "audit")
     except Exception:
         db.rollback()

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
+from app.events import publish
 from app.deps import get_current_user
 from app.models import Notification, User, UserRole
 from app.schemas import NotificationCreate, NotificationOut
@@ -51,6 +52,7 @@ def _ensure_eval_reminder(db: Session, user: User) -> None:
                       f"Đánh giá để chấm đánh giá tháng {now:%m/%Y}."),
             ))
             db.commit()
+            publish(user.company_id, "notification", [user.id])
         _eval_reminded.add(key)
 
 
@@ -101,6 +103,8 @@ def send_notification(
             title=payload.title, body=payload.body,
         ))
     db.commit()
+    # Đẩy ngay -> chuông người nhận kêu tức thì, không chờ nhịp hỏi lại.
+    publish(current.company_id, "notification", [u.id for u in recipients])
     return {"sent": len(recipients)}
 
 
@@ -134,6 +138,7 @@ def mark_read(notif_id: int, db: Session = Depends(get_db), current: User = Depe
         raise HTTPException(404, "Không tìm thấy thông báo.")
     n.is_read = True
     db.commit()
+    publish(current.company_id, "notification", [current.id])
 
 
 @router.post("/me/read-all", status_code=204)
@@ -144,3 +149,4 @@ def mark_all_read(db: Session = Depends(get_db), current: User = Depends(get_cur
         .update({"is_read": True})
     )
     db.commit()
+    publish(current.company_id, "notification", [current.id])

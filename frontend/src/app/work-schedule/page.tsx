@@ -302,7 +302,10 @@ export default function WorkSchedulePage() {
 
   // Tự làm mới: sếp vừa duyệt đơn thì ô nghỉ tự hiện lên lịch, không phải F5.
   // Dừng khi đang mở hộp thoại đăng ký lịch để không giật/ghi đè thao tác dở.
-  useAutoRefresh(() => loadLeaves(), { enabled: !!me && !studentModalOpen });
+  useAutoRefresh(() => loadLeaves(), {
+    enabled: !!me && !studentModalOpen,
+    topics: ["leave", "schedule"],
+  });
 
   useEffect(() => {
     loadLeaves();

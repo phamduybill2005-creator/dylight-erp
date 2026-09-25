@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.audit import date_vi, log_activity
+from app.events import publish
 from app.config import settings
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
@@ -227,6 +228,7 @@ def update_attendance(
                      f"{rec.user_name or f'#{rec.user_id}'} · {date_vi(rec.work_date)}: "
                      f"{before} → {after}")
         db.refresh(rec)
+    publish(current.company_id, "attendance")
     return rec
 
 

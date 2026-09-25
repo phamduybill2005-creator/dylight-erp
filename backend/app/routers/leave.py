@@ -9,6 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit import log_activity
+from app.events import publish
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.models import LeaveRequest, LeaveStatus, User, UserRole
@@ -99,6 +100,8 @@ def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: U
     db.commit()
     db.refresh(rec)
     _notify_new_leave(db, rec, current)
+    # Bảng "Đơn chờ duyệt" của sếp hiện thêm dòng mới ngay, không phải chờ nhịp.
+    publish(current.company_id, "leave")
     return rec
 
 
@@ -272,6 +275,9 @@ def decide_leave(
     log_activity(db, current, f"leave.{payload.status.value.lower()}", "leave_request", rec.id,
                  f"{rec.user_name}: {rec.from_date}→{rec.to_date}")
     _notify_leave_decided(db, rec, current)
+    # Trạng thái đơn bên máy người xin đổi ngay; lịch làm việc chung cũng vậy.
+    publish(current.company_id, "leave")
+    publish(current.company_id, "schedule")
     return rec
 
 
@@ -292,6 +298,8 @@ def delete_leave(
     db.delete(rec)
     db.commit()
     log_activity(db, current, "leave.delete", "leave_request", leave_id, info)
+    publish(current.company_id, "leave")
+    publish(current.company_id, "schedule")
     return {"message": "Đã xóa đơn nghỉ thành công."}
 
 

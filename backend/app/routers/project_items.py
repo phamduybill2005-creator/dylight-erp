@@ -8,6 +8,7 @@ from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from app.audit import hours_vi, log_activity
+from app.events import publish
 from app.database import get_db, vn_now
 from app.deps import get_current_user, can_see_money
 from app.models import ProjectItem, Project, User, ProjectItemRating, project_members, Timesheet
@@ -134,6 +135,7 @@ def create_item(
     db.add(item)
     db.commit()
     db.refresh(item)
+    publish(current.company_id, "project")
     return _out(item, current)
 
 

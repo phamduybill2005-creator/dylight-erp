@@ -19,7 +19,7 @@ from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, project_evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-    chat, iclock, departments, timesheets, archive, org_chart,
+    chat, iclock, departments, timesheets, archive, org_chart, events,
 )
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
@@ -509,6 +509,15 @@ app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 
 
 @app.on_event("startup")
+async def _remember_event_loop() -> None:
+    """Ghi nhớ vòng lặp sự kiện cho kênh đẩy trực tiếp (app/events.py)."""
+    import asyncio
+
+    from app import events
+    events.set_loop(asyncio.get_running_loop())
+
+
+@app.on_event("startup")
 def _start_yunatt_scheduler() -> None:
     """Bật lịch tự đồng bộ chấm công Yunatt (mỗi ngày 1 lần) khi app khởi động."""
     try:
@@ -529,7 +538,7 @@ P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
           project_items, attendance, evaluations, project_evaluations, partners, payroll,
           leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-          chat, departments, timesheets, archive, org_chart):
+          chat, departments, timesheets, archive, org_chart, events):
     app.include_router(r.router, prefix=P)
 
 # Máy chấm công đẩy trực tiếp (ZKTeco PUSH/ADMS) gọi đúng /iclock/... -> KHÔNG thêm tiền tố /api/v1.

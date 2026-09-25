@@ -19,6 +19,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit import date_vi, hours_vi, log_activity
+from app.events import publish
 from app.database import get_db, vn_now
 from app.deps import get_current_user, is_top_leadership
 from app.models import Project, ProjectItem, Timesheet, User
@@ -178,6 +179,7 @@ def upsert_timesheet(
             if log_prefix:
                 log_activity(db, current, "timesheet.edit_other", "project", proj.id,
                              log_prefix + "xóa")
+        publish(current.company_id, "timesheet")
         return {"deleted": True}
 
     if rec is None:
@@ -194,6 +196,7 @@ def upsert_timesheet(
         log_activity(db, current, "timesheet.edit_other", "project", proj.id,
                      log_prefix + hours_vi(payload.hours))
     db.refresh(rec)
+    publish(current.company_id, "timesheet")
     return TimesheetOut.model_validate(rec).model_dump(mode="json")
 
 
@@ -233,6 +236,7 @@ def delete_timesheet(
     db.commit()
     if info:
         log_activity(db, current, "timesheet.delete_other", "project", proj.id, info)
+    publish(current.company_id, "timesheet")
     return Response(status_code=204)
 
 
@@ -280,4 +284,5 @@ def clear_worker_hours(
             f"{_person(db, payload.user_id)} · {proj.code} · "
             f"{_item_label(item, 'cả dự án')} · xóa {deleted} dòng ({hours_vi(lost)})",
         )
+    publish(current.company_id, "timesheet")
     return {"deleted": deleted}

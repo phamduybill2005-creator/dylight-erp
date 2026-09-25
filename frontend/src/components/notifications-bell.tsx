@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
@@ -100,16 +101,17 @@ export default function NotificationsBell() {
     }
   }, []);
 
-  // Tự làm mới định kỳ (KHÔNG cần F5): số tin chưa đọc + danh sách thông báo cập nhật mỗi ~20s
+  // Nạp lần đầu, rồi để useAutoRefresh lo phần cập nhật: có thông báo mới là
+  // máy chủ đẩy xuống ngay (kênh trực tiếp), chuông kêu tức thì.
   useEffect(() => {
     refreshUnread();
     refreshItems();
-    const t = setInterval(() => {
-      refreshUnread();
-      refreshItems();
-    }, 20000);
-    return () => clearInterval(t);
   }, [refreshUnread, refreshItems]);
+
+  useAutoRefresh(() => {
+    refreshUnread();
+    refreshItems();
+  }, { topics: ["notification"] });
 
   async function openPanel() {
     setOpen(true);
