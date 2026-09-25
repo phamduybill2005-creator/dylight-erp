@@ -25,6 +25,11 @@ from dataclasses import dataclass, field
 # không ngốn hết bộ nhớ: đầy thì bỏ tin cũ nhất (nhịp dự phòng sẽ vá lại).
 _QUEUE_SIZE = 64
 
+# Chặn trên số kết nối của MỘT người. Bình thường mỗi tab 1 kết nối, mở 5 tab là
+# nhiều rồi; quá số này thì đóng cái cũ nhất. Đây là van an toàn phòng khi
+# trình duyệt lỗi và mở kết nối liên tục — không để một máy làm nghẽn máy chủ.
+_MAX_PER_USER = 6
+
 
 # eq=False để giữ so sánh & băm THEO DANH TÍNH: mỗi kết nối là một thuê bao
 # riêng, và dataclass mặc định (eq=True) sẽ bỏ __hash__ -> không cho vào set được.
@@ -51,6 +56,9 @@ def set_loop(loop: asyncio.AbstractEventLoop) -> None:
 
 
 def subscribe(user_id: int, company_id: int) -> Subscriber:
+    cua_toi = [s for s in _subscribers if s.user_id == user_id]
+    while len(cua_toi) >= _MAX_PER_USER:
+        _subscribers.discard(cua_toi.pop(0))   # bỏ kết nối cũ nhất
     sub = Subscriber(user_id=user_id, company_id=company_id)
     _subscribers.add(sub)
     return sub
