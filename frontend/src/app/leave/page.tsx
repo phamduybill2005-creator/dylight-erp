@@ -5,6 +5,7 @@
 // duyệt/từ chối trực tiếp. Không có màn chặn quyền: ai cũng vào được.
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { useStickyState } from "@/lib/use-sticky-state";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -108,9 +109,10 @@ export default function LeavePage() {
   const [deciding, setDeciding] = useState<number | null>(null);
   const [requestFormOpen, setRequestFormOpen] = useState(false);
 
-  const loadApprovedLeaves = useCallback(() => {
+  const loadApprovedLeaves = useCallback((quiet = false) => {
     if (!me || !isDirector(me.role)) return;
-    setLoadingApproved(true);
+    // quiet = làm mới nền (tự động 20s): KHÔNG bật spinner, tránh nháy màn hình.
+    if (!quiet) setLoadingApproved(true);
     const safeStart = approvedWeekStart && typeof approvedWeekStart === "string" && approvedWeekStart.includes("-")
       ? approvedWeekStart
       : mondayOf(todayLocal());
@@ -123,7 +125,7 @@ export default function LeavePage() {
     api.approvedLeaves(params)
       .then((data) => setAllApproved(Array.isArray(data) ? data : []))
       .catch(() => setAllApproved([]))
-      .finally(() => setLoadingApproved(false));
+      .finally(() => { if (!quiet) setLoadingApproved(false); });
   }, [me, approvedViewMode, approvedWeekStart, approvedMonthStr]);
 
   useEffect(() => {
@@ -157,6 +159,19 @@ export default function LeavePage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  // TỰ LÀM MỚI — không phải F5 nữa. Sếp duyệt ở máy khác thì trạng thái đơn của
+  // mình tự đổi sang "Đã duyệt"; có đơn mới thì bảng chờ duyệt tự hiện thêm.
+  // Chỉ nạp lại DANH SÁCH, không đụng form đang gõ dở.
+  useAutoRefresh(() => {
+    if (!me) return;
+    api.myLeaves().then(setMine).catch(() => {});
+    if (isManagerUp(me.role)) {
+      api.leaveList("PENDING").then(setPending).catch(() => {});
+      api.leavesDecidedByMe().then(setApprovedByMe).catch(() => {});
+    }
+    loadApprovedLeaves(true);
+  }, { enabled: !!me });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

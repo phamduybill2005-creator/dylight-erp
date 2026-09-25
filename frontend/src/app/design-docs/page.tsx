@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, type Filters } from "@/components/filter-bar";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
@@ -67,6 +68,11 @@ export default function DesignDocsPage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  // Tự làm mới; dừng khi đang mở form để không đè lên dữ liệu đang nhập.
+  useAutoRefresh(() => {
+    api.designDocs().then(setDocs).catch(() => {});
+  }, { enabled: !loading && !showForm });
 
   useEscapeKey(() => setShowForm(false), showForm);
 

@@ -33,6 +33,7 @@ import { splitDepts } from "@/components/filter-bar";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { normalizeDept } from "@/lib/groups";
 import StudentScheduleModal from "@/components/student-schedule-modal";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { getApprovedLeavesForDate, resolveLatestApprovedLeave } from "@/lib/schedule-helpers";
@@ -298,6 +299,10 @@ export default function WorkSchedulePage() {
         console.error("Lỗi khi tải lịch nghỉ:", err);
       });
   };
+
+  // Tự làm mới: sếp vừa duyệt đơn thì ô nghỉ tự hiện lên lịch, không phải F5.
+  // Dừng khi đang mở hộp thoại đăng ký lịch để không giật/ghi đè thao tác dở.
+  useAutoRefresh(() => loadLeaves(), { enabled: !!me && !studentModalOpen });
 
   useEffect(() => {
     loadLeaves();

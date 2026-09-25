@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
 import type { ActivityLog, User } from "@/lib/types";
@@ -27,6 +28,11 @@ export default function AuditPage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  // Tự làm mới: người khác vừa thao tác thì dòng nhật ký mới tự hiện lên đầu.
+  useAutoRefresh(() => {
+    api.auditLogs().then(setLogs).catch(() => {});
+  }, { enabled: !denied && !loading });
 
   if (denied) {
     return (

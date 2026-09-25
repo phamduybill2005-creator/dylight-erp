@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, ChevronRightIcon, FunnelIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL, userRankWeight } from "@/lib/roles";
 import { dateLocal, monthLocal, todayLocal } from "@/lib/format";
@@ -367,6 +368,12 @@ export default function EvaluationsPage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  // Tự làm mới: ai vừa chấm sao cho mình thì hiện ngay, không phải F5.
+  useAutoRefresh(() => {
+    api.evaluationsReceived().then(setReceived).catch(() => {});
+    api.evaluationsGiven().then(setGiven).catch(() => {});
+  }, { enabled: !!user });
 
   // Cấp dưới trực tiếp (cho quản lý chấm điểm).
   const subordinates = useMemo(

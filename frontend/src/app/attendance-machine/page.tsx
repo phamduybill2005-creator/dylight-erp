@@ -21,6 +21,7 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
 import type { User, YunattSyncResult, YunattPerson, YunattSyncStatus } from "@/lib/types";
@@ -84,6 +85,11 @@ export default function AttendanceMachinePage() {
       setSyncing(false);
     }
   }
+
+  // Tự làm mới trạng thái đồng bộ (job tự chạy 20:00, hoặc người khác bấm đồng bộ).
+  useAutoRefresh(() => {
+    api.yunattStatus().then(setStatus).catch(() => {});
+  }, { enabled: !!user && !syncing });
 
   async function loadPersons() {
     setLoadingPersons(true);

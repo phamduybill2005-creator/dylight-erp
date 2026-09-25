@@ -14,6 +14,7 @@ import {
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { roleTitle } from "@/lib/roles";
 import { formatVND } from "@/lib/format";
@@ -59,6 +60,13 @@ export default function ProfilePage() {
       .then((r) => { setSalaryShared(r.shared); setPayslips(r.items); })
       .catch(() => {});
   }, [router]);
+
+  // Tự làm mới: Giám đốc vừa chốt hoặc bật chia sẻ lương thì phiếu tự hiện.
+  useAutoRefresh(() => {
+    api.myPayroll()
+      .then((r) => { setSalaryShared(r.shared); setPayslips(r.items); })
+      .catch(() => {});
+  }, { enabled: !loading });
 
   if (loading) {
     return (

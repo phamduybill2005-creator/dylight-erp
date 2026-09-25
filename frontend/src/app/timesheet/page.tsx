@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { ClockIcon, ChevronLeftIcon, ChevronRightIcon, UserIcon, UsersIcon, BuildingOfficeIcon, StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { dateLocal, todayLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
@@ -132,6 +133,9 @@ export default function TimesheetPage() {
   }, [router]);
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
+
+  // Tự làm mới: người khác vừa khai giờ ở tab Tiến độ dự án thì bảng này tự cộng thêm.
+  useAutoRefresh(loadEntries, { enabled: !!me });
 
   // Danh sách phòng ban để lọc
   const deptOptions = useMemo(() => {

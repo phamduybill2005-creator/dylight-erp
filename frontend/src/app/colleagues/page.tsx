@@ -16,6 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { roleTitle } from "@/lib/roles";
 import { refreshNicknames } from "@/lib/nicknames";
@@ -38,6 +39,11 @@ export default function ColleaguesPage() {
     api.me().then(setMe).catch(() => router.push("/login"));
     api.colleagues().then(setList).catch(() => {}).finally(() => setLoading(false));
   }, [router]);
+
+  // Tự làm mới; tạm dừng khi đang sửa biệt danh để không mất chữ đang gõ.
+  useAutoRefresh(() => {
+    api.colleagues().then(setList).catch(() => {});
+  }, { enabled: !loading && editId === null });
 
   const canTeam = me ? ["ADMIN", "DIRECTOR", "MANAGER"].includes(me.role) : false;
 

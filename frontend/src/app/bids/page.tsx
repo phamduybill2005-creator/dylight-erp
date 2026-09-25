@@ -14,6 +14,7 @@ import {
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { canSeeMoney } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
@@ -75,8 +76,9 @@ export default function BidsPage() {
     else if (selectedBid) setSelectedBid(null);
   }, Boolean(projectModalOpen || createModalOpen || selectedBid));
 
-  function loadData() {
-    setLoading(true);
+  function loadData(quiet = false) {
+    // quiet = làm mới nền (tự động): KHÔNG bật spinner để khỏi nháy màn hình.
+    if (!quiet) setLoading(true);
     Promise.all([api.bids(), api.projects(), api.me()])
       .then(([bidsData, projectsData, meData]) => {
         setBids(bidsData);
@@ -84,10 +86,15 @@ export default function BidsPage() {
         setMe(meData);
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!quiet) setLoading(false); });
   }
 
-  useEffect(loadData, []);
+  useEffect(() => { loadData(); }, []);
+
+  // Tự làm mới; dừng khi đang mở hộp thoại tạo thầu / chuyển thành dự án.
+  useAutoRefresh(() => loadData(true), {
+    enabled: !loading && !createModalOpen && !projectModalOpen && !selectedBid,
+  });
 
   async function handleCreateBid(e: React.FormEvent) {
     e.preventDefault();

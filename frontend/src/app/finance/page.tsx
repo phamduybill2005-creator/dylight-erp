@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CurrencyDollarIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
 import { formatVND } from "@/lib/format";
@@ -32,6 +33,12 @@ export default function FinancePage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  // Tự làm mới: có hóa đơn / thanh toán mới thì số liệu tự cập nhật.
+  useAutoRefresh(() => {
+    api.financeSummary().then(setSummary).catch(() => {});
+    api.debts().then(setDebts).catch(() => {});
+  }, { enabled: !denied && !loading });
 
   if (denied) {
     return (

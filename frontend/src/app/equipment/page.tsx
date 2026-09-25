@@ -10,6 +10,7 @@ import {
   XMarkIcon, CheckIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { useEscapeKey } from "@/lib/use-escape-key";
@@ -62,6 +63,12 @@ export default function EquipmentPage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  // Tự làm mới; dừng khi đang mở form thêm thiết bị / ghi nhật ký.
+  useAutoRefresh(() => {
+    api.equipment().then(setEquipment).catch(() => {});
+    api.equipmentLogs().then(setLogs).catch(() => {});
+  }, { enabled: !denied && !loading && !showLogForm && !showEquipForm });
 
   useEscapeKey(() => {
     if (showLogForm) setShowLogForm(false);

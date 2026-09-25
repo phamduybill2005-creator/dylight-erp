@@ -12,6 +12,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { isDirector } from "@/lib/roles";
 import { formatVND, formatDate, dateLocal } from "@/lib/format";
@@ -26,8 +27,9 @@ export default function ReconciliationPage() {
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
 
-  function loadData() {
-    setLoading(true);
+  function loadData(quiet = false) {
+    // quiet = làm mới nền (tự động): KHÔNG bật spinner để khỏi nháy màn hình.
+    if (!quiet) setLoading(true);
     Promise.all([
       api.projects(),
       api.contracts(),
@@ -41,7 +43,7 @@ export default function ReconciliationPage() {
         setPayments(pmts);
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!quiet) setLoading(false); });
   }
 
   // Đối soát quyết toán lộ doanh thu/dòng tiền -> chỉ Giám đốc.
@@ -57,6 +59,9 @@ export default function ReconciliationPage() {
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  // Tự làm mới: hợp đồng / hóa đơn / thanh toán mới tự vào bảng đối soát.
+  useAutoRefresh(() => loadData(true), { enabled: !denied && !loading });
 
   if (denied) {
     return (
