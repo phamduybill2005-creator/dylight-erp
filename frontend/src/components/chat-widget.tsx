@@ -9,6 +9,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { splitLinks } from "@/lib/linkify";
 import {
   ChatBubbleLeftRightIcon,
@@ -109,10 +110,18 @@ function isManageableGroup(conv: Conversation | null): boolean {
   return !!conv && conv.type === "GROUP" && (conv.project_id == null);
 }
 
+// Trạng thái khung chat SỐNG QUA CHUYỂN TRANG. Widget nằm trong AppShell của từng trang nên
+// đổi trang là bị dựng lại (mất open/active). Giữ ở cấp module để: bấm nhóm chat dự án ->
+// trang nền chuyển sang chi tiết dự án mà khung chat vẫn mở đúng hội thoại. F5 thì về đóng (chủ ý).
+const persisted: { open: boolean; activeId: number | null } = { open: false, activeId: null };
+
 export default function ChatWidget() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [me, setMe] = useState<User | null>(null);
   const [unread, setUnread] = useState(0);
-  const [open, setOpen] = useState(false);
+  // Mở sẵn nếu trang trước đang mở khung chat (xem `persisted`).
+  const [open, setOpen] = useState(persisted.open);
 
   const [list, setList] = useState<Conversation[]>([]);
   const [active, setActive] = useState<Conversation | null>(null);
@@ -228,6 +237,27 @@ export default function ChatWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Giữ trạng thái khung chat qua chuyển trang: ghi vào `persisted` mỗi khi đổi, và sau khi
+  // trang mới nạp xong danh sách thì mở lại đúng hội thoại. Đọc id cần khôi phục vào ref NGAY
+  // lúc render đầu, vì effect ghi `persisted.activeId = null` sẽ chạy trước khi kịp khôi phục.
+  const restoreIdRef = useRef<number | null>(persisted.activeId);
+  useEffect(() => {
+    persisted.open = open;
+  }, [open]);
+  useEffect(() => {
+    persisted.activeId = activeId;
+  }, [activeId]);
+  useEffect(() => {
+    const id = restoreIdRef.current;
+    if (id == null || !open || active) return;
+    const conv = list.find((c) => c.id === id);
+    if (!conv) return;
+    restoreIdRef.current = null;
+    void openConversation(conv);
+    // openConversation ổn định trong vòng đời component.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list, open, active]);
+
   // Tự làm mới định kỳ ~8s: badge, danh sách chat, và tin nhắn (nếu đang xem)
   useEffect(() => {
     refreshUnread();
@@ -260,6 +290,7 @@ export default function ChatWidget() {
   }
 
   function closePanel() {
+    restoreIdRef.current = null;   // đã chủ động đóng thì không khôi phục hội thoại cũ nữa
     setOpen(false);
     setActive(null);
     setCreating(false);
@@ -282,6 +313,12 @@ export default function ChatWidget() {
     setMessages([]);
     closeConvExtras();
     setGroupTitle(conv.title || "");
+    // Nhóm chat gắn dự án: trang NỀN chuyển sang chi tiết dự án đó, khung chat vẫn mở đè lên
+    // (trạng thái mở + hội thoại được giữ qua chuyển trang nhờ `persisted`).
+    if (conv.project_id != null) {
+      const href = `/projects/${conv.project_id}`;
+      if (pathname !== href) router.push(href);
+    }
     try {
       setMessages(await api.chatMessages(conv.id));
       await api.markConversationRead(conv.id);
@@ -560,11 +597,11 @@ export default function ChatWidget() {
                   )
                 )}
                 {active?.project_id ? (
-                  // Nhóm chat gắn dự án: tiêu đề là LINK mở trang chi tiết dự án (đóng khung chat để thấy trang).
+                  // Nhóm chat gắn dự án: tiêu đề là LINK mở trang chi tiết dự án ở lớp nền; khung chat
+                  // vẫn mở (trạng thái giữ qua chuyển trang nhờ `persisted`).
                   <Link
                     href={`/projects/${active.project_id}`}
-                    onClick={closePanel}
-                    title="Mở chi tiết dự án này"
+                    title="Mở chi tiết dự án này (khung chat vẫn mở)"
                     className="group/title flex min-w-0 items-center gap-1 text-sm font-bold text-ink hover:text-steel"
                   >
                     <h2 className="truncate group-hover/title:underline">{convTitle(active, me.id, nick)}</h2>
