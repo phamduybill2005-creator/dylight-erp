@@ -8,12 +8,14 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { splitLinks } from "@/lib/linkify";
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
   PaperAirplaneIcon,
   ArrowLeftIcon,
+  ArrowTopRightOnSquareIcon,
   UserGroupIcon,
   PlusIcon,
   FaceSmileIcon,
@@ -557,13 +559,26 @@ export default function ChatWidget() {
                     })()
                   )
                 )}
-                <h2 className="truncate text-sm font-bold text-ink">
-                  {active
-                    ? convTitle(active, me.id, nick)
-                    : creating
-                    ? "Tin nhắn mới"
-                    : "Tin nhắn"}
-                </h2>
+                {active?.project_id ? (
+                  // Nhóm chat gắn dự án: tiêu đề là LINK mở trang chi tiết dự án (đóng khung chat để thấy trang).
+                  <Link
+                    href={`/projects/${active.project_id}`}
+                    onClick={closePanel}
+                    title="Mở chi tiết dự án này"
+                    className="group/title flex min-w-0 items-center gap-1 text-sm font-bold text-ink hover:text-steel"
+                  >
+                    <h2 className="truncate group-hover/title:underline">{convTitle(active, me.id, nick)}</h2>
+                    <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 shrink-0 text-muted group-hover/title:text-steel" />
+                  </Link>
+                ) : (
+                  <h2 className="truncate text-sm font-bold text-ink">
+                    {active
+                      ? convTitle(active, me.id, nick)
+                      : creating
+                      ? "Tin nhắn mới"
+                      : "Tin nhắn"}
+                  </h2>
+                )}
                 {active?.type === "GROUP" && (
                   <span className="shrink-0 rounded-full bg-paper px-2 py-0.5 text-[10px] text-muted">
                     {active.members.length} người
