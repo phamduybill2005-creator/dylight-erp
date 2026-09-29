@@ -4,7 +4,7 @@
 // Cách nhập: click vào hàng dự án → thanh chuyển đổi Vietcombank "kích hoạt" cho dự án đó.
 // Nhập số Yên ở thanh trên → chỉ cập nhật doanh thu của dự án đang chọn. Rời ô là tự lưu.
 // Doanh thu (VNĐ) = Time khách hàng (h) × Đơn giá Yên (¥/h) × Tỷ giá Vietcombank Realtime.
-// Xem theo Phòng Bản đồ: thêm nhóm cột Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section
+// Xem theo Phòng Bản đồ: thêm nhóm cột Vùng / Ortho / RIEGL / QLCL / DATA / Analysis / Trace / Section
 // — CHỈ XEM, đồng bộ từ bảng Dự án (cùng JSON `evaluation`), muốn sửa thì sang tab Dự án.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -239,7 +239,7 @@ export default function RevenuePage() {
 
   // Bố cục Phòng Bản đồ (cùng điều kiện với bảng Dự án): thêm 7 cột chỉ xem sau Tên dự án.
   const isBanDoMode = isBanDoView(filterDept, me);
-  const colCount = isBanDoMode ? 15 : 8;
+  const colCount = isBanDoMode ? 16 : 8;
 
   const uniqueDepts = useMemo(
     () =>
@@ -544,6 +544,7 @@ export default function RevenuePage() {
               <>
                 {/* Nhóm cột Phòng Bản đồ — cùng bề rộng với bảng Dự án */}
                 <col className="w-[60px]" />   {/* Vùng */}
+                <col className="w-[48px]" />   {/* Ortho */}
                 <col className="w-[48px]" />   {/* RIEGL */}
                 <col className="w-[48px]" />   {/* QLCL */}
                 <col className="w-[38px]" />   {/* DATA (ô tích) */}
@@ -566,7 +567,7 @@ export default function RevenuePage() {
               {isBanDoMode && (
                 <>
                   <th className={TH} title="Vùng / khu vực — nhập ở bảng Dự án">Vùng</th>
-                  {(["RIEGL", "QLCL", "DATA", "Analysis", "Trace", "Section"] as const).map((label) => (
+                  {(["Ortho", "RIEGL", "QLCL", "DATA", "Analysis", "Trace", "Section"] as const).map((label) => (
                     <th
                       key={label}
                       className="sticky top-0 z-10 border border-teal-200 bg-teal-50 px-0.5 py-2 text-center text-[9.5px] font-bold whitespace-nowrap text-teal-900"
@@ -651,6 +652,7 @@ export default function RevenuePage() {
                         <td className="border border-line align-middle px-1 py-2">
                           <div className="truncate text-[10.5px] text-ink" title={bando.vung}>{bando.vung || "—"}</div>
                         </td>
+                        <td className={TDB}>{num(bando.ortho)}</td>
                         <td className={TDB}>{num(bando.riegl)}</td>
                         <td className={TDB}>{num(bando.qlcl)}</td>
                         <td className={TDB}>{tick(bando.data)}</td>

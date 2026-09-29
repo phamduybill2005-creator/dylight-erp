@@ -492,7 +492,7 @@ def progress_history(project_id: int, db: Session = Depends(get_db), current: Us
 
 # 7 cột Bản đồ nằm trong JSON `evaluation` mà CHỈ chủ trì / Quản trị / Giám đốc được sửa.
 # Ghi chú (`tieu_de`) KHÔNG nằm trong danh sách -> vẫn theo quyền sửa dự án bình thường.
-_BANDO_LOCKED_KEYS = ("vung", "riegl", "qlcl", "data", "analysis", "trace", "section")
+_BANDO_LOCKED_KEYS = ("vung", "ortho", "riegl", "qlcl", "data", "analysis", "trace", "section")
 _BANDO_TICK_KEYS = ("data", "trace")
 
 
@@ -549,7 +549,7 @@ def update_project(
             raise HTTPException(
                 403,
                 "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới được sửa các cột "
-                "Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section.",
+                "Vùng / Ortho / RIEGL / QLCL / DATA / Analysis / Trace / Section.",
             )
 
     # member_ids / lead_id là thao tác QUẢN TRỊ -> đòi quyền _can_manage.

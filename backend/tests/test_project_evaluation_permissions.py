@@ -31,7 +31,7 @@ BANDO = "Phòng Bản đồ"
 
 # Giá trị mới cho từng cột khoá quyền — dùng để thử "đổi 1 cột" với mọi vai trò.
 LOCKED_CHANGES = {
-    "vung": "Kyushu", "riegl": "3", "qlcl": "5", "data": "1",
+    "vung": "Kyushu", "ortho": "2", "riegl": "3", "qlcl": "5", "data": "1",
     "analysis": "30", "trace": "1", "section": "4",
 }
 
@@ -39,7 +39,7 @@ LOCKED_CHANGES = {
 def bando_json(**over) -> str:
     """JSON Phòng Bản đồ như frontend lưu; dữ liệu cũ: data/trace = "0", analysis kèm 'ha'."""
     base = {
-        "vung": "", "riegl": "2", "qlcl": "", "data": "0", "analysis": "28.5 ha",
+        "vung": "", "ortho": "", "riegl": "2", "qlcl": "", "data": "0", "analysis": "28.5 ha",
         "trace": "0", "section": "", "tieu_de": "DDM",
     }
     base.update(over)

@@ -48,7 +48,7 @@ test("khung tỷ giá Doanh thu nằm trên một hàng ở điện thoại", ()
 
 test("thẻ dự án Phòng Bản đồ cho phép sửa đủ 7 trường trên điện thoại", () => {
   assert.match(projects, /data-testid="mobile-bando-editor"/);
-  for (const field of ["vung", "riegl", "qlcl", "analysis", "section", "data", "trace"]) {
+  for (const field of ["vung", "ortho", "riegl", "qlcl", "analysis", "section", "data", "trace"]) {
     assert.match(projects, new RegExp(`data-bando-field="${field}"`));
   }
   assert.match(projects, /canEditBanDo\(project\)/);

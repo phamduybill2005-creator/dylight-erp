@@ -138,7 +138,7 @@ function calculateDuration(start?: string | null, end?: string | null, deadline?
 /** Ô nhập SỐ ở các cột Phòng Bản đồ (RIEGL / QLCL / Analysis / Section). */
 const BANDO_NUM_INPUT =
   "h-6 w-full rounded border border-transparent bg-transparent px-0.5 py-0.5 text-center text-[10.5px] font-mono text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white";
-/** Ai được sửa 7 cột Bản đồ — hiện ở tooltip tiêu đề cột. */
+/** Ai được sửa 8 cột Bản đồ — hiện ở tooltip tiêu đề cột. */
 const BANDO_EDIT_HINT = "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới sửa được";
 
 /** Ô thông tin trên THẺ DỰ ÁN điện thoại: nhãn mờ ở trên, giá trị đậm ở dưới (1 cột của bảng máy tính). */
@@ -689,7 +689,7 @@ export default function ProjectsPage() {
   // Bố cục Phòng Bản đồ — điều kiện dùng CHUNG với trang Doanh thu (lib/groups.isBanDoView).
   const isBanDoMode = isBanDoView(filterDept, me);
   const canEditBanDoCols = isBanDoUser(me) || canManage || isSeniorManagerUp(me);
-  /** 7 cột Bản đồ (Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section): CHỈ chủ trì dự án đó,
+  /** 8 cột Bản đồ (Vùng / Ortho / RIEGL / QLCL / DATA / Analysis / Trace / Section): CHỈ chủ trì dự án đó,
    *  Quản trị hệ thống, Giám đốc — khớp gate ở backend. Ghi chú vẫn theo canEditBanDoCols. */
   const canEditBanDo = (p: Project) =>
     !!me && (me.role === "ADMIN" || me.role === "DIRECTOR" || p.lead_id === me.id);
@@ -707,7 +707,7 @@ export default function ProjectsPage() {
    *  thống / Quản lý cấp cao + danh sách chỉ định (lib/roles.canSeeRevenue). */
   const showRevenue = canSeeRevenue(me);
   // Ẩn cột -> bớt 1 ô khi gộp dòng "không tìm thấy dự án".
-  const infoCols = (isBanDoMode ? 22 : 15) - (showRevenue ? 0 : 1);
+  const infoCols = (isBanDoMode ? 23 : 15) - (showRevenue ? 0 : 1);
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -899,7 +899,22 @@ export default function ProjectsPage() {
                 >
                   {allowedBandoEdit ? (
                     <>
-                      <div className="grid grid-cols-4 gap-1.5 text-center">
+                      <div className="grid grid-cols-5 gap-1.5 text-center">
+                        <label className="min-w-0 rounded-md bg-white px-1 py-1.5">
+                          <span className="block text-[9px] font-bold uppercase text-teal-800">Ortho</span>
+                          <input
+                            data-bando-field="ortho"
+                            type="text"
+                            inputMode="decimal"
+                            value={bando.ortho}
+                            onChange={(event) => draftMobileBando({ ...bando, ortho: event.target.value })}
+                            onBlur={() => saveEvaluation(project)}
+                            onKeyDown={mobileBandoKeys}
+                            placeholder="—"
+                            aria-label="Ortho"
+                            className="mt-0.5 h-7 w-full min-w-0 rounded border border-slate-200 bg-white px-1 text-center font-mono text-xs font-semibold text-ink outline-none focus:border-teal-600"
+                          />
+                        </label>
                         <label className="min-w-0 rounded-md bg-white px-1 py-1.5">
                           <span className="block text-[9px] font-bold uppercase text-teal-800">RIEGL</span>
                           <input
@@ -1015,8 +1030,8 @@ export default function ProjectsPage() {
                     </>
                   ) : (
                     <>
-                      <dl className="grid grid-cols-4 gap-1.5 text-center">
-                        {([["RIEGL", bando.riegl], ["QLCL", bando.qlcl], ["Analysis", analysisHa ? `${analysisHa} ha` : ""], ["Section", bando.section]] as const).map(([label, value]) => (
+                      <dl className="grid grid-cols-5 gap-1.5 text-center">
+                        {([["Ortho", bando.ortho], ["RIEGL", bando.riegl], ["QLCL", bando.qlcl], ["Analysis", analysisHa ? `${analysisHa} ha` : ""], ["Section", bando.section]] as const).map(([label, value]) => (
                           <div key={label} className="rounded-md bg-white px-1 py-1.5">
                             <dt className="text-[9px] font-bold uppercase text-teal-800">{label}</dt>
                             <dd className={`mt-0.5 font-mono text-xs ${value ? "font-semibold text-ink" : "text-slate-300"}`}>{value || "—"}</dd>
@@ -1078,6 +1093,7 @@ export default function ProjectsPage() {
                   cộng sao 12px + gap 4px + padding 8px = 85px -> 90px (thu từ 100px để nhường chỗ cột Vùng). */}
               <col className="w-[90px]" />   {/* DOSCO担当 */}
               <col className="w-[60px]" />   {/* Vùng (chữ) */}
+              <col className="w-[48px]" />   {/* Ortho (nhập số) */}
               <col className="w-[48px]" />   {/* RIEGL (nhập số) */}
               <col className="w-[48px]" />   {/* QLCL (nhập số) */}
               <col className="w-[38px]" />   {/* DATA (ô tích) */}
@@ -1130,6 +1146,7 @@ export default function ProjectsPage() {
               {isBanDoMode ? (
                 <>
                   <th className={TH} title={`Vùng / khu vực của dự án — ${BANDO_EDIT_HINT}`}>Vùng</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={BANDO_EDIT_HINT}>Ortho</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={BANDO_EDIT_HINT}>RIEGL</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={BANDO_EDIT_HINT}>QLCL</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={`Ô tích — ${BANDO_EDIT_HINT}`}>DATA</th>
@@ -1184,8 +1201,8 @@ export default function ProjectsPage() {
                   });
                 }
               };
-              /** Ô nhập SỐ (RIEGL / QLCL / Section) — như trước. */
-              const numCell = (key: "riegl" | "qlcl" | "section") => (
+              /** Ô nhập SỐ (Ortho / RIEGL / QLCL / Section). */
+              const numCell = (key: "ortho" | "riegl" | "qlcl" | "section") => (
                 <td className={`${TD} align-top p-0.5 text-center`} onClick={(e) => e.stopPropagation()}>
                   {canEditBanDo(p) ? (
                     <input
@@ -1308,6 +1325,7 @@ export default function ProjectsPage() {
                           </span>
                         )}
                       </td>
+                      {numCell("ortho")}
                       {numCell("riegl")}
                       {numCell("qlcl")}
                       {tickCell("data")}

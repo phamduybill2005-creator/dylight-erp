@@ -30,6 +30,7 @@ test("parse: JSON cũ (chưa có 'vung') vẫn đọc được, vung rỗng, gi�
   });
   const d = parseBanDoDetails(old);
   assert.equal(d.vung, "");
+  assert.equal(d.ortho, "");   // JSON cũ chưa có cột Ortho -> rỗng, không lỗi
   assert.equal(d.riegl, "2");
   assert.equal(d.data, "0");
   assert.equal(d.analysis, "28.5 ha");

@@ -4,6 +4,7 @@
 
 export type BanDoDetails = {
   vung: string;      // Vùng / khu vực của dự án — chữ tự do
+  ortho: string;     // nhập số (cột đứng giữa Vùng và RIEGL)
   riegl: string;     // nhập số
   qlcl: string;      // nhập số
   data: string;      // Ô TÍCH: "1" = đã tích, "" = chưa (dữ liệu cũ nhập số: khác "0" coi là đã tích)
@@ -14,7 +15,7 @@ export type BanDoDetails = {
 };
 
 export const EMPTY_BANDO: BanDoDetails = {
-  vung: "", riegl: "", qlcl: "", data: "", analysis: "", trace: "", section: "", tieu_de: "",
+  vung: "", ortho: "", riegl: "", qlcl: "", data: "", analysis: "", trace: "", section: "", tieu_de: "",
 };
 
 /** Giá trị lưu vào JSON khi ô tích được tích. */
@@ -31,6 +32,7 @@ export function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
       const parsed = JSON.parse(s);
       return {
         vung: str(parsed.vung),
+        ortho: str(parsed.ortho),
         riegl: str(parsed.riegl),
         qlcl: str(parsed.qlcl),
         data: str(parsed.data),
