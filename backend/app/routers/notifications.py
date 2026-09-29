@@ -150,3 +150,16 @@ def mark_all_read(db: Session = Depends(get_db), current: User = Depends(get_cur
     )
     db.commit()
     publish(current.company_id, "notification", [current.id])
+
+
+@router.delete("/{notif_id}", status_code=204)
+def delete_notification(notif_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    """Người nhận tự XOÁ thông báo của mình. Mỗi người nhận là một bản ghi riêng (fan-out)
+    nên xoá chỉ mất ở chuông của chính mình, không ảnh hưởng người khác.
+    Không tìm thấy / của người khác -> 404 (giống mark_read, không lộ id tồn tại)."""
+    n = db.get(Notification, notif_id)
+    if not n or n.recipient_id != current.id:
+        raise HTTPException(404, "Không tìm thấy thông báo.")
+    db.delete(n)
+    db.commit()
+    publish(current.company_id, "notification", [current.id])

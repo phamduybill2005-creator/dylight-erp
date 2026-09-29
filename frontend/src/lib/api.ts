@@ -553,6 +553,7 @@ export const api = {
     request<{ sent: number }>("/notifications", { method: "POST", body: JSON.stringify(payload) }),
   markNotificationRead: (id: number) => request<void>(`/notifications/${id}/read`, { method: "POST" }),
   markAllNotificationsRead: () => request<void>("/notifications/me/read-all", { method: "POST" }),
+  deleteNotification: (id: number) => request<void>(`/notifications/${id}`, { method: "DELETE" }),
 
   // --- Giao việc / phân công ---
   // Lọc theo người nhận (assigneeId) HOẶC theo dự án (projectId — xem việc của mọi người trong dự án).

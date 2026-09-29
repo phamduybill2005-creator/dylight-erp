@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
+import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
@@ -119,6 +119,20 @@ export default function NotificationsBell() {
       setItems(await api.notifications());
     } catch {
       /* noop */
+    }
+  }
+
+  /** Xoá 1 thông báo khỏi chuông của mình (chỉ bản của mình, không ảnh hưởng người khác).
+   *  Gỡ khỏi danh sách ngay cho mượt; lỗi thì nạp lại từ máy chủ. */
+  async function removeNotification(n: Notification) {
+    setItems((prev) => prev.filter((x) => x.id !== n.id));
+    if (!n.is_read) setUnread((u) => Math.max(0, u - 1));
+    try {
+      await api.deleteNotification(n.id);
+    } catch (err: any) {
+      alert(err?.message || "Không xóa được thông báo.");
+      api.notifications().then(setItems).catch(() => {});
+      api.unreadCount().then((r) => setUnread(r.count)).catch(() => {});
     }
   }
 
@@ -293,18 +307,32 @@ export default function NotificationsBell() {
                 <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">Chưa có thông báo nào.</p>
               ) : (
                 items.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => markRead(n)}
-                    className={`block w-full rounded-xl2 border-l-4 bg-white p-3 text-left shadow-card ${n.is_read ? "border-transparent" : "border-amber"}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={`text-sm text-ink ${n.is_read ? "font-medium" : "font-bold"}`}>{n.title}</p>
-                      {!n.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber" />}
-                    </div>
-                    {n.body && <p className="mt-1 whitespace-pre-line break-words [overflow-wrap:anywhere] text-xs text-muted">{n.body}</p>}
-                    <p className="mt-1 text-[10px] text-muted">{nick(n.sender_id, n.sender_name) || "Hệ thống"} · {fmt(n.created_at)}</p>
-                  </button>
+                  // Nút xoá đặt NGOÀI nút "đánh dấu đã đọc" (không lồng button trong button), neo góc phải.
+                  <div key={n.id} className="relative">
+                    <button
+                      onClick={() => markRead(n)}
+                      className={`block w-full rounded-xl2 border-l-4 bg-white p-3 pr-10 text-left shadow-card ${n.is_read ? "border-transparent" : "border-amber"}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm text-ink ${n.is_read ? "font-medium" : "font-bold"}`}>{n.title}</p>
+                        {!n.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber" />}
+                      </div>
+                      {n.body && <p className="mt-1 whitespace-pre-line break-words [overflow-wrap:anywhere] text-xs text-muted">{n.body}</p>}
+                      <p className="mt-1 text-[10px] text-muted">{nick(n.sender_id, n.sender_name) || "Hệ thống"} · {fmt(n.created_at)}</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void removeNotification(n);
+                      }}
+                      title="Xóa thông báo này"
+                      aria-label="Xóa thông báo"
+                      className="absolute right-2 top-2 rounded-full p-1.5 text-slate-400 hover:bg-bad/10 hover:text-bad focus-visible:outline-steel"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
                 ))
               )}
             </div>
