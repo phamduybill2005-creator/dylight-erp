@@ -58,8 +58,21 @@ def _require_membership(db: Session, conv_id: int, current: User) -> Conversatio
     return conv
 
 
+def _project_chat_title(project: Project) -> str:
+    """Tên nhóm chat dự án: "Dự án: <mã> <tên>" — có mã ở trước để nhận ra ngay dự án nào."""
+    code = (project.code or "").strip()
+    return f"Dự án: {code} {project.name}" if code else f"Dự án: {project.name}"
+
+
 def _build_out(db: Session, conv: Conversation, current: User) -> ConversationOut:
     """Bơm thủ công members / last_message / unread cho 1 phòng (không map thẳng ORM)."""
+    # Nhóm gắn dự án: tên hiển thị lấy theo mã + tên dự án HIỆN TẠI (nhóm cũ tạo trước khi
+    # có mã, hay dự án đổi mã/tên, vẫn hiện đúng mà không cần sửa dữ liệu).
+    title = conv.title
+    if conv.project_id is not None:
+        project = db.get(Project, conv.project_id)
+        if project is not None:
+            title = _project_chat_title(project)
     members = (
         db.query(ConversationMember)
         .filter(ConversationMember.conversation_id == conv.id)
@@ -101,7 +114,7 @@ def _build_out(db: Session, conv: Conversation, current: User) -> ConversationOu
     return ConversationOut(
         id=conv.id,
         type=conv.type,
-        title=conv.title,
+        title=title,
         project_id=conv.project_id,
         members=member_out,
         last_message=last.body if last else None,
@@ -322,13 +335,16 @@ def project_conversation(
         conv = Conversation(
             company_id=current.company_id,
             type=ConversationType.GROUP,
-            title=f"Dự án: {project.name}",
+            title=_project_chat_title(project),
             created_by_id=current.id,
             direct_key=None,
             project_id=project_id,
         )
         db.add(conv)
         db.flush()
+    elif conv.title != _project_chat_title(project):
+        # Nhóm cũ (tên chưa có mã) hoặc dự án đã đổi mã/tên -> cập nhật tên lưu cho khớp.
+        conv.title = _project_chat_title(project)
 
     # Đồng bộ thành viên: thêm mọi người thuộc dự án + Giám đốc đang mở (nếu chưa có).
     want_ids = list(dict.fromkeys([*pmember_ids, current.id]))
