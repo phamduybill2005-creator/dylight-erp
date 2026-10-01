@@ -549,7 +549,7 @@ export const api = {
   // --- Thông báo nội bộ ---
   notifications: (limit = 50) => request<Notification[]>(`/notifications/me?limit=${limit}`),
   unreadCount: () => request<{ count: number }>("/notifications/me/unread-count"),
-  sendNotification: (payload: { title: string; body?: string | null; target: string; target_user_id?: number | null }) =>
+  sendNotification: (payload: { title: string; body?: string | null; target: string; target_user_id?: number | null; target_department?: string | null }) =>
     request<{ sent: number }>("/notifications", { method: "POST", body: JSON.stringify(payload) }),
   markNotificationRead: (id: number) => request<void>(`/notifications/${id}/read`, { method: "POST" }),
   markAllNotificationsRead: () => request<void>("/notifications/me/read-all", { method: "POST" }),

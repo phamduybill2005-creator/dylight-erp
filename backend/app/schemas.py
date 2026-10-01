@@ -778,8 +778,9 @@ class AdminResetPassword(BaseModel):
 class NotificationCreate(BaseModel):
     title: str = Field(min_length=1)
     body: str | None = None
-    target: str = "USER"            # USER | MANAGERS | STAFF | EVERYONE
+    target: str = "USER"            # USER | MANAGERS | STAFF | EVERYONE | DEPARTMENT
     target_user_id: int | None = None
+    target_department: str | None = None
 
 
 class NotificationOut(BaseModel):

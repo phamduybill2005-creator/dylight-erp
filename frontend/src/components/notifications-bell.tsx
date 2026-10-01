@@ -1,8 +1,8 @@
 "use client";
 
 // Nút lá thư nổi ở góc dưới — số tin chưa đọc + danh sách thông báo + ô soạn tin.
-// Quyền gửi: Giám đốc → mọi người / các quản lý / nhân viên / 1 người;
-//            Quản lý  → nhân viên / 1 người;  Nhân viên → chỉ nhận.
+// Quyền gửi: Giám đốc → mọi người / các quản lý / nhân viên / phòng ban / 1 người;
+//            Quản lý  → nhân viên / phòng ban / 1 người;  Nhân viên → chỉ nhận.
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -11,18 +11,21 @@ import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon, TrashIcon } from "@heroicon
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
+import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { useNicknames } from "@/lib/nicknames";
 import { useEscapeKey } from "@/lib/use-escape-key";
-import type { Notification, User } from "@/lib/types";
+import type { Department, Notification, User } from "@/lib/types";
 
 const TARGETS_DIRECTOR = [
   { value: "EVERYONE", label: "Tất cả mọi người" },
   { value: "MANAGERS", label: "Các quản lý" },
   { value: "STAFF", label: "Toàn bộ nhân viên" },
+  { value: "DEPARTMENT", label: "Theo phòng ban" },
   { value: "USER", label: "Một người cụ thể" },
 ];
 const TARGETS_MANAGER = [
   { value: "STAFF", label: "Toàn bộ nhân viên" },
+  { value: "DEPARTMENT", label: "Theo phòng ban" },
   { value: "USER", label: "Một người cụ thể" },
 ];
 
@@ -65,6 +68,8 @@ export default function NotificationsBell() {
 
   const [target, setTarget] = useState("USER");
   const [targetUser, setTargetUser] = useState<number | "">("");
+  const [targetDepartment, setTargetDepartment] = useState("");
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [users, setUsers] = useState<User[]>([]);
@@ -77,6 +82,7 @@ export default function NotificationsBell() {
   const tier = me ? roleTier(me.role) : "STAFF";
   const canCompose = tier !== "STAFF";
   const targets = tier === "DIRECTOR" ? TARGETS_DIRECTOR : TARGETS_MANAGER;
+  const departmentNames = departments.length ? departments.map((d) => d.name) : PRESET_DEPARTMENTS;
 
   // Đóng modal soạn thông báo hoặc khung danh sách thông báo khi nhấn phím ESC
   useEscapeKey(() => {
@@ -216,6 +222,8 @@ export default function NotificationsBell() {
     setCompose(true);
     setSendMsg("");
     setTarget(tier === "DIRECTOR" ? "EVERYONE" : "STAFF");
+    setTargetDepartment("");
+    api.departments().then(setDepartments).catch(() => {});
     if (users.length === 0) api.users().then(setUsers).catch(() => {});
   }
 
@@ -223,6 +231,10 @@ export default function NotificationsBell() {
     if (!title.trim()) return;
     if (target === "USER" && !targetUser) {
       setSendMsg("Chưa chọn người nhận.");
+      return;
+    }
+    if (target === "DEPARTMENT" && !targetDepartment) {
+      setSendMsg("Chưa chọn phòng ban nhận thông báo.");
       return;
     }
     setSending(true);
@@ -233,11 +245,13 @@ export default function NotificationsBell() {
         body: body.trim() || null,
         target,
         target_user_id: target === "USER" ? Number(targetUser) : null,
+        target_department: target === "DEPARTMENT" ? targetDepartment : null,
       });
       setSendMsg(`Đã gửi tới ${res.sent} người.`);
       setTitle("");
       setBody("");
       setTargetUser("");
+      setTargetDepartment("");
     } catch (e: unknown) {
       setSendMsg(e instanceof Error ? e.message : "Gửi thất bại.");
     } finally {
@@ -314,6 +328,19 @@ export default function NotificationsBell() {
                         <option key={t.value} value={t.value}>{t.label}</option>
                       ))}
                     </select>
+                    {target === "DEPARTMENT" && (
+                      <select
+                        aria-label="Phòng ban nhận thông báo"
+                        value={targetDepartment}
+                        onChange={(e) => setTargetDepartment(e.target.value)}
+                        className="w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-xs outline-none focus:border-steel"
+                      >
+                        <option value="">— Chọn phòng ban —</option>
+                        {departmentNames.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    )}
                     {target === "USER" && (
                       <select
                         value={targetUser}

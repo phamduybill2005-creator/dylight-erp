@@ -1,7 +1,7 @@
 """
 Router Thông báo nội bộ — Giám đốc/Quản lý gửi cho cấp dưới hoặc toàn thể.
 Mỗi người nhận = 1 bản ghi (fan-out) để theo dõi đã đọc/chưa đọc riêng.
-Phạm vi gửi: USER (1 người) | MANAGERS (quản lý) | STAFF (nhân viên) | EVERYONE.
+Phạm vi gửi: USER (1 người) | MANAGERS (quản lý) | STAFF (nhân viên) | EVERYONE | DEPARTMENT.
 Kèm nhắc ĐÁNH GIÁ HẰNG THÁNG: từ 8:00 ngày 27 mọi người nhận 1 thông báo từ "Hệ thống".
 """
 import threading
@@ -56,7 +56,10 @@ def _ensure_eval_reminder(db: Session, user: User) -> None:
         _eval_reminded.add(key)
 
 
-def _resolve_recipients(db: Session, sender: User, target: str, target_user_id: int | None):
+def _resolve_recipients(
+    db: Session, sender: User, target: str, target_user_id: int | None,
+    target_department: str | None = None,
+):
     base = db.query(User).filter(
         User.company_id == sender.company_id, User.is_active == True  # noqa: E712
     )
@@ -73,6 +76,16 @@ def _resolve_recipients(db: Session, sender: User, target: str, target_user_id: 
         return base.filter(User.role == UserRole.FIELD_STAFF).all()
     if target == "EVERYONE":
         return base.all()
+    if target == "DEPARTMENT":
+        department = " ".join((target_department or "").split()).casefold()
+        if not department:
+            raise HTTPException(400, "Chưa chọn phòng ban nhận thông báo.")
+        return [
+            u for u in base.filter(User.department.isnot(None)).all()
+            if department in {
+                " ".join(d.split()).casefold() for d in (u.department or "").split(",")
+            }
+        ]
     raise HTTPException(400, "Phạm vi gửi không hợp lệ.")
 
 
@@ -87,13 +100,17 @@ def send_notification(
         raise HTTPException(403, "Chỉ Giám đốc/Quản trị được gửi cho nhóm này.")
     if target == "STAFF" and current.role not in _MANAGERS_UP:
         raise HTTPException(403, "Bạn không có quyền gửi cho toàn bộ nhân viên.")
+    if target == "DEPARTMENT" and current.role not in (*_MANAGERS_UP, UserRole.MANAGER_MID):
+        raise HTTPException(403, "Chỉ Giám đốc/Quản trị/Quản lý được gửi theo phòng ban.")
     # Nhân viên (FIELD_STAFF) chỉ được gửi thông báo cho QUẢN LÝ TRỰC TIẾP của mình
     # (tránh spam người khác; muốn nhắn đồng nghiệp đã có Chat).
     if target == "USER" and current.role == UserRole.FIELD_STAFF:
         if not current.manager_id or payload.target_user_id != current.manager_id:
             raise HTTPException(403, "Nhân viên chỉ gửi thông báo cho quản lý trực tiếp; hãy dùng Chat để nhắn người khác.")
 
-    recipients = [u for u in _resolve_recipients(db, current, target, payload.target_user_id)
+    recipients = [u for u in _resolve_recipients(
+        db, current, target, payload.target_user_id, payload.target_department,
+    )
                   if u.id != current.id]
     if not recipients:
         raise HTTPException(400, "Không có người nhận phù hợp.")
