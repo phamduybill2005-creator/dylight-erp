@@ -14,7 +14,7 @@ một phiếu (gửi lại thì ghi đè); kỳ tuần (period = Thứ 7) tự s
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -263,7 +263,8 @@ def evaluation_overview(
     current: User = Depends(require_roles(*_TABLE_ROLES)),
 ):
     """Bảng đánh giá tháng (GĐ / Quản trị / QL cấp cao / QL cấp trung): mỗi người đang làm
-    trong khoảng ngày, TRỪ chính mình và Giám đốc (không ai được chấm Giám đốc).
+    trong khoảng ngày, bao gồm chính mình; chỉ hiện Giám đốc khi đó là người đang xem.
+    Dòng của chính mình chỉ để xem số liệu, không được tự chấm sao.
       - office_hours : giờ có mặt theo chấm công, đã trừ nghỉ trưa (như "tổng giờ" ở Tổng hợp).
       - project_hours: tổng giờ khai ở bảng tiến độ dự án (timesheets).
       - late_days    : số ngày đi muộn, đã miễn ngày có đơn đi muộn được duyệt.
@@ -276,7 +277,8 @@ def evaluation_overview(
     users = (
         db.query(User)
         .filter(
-            User.company_id == cid, User.id != current.id, User.role != UserRole.DIRECTOR,
+            User.company_id == cid,
+            or_(User.role != UserRole.DIRECTOR, User.id == current.id),
             User.is_active.is_(True), User.is_approved.is_(True),
         )
         .all()

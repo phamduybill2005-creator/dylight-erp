@@ -298,6 +298,7 @@ export default function EvaluationsPage() {
   // Bấm sao: lưu phiếu CHUNG (không gắn dự án) vào NGÀY 1 của tháng đang xem — cùng 1 ngày nên
   // bấm sao khác là SỬA phiếu đó. Bấm lại ĐÚNG sao đang chọn = BỎ SAO (xoá phiếu tháng đó).
   async function rateUser(uid: number, stars: number) {
+    if (uid === user?.id) return;
     const before = overview.find((r) => r.user_id === uid)?.my_rating ?? null;
     const unrate = before === stars;
     const setMine = (v: number | null) =>
@@ -601,11 +602,11 @@ export default function EvaluationsPage() {
 
   // ===== GIÁM ĐỐC / QUẢN TRỊ / QL CẤP CAO / QL CẤP TRUNG: bảng đánh giá THÁNG =====
   if (usesMonthTable) {
-    // Bảng tháng: KHÔNG hiện Giám đốc; xếp theo cấp bậc rồi tên — KHÔNG theo sao để hàng
-    // không nhảy khi bấm. Xuất Excel dùng chính danh sách này nên cũng bỏ Giám đốc.
+    // Bảng tháng gồm chính mình (kể cả Giám đốc); xếp theo cấp bậc rồi tên để hàng
+    // không nhảy khi bấm sao. Xuất Excel dùng chính danh sách đang xem.
     // Người thuộc nhiều phòng ("Phòng Bản đồ, Phòng AI") được tính ở TỪNG phòng, giống bộ lọc các trang khác.
     const rows = overview
-      .filter((r) => r.role !== "DIRECTOR")
+      .filter((r) => r.role !== "DIRECTOR" || r.user_id === user.id)
       .filter((r) => !selDept || splitDepts(r.department).map(normalizeDept).includes(selDept))
       .sort((x, y) => userRankWeight(x) - userRankWeight(y) || x.full_name.localeCompare(y.full_name, "vi"));
     const hoursCell = (h: number) =>
@@ -694,7 +695,11 @@ export default function EvaluationsPage() {
                   </div>
                   <div className="flex min-h-14 items-center justify-between gap-2 px-3 py-2">
                     <span className="text-xs font-semibold text-muted">Đánh giá tháng</span>
-                    <RateStars value={r.my_rating ?? 0} busy={ratingUid === r.user_id} onRate={(n) => rateUser(r.user_id, n)} />
+                    {r.user_id === user.id ? (
+                      <span className="text-xs text-muted" title="Không thể tự đánh giá chính mình.">Chính bạn</span>
+                    ) : (
+                      <RateStars value={r.my_rating ?? 0} busy={ratingUid === r.user_id} onRate={(n) => rateUser(r.user_id, n)} />
+                    )}
                   </div>
                   {openUid === r.user_id && <div className="border-t border-line bg-paper/60 px-3 py-2"><ProjectHoursDetail data={projHours[`${r.user_id}:${selMonth}`]} month={selMonth} /></div>}
                 </article>
@@ -746,11 +751,15 @@ export default function EvaluationsPage() {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex justify-center">
-                          <RateStars
-                            value={r.my_rating ?? 0}
-                            busy={ratingUid === r.user_id}
-                            onRate={(n) => rateUser(r.user_id, n)}
-                          />
+                          {r.user_id === user.id ? (
+                            <span className="text-xs text-muted" title="Không thể tự đánh giá chính mình.">Chính bạn</span>
+                          ) : (
+                            <RateStars
+                              value={r.my_rating ?? 0}
+                              busy={ratingUid === r.user_id}
+                              onRate={(n) => rateUser(r.user_id, n)}
+                            />
+                          )}
                         </div>
                       </td>
                     </tr>
