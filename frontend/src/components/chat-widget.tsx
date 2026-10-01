@@ -27,6 +27,7 @@ import {
 import { api } from "@/lib/api";
 import { useNicknames } from "@/lib/nicknames";
 import { useEscapeKey } from "@/lib/use-escape-key";
+import { createChatNotificationTracker, dispatchDesktopClick, DESKTOP_CLICK_EVENT, showDesktopNotification, type DesktopClick } from "@/lib/desktop-notifications";
 import type { Conversation, ChatMessage, Colleague, User } from "@/lib/types";
 
 const POLL_MS = 8000;
@@ -152,7 +153,8 @@ export default function ChatWidget() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const draftRef = useRef<HTMLTextAreaElement | null>(null);
   const activeId = active?.id ?? null;
-  const [lastConvStates, setLastConvStates] = useState<Record<number, { unread: number; lastMsgAt: string | null }>>({});
+  const trackChat = useRef(createChatNotificationTracker());
+  const refreshingList = useRef(false);
 
   // Đóng picker emoji / info nhóm / tạo phòng / đoạn chat / cửa sổ chat khi bấm ESC
   useEscapeKey(() => {
@@ -164,43 +166,45 @@ export default function ChatWidget() {
     else if (open) setOpen(false);
   }, Boolean(showEmoji || reactFor !== null || showGroupInfo || creating || active || open));
 
-  const showDesktopNotification = useCallback((titleStr: string, bodyStr: string) => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission === "granted") {
-      new Notification(titleStr, { body: bodyStr });
-    } else if (Notification.permission !== "denied") {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          new Notification(titleStr, { body: bodyStr });
-        }
-      });
-    }
-  }, []);
-
   const refreshUnread = useCallback(() => {
     api.chatUnreadCount().then((r) => setUnread(r.count)).catch(() => {});
   }, []);
 
   const refreshList = useCallback(() => {
+    if (refreshingList.current) return;
+    refreshingList.current = true;
     api.chatConversations().then((newList) => {
       setList(newList);
-      setLastConvStates((prev) => {
-        const nextStates = { ...prev };
-        newList.forEach((c) => {
-          const prevState = prev[c.id];
-          const hasNewUnread = c.unread > 0 && (!prevState || c.unread > prevState.unread || c.last_message_at !== prevState.lastMsgAt);
-          if (hasNewUnread && c.last_message) {
-            if (activeId !== c.id) {
-              const title = convTitle(c, me?.id, nick);
-              showDesktopNotification(`Tin nhắn mới từ ${title}`, c.last_message);
-            }
-          }
-          nextStates[c.id] = { unread: c.unread, lastMsgAt: c.last_message_at || null };
+      const visible = document.visibilityState === "visible" && document.hasFocus();
+      trackChat.current(newList, activeId, visible).forEach((c) => {
+        const title = convTitle(c, me?.id, nick);
+        showDesktopNotification(`Tin nhắn mới từ ${title}`, {
+          body: c.last_message || "", tag: `dosco-chat-${c.id}`,
+        }, () => {
+          dispatchDesktopClick({ kind: "chat", conversationId: c.id });
         });
-        return nextStates;
       });
-    }).catch(() => {});
-  }, [activeId, me?.id, nick, showDesktopNotification]);
+    }).catch(() => {}).finally(() => { refreshingList.current = false; });
+  }, [activeId, me?.id, nick]);
+
+  useEffect(() => {
+    const onDesktopClick = (event: Event) => {
+      const detail = (event as CustomEvent<DesktopClick>).detail;
+      if (detail?.kind !== "chat") return;
+      void api.chatConversations().then(async (rooms) => {
+        const conversation = rooms.find((room) => room.id === detail.conversationId);
+        if (!conversation) return;
+        persisted.open = true;
+        persisted.activeId = conversation.id;
+        setOpen(true);
+        await openConversation(conversation);
+      }).catch(() => {});
+    };
+    window.addEventListener(DESKTOP_CLICK_EVENT, onDesktopClick);
+    return () => window.removeEventListener(DESKTOP_CLICK_EVENT, onDesktopClick);
+    // openConversation dùng router/pathname của trang đang hiển thị.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, router, refreshUnread]);
 
   const refreshMessages = useCallback((id: number) => {
     api.chatMessages(id).then(setMessages).catch(() => {});
@@ -209,11 +213,6 @@ export default function ChatWidget() {
   // Nạp người đăng nhập 1 lần.
   useEffect(() => {
     api.me().then(setMe).catch(() => {});
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-        Notification.requestPermission();
-      }
-    }
   }, []);
 
   // Cho phép các trang khác mở nhóm chat của 1 dự án qua sự kiện toàn cục

@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
 import { projectsDueToday, type DeadlineAlertEntry } from "@/lib/deadline-alert";
 import { todayLocal } from "@/lib/format";
+import { desktopPermission, requestDesktopPermission, showDesktopNotification, dispatchDesktopClick, DESKTOP_CLICK_EVENT, type DesktopClick, type DesktopPermission } from "@/lib/desktop-notifications";
 import type { User } from "@/lib/types";
 
 // Mốc THỜI ĐIỂM (epoch ms) lần nhắc gần nhất — để giới hạn tối đa 15 phút/lần.
@@ -62,51 +63,52 @@ function playAlertSound(): void {
 export default function DeadlineAlert({ user }: { user: User | null }) {
   const [near, setNear] = useState<DeadlineAlertEntry[]>([]);
   const [open, setOpen] = useState(false);
-  const [canNotify, setCanNotify] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [canNotify, setCanNotify] = useState<DesktopPermission>("unsupported");
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    setCanNotify(Notification.permission);
+    const refresh = () => setCanNotify(desktopPermission());
+    refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   /** Bắn thông báo lên DESKTOP (hiện cả khi đang ở tab/app khác). */
   const notifyDesktop = useCallback((list: DeadlineAlertEntry[]) => {
-    try {
-      if (typeof window === "undefined" || !("Notification" in window)) return;
-      if (Notification.permission !== "granted") return;
-      const first = list[0];
-      if (!first) return;
-      const n = new Notification("🔔 NHẮC HẠN NỘP HÔM NAY", {
-        body:
-          `${list.length} dự án đến hạn nộp hôm nay.\n` +
-          `${first.p.name} — hạn ${first.due}`,
-        icon: "/logo.png",
-        badge: "/logo.png",
-        tag: "dosco-deadline",
-        requireInteraction: true,
-      });
-      n.onclick = () => { window.focus(); n.close(); };
-    } catch {
-      /* noop */
-    }
+    const first = list[0];
+    if (!first) return;
+    showDesktopNotification("🔔 NHẮC HẠN NỘP HÔM NAY", {
+      body:
+        `${list.length} dự án đến hạn nộp hôm nay.\n` +
+        `${first.p.name} — hạn ${first.due}`,
+      tag: "dosco-deadline",
+      requireInteraction: true,
+    }, () => dispatchDesktopClick({ kind: "deadline", entries: list }));
   }, []);
+
+  useEffect(() => {
+    if (!user || roleTier(user.role) !== "DIRECTOR") return;
+    const onDesktopClick = (event: Event) => {
+      const detail = (event as CustomEvent<DesktopClick>).detail;
+      if (detail?.kind !== "deadline") return;
+      const list = projectsDueToday(detail.entries.map((entry) => entry.p), todayLocal());
+      if (!list.length) return;
+      setNear(list);
+      setOpen(true);
+    };
+    window.addEventListener(DESKTOP_CLICK_EVENT, onDesktopClick);
+    return () => window.removeEventListener(DESKTOP_CLICK_EVENT, onDesktopClick);
+  }, [user]);
 
   /** Kêu + báo desktop ngay lập tức (dùng cho lần đầu và mỗi lần nhắc lại). */
   const alertNow = useCallback(
     (list: DeadlineAlertEntry[]) => {
       playAlertSound();
-      if (typeof window === "undefined" || !("Notification" in window)) return;
-      if (Notification.permission === "granted") {
-        notifyDesktop(list);
-      } else if (Notification.permission === "default") {
-        Notification.requestPermission()
-          .then((perm) => {
-            setCanNotify(perm);
-            if (perm === "granted") notifyDesktop(list);
-          })
-          .catch(() => {});
-      }
+      notifyDesktop(list);
     },
     [notifyDesktop],
   );
@@ -154,19 +156,11 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
   }
 
   /** Nút kiểm tra: xin quyền (cần cú bấm của người dùng) + kêu thử + bắn thử thông báo. */
-  function testAlert() {
+  async function testAlert() {
     playAlertSound();
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission === "granted") {
-      notifyDesktop(near);
-      return;
-    }
-    Notification.requestPermission()
-      .then((perm) => {
-        setCanNotify(perm);
-        if (perm === "granted") notifyDesktop(near);
-      })
-      .catch(() => {});
+    const permission = await requestDesktopPermission();
+    setCanNotify(permission);
+    if (permission === "granted") notifyDesktop(near);
   }
 
   if (!open || near.length === 0) return null;
@@ -205,8 +199,10 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
         {canNotify !== "granted" && (
           <p className="border-t border-line bg-amber/10 px-4 py-2 text-[11px] text-amber-deep">
             {canNotify === "denied"
-              ? "Thông báo desktop đang bị CHẶN — mở khóa ở biểu tượng ổ khóa trên thanh địa chỉ để nhận báo khi không mở app."
-              : "Bấm “Bật thông báo + kêu thử” để cho phép báo trên desktop."}
+              ? "Thông báo desktop đang bị CHẶN — chọn Cho phép trong cài đặt trang bên trái thanh địa chỉ. Giữ một tab DOSCO mở để nhận báo."
+              : canNotify === "unsupported"
+              ? "Trình duyệt chưa hỗ trợ thông báo desktop. Hãy mở DOSCO bằng HTTPS trên Chrome/Edge máy tính."
+              : "Bấm “Bật thông báo + kêu thử” để cho phép báo desktop khi giữ một tab DOSCO mở."}
           </p>
         )}
 

@@ -4,7 +4,7 @@
 // Quyền gửi: Giám đốc → mọi người / các quản lý / nhân viên / phòng ban / 1 người;
 //            Quản lý  → nhân viên / phòng ban / 1 người;  Nhân viên → chỉ nhận.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon, TrashIcon } from "@heroicons/react/24/outline";
@@ -14,6 +14,8 @@ import { roleTier } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { useNicknames } from "@/lib/nicknames";
 import { useEscapeKey } from "@/lib/use-escape-key";
+import { createUnreadNotificationTracker, createRefreshQueue, dispatchDesktopClick, DESKTOP_CLICK_EVENT, showDesktopNotification, type DesktopClick } from "@/lib/desktop-notifications";
+import DesktopNotificationControl from "./desktop-notification-control";
 import type { Department, Notification, User } from "@/lib/types";
 
 const TARGETS_DIRECTOR = [
@@ -76,7 +78,7 @@ export default function NotificationsBell() {
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState("");
 
-  const [lastNotificationIds, setLastNotificationIds] = useState<Set<number>>(new Set());
+  const trackUnread = useRef(createUnreadNotificationTracker());
 
   const nick = useNicknames();
   const tier = me ? roleTier(me.role) : "STAFF";
@@ -90,63 +92,38 @@ export default function NotificationsBell() {
     else if (open) setOpen(false);
   }, Boolean(compose || open));
 
-  const showDesktopNotification = useCallback((n: Notification) => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    const show = () => {
-      try {
-        const notif = new Notification(n.title, { body: n.body || "" });
-        notif.onclick = () => {
-          window.focus();
-          const url = getNotificationUrl(n);
-          if (url) {
-            router.push(url);
-          }
-        };
-      } catch {
-        /* noop */
-      }
-    };
-    if (Notification.permission === "granted") {
-      show();
-    } else if (Notification.permission !== "denied") {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          show();
-        }
-      });
-    }
-  }, [router]);
+  const notifyDesktop = useCallback((n: Notification) => {
+    showDesktopNotification(n.title, { body: n.body || "", tag: `dosco-notification-${n.id}` }, () => {
+      dispatchDesktopClick({ kind: "notification", notification: n });
+    });
+  }, []);
 
   const refreshUnread = useCallback(() => {
     api.unreadCount().then((r) => setUnread(r.count)).catch(() => {});
   }, []);
 
-  const refreshItems = useCallback(() => {
-    api.notifications().then((newItems) => {
-      setItems(newItems);
-      setLastNotificationIds((prevIds) => {
-        const nextIds = new Set(newItems.map((x) => x.id));
-        if (prevIds.size > 0) {
-          const newUnread = newItems.filter((x) => !x.is_read && !prevIds.has(x.id));
-          if (newUnread.length > 0) {
-            newUnread.forEach((n) => {
-              showDesktopNotification(n);
-            });
-          }
-        }
-        return nextIds;
-      });
-    }).catch(() => {});
-  }, [showDesktopNotification]);
+  const refreshItems = useMemo(() => createRefreshQueue(async () => {
+    const newItems = await api.notifications();
+    setItems(newItems);
+    trackUnread.current(newItems).forEach(notifyDesktop);
+  }), [notifyDesktop]);
+
+  useEffect(() => {
+    const onDesktopClick = (event: Event) => {
+      const detail = (event as CustomEvent<DesktopClick>).detail;
+      if (detail?.kind !== "notification") return;
+      handleNotificationClick(detail.notification);
+      if (!getNotificationUrl(detail.notification)) setOpen(true);
+    };
+    window.addEventListener(DESKTOP_CLICK_EVENT, onDesktopClick);
+    return () => window.removeEventListener(DESKTOP_CLICK_EVENT, onDesktopClick);
+    // Chỉ router thay đổi giữa các trang; các setter React luôn ổn định.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
 
   // Nạp thông tin người đăng nhập 1 lần khi mở app.
   useEffect(() => {
     api.me().then(setMe).catch(() => {});
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-        Notification.requestPermission();
-      }
-    }
   }, []);
 
   // Nạp lần đầu, rồi để useAutoRefresh lo phần cập nhật: có thông báo mới là
@@ -159,7 +136,7 @@ export default function NotificationsBell() {
   useAutoRefresh(() => {
     refreshUnread();
     refreshItems();
-  }, { topics: ["notification"] });
+  }, { topics: ["notification"], background: true });
 
   async function openPanel() {
     setOpen(true);
@@ -307,6 +284,8 @@ export default function NotificationsBell() {
                 </button>
               </div>
             </header>
+
+            <DesktopNotificationControl />
 
             {canCompose && (
               <div className="border-b border-line bg-white px-4 py-2">

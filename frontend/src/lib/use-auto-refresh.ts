@@ -19,6 +19,8 @@ export const FALLBACK_MS_OFFLINE = 15_000;
 type Options = {
   /** Tạm dừng khi chưa sẵn sàng (chưa đăng nhập xong) hoặc đang mở form sửa. */
   enabled?: boolean;
+  /** Nhận thông báo desktop dù tab đang nằm nền. Chỉ bật cho luồng thông báo. */
+  background?: boolean;
   /**
    * Chỉ nạp lại khi máy chủ báo đúng mục này đổi (vd ["leave", "schedule"]).
    * Bỏ trống = nạp lại với mọi thay đổi.
@@ -42,7 +44,7 @@ type Options = {
  * `reload` giữ trong ref nên trang KHÔNG cần bọc useCallback.
  */
 export function useAutoRefresh(reload: () => void, options: Options = {}) {
-  const { enabled = true, topics, intervalMs } = options;
+  const { enabled = true, background = false, topics, intervalMs } = options;
   const fn = useRef(reload);
   fn.current = reload;
 
@@ -55,7 +57,7 @@ export function useAutoRefresh(reload: () => void, options: Options = {}) {
     const wanted = topicKey ? new Set(topicKey.split(",")) : null;
 
     const run = () => {
-      if (typeof document === "undefined" || document.visibilityState === "visible") {
+      if (background || typeof document === "undefined" || document.visibilityState === "visible") {
         fn.current();
       }
     };
@@ -88,5 +90,5 @@ export function useAutoRefresh(reload: () => void, options: Options = {}) {
       document.removeEventListener("visibilitychange", run);
       window.removeEventListener("focus", run);
     };
-  }, [enabled, topicKey, intervalMs]);
+  }, [enabled, background, topicKey, intervalMs]);
 }
