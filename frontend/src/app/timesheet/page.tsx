@@ -450,9 +450,9 @@ export default function TimesheetPage() {
                 <button type="button" onClick={() => togglePin(project.id)} className="flex h-11 w-9 shrink-0 items-start justify-center pt-1" aria-label={pinned ? "Bỏ ghim dự án" : "Ghim dự án"}>
                   {pinned ? <StarIconSolid className="h-5 w-5 text-amber" /> : <StarIconOutline className="h-5 w-5 text-slate-300" />}
                 </button>
-                <Link href={`/projects/${project.id}`} className="min-w-0 flex-1 py-0.5">
-                  <span className="block font-mono text-xs font-bold text-bad">{project.code}</span>
-                  <span className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-ink">{project.name}</span>
+                <Link href={`/projects/${project.id}`} className="flex min-w-0 flex-1 items-center gap-1 whitespace-nowrap py-0.5" title={`${project.code} ${project.name}`}>
+                  <span className="shrink-0 font-mono text-xs font-bold text-bad">{project.code}</span>
+                  <span className="min-w-0 truncate text-sm font-semibold leading-snug text-ink">{project.name}</span>
                 </Link>
                 <div className="shrink-0 text-right">
                   <p className="text-lg font-extrabold text-steel tnum">{num1(summary.totalHours)}h</p>
@@ -594,12 +594,12 @@ export default function TimesheetPage() {
                             {/* Mã + Tên dự án — bấm để mở trang chi tiết dự án */}
                             <Link
                               href={`/projects/${p.id}`}
-                              className="group min-w-0 flex-1 rounded focus-visible:outline-steel"
-                              title={`${p.name} — mở chi tiết dự án`}
+                              className={`group flex min-w-0 flex-1 items-center gap-1 whitespace-nowrap rounded ${isMonth ? "text-[10px]" : "text-[11px]"} focus-visible:outline-steel`}
+                              title={`${p.code} ${p.name} — mở chi tiết dự án`}
                             >
-                              <span className="font-mono text-[9px] font-bold text-bad leading-none block truncate">{p.code}</span>
+                              <span className="shrink-0 font-mono font-bold text-bad">{p.code}</span>
                               <span
-                                className={`block ${isMonth ? "max-w-[95px] lg:max-w-[125px] text-[10px]" : "max-w-[160px] text-[11px]"} truncate font-medium text-ink leading-tight group-hover:text-steel group-hover:underline`}
+                                className="min-w-0 truncate font-medium text-ink leading-tight group-hover:text-steel group-hover:underline"
                               >
                                 {p.name}
                               </span>
