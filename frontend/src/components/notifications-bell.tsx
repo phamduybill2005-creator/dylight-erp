@@ -5,6 +5,7 @@
 //            Quản lý  → nhân viên / 1 người;  Nhân viên → chỉ nhận.
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
@@ -25,10 +26,37 @@ const TARGETS_MANAGER = [
   { value: "USER", label: "Một người cụ thể" },
 ];
 
+function getNotificationUrl(n: Notification): string | null {
+  const text = `${n.title} ${n.body || ""}`.toLowerCase();
+  if (
+    text.includes("nghỉ phép") ||
+    text.includes("xin nghỉ") ||
+    text.includes("đi muộn") ||
+    text.includes("đơn nghỉ") ||
+    text.includes("duyệt đơn")
+  ) {
+    return "/leave";
+  }
+  if (text.includes("đánh giá")) {
+    return "/evaluations";
+  }
+  if (text.includes("lịch làm việc")) {
+    return "/work-schedule";
+  }
+  if (text.includes("chấm công")) {
+    return "/attendance";
+  }
+  if (text.includes("giao việc") || text.includes("dự án")) {
+    return "/projects";
+  }
+  return null;
+}
+
 const fmt = (iso: string) =>
   new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export default function NotificationsBell() {
+  const router = useRouter();
   const [me, setMe] = useState<User | null>(null);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -56,18 +84,32 @@ export default function NotificationsBell() {
     else if (open) setOpen(false);
   }, Boolean(compose || open));
 
-  const showDesktopNotification = useCallback((titleStr: string, bodyStr: string) => {
+  const showDesktopNotification = useCallback((n: Notification) => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
+    const show = () => {
+      try {
+        const notif = new Notification(n.title, { body: n.body || "" });
+        notif.onclick = () => {
+          window.focus();
+          const url = getNotificationUrl(n);
+          if (url) {
+            router.push(url);
+          }
+        };
+      } catch {
+        /* noop */
+      }
+    };
     if (Notification.permission === "granted") {
-      new Notification(titleStr, { body: bodyStr });
+      show();
     } else if (Notification.permission !== "denied") {
       Notification.requestPermission().then((permission) => {
         if (permission === "granted") {
-          new Notification(titleStr, { body: bodyStr });
+          show();
         }
       });
     }
-  }, []);
+  }, [router]);
 
   const refreshUnread = useCallback(() => {
     api.unreadCount().then((r) => setUnread(r.count)).catch(() => {});
@@ -82,7 +124,7 @@ export default function NotificationsBell() {
           const newUnread = newItems.filter((x) => !x.is_read && !prevIds.has(x.id));
           if (newUnread.length > 0) {
             newUnread.forEach((n) => {
-              showDesktopNotification(n.title, n.body || "");
+              showDesktopNotification(n);
             });
           }
         }
@@ -144,6 +186,19 @@ export default function NotificationsBell() {
       setUnread((u) => Math.max(0, u - 1));
     } catch {
       /* noop */
+    }
+  }
+
+  function handleNotificationClick(n: Notification) {
+    void markRead(n);
+    const targetUrl = getNotificationUrl(n);
+    if (targetUrl) {
+      setOpen(false);
+      setCompose(false);
+      router.push(targetUrl);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("focus"));
+      }
     }
   }
 
@@ -306,34 +361,46 @@ export default function NotificationsBell() {
               {items.length === 0 ? (
                 <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">Chưa có thông báo nào.</p>
               ) : (
-                items.map((n) => (
-                  // Nút xoá đặt NGOÀI nút "đánh dấu đã đọc" (không lồng button trong button), neo góc phải.
-                  <div key={n.id} className="relative">
-                    <button
-                      onClick={() => markRead(n)}
-                      className={`block w-full rounded-xl2 border-l-4 bg-white p-3 pr-10 text-left shadow-card ${n.is_read ? "border-transparent" : "border-amber"}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm text-ink ${n.is_read ? "font-medium" : "font-bold"}`}>{n.title}</p>
-                        {!n.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber" />}
-                      </div>
-                      {n.body && <p className="mt-1 whitespace-pre-line break-words [overflow-wrap:anywhere] text-xs text-muted">{n.body}</p>}
-                      <p className="mt-1 text-[10px] text-muted">{nick(n.sender_id, n.sender_name) || "Hệ thống"} · {fmt(n.created_at)}</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void removeNotification(n);
-                      }}
-                      title="Xóa thông báo này"
-                      aria-label="Xóa thông báo"
-                      className="absolute right-2 top-2 rounded-full p-1.5 text-slate-400 hover:bg-bad/10 hover:text-bad focus-visible:outline-steel"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))
+                items.map((n) => {
+                  const targetUrl = getNotificationUrl(n);
+                  return (
+                    // Nút xoá đặt NGOÀI nút "đánh dấu đã đọc" (không lồng button trong button), neo góc phải.
+                    <div key={n.id} className="group relative">
+                      <button
+                        onClick={() => handleNotificationClick(n)}
+                        className={`block w-full rounded-xl2 border-l-4 bg-white p-3 pr-10 text-left shadow-card transition-colors hover:bg-slate-50 active:bg-slate-100 ${
+                          n.is_read ? "border-transparent" : "border-amber"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={`text-sm text-ink ${n.is_read ? "font-medium" : "font-bold"}`}>{n.title}</p>
+                          {!n.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber" />}
+                        </div>
+                        {n.body && <p className="mt-1 whitespace-pre-line break-words [overflow-wrap:anywhere] text-xs text-muted">{n.body}</p>}
+                        <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-muted">
+                          <span>{nick(n.sender_id, n.sender_name) || "Hệ thống"} · {fmt(n.created_at)}</span>
+                          {targetUrl && (
+                            <span className="font-semibold text-steel/80 group-hover:text-amber transition-colors flex items-center gap-0.5">
+                              {targetUrl === "/leave" ? "Xem đơn nghỉ phép" : "Xem chi tiết"} &rarr;
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void removeNotification(n);
+                        }}
+                        title="Xóa thông báo này"
+                        aria-label="Xóa thông báo"
+                        className="absolute right-2 top-2 rounded-full p-1.5 text-slate-400 hover:bg-bad/10 hover:text-bad focus-visible:outline-steel"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
