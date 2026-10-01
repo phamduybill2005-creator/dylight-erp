@@ -15,7 +15,6 @@ import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { useNicknames } from "@/lib/nicknames";
 import { useEscapeKey } from "@/lib/use-escape-key";
 import { createUnreadNotificationTracker, createRefreshQueue, dispatchDesktopClick, DESKTOP_CLICK_EVENT, showDesktopNotification, type DesktopClick } from "@/lib/desktop-notifications";
-import DesktopNotificationControl from "./desktop-notification-control";
 import type { Department, Notification, User } from "@/lib/types";
 
 const TARGETS_DIRECTOR = [
@@ -284,8 +283,6 @@ export default function NotificationsBell() {
                 </button>
               </div>
             </header>
-
-            <DesktopNotificationControl />
 
             {canCompose && (
               <div className="border-b border-line bg-white px-4 py-2">

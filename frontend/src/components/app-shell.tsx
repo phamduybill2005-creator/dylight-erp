@@ -36,6 +36,7 @@ import AccountMenu from "./account-menu";
 import DeadlineAlert from "./deadline-alert";
 import EvaluationAlert from "./evaluation-alert";
 import { buildMobileNavigation } from "@/lib/mobile-navigation";
+import { watchDesktopPermission } from "@/lib/desktop-notifications";
 
 type IconType = React.ComponentType<{ className?: string }>;
 type NavLink = { href: string; label: string; icon: IconType };
@@ -108,6 +109,11 @@ export default function AppShell({
     }
     api.me().then(setUser).catch(() => router.replace("/login"));
   }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+    return watchDesktopPermission();
+  }, [user?.id]);
 
   function logout() {
     tokenStore.clear();

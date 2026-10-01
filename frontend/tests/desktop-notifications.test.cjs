@@ -158,3 +158,109 @@ test("a live refresh arriving during a request is queued and overlapping request
   await new Promise(setImmediate);
   assert.equal(requests, 2);
 });
+
+test("native permission is requested on the first user gesture, once across page changes", async () => {
+  const { watchDesktopPermission } = helpers();
+  assert.equal(typeof watchDesktopPermission, "function", "automatic permission flow is missing");
+  let prompts = 0;
+  class BrowserNotification {
+    static permission = "default";
+    static requestPermission() { prompts++; return Promise.resolve("default"); }
+  }
+  const events = new EventTarget();
+  Object.assign(events, { Notification: BrowserNotification, isSecureContext: true, navigator: { userActivation: { isActive: true } } });
+  global.window = events;
+  try {
+    const clean = watchDesktopPermission();
+    assert.equal(prompts, 0, "mounting alone must not ask without a user gesture");
+    events.dispatchEvent(new Event("click"));
+    assert.equal(prompts, 1);
+    await new Promise(setImmediate);
+    events.dispatchEvent(new Event("keydown"));
+    clean();
+    const cleanNextPage = watchDesktopPermission();
+    events.dispatchEvent(new Event("click"));
+    assert.equal(prompts, 1, "dismissing the prompt must not cause repeated requests after navigation");
+    cleanNextPage();
+  } finally { delete global.window; }
+});
+
+test("permission flow respects existing grants, blocks and unsupported browsers", () => {
+  const { watchDesktopPermission } = helpers();
+  assert.equal(typeof watchDesktopPermission, "function");
+  let prompts = 0;
+  class BrowserNotification {
+    static permission = "granted";
+    static requestPermission() { prompts++; return Promise.resolve("granted"); }
+  }
+  const events = new EventTarget();
+  Object.assign(events, { Notification: BrowserNotification, isSecureContext: true, navigator: { userActivation: { isActive: true } } });
+  global.window = events;
+  try {
+    for (const permission of ["granted", "denied"]) {
+      BrowserNotification.permission = permission;
+      const clean = watchDesktopPermission();
+      events.dispatchEvent(new Event("click"));
+      clean();
+    }
+    delete events.Notification;
+    const clean = watchDesktopPermission();
+    events.dispatchEvent(new Event("click"));
+    clean();
+    assert.equal(prompts, 0);
+  } finally { delete global.window; }
+});
+
+test("non-user events do not request permission and unmount removes pending listeners", () => {
+  const { watchDesktopPermission } = helpers();
+  assert.equal(typeof watchDesktopPermission, "function");
+  let prompts = 0;
+  class BrowserNotification {
+    static permission = "default";
+    static requestPermission() { prompts++; return Promise.resolve("granted"); }
+  }
+  const activation = { isActive: false };
+  const events = new EventTarget();
+  Object.assign(events, { Notification: BrowserNotification, isSecureContext: true, navigator: { userActivation: activation } });
+  global.window = events;
+  try {
+    const clean = watchDesktopPermission();
+    events.dispatchEvent(new Event("click"));
+    assert.equal(prompts, 0);
+    activation.isActive = true;
+    events.dispatchEvent(new Event("keydown"));
+    assert.equal(prompts, 1);
+    clean();
+    // A fresh module models a new document where no gesture has occurred yet.
+    const nextClean = helpers().watchDesktopPermission();
+    nextClean();
+    events.dispatchEvent(new Event("click"));
+    assert.equal(prompts, 1);
+  } finally { delete global.window; }
+});
+
+test("the first click still requests permission when a child stops event bubbling", () => {
+  const { watchDesktopPermission } = helpers();
+  let prompts = 0;
+  const listeners = [];
+  class BrowserNotification {
+    static permission = "default";
+    static requestPermission() { prompts++; return Promise.resolve("granted"); }
+  }
+  global.window = {
+    Notification: BrowserNotification, isSecureContext: true, navigator: { userActivation: { isActive: true } },
+    addEventListener(type, fn, capture) { listeners.push({ type, fn, capture }); },
+    removeEventListener(type, fn, capture) {
+      const index = listeners.findIndex((listener) => listener.type === type && listener.fn === fn && listener.capture === capture);
+      if (index >= 0) listeners.splice(index, 1);
+    },
+  };
+  try {
+    const clean = watchDesktopPermission();
+    // A child that stops propagation is reached after the window's capture phase.
+    listeners.filter((listener) => listener.type === "click" && listener.capture?.capture === true).forEach((listener) => listener.fn());
+    assert.equal(prompts, 1);
+    clean();
+    assert.equal(listeners.length, 0);
+  } finally { delete global.window; }
+});

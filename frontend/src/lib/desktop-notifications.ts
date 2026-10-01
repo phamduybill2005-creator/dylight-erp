@@ -37,7 +37,7 @@ export function desktopPermission(): DesktopPermission {
   return window.Notification.permission;
 }
 
-/** Chỉ gọi từ nút bấm của người dùng, không xin quyền khi nhận tin ở nền. */
+/** Chỉ gọi khi người dùng tương tác, không xin quyền khi nhận tin ở nền. */
 export async function requestDesktopPermission(): Promise<DesktopPermission> {
   const permission = desktopPermission();
   if (permission !== "default") return permission;
@@ -46,6 +46,28 @@ export async function requestDesktopPermission(): Promise<DesktopPermission> {
   } catch {
     return desktopPermission();
   }
+}
+
+let permissionPromptStarted = false;
+
+/** Hỏi bằng hộp quyền gốc của trình duyệt ở lần tương tác đầu, không cần nút riêng. */
+export function watchDesktopPermission(): () => void {
+  if (desktopPermission() !== "default" || permissionPromptStarted) return () => {};
+  const capture = { capture: true };
+  const cleanup = () => {
+    window.removeEventListener("click", ask, capture);
+    window.removeEventListener("keydown", ask, capture);
+  };
+  const ask = () => {
+    if (window.navigator?.userActivation && !window.navigator.userActivation.isActive) return;
+    if (desktopPermission() !== "default" || permissionPromptStarted) { cleanup(); return; }
+    permissionPromptStarted = true;
+    cleanup();
+    void requestDesktopPermission();
+  };
+  window.addEventListener("click", ask, capture);
+  window.addEventListener("keydown", ask, capture);
+  return cleanup;
 }
 
 export function showDesktopNotification(

@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
 import { projectsDueToday, type DeadlineAlertEntry } from "@/lib/deadline-alert";
 import { todayLocal } from "@/lib/format";
-import { desktopPermission, requestDesktopPermission, showDesktopNotification, dispatchDesktopClick, DESKTOP_CLICK_EVENT, type DesktopClick, type DesktopPermission } from "@/lib/desktop-notifications";
+import { desktopPermission, showDesktopNotification, dispatchDesktopClick, DESKTOP_CLICK_EVENT, type DesktopClick, type DesktopPermission } from "@/lib/desktop-notifications";
 import type { User } from "@/lib/types";
 
 // Mốc THỜI ĐIỂM (epoch ms) lần nhắc gần nhất — để giới hạn tối đa 15 phút/lần.
@@ -155,10 +155,10 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
     setOpen(false);
   }
 
-  /** Nút kiểm tra: xin quyền (cần cú bấm của người dùng) + kêu thử + bắn thử thông báo. */
-  async function testAlert() {
+  /** Kêu thử; quyền desktop được AppShell hỏi bằng hộp gốc khi tương tác. */
+  function testAlert() {
     playAlertSound();
-    const permission = await requestDesktopPermission();
+    const permission = desktopPermission();
     setCanNotify(permission);
     if (permission === "granted") notifyDesktop(near);
   }
@@ -202,7 +202,7 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
               ? "Thông báo desktop đang bị CHẶN — chọn Cho phép trong cài đặt trang bên trái thanh địa chỉ. Giữ một tab DOSCO mở để nhận báo."
               : canNotify === "unsupported"
               ? "Trình duyệt chưa hỗ trợ thông báo desktop. Hãy mở DOSCO bằng HTTPS trên Chrome/Edge máy tính."
-              : "Bấm “Bật thông báo + kêu thử” để cho phép báo desktop khi giữ một tab DOSCO mở."}
+              : "Trình duyệt sẽ hỏi quyền thông báo khi bạn tương tác với web. Chọn Cho phép và giữ một tab DOSCO mở để nhận báo desktop."}
           </p>
         )}
 
@@ -211,7 +211,7 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
             onClick={testAlert}
             className="flex items-center justify-center gap-1 rounded-xl2 border border-line px-3 py-2.5 text-xs font-semibold text-steel hover:bg-paper"
           >
-            <SpeakerWaveIcon className="h-4 w-4" /> Bật thông báo + kêu thử
+            <SpeakerWaveIcon className="h-4 w-4" /> Kêu thử
           </button>
           <Link
             href="/projects"
