@@ -628,8 +628,9 @@ export default function AttendancePage() {
                         {[...detailRecs]
                           .sort((a, b) => a.work_date.localeCompare(b.work_date))
                           .map((r) => (
-                            <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-paper px-2.5 py-1.5 text-xs">
-                              <div className="flex flex-1 items-center gap-2 min-w-0">
+                            <div key={r.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 rounded-lg bg-paper px-2.5 py-1.5 text-xs sm:flex sm:flex-wrap sm:justify-between sm:gap-2">
+                              <div className="contents sm:flex sm:min-w-0 sm:flex-1 sm:items-center sm:gap-2">
+                                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-nowrap">
                                 <span className="font-medium text-ink shrink-0">
                                   {new Date(r.work_date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
                                 </span>
@@ -647,6 +648,7 @@ export default function AttendancePage() {
                                 >
                                   {r.is_late ? "trễ ✕" : "+ trễ"}
                                 </button>
+                                </div>
 
                                 {/* Thanh ghi chú lý do */}
                                 <input
@@ -656,10 +658,10 @@ export default function AttendancePage() {
                                   onBlur={() => handleSaveNote(r.id)}
                                   onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())}
                                   placeholder="Ghi chú lý do..."
-                                  className="min-w-[140px] max-w-[260px] flex-1 rounded border border-line/70 bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel placeholder:text-slate-300 shadow-sm"
+                                  className="col-span-2 row-start-2 w-full min-w-0 rounded border border-line/70 bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel placeholder:text-slate-300 shadow-sm sm:w-auto sm:min-w-[140px] sm:max-w-[260px] sm:flex-1"
                                 />
                               </div>
-                              <div className="flex items-center gap-3 tnum shrink-0">
+                              <div className="col-start-2 row-start-1 flex shrink-0 items-center gap-2 whitespace-nowrap tnum sm:gap-3">
                                 <span className="text-ink">{fmtTime(r.check_in)} - {fmtTime(r.check_out)}</span>
                                 <span className="font-bold text-steel">{fmtHours(r.worked_minutes)}</span>
                               </div>
