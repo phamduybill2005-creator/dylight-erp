@@ -641,11 +641,6 @@ export default function WorkSchedulePage() {
         ) : filteredUsers.length === 0 ? (
           <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Không tìm thấy nhân viên nào phù hợp.</p>
         ) : filteredUsers.map((user, index) => {
-          const events = daysList.flatMap((day) => {
-            const leave = getApprovedLeave(user.id, day.dateStr);
-            const note = cellNotes[`${user.id}_${day.dateStr}`];
-            return leave || note ? [{ day, leave, note }] : [];
-          });
           const open = expandedMobileUser === user.id;
           return (
             <article key={user.id} className="overflow-hidden rounded-xl border border-line bg-white shadow-card">
@@ -655,7 +650,6 @@ export default function WorkSchedulePage() {
                   <span className="block truncate text-sm font-bold text-ink">{user.full_name}</span>
                   <span className="block truncate text-[11px] text-muted">{user.department || "Chưa phân phòng ban"}</span>
                 </span>
-                <span className="shrink-0 text-right text-[11px] font-semibold text-steel">{events.length > 0 ? `${events.length} thay đổi` : "Bình thường"}</span>
                 <ChevronRightIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? "rotate-90" : ""}`} />
               </button>
               {open && (

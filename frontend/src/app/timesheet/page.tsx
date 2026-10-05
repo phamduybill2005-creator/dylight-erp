@@ -286,9 +286,9 @@ export default function TimesheetPage() {
 
       {/* Thanh điều khiển: chế độ xem Toàn đội / Cá nhân / Chọn phòng ban & Tuần / Tháng */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl2 border border-line bg-white p-2 shadow-card">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={viewPeriod === "month" ? "contents sm:flex sm:flex-wrap sm:items-center sm:gap-2" : "flex flex-wrap items-center gap-2"}>
           {/* Tab chọn phạm vi: Toàn đội / Cá nhân */}
-          <div className="flex items-center gap-1 rounded-lg border border-line bg-slate-100/70 p-0.5 text-xs mr-1">
+          <div className={`flex items-center gap-1 rounded-lg border border-line bg-slate-100/70 p-0.5 text-xs mr-1 ${viewPeriod === "month" ? "w-full sm:w-auto" : ""}`}>
             <button
               onClick={() => setViewScope("all")}
               className={`flex items-center gap-1.5 rounded px-3 py-1 font-semibold transition-all duration-200 ${
@@ -315,13 +315,13 @@ export default function TimesheetPage() {
 
           {/* Bộ lọc chọn Phòng ban (CHỈ HIỆN với Giám đốc, Quản trị & Quản lý cấp cao xem từng phòng) */}
           {isSeniorManagerUp(me) && (
-            <div className="flex items-center gap-1.5 rounded-lg border border-line bg-slate-100/70 px-2.5 py-1 text-xs mr-2">
+            <div className={`flex items-center gap-1.5 rounded-lg border border-line bg-slate-100/70 px-2.5 py-1 text-xs mr-2 ${viewPeriod === "month" ? "w-full sm:w-auto" : ""}`}>
               <BuildingOfficeIcon className="h-4 w-4 text-steel shrink-0" />
               <span className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">Phòng ban:</span>
               <select
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
-                className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-ink outline-none focus:border-steel cursor-pointer transition-all hover:border-slate-400"
+                className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-ink outline-none focus:border-steel cursor-pointer transition-all hover:border-slate-400 sm:flex-none"
               >
                 <option value="">— Tất cả phòng ban —</option>
                 {deptOptions.map((d) => (
@@ -334,23 +334,23 @@ export default function TimesheetPage() {
           )}
 
           {/* Toggle Tuần / Tháng */}
-          <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs mr-1">
+          <div className="flex shrink-0 items-center rounded-lg border border-line p-0.5 text-xs sm:mr-1 sm:gap-1">
             <button
               onClick={() => setViewPeriod("week")}
-              className={`rounded px-2.5 py-1 font-semibold transition-colors duration-200 ${viewPeriod === "week" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
+              className={`rounded px-1.5 py-1 font-semibold transition-colors duration-200 sm:px-2.5 ${viewPeriod === "week" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
             >
               Tuần
             </button>
             <button
               onClick={() => setViewPeriod("month")}
-              className={`rounded px-2.5 py-1 font-semibold transition-colors duration-200 ${viewPeriod === "month" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
+              className={`rounded px-1.5 py-1 font-semibold transition-colors duration-200 sm:px-2.5 ${viewPeriod === "month" ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
             >
               Tháng
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className={viewPeriod === "month" ? "flex min-w-0 flex-1 items-center gap-1 sm:flex-none sm:gap-2" : "flex items-center gap-2"}>
           {viewPeriod === "week" ? (
             <>
               <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper" title="Tuần trước">
@@ -380,12 +380,12 @@ export default function TimesheetPage() {
                   const prev = new Date(y, m - 2, 1);
                   setMonthStr(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`);
                 }}
-                className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper"
+                className="shrink-0 rounded-lg border border-line p-1 text-muted hover:bg-paper sm:p-1.5"
                 title="Tháng trước"
               >
                 <ChevronLeftIcon className="h-4 w-4" />
               </button>
-              <span className="text-xs font-semibold text-ink">
+              <span className="hidden whitespace-nowrap text-xs font-semibold text-ink sm:inline">
                 Tháng {Number(monthStr.slice(5, 7))}/{monthStr.slice(0, 4)}
               </span>
               <button
@@ -394,7 +394,7 @@ export default function TimesheetPage() {
                   const next = new Date(y, m, 1);
                   setMonthStr(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
                 }}
-                className="rounded-lg border border-line p-1.5 text-muted hover:bg-paper"
+                className="shrink-0 rounded-lg border border-line p-1 text-muted hover:bg-paper sm:p-1.5"
                 title="Tháng sau"
               >
                 <ChevronRightIcon className="h-4 w-4" />
@@ -403,11 +403,8 @@ export default function TimesheetPage() {
                 type="month"
                 value={monthStr}
                 onChange={(e) => e.target.value && setMonthStr(e.target.value)}
-                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
+                className="w-0 min-w-0 flex-1 rounded-lg border border-line bg-white px-1 py-1.5 text-xs outline-none focus:border-steel sm:w-auto sm:flex-none sm:px-2"
               />
-              <button onClick={() => setMonthStr(today.slice(0, 7))} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper">
-                Tháng này
-              </button>
             </>
           )}
         </div>
