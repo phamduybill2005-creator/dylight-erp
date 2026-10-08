@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.config import settings  # noqa: E402
 from app.database import Base  # noqa: E402
 import app.models  # noqa: E402,F401  (đăng ký toàn bộ bảng vào Base.metadata)
+import app.zalo_models  # noqa: E402,F401
 
 config = context.config
 

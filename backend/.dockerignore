@@ -1,0 +1,17 @@
+# Secrets are runtime environment values, never image layers.
+.env
+.env.*
+**/.env
+**/.env.*
+*.env
+**/*.env
+.venv/
+**/__pycache__/
+.pytest_cache/
+*.db
+**/*.db
+*.sqlite*
+**/*.sqlite*
+*.log
+**/*.log
+!.env.example

@@ -19,12 +19,19 @@ from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, project_evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-    chat, iclock, departments, timesheets, archive, org_chart, events,
+    chat, iclock, departments, timesheets, archive, org_chart, events, zalo,
 )
+from app.zalo_models import ZALO_TABLE_NAMES
+from app.services.zalo_logging import install_callback_log_filter
+
+install_callback_log_filter()
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
 # (đã có sẵn alembic trong requirements) để quản lý phiên bản schema.
-Base.metadata.create_all(bind=engine)
+# Zalo tables require an explicit migration; never create them implicitly at ERP startup.
+Base.metadata.create_all(bind=engine, tables=[
+    table for table in Base.metadata.sorted_tables if table.name not in ZALO_TABLE_NAMES
+])
 
 
 def _ensure_schema() -> None:
@@ -543,3 +550,6 @@ for r in (auth, companies, bids, projects, contracts, invoices, payments, progre
 
 # Máy chấm công đẩy trực tiếp (ZKTeco PUSH/ADMS) gọi đúng /iclock/... -> KHÔNG thêm tiền tố /api/v1.
 app.include_router(iclock.router)
+
+# OAuth callback has the exact registered URL, independently of API_V1_PREFIX.
+app.include_router(zalo.router)

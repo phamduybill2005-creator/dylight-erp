@@ -4,7 +4,7 @@ Cấu hình trung tâm của ứng dụng.
 trên nhiều môi trường (dev / staging / production) mà không sửa code.
 """
 from functools import lru_cache
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Giá trị SECRET_KEY mặc định (CHỈ dùng cho dev). Nếu PROD (DEBUG=False) mà vẫn
@@ -91,6 +91,15 @@ class Settings(BaseSettings):
     GOOGLE_AUTO_CREATE: bool = True
     GOOGLE_DEFAULT_COMPANY_ID: int = 1          # công ty gán cho người tự tạo
     GOOGLE_DEFAULT_ROLE: str = "FIELD_STAFF"    # vai trò mặc định (thấp nhất) cho người tự tạo
+
+    # Zalo OA: chỉ backend; thiếu cấu hình không làm ERP ngừng khởi động.
+    ZALO_ENABLED: bool = False
+    ZALO_APP_ID: str = ""
+    ZALO_APP_SECRET: SecretStr = SecretStr("")
+    ZALO_OA_CALLBACK_URL: str = "https://erp.dosco.vn/api/zalo/callback"
+    ZALO_OA_ID: str = ""
+    ZALO_COMPANY_ID: int = 0  # Gắn OA vào tenant cụ thể, không suy ra công ty đầu tiên.
+    ZALO_TOKEN_ENCRYPTION_KEY: SecretStr = SecretStr("")
 
     @model_validator(mode="after")
     def _enforce_prod_secret(self):
