@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const test = require("node:test");
 const ts = require("typescript");
+const { loadTypeScript } = require("./helpers/load-typescript.cjs");
 
 function loadApi() {
   const storage = new Map();
@@ -22,6 +23,7 @@ function loadApi() {
   }).outputText;
   vm.runInNewContext(compiled, {
     exports: module.exports, module, process, sessionStorage,
+    require: (name) => name === "./leave-links" ? loadTypeScript("src/lib/leave-links.ts") : require(name),
     localStorage: { getItem: () => "test-token", setItem() {} }, window: {},
     Headers, FormData, console,
     fetch: async (url, init) => {

@@ -5,7 +5,7 @@ import calendar
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, update
 from sqlalchemy.orm import Session
 
 from app.audit import log_activity
@@ -14,7 +14,8 @@ from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.models import LeaveRequest, LeaveStatus, User, UserRole
 from app.notify import leadership_of, notify
-from app.schemas import LeaveCreate, LeaveDecision, LeaveOut, StudentWeekSchedulePayload
+from app.schemas import LeaveCreate, LeaveCreatedOut, LeaveDecision, LeaveOut, StudentWeekSchedulePayload
+from app.services.leave_zalo_service import LeaveZaloService, get_leave_zalo_service
 
 router = APIRouter(prefix="/leave", tags=["Nghỉ phép"])
 
@@ -75,8 +76,9 @@ def _notify_leave_decided(db: Session, rec: LeaveRequest, decider: User) -> None
     notify(db, rec.company_id, [rec.user_id], title, body, sender_id=decider.id)
 
 
-@router.post("", response_model=LeaveOut, status_code=201)
-def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+@router.post("", response_model=LeaveCreatedOut, status_code=201)
+def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: User = Depends(get_current_user),
+                 zalo: LeaveZaloService = Depends(get_leave_zalo_service)):
     if payload.to_date < payload.from_date:
         raise HTTPException(400, "Ngày kết thúc phải sau ngày bắt đầu.")
 
@@ -102,7 +104,9 @@ def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: U
     _notify_new_leave(db, rec, current)
     # Bảng "Đơn chờ duyệt" của sếp hiện thêm dòng mới ngay, không phải chờ nhịp.
     publish(current.company_id, "leave")
-    return rec
+    # Snapshot before OAuth can rollback/expire the ORM session on provider failure.
+    saved = LeaveOut.model_validate(rec)
+    return LeaveCreatedOut(**saved.model_dump(), zalo=zalo.send_request(saved))
 
 
 @router.get("/me", response_model=list[LeaveOut])
@@ -255,6 +259,17 @@ def get_schedule_leaves(
     ).all()
 
 
+@router.get("/{leave_id}", response_model=LeaveOut)
+def get_leave(leave_id: int, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    """Read the exact linked request, independently of list filters, without deciding it."""
+    rec = db.get(LeaveRequest, leave_id)
+    approver = current.role in (*_MANAGER_ROLES, UserRole.ADMIN)
+    if (not rec or rec.company_id != current.company_id
+            or (rec.user_id != current.id and not approver)):
+        raise HTTPException(404, "Không tìm thấy đơn nghỉ.")
+    return rec
+
+
 @router.post("/{leave_id}/decide", response_model=LeaveOut)
 def decide_leave(
     leave_id: int,
@@ -267,9 +282,16 @@ def decide_leave(
         raise HTTPException(404, "Không tìm thấy đơn nghỉ.")
     if payload.status not in (LeaveStatus.APPROVED, LeaveStatus.REJECTED):
         raise HTTPException(400, "Trạng thái duyệt không hợp lệ.")
-    rec.status = payload.status
-    rec.decided_by_id = current.id
-    rec.decided_at = vn_now()
+    # Conditional write makes competing/repeated decisions single-use, including
+    # requests that read PENDING before a different approver committed.
+    result = db.execute(update(LeaveRequest).where(
+        LeaveRequest.id == leave_id, LeaveRequest.company_id == current.company_id,
+        LeaveRequest.status == LeaveStatus.PENDING,
+    ).values(status=payload.status, decided_by_id=current.id, decided_at=vn_now())
+        .execution_options(synchronize_session=False))
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "Đơn đã được xử lý. Vui lòng xem trạng thái mới nhất.")
     db.commit()
     db.refresh(rec)
     log_activity(db, current, f"leave.{payload.status.value.lower()}", "leave_request", rec.id,

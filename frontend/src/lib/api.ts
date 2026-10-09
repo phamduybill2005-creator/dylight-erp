@@ -2,6 +2,7 @@
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 import type { NotificationSendResult } from "./notification-send-result";
+import { leaveLoginPath } from "./leave-links";
 
 import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 
@@ -106,7 +107,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (res.status === 401) {
     cachedMe = null;
     tokenStore.clear();
-    if (typeof window !== "undefined") window.location.href = "/login";
+    if (typeof window !== "undefined") window.location.href = leaveLoginPath(window.location.pathname, window.location.search);
     throw new Error("Phiên đăng nhập đã hết hạn.");
   }
   if (!res.ok) {
@@ -424,7 +425,8 @@ export const api = {
 
   // --- Nghỉ phép ---
   createLeave: (payload: { from_date: string; to_date: string; leave_type?: string | null; reason?: string | null }) =>
-    request<LeaveRequest>("/leave", { method: "POST", body: JSON.stringify(payload) }),
+    request<LeaveRequest & { zalo?: { status: "sent" | "failed" | "skipped"; reason?: string } }>("/leave", { method: "POST", body: JSON.stringify(payload) }),
+  leave: (id: number) => request<LeaveRequest>(`/leave/${id}`),
   myLeaves: () => request<LeaveRequest[]>("/leave/me"),
   /** Đơn nghỉ do CHÍNH TÔI duyệt (chỉ quản lý trở lên gọi được). */
   leavesDecidedByMe: () => request<LeaveRequest[]>("/leave/decided-by-me"),

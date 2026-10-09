@@ -28,6 +28,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { api, previewRole, tokenStore } from "@/lib/api";
+import { leaveLoginPath } from "@/lib/leave-links";
 import { roleTier, canSeeRevenue, ROLE_LABEL } from "@/lib/roles";
 import type { Role, User } from "@/lib/types";
 import NotificationsBell from "./notifications-bell";
@@ -104,10 +105,10 @@ export default function AppShell({
 
   useEffect(() => {
     if (!tokenStore.get()) {
-      router.replace("/login");
+      router.replace(leaveLoginPath(window.location.pathname, window.location.search));
       return;
     }
-    api.me().then(setUser).catch(() => router.replace("/login"));
+    api.me().then(setUser).catch(() => router.replace(leaveLoginPath(window.location.pathname, window.location.search)));
   }, [router]);
 
   useEffect(() => {

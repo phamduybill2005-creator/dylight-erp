@@ -877,6 +877,10 @@ class LeaveOut(BaseModel):
     days: float = 0
 
 
+class LeaveCreatedOut(LeaveOut):
+    zalo: dict[str, str]
+
+
 class StudentDaySchedule(BaseModel):
     date: date
     shift: str  # "ALL_DAY" | "MORNING_ONLY" (làm sáng, nghỉ chiều) | "AFTERNOON_ONLY" (làm chiều, nghỉ sáng) | "OFF" (nghỉ cả ngày)

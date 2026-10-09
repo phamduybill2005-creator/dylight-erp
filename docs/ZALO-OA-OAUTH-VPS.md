@@ -142,7 +142,7 @@ Response chỉ chứa OA ID/phân trang và `group_id`, `name`, `status`, `total
 
 ## Thông báo ERP soạn thủ công → GMF (bổ sung local)
 
-Chỉ `POST /api/v1/notifications` được nối với `NotificationZaloService`. Quyền gửi và tập người nhận trong ERP giữ nguyên. Sau khi commit toàn bộ bản ghi ERP, service thử gửi **một** tin vào `ZALO_GMF_GROUP_ID`, ngoài vòng lặp người nhận. Không nối thông báo tự động về nghỉ phép, giao việc hoặc nhắc đánh giá với Zalo.
+`POST /api/v1/notifications` được nối với `NotificationZaloService`. Quyền gửi và tập người nhận trong ERP giữ nguyên. Sau khi commit toàn bộ bản ghi ERP, service thử gửi **một** tin vào `ZALO_GMF_GROUP_ID`, ngoài vòng lặp người nhận. Nghỉ phép dùng service riêng bên dưới; giao việc và nhắc đánh giá chưa nối với Zalo.
 
 | Phạm vi ERP | Người nhận ghi trong tin GMF |
 | --- | --- |
@@ -168,6 +168,32 @@ Người gửi: <full_name của người gửi ERP đã xác thực>
 Response giữ `sent` (số người nhận ERP), thêm `zalo.status=sent|skipped|failed` và reason code an toàn khi cần. `sent` của Zalo chỉ xác nhận API tiếp nhận, không chứng minh từng thành viên đã đọc. Frontend hiển thị riêng hai kết quả và tương thích backend cũ chưa có trường `zalo`.
 
 Zalo lỗi/timeout hoặc thiếu credential không hủy thông báo ERP đã commit. Không tự retry GMF hoặc refresh token. Timeout có thể xảy ra sau khi Zalo đã nhận tin: không bấm gửi lại thông báo ERP để thử Zalo, vì có thể trùng tin. Cam kết một lần gọi GMF cho mỗi request ERP thành công; chưa có outbox/idempotency để chống trùng giữa các request người dùng gửi lại. Một lần refresh có thể thêm một HTTP request token trước request GMF. Gửi đồng bộ có thể làm response chờ thêm timeout của OAuth/GMF hiện có.
+
+### Gửi đơn nghỉ phép → GMF (bổ sung local)
+
+`POST /api/v1/leave` giữ nguyên quy tắc gửi đơn và thông báo web. Sau khi chúng đã commit, `LeaveZaloService` thử gửi một tin GMF, dùng cấu hình/OAuth/refresh hiện có. Không gửi khi đăng ký lịch sinh viên, mở liên kết hay duyệt/từ chối. Không thêm migration, env hoặc quyền Zalo.
+
+```text
+[ĐƠN XIN NGHỈ DOSCO]
+
+Người gửi: <tên người gửi ERP>
+Từ ngày: <dd/mm/yyyy>
+Đến ngày: <dd/mm/yyyy>
+Thời gian nghỉ: <Cả ngày / Buổi sáng / Buổi chiều>
+Lý do: <giá trị đã chọn trên web>
+Nghỉ phép: Nghỉ
+Trạng thái: Chờ duyệt
+
+Xem và xử lý đơn: https://erp.dosco.vn/leave?request_id=<id>
+```
+
+Đơn đi muộn dùng `Buổi đi muộn: Đi muộn sáng/Đi muộn chiều` và `Nghỉ phép: Đi muộn`, đúng nhãn form. Origin của link lấy từ callback backend đã được kiểm tra; không dùng Host do client gửi. API tạo đơn thêm `zalo.status=sent|failed|skipped`; lỗi Zalo không hủy đơn hoặc thông báo web. Không retry khi timeout vì Zalo có thể đã nhận tin; không gửi lại đơn chỉ để thử Zalo. Một lần gọi GMF trên mỗi request ERP thành công, chưa chống trùng giữa các request tạo đơn độc lập. Gửi đồng bộ có thể tăng thời gian chờ response theo timeout hiện có.
+
+[API GMF text chính thức](https://docs.zaloplatforms.com/docs/OA/nhom-chat-gmf/tin-nhan/text_message) không mô tả nút Duyệt/Từ chối hoặc postback. Tin dùng link mở ERP trong trình duyệt Zalo. Nếu chưa đăng nhập, ERP giữ đúng ID đơn qua trang login (mật khẩu và Google); chỉ chấp nhận đường dẫn nội bộ `/leave?request_id=<id>`, không redirect URL tùy ý.
+
+`GET /api/v1/leave/{id}` chỉ đọc: người gửi hoặc ADMIN/DIRECTOR/MANAGER cùng công ty mới xem được. Thẻ đơn nằm ngoài bộ lọc danh sách và có nút Duyệt/Từ chối trên web cho người có quyền khi đơn còn PENDING. Link không quyết định đơn và không chứa token/quyền duyệt. `POST /api/v1/leave/{id}/decide` cập nhật có điều kiện PENDING: chỉ một quyết định thành công; lần sau trả 409, không ghi đè hoặc thông báo lại. Thông báo cho người xin, audit và cập nhật lịch/web dùng cơ chế ERP cũ.
+
+Kiểm thử local dùng SQLite tạm và HTTP MockTransport, gồm gửi đúng format/một lần, refresh, lỗi/timeout, quyền xem/xử lý và quyết định lặp. Chưa deploy hoặc thử OA thật cho giai đoạn này.
 
 ### Gửi riêng: chưa triển khai
 

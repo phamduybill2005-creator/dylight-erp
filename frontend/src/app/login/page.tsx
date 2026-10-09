@@ -17,6 +17,7 @@ import {
   EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
+import { leaveLoginReturnPath } from "@/lib/leave-links";
 
 // Các hạng mục công ty DOSCO đảm nhiệm (nguồn: dosco.vn).
 const SERVICES = [
@@ -48,7 +49,7 @@ export default function LoginPage() {
       setLoading(true);
       try {
         await api.loginWithGoogle(response.credential);
-        router.replace("/");
+        router.replace(leaveLoginReturnPath(window.location.search));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Đăng nhập Google thất bại.");
       } finally {
@@ -87,7 +88,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await api.login(email, password);
-      router.replace("/");
+      router.replace(leaveLoginReturnPath(window.location.search));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Đăng nhập thất bại.");
     } finally {

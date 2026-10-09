@@ -185,6 +185,78 @@ class LeaveNotificationTests(unittest.TestCase):
 
     # --------- Không được làm hỏng nghiệp vụ chính ---------
 
+    def test_linked_leave_is_visible_to_owner_and_approvers_only(self):
+        leave_id = self._gui_don()
+        before = len(self._notis())
+        for user in (self.staff, self.admin, self.director, self.senior):
+            self.current = user
+            response = self.client.get(f"/leave/{leave_id}")
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["id"], leave_id)
+            self.assertEqual(response.json()["status"], "PENDING")
+        for user in (self.other, self.mid):
+            self.current = user
+            self.assertEqual(self.client.get(f"/leave/{leave_id}").status_code, 404)
+        self.assertEqual(len(self._notis()), before)
+
+    def test_other_company_cannot_read_or_decide_linked_leave(self):
+        leave_id = self._gui_don()
+        with self.sessions() as db:
+            company = Company(name="Other", code="OTHER-LINK")
+            db.add(company)
+            db.flush()
+            foreign = User(company_id=company.id, email="foreign@example.com", full_name="Other admin",
+                           role=UserRole.ADMIN, hashed_password="unused")
+            db.add(foreign)
+            db.commit()
+        self.current = foreign
+        self.assertEqual(self.client.get(f"/leave/{leave_id}").status_code, 404)
+        self.assertEqual(self.client.post(f"/leave/{leave_id}/decide", json={"status": "APPROVED"}).status_code, 404)
+
+    def test_repeated_decision_cannot_overwrite_or_notify_twice(self):
+        leave_id = self._gui_don()
+        self.current = self.director
+        response = self.client.post(f"/leave/{leave_id}/decide", json={"status": "APPROVED"})
+        self.assertEqual(response.status_code, 200)
+        before = len(self._notis())
+        self.current = self.senior
+        for decision in ("APPROVED", "REJECTED"):
+            response = self.client.post(f"/leave/{leave_id}/decide", json={"status": decision})
+            self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(len(self._notis()), before)
+        with self.sessions() as db:
+            row = db.get(LeaveRequest, leave_id)
+            self.assertEqual(row.status, LeaveStatus.APPROVED)
+            self.assertEqual(row.decided_by_id, self.director.id)
+
+    def test_staff_cannot_decide_even_with_the_link(self):
+        leave_id = self._gui_don()
+        self.assertEqual(self.client.post(f"/leave/{leave_id}/decide", json={"status": "APPROVED"}).status_code, 403)
+
+    def test_stale_pending_session_cannot_overwrite_a_completed_decision(self):
+        from fastapi import HTTPException
+        from app.routers.leave import decide_leave
+        from app.schemas import LeaveDecision
+
+        leave_id = self._gui_don()
+        with self.sessions() as stale:
+            old = stale.get(LeaveRequest, leave_id)
+            self.assertEqual(old.status, LeaveStatus.PENDING)
+            self.current = self.director
+            response = self.client.post(f"/leave/{leave_id}/decide", json={"status": "APPROVED"})
+            self.assertEqual(response.status_code, 200, response.text)
+            before = len(self._notis())
+            # This session still holds the PENDING identity read before the first commit.
+            self.assertEqual(old.status, LeaveStatus.PENDING)
+            with self.assertRaises(HTTPException) as rejected:
+                decide_leave(leave_id, LeaveDecision(status=LeaveStatus.REJECTED), db=stale, current=self.senior)
+            self.assertEqual(rejected.exception.status_code, 409)
+        with self.sessions() as db:
+            rec = db.get(LeaveRequest, leave_id)
+            self.assertEqual(rec.status, LeaveStatus.APPROVED)
+            self.assertEqual(rec.decided_by_id, self.director.id)
+        self.assertEqual(len(self._notis()), before)
+
     def test_leave_is_saved_even_if_nobody_can_be_notified(self):
         """Công ty không có ai thuộc 3 cấp lãnh đạo -> đơn vẫn phải lưu."""
         with self.sessions() as db:

@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const test = require("node:test");
 const ts = require("typescript");
+const { loadTypeScript } = require("./helpers/load-typescript.cjs");
 
 function loadApi() {
   const requests = [];
@@ -15,6 +16,7 @@ function loadApi() {
   }).outputText;
   vm.runInNewContext(compiled, {
     exports: module.exports,
+    require: (name) => name === "./leave-links" ? loadTypeScript("src/lib/leave-links.ts") : require(name),
     module,
     process,
     sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },

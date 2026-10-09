@@ -4,10 +4,10 @@
 // Quản lý trở lên (isManagerUp) thấy thêm danh sách đơn chờ duyệt toàn công ty,
 // duyệt/từ chối trực tiếp. Không có màn chặn quyền: ai cũng vào được.
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { useStickyState } from "@/lib/use-sticky-state";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   CalendarDaysIcon, PaperAirplaneIcon, CheckIcon, XMarkIcon, TableCellsIcon,
@@ -16,6 +16,7 @@ import {
 import AppShell from "@/components/app-shell";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
+import { canDecideLinkedLeave, leaveLoginPath, linkedLeaveId } from "@/lib/leave-links";
 import { isManagerUp, isDirector } from "@/lib/roles";
 import { formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
@@ -34,6 +35,10 @@ const STATUS_LABEL: Record<LeaveStatus, string> = {
   PENDING: "Chờ duyệt",
   APPROVED: "Đã duyệt",
   REJECTED: "Từ chối",
+};
+const LEAVE_TIME_LABEL: Record<string, string> = {
+  FULL: "Cả ngày", MORNING: "Buổi sáng", AFTERNOON: "Buổi chiều",
+  LATE: "Đi muộn sáng", LATE_MORNING: "Đi muộn sáng", LATE_AFTERNOON: "Đi muộn chiều",
 };
 const STATUS_CLS: Record<LeaveStatus, string> = {
   PENDING: "bg-amber/15 text-amber-deep",
@@ -76,9 +81,20 @@ function nextMonth(m: string): string {
 }
 
 export default function LeavePage() {
+  return <Suspense fallback={<AppShell><p className="p-4">Đang tải đơn nghỉ…</p></AppShell>}><LeaveContent /></Suspense>;
+}
+
+function LeaveContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestId = linkedLeaveId(searchParams.toString());
   const [me, setMe] = useState<User | null>(api.cachedUser());
   const [loading, setLoading] = useState(true);
+  const [linkedLeave, setLinkedLeave] = useState<LeaveRequest | null>(null);
+  const linkedLoadSequence = useRef(0);
+  const [linkedError, setLinkedError] = useState<string | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [submitResult, setSubmitResult] = useState<string | null>(null);
 
   const [mine, setMine] = useState<LeaveRequest[]>([]);
   const [pending, setPending] = useState<LeaveRequest[]>([]);
@@ -108,6 +124,30 @@ export default function LeavePage() {
   const [saving, setSaving] = useState(false);
   const [deciding, setDeciding] = useState<number | null>(null);
   const [requestFormOpen, setRequestFormOpen] = useState(false);
+
+  const loadLinkedLeave = useCallback(async () => {
+    if (!requestId) return;
+    const sequence = ++linkedLoadSequence.current;
+    try {
+      const data = await api.leave(requestId);
+      if (sequence !== linkedLoadSequence.current) return;
+      setLinkedLeave(data);
+      setLinkedError(null);
+    } catch {
+      if (sequence !== linkedLoadSequence.current) return;
+      setLinkedLeave(null);
+      setLinkedError("Không thể mở đơn này. Đơn có thể đã bị xóa hoặc tài khoản không có quyền xem.");
+    }
+  }, [requestId]);
+
+  useEffect(() => {
+    ++linkedLoadSequence.current;
+    setLinkedLeave(null);
+    setLinkedError(null);
+    setDecisionError(null);
+    if (me && requestId) void loadLinkedLeave();
+    return () => { ++linkedLoadSequence.current; };
+  }, [me, requestId, loadLinkedLeave]);
 
   const loadApprovedLeaves = useCallback((quiet = false) => {
     if (!me || !isDirector(me.role)) return;
@@ -157,7 +197,7 @@ export default function LeavePage() {
         }
         Promise.all(tasks).finally(() => setLoading(false));
       })
-      .catch(() => router.push("/login"));
+      .catch(() => router.push(leaveLoginPath(window.location.pathname, window.location.search)));
   }, [router]);
 
   // TỰ LÀM MỚI — không phải F5 nữa. Sếp duyệt ở máy khác thì trạng thái đơn của
@@ -171,6 +211,7 @@ export default function LeavePage() {
       api.leavesDecidedByMe().then(setApprovedByMe).catch(() => {});
     }
     loadApprovedLeaves(true);
+    void loadLinkedLeave();
   }, { enabled: !!me, topics: ["leave"] });
 
   async function submit(e: React.FormEvent) {
@@ -178,15 +219,24 @@ export default function LeavePage() {
     if (!fromDate || !toDate || !reason) return;   // bắt buộc chọn 1 lý do
     setSaving(true);
     setSubmitError(null);
+    setSubmitResult(null);
     try {
       const finalType = leaveCategory === "LATE"
         ? (lateSlot === "AFTERNOON" ? "LATE_AFTERNOON" : "LATE_MORNING")
         : leaveType;
-      await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: finalType, reason: reason || null });
+      const saved = await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: finalType, reason: reason || null });
+      setSubmitResult(saved.zalo?.status === "sent"
+        ? "Đã lưu đơn trên ERP và gửi thông báo vào nhóm Zalo."
+        : saved.zalo?.status === "failed"
+          ? "Đã lưu đơn trên ERP. Chưa xác nhận được tin Zalo; không gửi lại đơn để tránh trùng."
+          : saved.zalo?.status === "skipped"
+            ? "Đã lưu đơn trên ERP. Thông báo Zalo chưa được bật hoặc chưa đủ cấu hình."
+            : "Đã lưu đơn trên ERP.");
       setFromDate(""); setToDate(""); setLeaveType("FULL"); setLeaveCategory("LEAVE"); setLateSlot("MORNING"); setReason("");
       setRequestFormOpen(false);
-      const list = await api.myLeaves();
-      setMine(list);
+      setMine((old) => [saved, ...old]);
+      // A refresh failure after a successful save must not invite resubmission.
+      await api.myLeaves().then(setMine).catch(() => {});
     } catch (err) {
       // Trước đây nuốt lỗi -> backend từ chối (VD quá hạn 19h) mà người gửi
       // không biết gì. Nay hiện đúng thông điệp backend trả về.
@@ -195,9 +245,12 @@ export default function LeavePage() {
   }
 
   async function decide(id: number, status: "APPROVED" | "REJECTED") {
+    if (deciding !== null) return;
     setDeciding(id);
+    setDecisionError(null);
     try {
-      await api.decideLeave(id, status);
+      const updated = await api.decideLeave(id, status);
+      if (id === requestId) setLinkedLeave(updated);
       const [p, m, a] = await Promise.all([
         api.leaveList("PENDING").catch(() => pending),
         api.myLeaves().catch(() => mine),
@@ -205,7 +258,13 @@ export default function LeavePage() {
       ]);
       setPending(p); setMine(m); setApprovedByMe(a);
       loadApprovedLeaves();
-    } catch { /* noop */ } finally { setDeciding(null); }
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : "Chưa xác nhận được kết quả xử lý đơn.");
+    } finally {
+      // Also reload after a 409/network error: another approver may have finished.
+      await loadLinkedLeave();
+      setDeciding(null);
+    }
   }
 
   if (loading || !me) {
@@ -283,6 +342,35 @@ export default function LeavePage() {
           <span>Xem Lịch làm việc</span>
         </Link>
       </header>
+
+      {submitResult && <p role="status" className="mt-3 rounded-lg bg-ok/10 p-3 text-sm text-ink">{submitResult}</p>}
+      {decisionError && <p role="alert" className="mt-3 rounded-lg bg-bad/10 p-3 text-sm text-bad">{decisionError}</p>}
+      {searchParams.has("request_id") && (
+        <section className="mt-4 rounded-xl2 border border-steel bg-white p-4 shadow-card" aria-label="Đơn từ liên kết Zalo">
+          <h2 className="mb-3 font-bold text-ink">Đơn xin nghỉ {requestId ? `#${requestId}` : ""}</h2>
+          {!requestId ? <p role="alert">Liên kết đơn không hợp lệ.</p>
+            : linkedError ? <p role="alert" className="text-bad">{linkedError}</p>
+            : !linkedLeave || linkedLeave.id !== requestId ? <p>Đang tải đơn…</p>
+            : <>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div><dt className="text-slate-500">Người gửi</dt><dd>{linkedLeave.user_name || "Nhân sự"}</dd></div>
+                <div><dt className="text-slate-500">Trạng thái</dt><dd><StatusBadge s={linkedLeave.status} /></dd></div>
+                <div><dt className="text-slate-500">Từ ngày</dt><dd>{formatDate(linkedLeave.from_date)}</dd></div>
+                <div><dt className="text-slate-500">Đến ngày</dt><dd>{formatDate(linkedLeave.to_date)}</dd></div>
+                <div><dt className="text-slate-500">{linkedLeave.leave_type?.startsWith("LATE") ? "Buổi đi muộn" : "Thời gian nghỉ"}</dt><dd>{LEAVE_TIME_LABEL[linkedLeave.leave_type || "FULL"] || linkedLeave.leave_type}</dd></div>
+                <div><dt className="text-slate-500">Nghỉ phép</dt><dd>{linkedLeave.leave_type?.startsWith("LATE") ? "Đi muộn" : "Nghỉ"}</dd></div>
+                <div><dt className="text-slate-500">Lý do</dt><dd className="whitespace-pre-wrap break-words">{linkedLeave.reason || "—"}</dd></div>
+                {linkedLeave.decided_by_name && <div><dt className="text-slate-500">Người xử lý</dt><dd>{linkedLeave.decided_by_name}</dd></div>}
+              </dl>
+              {canDecideLinkedLeave(api.realUser()?.role || me.role, linkedLeave.status) && (
+                <div className="mt-4 flex gap-3">
+                  <button type="button" disabled={deciding !== null} onClick={() => decide(linkedLeave.id, "REJECTED")} className="rounded-lg bg-bad/10 px-4 py-2 font-semibold text-bad disabled:opacity-50">Từ chối</button>
+                  <button type="button" disabled={deciding !== null} onClick={() => decide(linkedLeave.id, "APPROVED")} className="rounded-lg bg-ok/10 px-4 py-2 font-semibold text-ok disabled:opacity-50">Duyệt</button>
+                </div>
+              )}
+            </>}
+        </section>
+      )}
 
       <button type="button" onClick={() => setRequestFormOpen((open) => !open)} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-steel px-4 text-sm font-bold text-white shadow-card lg:hidden" aria-expanded={requestFormOpen}>
         <PaperAirplaneIcon className="h-4 w-4" /> {requestFormOpen ? "Đóng biểu mẫu" : "Tạo đơn mới"}
