@@ -22,6 +22,7 @@ from app.routers import (
     chat, iclock, departments, timesheets, archive, org_chart, events, zalo,
 )
 from app.zalo_models import ZALO_TABLE_NAMES
+from app.zalo_reminder_models import ZALO_REMINDER_TABLE_NAMES
 from app.services.zalo_logging import install_callback_log_filter
 
 install_callback_log_filter()
@@ -30,7 +31,8 @@ install_callback_log_filter()
 # (đã có sẵn alembic trong requirements) để quản lý phiên bản schema.
 # Zalo tables require an explicit migration; never create them implicitly at ERP startup.
 Base.metadata.create_all(bind=engine, tables=[
-    table for table in Base.metadata.sorted_tables if table.name not in ZALO_TABLE_NAMES
+    table for table in Base.metadata.sorted_tables
+    if table.name not in ZALO_TABLE_NAMES | ZALO_REMINDER_TABLE_NAMES
 ])
 
 
@@ -525,13 +527,13 @@ async def _remember_event_loop() -> None:
 
 
 @app.on_event("startup")
-def _start_yunatt_scheduler() -> None:
-    """Bật lịch tự đồng bộ chấm công Yunatt (mỗi ngày 1 lần) khi app khởi động."""
+def _start_background_scheduler() -> None:
+    """Bật các lịch được cấu hình: chấm công Yunatt và nhắc đánh giá Zalo."""
     try:
         from app.services.scheduler import start_scheduler
         start_scheduler()
-    except Exception as _e:  # noqa: BLE001
-        print(f"[startup] khong bat duoc lich Yunatt: {_e}")
+    except Exception:  # noqa: BLE001
+        print("[startup] khong bat duoc lich nen; ERP van hoat dong.")
 
 
 @app.get("/", tags=["Health"])

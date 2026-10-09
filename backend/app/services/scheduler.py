@@ -1,5 +1,5 @@
 """
-Lịch chạy nền: TỰ ĐỘNG đồng bộ chấm công từ Yunatt mỗi ngày 1 lần (mặc định 20:00).
+Lịch chạy nền: đồng bộ Yunatt và nhắc đánh giá Zalo khi được cấu hình bật.
 
 Dùng APScheduler BackgroundScheduler — job chạy trong LUỒNG RIÊNG (không có vòng
 lặp asyncio) nên Playwright sync trong yunatt_service hoạt động bình thường.
@@ -13,9 +13,12 @@ Lưu ý vận hành:
 """
 from __future__ import annotations
 
+import logging
+
 from app.config import settings
 
 _scheduler = None
+_logger = logging.getLogger(__name__)
 
 
 def _run_daily_sync() -> None:
@@ -45,33 +48,74 @@ def _run_daily_sync() -> None:
         db.close()
 
 
+def _run_eval_reminder() -> None:
+    """Own a short-lived session; never expose exception/credential contents."""
+    from app.database import SessionLocal
+    from app.services.evaluation_zalo_service import EvaluationZaloService
+    from app.services.zalo_oauth_service import ZaloOAuthService
+
+    db = None
+    try:
+        db = SessionLocal()
+        result = EvaluationZaloService(ZaloOAuthService(db, settings)).run_due()
+        if result["status"] == "sent":
+            _logger.info("[zalo-eval-reminder] sent")
+        elif result["status"] == "failed" or result.get("reason") == "schema_not_ready":
+            _logger.warning("[zalo-eval-reminder] unavailable; check schema/configuration/connection")
+    except Exception:
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+        _logger.warning("[zalo-eval-reminder] worker failed")
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                _logger.warning("[zalo-eval-reminder] session cleanup failed")
+
+
 def start_scheduler() -> None:
-    """Bật lịch nếu YUNATT_ENABLED. An toàn khi gọi nhiều lần (chỉ tạo 1 lần)."""
+    """Register enabled jobs once; Zalo reminders are independent of Yunatt."""
     global _scheduler
-    if not settings.YUNATT_ENABLED or _scheduler is not None:
+    zalo_enabled = settings.ZALO_ENABLED and settings.ZALO_EVAL_REMINDER_ENABLED
+    if _scheduler is not None or not (settings.YUNATT_ENABLED or zalo_enabled):
         return
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
-    except ImportError as e:  # noqa: BLE001
-        print(f"[yunatt-sync] thieu apscheduler -> tat lich tu dong: {e}")
+    except ImportError:  # noqa: BLE001
+        _logger.warning("[scheduler] APScheduler unavailable")
         return
     try:
-        sched = BackgroundScheduler(timezone=settings.YUNATT_TIMEZONE)
-        sched.add_job(
-            _run_daily_sync,
-            "cron",
-            hour=settings.YUNATT_SYNC_HOUR,
-            minute=settings.YUNATT_SYNC_MINUTE,
-            id="yunatt_daily_sync",
-            replace_existing=True,
-            misfire_grace_time=3600,  # chạy bù trong 1h nếu lỡ giờ
-            coalesce=True,            # gộp nhiều lần lỡ thành 1
-        )
+        sched = BackgroundScheduler(timezone=settings.YUNATT_TIMEZONE if settings.YUNATT_ENABLED else "Asia/Ho_Chi_Minh")
+        if settings.YUNATT_ENABLED:
+            sched.add_job(
+                _run_daily_sync,
+                "cron",
+                hour=settings.YUNATT_SYNC_HOUR,
+                minute=settings.YUNATT_SYNC_MINUTE,
+                id="yunatt_daily_sync",
+                replace_existing=True,
+                misfire_grace_time=3600,  # chạy bù trong 1h nếu lỡ giờ
+                coalesce=True,
+            )
+        if zalo_enabled:
+            sched.add_job(_run_eval_reminder, "cron", day=27, hour="8-23", minute="*/5", second=0,
+                timezone="Asia/Ho_Chi_Minh", id="zalo_eval_reminder", replace_existing=True,
+                misfire_grace_time=300, coalesce=True, max_instances=1)
+            # Check the due window after restart without blocking ERP startup.
+            sched.add_job(_run_eval_reminder, "date", id="zalo_eval_startup", replace_existing=True,
+                misfire_grace_time=60, coalesce=True, max_instances=1)
         sched.start()
         _scheduler = sched
-        print(
-            f"[yunatt-sync] da bat lich chay {settings.YUNATT_SYNC_HOUR:02d}:"
-            f"{settings.YUNATT_SYNC_MINUTE:02d} ({settings.YUNATT_TIMEZONE})."
-        )
-    except Exception as e:  # noqa: BLE001
-        print(f"[yunatt-sync] khong khoi dong duoc lich: {e}")
+        if settings.YUNATT_ENABLED:
+            print(
+                f"[yunatt-sync] da bat lich chay {settings.YUNATT_SYNC_HOUR:02d}:"
+                f"{settings.YUNATT_SYNC_MINUTE:02d} ({settings.YUNATT_TIMEZONE})."
+            )
+        if zalo_enabled:
+            _logger.info("[zalo-eval-reminder] enabled: day 27, from 08:00 Vietnam time")
+    except Exception:  # noqa: BLE001
+        _logger.warning("[scheduler] could not start enabled jobs")

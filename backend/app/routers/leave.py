@@ -276,6 +276,7 @@ def decide_leave(
     payload: LeaveDecision,
     db: Session = Depends(get_db),
     current: User = Depends(require_roles(*_MANAGER_ROLES)),
+    zalo: LeaveZaloService = Depends(get_leave_zalo_service),
 ):
     rec = db.get(LeaveRequest, leave_id)
     if not rec or rec.company_id != current.company_id:
@@ -300,7 +301,11 @@ def decide_leave(
     # Trạng thái đơn bên máy người xin đổi ngay; lịch làm việc chung cũng vậy.
     publish(current.company_id, "leave")
     publish(current.company_id, "schedule")
-    return rec
+    # Snapshot committed result before OAuth can rollback/expire the ORM session.
+    # Only the winning PENDING update reaches this send; failed sends are not retried.
+    saved = LeaveOut.model_validate(rec)
+    zalo.send_decision(saved)
+    return saved
 
 
 @router.delete("/{leave_id}")

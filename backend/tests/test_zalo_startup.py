@@ -21,6 +21,7 @@ from app.main import app, engine
 tables = set(inspect(engine).get_table_names())
 assert 'users' in tables and 'projects' in tables
 assert not {'zalo_oauth_transactions', 'zalo_oa_credentials'}.intersection(tables)
+assert 'zalo_evaluation_reminders' not in tables
 paths = {route.path for route in app.routes}
 assert '/api/zalo/callback' in paths and '/api/zalo/authorize' in paths
 assert '/api/v1/auth/login' in paths
