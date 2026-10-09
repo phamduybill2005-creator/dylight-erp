@@ -1,4 +1,4 @@
-"""GMF discovery and text sending, deliberately not attached to ERP business flows."""
+"""GMF discovery and text sending, reused by the manual announcement service."""
 from app.services.zalo_oauth_service import ZaloError, ZaloOAuthService
 
 GROUPS_URL = "https://openapi.zalo.me/v3.0/oa/group/getgroupsofoa"

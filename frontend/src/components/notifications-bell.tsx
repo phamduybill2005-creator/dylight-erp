@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
+import { formatNotificationSendResult } from "@/lib/notification-send-result";
 import { roleTier } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { useNicknames } from "@/lib/nicknames";
@@ -223,7 +224,7 @@ export default function NotificationsBell() {
         target_user_id: target === "USER" ? Number(targetUser) : null,
         target_department: target === "DEPARTMENT" ? targetDepartment : null,
       });
-      setSendMsg(`Đã gửi tới ${res.sent} người.`);
+      setSendMsg(formatNotificationSendResult(res));
       setTitle("");
       setBody("");
       setTargetUser("");

@@ -15,6 +15,7 @@ from app.events import publish
 from app.deps import get_current_user
 from app.models import Notification, User, UserRole
 from app.schemas import NotificationCreate, NotificationOut
+from app.services.notification_zalo_service import NotificationZaloService, get_notification_zalo_service
 
 router = APIRouter(prefix="/notifications", tags=["Thông báo"])
 
@@ -94,6 +95,7 @@ def send_notification(
     payload: NotificationCreate,
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
+    zalo: NotificationZaloService = Depends(get_notification_zalo_service),
 ):
     target = (payload.target or "USER").upper()
     if target in ("EVERYONE", "MANAGERS") and current.role not in _DIRECTORS:
@@ -114,6 +116,8 @@ def send_notification(
                   if u.id != current.id]
     if not recipients:
         raise HTTPException(400, "Không có người nhận phù hợp.")
+    company_id, sender_name = current.company_id, current.full_name
+    recipient_ids = [u.id for u in recipients]
     for u in recipients:
         db.add(Notification(
             company_id=current.company_id, sender_id=current.id, recipient_id=u.id,
@@ -121,8 +125,11 @@ def send_notification(
         ))
     db.commit()
     # Đẩy ngay -> chuông người nhận kêu tức thì, không chờ nhịp hỏi lại.
-    publish(current.company_id, "notification", [u.id for u in recipients])
-    return {"sent": len(recipients)}
+    publish(company_id, "notification", recipient_ids)
+    delivery = zalo.send_announcement(company_id=company_id, target=target,
+                                      department=payload.target_department, title=payload.title,
+                                      body=payload.body, sender_name=sender_name)
+    return {"sent": len(recipient_ids), "zalo": delivery}
 
 
 @router.get("/me", response_model=list[NotificationOut])

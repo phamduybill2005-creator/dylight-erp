@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     ZALO_OA_CALLBACK_URL: str = "https://erp.dosco.vn/api/zalo/callback"
     ZALO_OA_ID: str = ""
     ZALO_COMPANY_ID: int = 0  # Gắn OA vào tenant cụ thể, không suy ra công ty đầu tiên.
+    ZALO_GMF_GROUP_ID: str = ""  # Trống = không gửi thông báo ERP vào GMF.
     ZALO_TOKEN_ENCRYPTION_KEY: SecretStr = SecretStr("")
 
     @model_validator(mode="after")

@@ -22,6 +22,7 @@ Flow OAuth/GMF hiện tại không gọi `getoa` và **không yêu cầu quyền
 | `ZALO_OA_CALLBACK_URL` | `https://erp.dosco.vn/api/zalo/callback` |
 | `ZALO_OA_ID` | ID số của OA Công ty DOSCO, lấy từ trang quản trị OA |
 | `ZALO_COMPANY_ID` | ID tenant DOSCO trong bảng `companies`; phải trùng công ty của ADMIN khởi tạo |
+| `ZALO_GMF_GROUP_ID` | Nhóm GMF nhận thông báo nhóm soạn thủ công; mặc định trống để chưa tự gửi |
 | `ZALO_TOKEN_ENCRYPTION_KEY` | Fernet key: Base64URL của 32 byte ngẫu nhiên, độc lập với JWT `SECRET_KEY` |
 
 Tạo encryption key trên môi trường riêng, lưu vào trình quản lý secret / file backend; không chia sẻ đầu ra:
@@ -36,11 +37,11 @@ Giữ các thiết lập backend hiện hữu, đặc biệt `DATABASE_URL`, JWT
 
 ### Nếu VPS dùng docker-compose.yml
 
-File này đã có `backend.env_file: ./backend/.env`: thêm bảy biến vào file đó là đủ, không cần sửa Compose.
+File này đã có `backend.env_file: ./backend/.env`: thêm các biến Zalo vào file đó là đủ, không cần sửa Compose.
 
 ### Nếu VPS dùng docker-compose.prod.yml
 
-`.env` cạnh Compose chỉ cung cấp giá trị thay thế `${...}`; file hiện tại không truyền bảy biến Zalo vào backend. Tạo một override riêng **trên VPS sau khi được duyệt deploy**, ví dụ `docker-compose.zalo.yml`:
+`.env` cạnh Compose chỉ cung cấp giá trị thay thế `${...}`; file hiện tại không truyền các biến Zalo vào backend. Tạo một override riêng **trên VPS sau khi được duyệt deploy**, ví dụ `docker-compose.zalo.yml`:
 
 ```yaml
 services:
@@ -137,7 +138,42 @@ const groups = await response.json();
 console.table(groups.groups);
 ```
 
-Response chỉ chứa OA ID/phân trang và `group_id`, `name`, `status`, `total_member`. Tăng offset để xem các trang tiếp theo. Không trả provider payload, token hoặc secret. `ZaloOAService.send_gmf_message(group_id, message)` đã chuẩn bị nhưng không có endpoint gửi tin, không gắn vào ERP. Trong test, hàm chỉ chạy qua MockTransport.
+Response chỉ chứa OA ID/phân trang và `group_id`, `name`, `status`, `total_member`. Tăng offset để xem các trang tiếp theo. Không trả provider payload, token hoặc secret. `ZaloOAService.send_gmf_message(group_id, message)` được tái sử dụng bởi service thông báo thủ công bên dưới, không thêm endpoint gửi GMF độc lập. Trong test, hàm chỉ chạy qua MockTransport.
+
+## Thông báo ERP soạn thủ công → GMF (bổ sung local)
+
+Chỉ `POST /api/v1/notifications` được nối với `NotificationZaloService`. Quyền gửi và tập người nhận trong ERP giữ nguyên. Sau khi commit toàn bộ bản ghi ERP, service thử gửi **một** tin vào `ZALO_GMF_GROUP_ID`, ngoài vòng lặp người nhận. Không nối thông báo tự động về nghỉ phép, giao việc hoặc nhắc đánh giá với Zalo.
+
+| Phạm vi ERP | Người nhận ghi trong tin GMF |
+| --- | --- |
+| `EVERYONE` | Tất cả mọi người |
+| `DEPARTMENT` | Phòng <tên phòng ban>, không lặp chữ Phòng nếu tên đã có tiền tố |
+| `MANAGERS` | Các quản lý |
+| `STAFF` | Toàn bộ nhân viên |
+| `USER` | Không gửi GMF; chỉ tạo thông báo ERP và báo chưa hỗ trợ gửi Zalo riêng |
+
+Tin nhóm có định dạng:
+
+```text
+[THÔNG BÁO DOSCO]
+
+Người nhận: <phạm vi>
+Tiêu đề: <tiêu đề>
+Nội dung: <nội dung>
+Người gửi: <full_name của người gửi ERP đã xác thực>
+```
+
+Để gửi nhóm cần `ZALO_ENABLED=true`, `ZALO_COMPANY_ID` trùng công ty người gửi, `ZALO_GMF_GROUP_ID` không trống, đủ cấu hình OAuth và credential hợp lệ. Nhóm đã được chọn là `978226075868b136e879`; chỉ cấu hình giá trị này ở backend runtime khi được phép bật gửi thật. Env mẫu vẫn để trống. Không thêm migration hoặc thay cấu hình proxy/Compose.
+
+Response giữ `sent` (số người nhận ERP), thêm `zalo.status=sent|skipped|failed` và reason code an toàn khi cần. `sent` của Zalo chỉ xác nhận API tiếp nhận, không chứng minh từng thành viên đã đọc. Frontend hiển thị riêng hai kết quả và tương thích backend cũ chưa có trường `zalo`.
+
+Zalo lỗi/timeout hoặc thiếu credential không hủy thông báo ERP đã commit. Không tự retry GMF hoặc refresh token. Timeout có thể xảy ra sau khi Zalo đã nhận tin: không bấm gửi lại thông báo ERP để thử Zalo, vì có thể trùng tin. Cam kết một lần gọi GMF cho mỗi request ERP thành công; chưa có outbox/idempotency để chống trùng giữa các request người dùng gửi lại. Một lần refresh có thể thêm một HTTP request token trước request GMF. Gửi đồng bộ có thể làm response chờ thêm timeout của OAuth/GMF hiện có.
+
+### Gửi riêng: chưa triển khai
+
+Project chưa có mapping đã xác minh giữa ERP user và OA-scoped Zalo `user_id`. Số điện thoại không phải UID. Phương án cho giai đoạn riêng: bảng mapping `(company_id, erp_user_id, oa_id, zalo_user_id, verified_at)` với ràng buộc duy nhất theo OA/user; liên kết từ phiên ERP xác thực bằng nonce có expiry/single-use, đối chiếu tương tác qua webhook Zalo đã xác minh. Chưa tạo bảng hoặc endpoint này.
+
+Private text dùng [API gửi tin tư vấn](https://docs.zaloplatforms.com/docs/OA/tin-nhan/tin-tu-van/gui-tin-tu-van-dang-van-ban), cần nhóm **quyền gửi tin nhắn**, ngoài quyền GMF. Cần đối chiếu [điều kiện gửi tin tư vấn](https://docs.zaloplatforms.com/docs/OA/tin-nhan/tin-tu-van/dieu-kien-gui-tin-tu-van) và mục đích nội dung; không mặc định thông báo nội bộ ERP đủ điều kiện. UID lấy từ tương tác/webhook OA, không bắt buộc thêm getoa hoặc quyền quản lý thông tin OA cho flow GMF. Nếu muốn gọi API lấy hồ sơ/danh sách người dùng thì đánh giá thêm quyền tương ứng ở giai đoạn đó. Khi chưa đủ mapping/quyền/điều kiện, `USER` chỉ báo `private_unavailable`, không gửi nhóm chung.
 
 ## Refresh và xử lý sự cố
 

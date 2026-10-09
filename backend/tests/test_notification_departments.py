@@ -89,7 +89,7 @@ class DepartmentNotificationTests(unittest.TestCase):
                     db.commit()
                 response = self._send(department)
                 self.assertEqual(response.status_code, 201, response.text)
-                self.assertEqual(response.json(), {"sent": len(expected)})
+                self.assertEqual(response.json()["sent"], len(expected))
                 self.assertEqual(self._recipients(), expected)
                 with self.sessions() as db:
                     for notification in db.query(Notification).all():

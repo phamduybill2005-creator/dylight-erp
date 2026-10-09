@@ -1,6 +1,7 @@
 // Lớp gọi API tới backend FastAPI. Tự gắn JWT vào header Authorization.
 // Lưu ý: MVP lưu token trong localStorage cho đơn giản. Production nên dùng
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
+import type { NotificationSendResult } from "./notification-send-result";
 
 import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 
@@ -550,7 +551,7 @@ export const api = {
   notifications: (limit = 50) => request<Notification[]>(`/notifications/me?limit=${limit}`),
   unreadCount: () => request<{ count: number }>("/notifications/me/unread-count"),
   sendNotification: (payload: { title: string; body?: string | null; target: string; target_user_id?: number | null; target_department?: string | null }) =>
-    request<{ sent: number }>("/notifications", { method: "POST", body: JSON.stringify(payload) }),
+    request<NotificationSendResult>("/notifications", { method: "POST", body: JSON.stringify(payload) }),
   markNotificationRead: (id: number) => request<void>(`/notifications/${id}/read`, { method: "POST" }),
   markAllNotificationsRead: () => request<void>("/notifications/me/read-all", { method: "POST" }),
   deleteNotification: (id: number) => request<void>(`/notifications/${id}`, { method: "DELETE" }),
