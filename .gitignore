@@ -7,6 +7,7 @@ venv/
 backend/uploads/
 backend/.env
 backend/dosco.db
+notification-time-repair*.json
 
 # --- Node / Frontend ---
 node_modules/
