@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { splitLinks } from "@/lib/linkify";
+import { formatChatTime } from "@/lib/chat-time";
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -47,9 +48,6 @@ const PICKER_EMOJIS = [
 
 // Palette avatar cố định — hash id/tên -> chọn 1 lớp nền ổn định.
 const AVATAR_BG = ["bg-steel", "bg-amber", "bg-ok", "bg-bad", "bg-ink"];
-
-const fmt = (iso: string) =>
-  new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 function hashKey(key: string): number {
   let h = 0;
@@ -694,7 +692,7 @@ export default function ChatWidget() {
                               <div className="mt-1 flex items-center justify-between gap-2">
                                 <p className="truncate text-xs text-muted">{c.last_message || "Chưa có tin nhắn."}</p>
                                 {c.last_message_at && (
-                                  <span className="shrink-0 text-[10px] text-muted">{fmt(c.last_message_at)}</span>
+                                  <span className="shrink-0 text-[10px] text-muted">{formatChatTime(c.last_message_at, "vietnam")}</span>
                                 )}
                               </div>
                             </div>
@@ -898,7 +896,7 @@ export default function ChatWidget() {
                             )}
 
                             <p className={`mt-0.5 px-1 text-[10px] text-muted ${mine ? "text-right" : ""}`}>
-                              {fmt(m.created_at)}
+                              {formatChatTime(m.created_at)}
                             </p>
                           </div>
                         </div>

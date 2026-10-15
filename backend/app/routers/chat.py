@@ -6,13 +6,13 @@ phòng (conversation) mà mình là THÀNH VIÊN (kiểm qua ConversationMember)
 Mọi truy vấn lọc theo company_id để bảo đảm cô lập đa người dùng (tenant).
 Mô hình poll ~8s ở frontend (không WebSocket) — giống các module hiện có.
 """
-from datetime import datetime
+from datetime import datetime, timedelta, timezone, tzinfo
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.database import get_db, vn_now
+from app.database import get_db
 from app.deps import get_current_user
 from app.models import (
     ChatMessage, Conversation, ConversationMember, ConversationType, MessageReaction,
@@ -24,6 +24,32 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+_VN_TIMEZONE = timezone(timedelta(hours=7))
+
+
+def _chat_timestamp(value: datetime, naive_zone: tzinfo) -> datetime:
+    """Attach an offset only when the timestamp's source timezone is known."""
+    return value.replace(tzinfo=naive_zone) if value.tzinfo is None else value
+
+
+def _latest_message_clock(db: Session, conversation_id: int) -> tuple[int, datetime | None] | None:
+    # Read the ID and its room clock in one snapshot, including for paginated history.
+    row = (
+        db.query(ChatMessage.id, Conversation.last_message_at)
+        .join(Conversation, Conversation.id == ChatMessage.conversation_id)
+        .filter(ChatMessage.conversation_id == conversation_id)
+        .order_by(ChatMessage.id.desc())
+        .first()
+    )
+    return (row[0], row[1]) if row else None
+
+
+def _message_timestamp(msg: ChatMessage, clock: tuple[int, datetime | None] | None) -> datetime:
+    # last_message_at was explicitly written in VN time by send_message. It proves
+    # the instant of THIS exact last ID, not the timezone of every older DB row.
+    if clock and msg.id == clock[0] and clock[1] is not None:
+        return _chat_timestamp(clock[1], _VN_TIMEZONE)
+    return msg.created_at
 
 
 def _direct_key(a: int, b: int) -> str:
@@ -118,7 +144,7 @@ def _build_out(db: Session, conv: Conversation, current: User) -> ConversationOu
         project_id=conv.project_id,
         members=member_out,
         last_message=last.body if last else None,
-        last_message_at=conv.last_message_at,
+        last_message_at=_chat_timestamp(conv.last_message_at, _VN_TIMEZONE) if conv.last_message_at else None,
         unread=int(unread),
         created_at=conv.created_at,
     )
@@ -151,7 +177,7 @@ def _message_out(db: Session, msg: ChatMessage, current: User) -> MessageOut:
         sender_id=msg.sender_id,
         sender_name=msg.sender_name,
         body=msg.body,
-        created_at=msg.created_at,
+        created_at=_message_timestamp(msg, _latest_message_clock(db, msg.conversation_id)),
         reactions=_agg_reactions(rx, current.id),
     )
 
@@ -159,6 +185,7 @@ def _message_out(db: Session, msg: ChatMessage, current: User) -> MessageOut:
 def _messages_out(db: Session, msgs: list[ChatMessage], current: User) -> list[MessageOut]:
     """Build nhiều MessageOut — 1 query duy nhất lấy hết reactions (không N+1)."""
     ids = [m.id for m in msgs]
+    clock = _latest_message_clock(db, msgs[0].conversation_id) if msgs else None
     by_msg: dict[int, list[MessageReaction]] = {}
     if ids:
         for r in (
@@ -174,7 +201,7 @@ def _messages_out(db: Session, msgs: list[ChatMessage], current: User) -> list[M
             sender_id=m.sender_id,
             sender_name=m.sender_name,
             body=m.body,
-            created_at=m.created_at,
+            created_at=_message_timestamp(m, clock),
             reactions=_agg_reactions(by_msg.get(m.id, []), current.id),
         )
         for m in msgs
@@ -406,15 +433,18 @@ def send_message(
     body = payload.body.strip()
     if not body:
         raise HTTPException(400, "Nội dung tin nhắn trống.")
+    # Use one application clock, independent of the DB session/server timezone.
+    now = datetime.now(timezone.utc).astimezone(_VN_TIMEZONE).replace(tzinfo=None)
     msg = ChatMessage(
         company_id=current.company_id,
         conversation_id=conv_id,
         sender_id=current.id,
         body=body,
+        created_at=now,
     )
     db.add(msg)
     db.flush()
-    conv.last_message_at = vn_now()
+    conv.last_message_at = now
     # người gửi đương nhiên đã đọc tin mình vừa gửi
     me = (
         db.query(ConversationMember)
