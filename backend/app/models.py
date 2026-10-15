@@ -26,7 +26,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, vn_now
 
 # Bảng liên kết nhiều-nhiều giữa Dự án và Thành viên thực hiện
 project_members = Table(
@@ -946,7 +946,8 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String(255))
     body: Mapped[str | None] = mapped_column(Text)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # ORM inserts from manual announcements, leave, assignments and reminders all use VN time.
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now, server_default=func.now())
 
     sender: Mapped["User | None"] = relationship("User", foreign_keys=[sender_id])
 
@@ -1075,7 +1076,7 @@ class ChatMessage(Base):
     )
     sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     body: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now, server_default=func.now(), index=True)
 
     sender: Mapped["User | None"] = relationship("User", foreign_keys=[sender_id])
 

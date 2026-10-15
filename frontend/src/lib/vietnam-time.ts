@@ -4,7 +4,7 @@ const vietnamClock = new Intl.DateTimeFormat("vi-VN", {
 });
 
 /** Preserve unknown legacy wall times; explicit offsets and new VN writes are unambiguous. */
-export function formatChatTime(iso?: string | null, naiveZone: "utc" | "vietnam" = "vietnam"): string {
+export function formatVietnamTime(iso?: string | null, naiveZone: "utc" | "vietnam" = "vietnam"): string {
   if (!iso?.trim()) return "—";
   const value = iso.trim().replace(" ", "T");
   const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)

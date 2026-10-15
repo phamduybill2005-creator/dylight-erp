@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { splitLinks } from "@/lib/linkify";
-import { formatChatTime } from "@/lib/chat-time";
+import { formatVietnamTime } from "@/lib/vietnam-time";
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -692,7 +692,7 @@ export default function ChatWidget() {
                               <div className="mt-1 flex items-center justify-between gap-2">
                                 <p className="truncate text-xs text-muted">{c.last_message || "Chưa có tin nhắn."}</p>
                                 {c.last_message_at && (
-                                  <span className="shrink-0 text-[10px] text-muted">{formatChatTime(c.last_message_at, "vietnam")}</span>
+                                  <span className="shrink-0 text-[10px] text-muted">{formatVietnamTime(c.last_message_at)}</span>
                                 )}
                               </div>
                             </div>
@@ -896,7 +896,7 @@ export default function ChatWidget() {
                             )}
 
                             <p className={`mt-0.5 px-1 text-[10px] text-muted ${mine ? "text-right" : ""}`}>
-                              {formatChatTime(m.created_at)}
+                              {formatVietnamTime(m.created_at)}
                             </p>
                           </div>
                         </div>

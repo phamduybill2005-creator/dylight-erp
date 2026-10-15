@@ -11,6 +11,7 @@ import { EnvelopeIcon, XMarkIcon, PaperAirplaneIcon, TrashIcon } from "@heroicon
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { formatNotificationSendResult } from "@/lib/notification-send-result";
+import { formatVietnamTime } from "@/lib/vietnam-time";
 import { roleTier } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { useNicknames } from "@/lib/nicknames";
@@ -56,9 +57,6 @@ function getNotificationUrl(n: Notification): string | null {
   }
   return null;
 }
-
-const fmt = (iso: string) =>
-  new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export default function NotificationsBell() {
   const router = useRouter();
@@ -382,7 +380,7 @@ export default function NotificationsBell() {
                         </div>
                         {n.body && <p className="mt-1 whitespace-pre-line break-words [overflow-wrap:anywhere] text-xs text-muted">{n.body}</p>}
                         <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-muted">
-                          <span>{nick(n.sender_id, n.sender_name) || "Hệ thống"} · {fmt(n.created_at)}</span>
+                          <span>{nick(n.sender_id, n.sender_name) || "Hệ thống"} · {formatVietnamTime(n.created_at)}</span>
                           {targetUrl && (
                             <span className="font-semibold text-steel/80 group-hover:text-amber transition-colors flex items-center gap-0.5">
                               {targetUrl === "/leave" ? "Xem đơn nghỉ phép" : "Xem chi tiết"} &rarr;

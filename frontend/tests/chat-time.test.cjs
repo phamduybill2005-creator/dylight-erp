@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { loadTypeScript } = require("./helpers/load-typescript.cjs");
 
-const format = (...args) => loadTypeScript("src/lib/chat-time.ts").formatChatTime(...args);
+const format = (...args) => loadTypeScript("src/lib/vietnam-time.ts").formatVietnamTime(...args);
 
 test("explicit UTC message time displays seven hours later in Vietnam", () => {
   assert.equal(format("2026-09-24T02:26:00Z"), "09:26 24/09");
@@ -26,7 +26,7 @@ test("conversion rolls the displayed date across midnight and year end", () => {
   assert.equal(format("2026-12-31T18:05:00Z"), "01:05 01/01");
 });
 
-test("chat displays Vietnam time regardless of the device timezone", () => {
+test("chat and notification timestamps display Vietnam time regardless of the device timezone", () => {
   const previous = process.env.TZ;
   try {
     for (const tz of ["UTC", "America/New_York", "Asia/Tokyo", "Asia/Ho_Chi_Minh"]) {
