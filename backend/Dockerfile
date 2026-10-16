@@ -1,4 +1,5 @@
-FROM python:3.12-slim
+# Debian 12 is supported by the pinned Playwright 1.49 browser dependencies.
+FROM python:3.12-slim-bookworm
 
 # Không ghi file .pyc, log ra stdout ngay (tốt cho container)
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
@@ -12,12 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# LƯU Ý: KHÔNG cài Chromium ở đây. Việc cào Yunatt (Playwright) đã chuyển sang
-# GitHub Actions (.github/workflows/yunatt-sync.yml). Bước "playwright install
-# --with-deps chromium" rất nặng, làm build BACKEND HỎNG trên gói Render free.
-# yunatt_service import Playwright kiểu lazy nên ảnh không có Chromium vẫn chạy
-# bình thường (chỉ nút "Đồng bộ ngay" thủ công là không dùng được — đã tắt qua
-# YUNATT_ENABLED=false; đồng bộ tự động do Actions lo).
+# VPS chạy cả nút Đồng bộ ngay và scheduler nên cần browser TRONG image.
+# Giữ build mặc định nhẹ cho môi trường dùng job riêng (VD GitHub Actions).
+# docker-compose.yml bật tùy chọn này cho VPS; recreate không làm mất browser.
+ARG INSTALL_YUNATT_BROWSER=false
+RUN if [ "$INSTALL_YUNATT_BROWSER" = "true" ]; then \
+      python -m playwright install --with-deps chromium && \
+      rm -rf /var/lib/apt/lists/*; \
+    fi
 
 COPY . .
 

@@ -130,10 +130,21 @@ def fetch_months(months: list[str]):
     all_punches: list[dict] = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=settings.YUNATT_HEADLESS,
-            args=["--no-sandbox", "--disable-dev-shm-usage"],
-        )
+        try:
+            browser = p.chromium.launch(
+                headless=settings.YUNATT_HEADLESS,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+            )
+        except Exception as e:  # noqa: BLE001 — normalize browser startup failures for API/job
+            if "Executable doesn't exist" in str(e):
+                raise YunattError(
+                    "Image backend thiếu Chromium để đồng bộ Yunatt. Cần build lại backend "
+                    "với INSTALL_YUNATT_BROWSER=true. [yunatt_browser_missing]"
+                ) from e
+            raise YunattError(
+                "Không khởi động được Chromium để đồng bộ Yunatt. Kiểm tra browser và "
+                "các thư viện hệ thống trong image backend. [yunatt_browser_start_failed]"
+            ) from e
         try:
             page = browser.new_context().new_page()
             page.set_default_timeout(45000)
@@ -150,15 +161,28 @@ def fetch_months(months: list[str]):
                 pass
             page.wait_for_selector('input[type="password"]', timeout=30000)
             page.locator('input[type="text"], input[type="email"]').first.fill(settings.YUNATT_EMAIL.strip())
-            page.locator('input[type="password"]').first.fill(settings.YUNATT_PASSWORD.strip())
+            # Spaces can be part of a valid password; only normalize the email.
+            page.locator('input[type="password"]').first.fill(settings.YUNATT_PASSWORD)
             try:
-                page.get_by_role("button", name=re.compile("login", re.I)).first.click(timeout=5000)
-            except Exception:  # noqa: BLE001
-                page.locator('input[type="password"]').first.press("Enter")
-            try:
-                page.wait_for_load_state("networkidle", timeout=30000)
-            except Exception:  # noqa: BLE001
-                pass
+                page.get_by_role("button", name=re.compile("login", re.I)).first.click(timeout=45000)
+                # Click waits for initiated navigations; an idle network is still
+                # not evidence of an accepted login. Wait for the login form to
+                # disappear before opening records (also covers delayed redirects).
+                page.wait_for_selector('input[type="password"]', state="hidden", timeout=45000)
+            except Exception as e:  # noqa: BLE001
+                # Do not press Enter/re-submit after a timeout: the first login
+                # might still be in flight. Never dump page text or credentials.
+                if page.locator('input[type="password"]').first.is_visible():
+                    raise YunattError(
+                        "Yunatt vẫn trả về trang đăng nhập. Kiểm tra YUNATT_EMAIL / YUNATT_PASSWORD "
+                        "trong GitHub Actions (hoặc cấu hình backend nếu chạy thủ công) có khớp "
+                        "tài khoản đăng nhập trực tiếp; kiểm tra yêu cầu xác minh hoặc hạn chế "
+                        "đăng nhập từ máy chủ. [yunatt_login_not_accepted]"
+                    ) from e
+                raise YunattError(
+                    "Yunatt chưa hoàn tất phản hồi đăng nhập. Kiểm tra kết nối từ môi trường "
+                    "chạy đồng bộ tới Yunatt và thử lại. [yunatt_login_incomplete]"
+                ) from e
 
             # 2) Trang Punch Record -> đọc map tháng -> monthDataId
             page.goto(base + "/cardRecord/monthIndex", wait_until="domcontentloaded")
@@ -173,19 +197,16 @@ def fetch_months(months: list[str]):
                 # Playwright coi là "ẩn", nên state mặc định "visible" sẽ chờ vô ích -> timeout).
                 page.wait_for_selector("#fq-monthDataId option", state="attached", timeout=20000)
             except Exception as e:  # noqa: BLE001
-                diag = ""
-                try:
-                    still_login = page.locator('input[type="password"]').count() > 0
-                    snippet = " ".join((page.inner_text("body") or "").split())[:250]
-                    diag = (
-                        f" [chan_doan: url={page.url} con_o_login={still_login} "
-                        f"noi_dung={snippet!r}]"
-                    )
-                except Exception:  # noqa: BLE001
-                    pass
+                if page.locator('input[type="password"]').first.is_visible():
+                    raise YunattError(
+                        "Yunatt chuyển về trang đăng nhập khi mở bảng chấm công; phiên đăng nhập "
+                        "không được duy trì hoặc tài khoản chưa có quyền truy cập. "
+                        "[yunatt_session_lost]"
+                    ) from e
                 raise YunattError(
-                    "Không vào được trang chấm công Yunatt — sai tài khoản/mật khẩu "
-                    "hoặc giao diện Yunatt đã thay đổi." + diag
+                    "Đã qua bước đăng nhập nhưng không tải được ô chọn tháng chấm công Yunatt. "
+                    "Kiểm tra quyền truy cập, kết nối hoặc thay đổi giao diện Yunatt. "
+                    "[yunatt_month_selector_missing]"
                 ) from e
             opts = page.eval_on_selector_all(
                 "#fq-monthDataId option",

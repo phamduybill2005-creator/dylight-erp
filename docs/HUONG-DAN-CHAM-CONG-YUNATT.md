@@ -67,6 +67,40 @@ trước** và ghi vào ERP.
 ---
 
 ## ❓ Xử lý sự cố nhanh
+
+### VPS báo 500 và log có `Executable doesn't exist`
+
+Đây là lỗi thiếu Chromium trong container, xảy ra trước bước đăng nhập Yunatt.
+Image VPS phải cài browser ngay khi build; cài bằng `docker exec` chỉ tồn tại
+trong container hiện tại và sẽ mất sau khi recreate.
+
+Với `docker-compose.yml`, build backend có `INSTALL_YUNATT_BROWSER=true`.
+Dockerfile dùng Debian 12 để khớp bộ thư viện của Playwright đang ghim.
+Sau khi đưa bản sửa này lên VPS, dùng đúng project/file Compose hiện hữu:
+
+```bash
+cd /opt/dosco-erp/app
+sudo docker compose -p app -f docker-compose.yml build backend
+sudo docker compose -p app -f docker-compose.yml up -d --no-deps --no-build backend
+```
+
+Đường dẫn/project ở trên là của VPS đã đối chiếu nhãn container. Với VPS khác,
+dùng đường dẫn/project thực tế. Sau khi backend khởi động, bấm **Đồng bộ ngay**
+và kiểm tra trạng thái của lần vừa chạy. Có Chromium chỉ giải quyết lỗi khởi
+động browser; vẫn phải xác nhận đăng nhập Yunatt và lấy dữ liệu thành công.
+
+Nếu cần khôi phục container hiện tại trước khi triển khai bản sửa image:
+
+```bash
+sudo docker exec -u 0 dosco-erp-api python -m playwright install --with-deps chromium
+```
+
+Đây là cách tạm thời. Lệnh tải Chromium và thư viện hệ thống vào container;
+chờ lệnh kết thúc thành công rồi bấm **Đồng bộ ngay**. Nếu tải/cài thất bại,
+giữ phần lỗi cuối để kiểm tra, không tiếp tục giả định browser đã sẵn sàng.
+
+### Các lỗi khác
+
 | Hiện tượng | Cách xử lý |
 |---|---|
 | "Đồng bộ ngay" báo lỗi đăng nhập | Kiểm tra lại `YUNATT_EMAIL` / `YUNATT_PASSWORD` trong cấu hình server |
