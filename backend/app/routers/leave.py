@@ -119,7 +119,6 @@ def my_leaves(db: Session = Depends(get_db), current: User = Depends(get_current
             LeaveRequest.user_id == current.id,
             LeaveRequest.from_date >= date(2026, 9, 1),
             or_(LeaveRequest.source == "LEAVE", LeaveRequest.source.is_(None)),
-            LeaveRequest.source != "SCHEDULE",
         )
         .order_by(LeaveRequest.from_date.desc())
         .all()
@@ -308,6 +307,34 @@ def decide_leave(
     return saved
 
 
+@router.post("/{leave_id}/withdraw", response_model=LeaveOut)
+def withdraw_leave(
+    leave_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Only the sender may withdraw an undecided leave; keep the original record."""
+    rec = db.get(LeaveRequest, leave_id)
+    if not rec or rec.company_id != current.company_id or rec.user_id != current.id:
+        raise HTTPException(404, "Không tìm thấy đơn nghỉ của bạn.")
+    if rec.source not in (None, "LEAVE"):
+        raise HTTPException(400, "Chỉ thu hồi đơn được gửi trong mục Nghỉ phép.")
+    result = db.execute(update(LeaveRequest).where(
+        LeaveRequest.id == leave_id, LeaveRequest.company_id == current.company_id,
+        LeaveRequest.user_id == current.id, LeaveRequest.status == LeaveStatus.PENDING,
+    ).values(status=LeaveStatus.CANCELED).execution_options(synchronize_session=False))
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "Đơn đã được xử lý hoặc thu hồi. Vui lòng xem trạng thái mới nhất.")
+    db.commit()
+    db.refresh(rec)
+    log_activity(db, current, "leave.withdraw", "leave_request", rec.id,
+                 f"{rec.user_name}: {rec.from_date}→{rec.to_date}")
+    publish(current.company_id, "leave")
+    publish(current.company_id, "schedule")
+    return rec
+
+
 @router.delete("/{leave_id}")
 def delete_leave(
     leave_id: int,
@@ -321,6 +348,11 @@ def delete_leave(
     is_admin = current.role in _MANAGER_ROLES or current.role == UserRole.ADMIN
     if not is_admin and rec.user_id != current.id:
         raise HTTPException(403, "Không có quyền xóa đơn nghỉ này.")
+    # The legacy DELETE must not bypass the owner's pending-only rule or
+    # erase the history. Student schedules retain their separate delete flow.
+    if rec.user_id == current.id and rec.source in (None, "LEAVE"):
+        withdraw_leave(leave_id, db, current)
+        return {"message": "Đã thu hồi đơn nghỉ thành công."}
     info = f"{rec.user_name}: {rec.from_date}→{rec.to_date} ({rec.reason})"
     db.delete(rec)
     db.commit()
@@ -369,9 +401,13 @@ def save_student_week_schedule(
         .filter(
             LeaveRequest.company_id == current.company_id,
             LeaveRequest.user_id == target_user_id,
+            LeaveRequest.status != LeaveStatus.CANCELED,
             LeaveRequest.from_date <= max_d,
             LeaveRequest.to_date >= min_d,
         )
+        # Serialize schedule edits with approval/withdrawal. A row canceled
+        # while this query waits is rechecked and excluded by PostgreSQL.
+        .with_for_update()
         .all()
     )
     # Ưu tiên đơn source="SCHEDULE" cho lịch sinh viên nếu ngày đó có nhiều đơn

@@ -15,6 +15,7 @@ from sqlalchemy import inspect, text
 
 from app.config import settings
 from app.database import Base, engine
+from app.leave_schema import ensure_leave_canceled_status
 from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, project_evaluations, partners, payroll,
@@ -34,6 +35,7 @@ Base.metadata.create_all(bind=engine, tables=[
     table for table in Base.metadata.sorted_tables
     if table.name not in ZALO_TABLE_NAMES | ZALO_REMINDER_TABLE_NAMES
 ])
+ensure_leave_canceled_status(engine)
 
 
 def _ensure_schema() -> None:

@@ -14,6 +14,7 @@ import {
   ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import { LeaveWithdrawButton, canWithdrawLeave } from "@/components/leave-withdraw-button";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { canDecideLinkedLeave, leaveLoginPath, linkedLeaveId } from "@/lib/leave-links";
@@ -35,6 +36,7 @@ const STATUS_LABEL: Record<LeaveStatus, string> = {
   PENDING: "Chờ duyệt",
   APPROVED: "Đã duyệt",
   REJECTED: "Từ chối",
+  CANCELED: "Đã thu hồi",
 };
 const LEAVE_TIME_LABEL: Record<string, string> = {
   FULL: "Cả ngày", MORNING: "Buổi sáng", AFTERNOON: "Buổi chiều",
@@ -44,6 +46,7 @@ const STATUS_CLS: Record<LeaveStatus, string> = {
   PENDING: "bg-amber/15 text-amber-deep",
   APPROVED: "bg-ok/10 text-ok",
   REJECTED: "bg-bad/10 text-bad",
+  CANCELED: "bg-slate-100 text-slate-600",
 };
 
 function StatusBadge({ s }: { s: LeaveStatus }) {
@@ -123,6 +126,7 @@ function LeaveContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);   // lỗi backend trả về (VD quá hạn 19h)
   const [saving, setSaving] = useState(false);
   const [deciding, setDeciding] = useState<number | null>(null);
+  const [withdrawing, setWithdrawing] = useState<number | null>(null);
   const [requestFormOpen, setRequestFormOpen] = useState(false);
 
   const loadLinkedLeave = useCallback(async () => {
@@ -245,7 +249,7 @@ function LeaveContent() {
   }
 
   async function decide(id: number, status: "APPROVED" | "REJECTED") {
-    if (deciding !== null) return;
+    if (deciding !== null || withdrawing !== null) return;
     setDeciding(id);
     setDecisionError(null);
     try {
@@ -264,6 +268,33 @@ function LeaveContent() {
       // Also reload after a 409/network error: another approver may have finished.
       await loadLinkedLeave();
       setDeciding(null);
+    }
+  }
+
+  async function withdraw(id: number) {
+    if (withdrawing !== null || deciding !== null || !me) return;
+    const leave = mine.find((item) => item.id === id) || (linkedLeave?.id === id ? linkedLeave : null);
+    if (!leave || !canWithdrawLeave(me.id, leave)) return;
+    if (!window.confirm(`Thu hồi đơn xin nghỉ từ ${formatDate(leave.from_date)} đến ${formatDate(leave.to_date)}? Đơn sẽ không còn chờ duyệt.`)) return;
+    setWithdrawing(id);
+    setDecisionError(null);
+    setSubmitResult(null);
+    try {
+      const updated = await api.withdrawLeave(id);
+      setMine((old) => old.map((item) => item.id === id ? updated : item));
+      setPending((old) => old.filter((item) => item.id !== id));
+      if (id === requestId) {
+        ++linkedLoadSequence.current;
+        setLinkedLeave(updated);
+      }
+      setSubmitResult("Đã thu hồi đơn. Đơn được giữ trong lịch sử và không còn chờ duyệt.");
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : "Chưa xác nhận được kết quả thu hồi. Vui lòng kiểm tra trạng thái đơn.");
+    } finally {
+      // A decision may have won the race; show its real status without retrying.
+      await api.myLeaves().then(setMine).catch(() => {});
+      await loadLinkedLeave();
+      setWithdrawing(null);
     }
   }
 
@@ -362,6 +393,11 @@ function LeaveContent() {
                 <div><dt className="text-slate-500">Lý do</dt><dd className="whitespace-pre-wrap break-words">{linkedLeave.reason || "—"}</dd></div>
                 {linkedLeave.decided_by_name && <div><dt className="text-slate-500">Người xử lý</dt><dd>{linkedLeave.decided_by_name}</dd></div>}
               </dl>
+              <div className="mt-3">
+                <LeaveWithdrawButton leave={linkedLeave} userId={me.id}
+                  busy={withdrawing !== null || deciding !== null} withdrawing={withdrawing === linkedLeave.id}
+                  onWithdraw={withdraw} />
+              </div>
               {canDecideLinkedLeave(api.realUser()?.role || me.role, linkedLeave.status) && (
                 <div className="mt-4 flex gap-3">
                   <button type="button" disabled={deciding !== null} onClick={() => decide(linkedLeave.id, "REJECTED")} className="rounded-lg bg-bad/10 px-4 py-2 font-semibold text-bad disabled:opacity-50">Từ chối</button>
@@ -462,7 +498,12 @@ function LeaveContent() {
                 <StatusBadge s={leave.status} />
               </div>
               <p className="mt-3 text-sm text-slate-700">{leave.reason || "Không ghi lý do"}</p>
-              <p className="mt-2 text-[11px] text-muted">{approverName ? `Người duyệt: ${approverName}` : leave.status === "PENDING" ? "Đang chờ duyệt" : "Chưa có thông tin người duyệt"}</p>
+              <p className="mt-2 text-[11px] text-muted">{approverName ? `Người duyệt: ${approverName}` : leave.status === "CANCELED" ? "Bạn đã thu hồi đơn" : leave.status === "PENDING" ? "Đang chờ duyệt" : "Chưa có thông tin người duyệt"}</p>
+              {canWithdrawLeave(me.id, leave) && <div className="mt-3">
+                <LeaveWithdrawButton leave={leave} userId={me.id}
+                  busy={withdrawing !== null || deciding !== null} withdrawing={withdrawing === leave.id}
+                  onWithdraw={withdraw} />
+              </div>}
             </article>
           );
         })}
@@ -477,11 +518,12 @@ function LeaveContent() {
               <th className="border border-line px-3 py-2">Lý do</th>
               <th className="border border-line px-3 py-2 text-center">Trạng thái</th>
               <th className="border border-line px-3 py-2">Người duyệt</th>
+              <th className="border border-line px-3 py-2 text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {shownMine.length === 0 && (
-              <tr><td colSpan={6} className="border border-line px-3 py-6 text-center text-muted">Chưa có đơn nào.</td></tr>
+              <tr><td colSpan={7} className="border border-line px-3 py-6 text-center text-muted">Chưa có đơn nào.</td></tr>
             )}
             {shownMine.map((l) => {
               const approverName = l.decided_by_name || (l.decided_by_id ? users.find((u) => u.id === l.decided_by_id)?.full_name : null);
@@ -505,9 +547,16 @@ function LeaveContent() {
                       ) : (
                         <span className="text-xs text-rose-500 italic">Từ chối</span>
                       )
+                    ) : l.status === "CANCELED" ? (
+                      <span className="text-xs text-muted">Bạn đã thu hồi đơn</span>
                     ) : (
                       <span className="text-xs text-muted italic">Đang chờ duyệt</span>
                     )}
+                  </td>
+                  <td className="border border-line px-3 py-2 text-center">
+                    <LeaveWithdrawButton leave={l} userId={me.id}
+                      busy={withdrawing !== null || deciding !== null} withdrawing={withdrawing === l.id}
+                      onWithdraw={withdraw} />
                   </td>
                 </tr>
               );

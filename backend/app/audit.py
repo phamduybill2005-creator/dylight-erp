@@ -29,6 +29,7 @@ ACTION_LABELS: dict[str, str] = {
     "leave.approved": "Duyệt đơn nghỉ",
     "leave.rejected": "Từ chối đơn nghỉ",
     "leave.delete": "Xóa đơn nghỉ",
+    "leave.withdraw": "Thu hồi đơn nghỉ",
     "leave.student_schedule": "Đăng ký lịch sinh viên",
     # Tài khoản
     "user.create": "Tạo tài khoản",

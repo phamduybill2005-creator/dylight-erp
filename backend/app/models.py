@@ -801,6 +801,7 @@ class LeaveStatus(str, enum.Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    CANCELED = "CANCELED"  # Người gửi thu hồi trước khi được xử lý.
 
 
 # --------------------------------------------------------------------------

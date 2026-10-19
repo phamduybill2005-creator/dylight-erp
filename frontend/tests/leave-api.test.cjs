@@ -55,3 +55,13 @@ test("actual API 401 clears authentication but keeps a safe return to the same l
   assert.equal(storage.has("dylight_token"), false);
   assert.equal(location.href, "/login?next=%2Fleave%3Frequest_id%3D42");
 });
+
+test("withdrawing a leave sends a single authenticated POST to its own action", async () => {
+  const { api, requests } = loadApi();
+  await api.withdrawLeave(42);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "http://localhost:8000/api/v1/leave/42/withdraw");
+  assert.equal(requests[0].method, "POST");
+  assert.equal(requests[0].auth, "Bearer synthetic-erp-jwt");
+  assert.equal(requests[0].body, undefined);
+});
