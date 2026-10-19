@@ -707,7 +707,7 @@ export default function ProjectsPage() {
    *  thống / Quản lý cấp cao + danh sách chỉ định (lib/roles.canSeeRevenue). */
   const showRevenue = canSeeRevenue(me);
   // Ẩn cột -> bớt 1 ô khi gộp dòng "không tìm thấy dự án".
-  const infoCols = (isBanDoMode ? 23 : 15) - (showRevenue ? 0 : 1);
+  const infoCols = (isBanDoMode ? 24 : 15) - (showRevenue ? 0 : 1);
 
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
@@ -979,7 +979,7 @@ export default function ProjectsPage() {
                           />
                         </label>
                       </div>
-                      <div className="mt-1.5 grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-1.5 text-[10px] font-semibold">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
                         <label className={`flex h-8 items-center gap-1.5 rounded-full px-2 ring-1 ${isBanDoTicked(bando.data) ? "bg-teal-600 text-white ring-teal-600" : "bg-white text-slate-500 ring-slate-200"}`}>
                           <input
                             data-bando-field="data"
@@ -991,9 +991,24 @@ export default function ProjectsPage() {
                               void commitEvaluation(project, json);
                             }}
                             aria-label="DATA"
-                            className="h-3.5 w-3.5 rounded accent-teal-700"
+                            className={`h-3.5 w-3.5 rounded border ${tickInputClass(isBanDoTicked(bando.data))} accent-teal-700`}
                           />
                           DATA
+                        </label>
+                        <label className={`flex h-8 items-center gap-1.5 rounded-full px-2 ring-1 ${isBanDoTicked(bando.hovermaps) ? "bg-teal-600 text-white ring-teal-600" : "bg-white text-slate-500 ring-slate-200"}`}>
+                          <input
+                            data-bando-field="hovermaps"
+                            type="checkbox"
+                            checked={isBanDoTicked(bando.hovermaps)}
+                            onChange={(event) => {
+                              const json = stringifyBanDoDetails({ ...bando, hovermaps: event.target.checked ? TICKED : "" });
+                              setEvalEdits((current) => ({ ...current, [project.id]: json }));
+                              void commitEvaluation(project, json);
+                            }}
+                            aria-label="HoverMaps"
+                            className={`h-3.5 w-3.5 rounded border ${tickInputClass(isBanDoTicked(bando.hovermaps))} accent-teal-700`}
+                          />
+                          HoverMaps
                         </label>
                         <label className={`flex h-8 items-center gap-1.5 rounded-full px-2 ring-1 ${isBanDoTicked(bando.trace) ? "bg-teal-600 text-white ring-teal-600" : "bg-white text-slate-500 ring-slate-200"}`}>
                           <input
@@ -1006,11 +1021,11 @@ export default function ProjectsPage() {
                               void commitEvaluation(project, json);
                             }}
                             aria-label="TRACE"
-                            className="h-3.5 w-3.5 rounded accent-teal-700"
+                            className={`h-3.5 w-3.5 rounded border ${tickInputClass(isBanDoTicked(bando.trace))} accent-teal-700`}
                           />
                           TRACE
                         </label>
-                        <label className="flex h-8 min-w-0 items-center gap-1 rounded-full bg-white px-2 text-slate-600 ring-1 ring-slate-200">
+                        <label className="flex h-8 w-20 min-w-0 items-center gap-1 rounded-full bg-white px-2 text-slate-600 ring-1 ring-slate-200">
                           <span className="shrink-0">Vùng:</span>
                           <input
                             data-bando-field="vung"
@@ -1040,6 +1055,7 @@ export default function ProjectsPage() {
                       </dl>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
                         {tick("DATA", bando.data)}
+                        {tick("HoverMaps", bando.hovermaps)}
                         {tick("TRACE", bando.trace)}
                         <span className="rounded-full bg-white px-2 py-1 text-slate-600 ring-1 ring-slate-200">Vùng: {bando.vung || "—"}</span>
                       </div>
@@ -1092,12 +1108,13 @@ export default function ProjectsPage() {
               {/* DOSCO担当: tên dài nhất (P.T.T.NHUNG) ≈ 61px ở cỡ chữ 10.5px,
                   cộng sao 12px + gap 4px + padding 8px = 85px -> 90px (thu từ 100px để nhường chỗ cột Vùng). */}
               <col className="w-[90px]" />   {/* DOSCO担当 */}
-              <col className="w-[60px]" />   {/* Vùng (chữ) */}
+              <col className="w-[36px]" />   {/* Vùng (chữ) */}
               <col className="w-[48px]" />   {/* Ortho (nhập số) */}
               <col className="w-[48px]" />   {/* RIEGL (nhập số) */}
               <col className="w-[48px]" />   {/* QLCL (nhập số) */}
               <col className="w-[38px]" />   {/* DATA (ô tích) */}
               <col className="w-[52px]" />   {/* Analysis (số + "ha") */}
+              <col className="w-[66px]" />   {/* HoverMaps (ô tích) */}
               <col className="w-[38px]" />   {/* Trace (ô tích) */}
               <col className="w-[48px]" />   {/* Section (nhập số) */}
               <col className="w-[145px]" />  {/* GHI CHÚ (cột to nhất trong 8 cột Bản đồ) */}
@@ -1151,6 +1168,7 @@ export default function ProjectsPage() {
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={BANDO_EDIT_HINT}>QLCL</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={`Ô tích — ${BANDO_EDIT_HINT}`}>DATA</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={`Diện tích phân tích (ha), chỉ gõ số — ${BANDO_EDIT_HINT}`}>Analysis</th>
+                  <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={`Ô tích — ${BANDO_EDIT_HINT}`}>HoverMaps</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={`Ô tích — ${BANDO_EDIT_HINT}`}>Trace</th>
                   <th className={`${TH} text-center bg-teal-50 text-teal-900 border-teal-200 font-bold px-0.5 text-[9.5px]`} title={BANDO_EDIT_HINT}>Section</th>
                   <th className={`${TH} text-center bg-amber-50 text-amber-900 border-amber-200 font-bold text-[10px]`}>GHI CHÚ</th>
@@ -1224,7 +1242,7 @@ export default function ProjectsPage() {
                 </td>
               );
               /** Ô TÍCH (DATA / TRACE) — tích là lưu ngay. Không đủ quyền thì chỉ xem (mờ, không bấm được). */
-              const tickCell = (key: "data" | "trace") => {
+              const tickCell = (key: "data" | "hovermaps" | "trace") => {
                 const allowed = canEditBanDo(p);
                 const ticked = isBanDoTicked(bando[key]);
                 return (
@@ -1243,6 +1261,7 @@ export default function ProjectsPage() {
                           ? `${key.toUpperCase()}: tích là lưu ngay`
                           : "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới tích được"
                       }
+                      aria-label={key === "hovermaps" ? "HoverMaps" : key.toUpperCase()}
                       className={`h-3.5 w-3.5 cursor-pointer rounded border ${tickInputClass(ticked)} accent-teal-700 disabled:cursor-not-allowed disabled:opacity-60`}
                     />
                   </td>
@@ -1352,6 +1371,7 @@ export default function ProjectsPage() {
                           </span>
                         )}
                       </td>
+                      {tickCell("hovermaps")}
                       {tickCell("trace")}
                       {numCell("section")}
                       <td className={`${TD} align-top p-0.5`} onClick={(e) => e.stopPropagation()}>

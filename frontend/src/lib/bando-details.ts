@@ -9,13 +9,14 @@ export type BanDoDetails = {
   qlcl: string;      // nhập số
   data: string;      // Ô TÍCH: "1" = đã tích, "" = chưa (dữ liệu cũ nhập số: khác "0" coi là đã tích)
   analysis: string;  // SỐ hecta — đơn vị "ha" cố định (dữ liệu cũ có thể còn kèm chữ "ha")
+  hovermaps: string; // Ô TÍCH như DATA
   trace: string;     // Ô TÍCH như DATA
   section: string;   // nhập số
   tieu_de: string;   // Ghi chú
 };
 
 export const EMPTY_BANDO: BanDoDetails = {
-  vung: "", ortho: "", riegl: "", qlcl: "", data: "", analysis: "", trace: "", section: "", tieu_de: "",
+  vung: "", ortho: "", riegl: "", qlcl: "", data: "", analysis: "", hovermaps: "", trace: "", section: "", tieu_de: "",
 };
 
 /** Giá trị lưu vào JSON khi ô tích được tích. */
@@ -37,6 +38,7 @@ export function parseBanDoDetails(evalStr?: string | null): BanDoDetails {
         qlcl: str(parsed.qlcl),
         data: str(parsed.data),
         analysis: str(parsed.analysis),
+        hovermaps: str(parsed.hovermaps),
         trace: str(parsed.trace),
         section: str(parsed.section),
         tieu_de: str(parsed.tieu_de),

@@ -490,17 +490,17 @@ def progress_history(project_id: int, db: Session = Depends(get_db), current: Us
     }
 
 
-# 7 cột Bản đồ nằm trong JSON `evaluation` mà CHỈ chủ trì / Quản trị / Giám đốc được sửa.
+# Các cột Bản đồ nằm trong JSON `evaluation` mà CHỈ chủ trì / Quản trị / Giám đốc được sửa.
 # Ghi chú (`tieu_de`) KHÔNG nằm trong danh sách -> vẫn theo quyền sửa dự án bình thường.
-_BANDO_LOCKED_KEYS = ("vung", "ortho", "riegl", "qlcl", "data", "analysis", "trace", "section")
-_BANDO_TICK_KEYS = ("data", "trace")
+_BANDO_LOCKED_KEYS = ("vung", "ortho", "riegl", "qlcl", "data", "analysis", "hovermaps", "trace", "section")
+_BANDO_TICK_KEYS = ("data", "hovermaps", "trace")
 
 
 def _bando_locked(evaluation: str | None) -> dict[str, object]:
-    """Giá trị đã chuẩn hoá của 7 cột Bản đồ khoá quyền (JSON lưu trong `evaluation`).
+    """Giá trị đã chuẩn hoá của các cột Bản đồ khoá quyền (JSON lưu trong `evaluation`).
 
-    Ô tích DATA / TRACE quy về đã tích / chưa (khác rỗng và khác "0" — 2 cột này trước
-    đây nhập số), cột khác so chuỗi đã trim. Không phải JSON -> coi như 7 cột trống.
+    Ô tích DATA / HoverMaps / TRACE quy về đã tích / chưa (khác rỗng và khác "0"),
+    cột khác so chuỗi đã trim. Không phải JSON -> coi như các cột trống.
     Khớp frontend/src/lib/bando-details.ts.
     """
     s = (evaluation or "").strip()
@@ -541,15 +541,15 @@ def update_project(
         if not (only_evaluation and _is_project_in_user_depts(db, p, current)):
             raise HTTPException(403, "Bạn không có quyền sửa dự án này.")
 
-    # 7 cột Bản đồ (Vùng / RIEGL / QLCL / DATA / Analysis / Trace / Section, nằm trong JSON
+    # Các cột Bản đồ (Vùng / Ortho / RIEGL / QLCL / DATA / Analysis / HoverMaps / Trace / Section, nằm trong JSON
     # `evaluation`): CHỈ chủ trì dự án, Quản trị hệ thống, Giám đốc được đổi. Người khác
-    # sửa Ghi chú thì 7 cột này phải giữ nguyên (so giá trị đã chuẩn hoá, không so chuỗi thô).
+    # sửa Ghi chú thì các cột này phải giữ nguyên (so giá trị đã chuẩn hoá, không so chuỗi thô).
     if "evaluation" in data and not (_is_director(current) or p.lead_id == current.id):
         if _bando_locked(p.evaluation) != _bando_locked(data["evaluation"]):
             raise HTTPException(
                 403,
                 "Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới được sửa các cột "
-                "Vùng / Ortho / RIEGL / QLCL / DATA / Analysis / Trace / Section.",
+                "Vùng / Ortho / RIEGL / QLCL / DATA / Analysis / HoverMaps / Trace / Section.",
             )
 
     # member_ids / lead_id là thao tác QUẢN TRỊ -> đòi quyền _can_manage.

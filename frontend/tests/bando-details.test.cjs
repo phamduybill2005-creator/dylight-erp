@@ -41,6 +41,19 @@ test("parse: JSON hỏng -> giữ nguyên chuỗi làm ghi chú", () => {
   assert.deepEqual(plain(parseBanDoDetails("{hỏng")), { ...EMPTY_BANDO, tieu_de: "{hỏng" });
 });
 
+test("HoverMaps: dự án cũ mặc định chưa tích, bật/tắt không mất các cột và ghi chú", () => {
+  const old = { vung: "VII", data: "1", analysis: "33", trace: "1", tieu_de: "Z: -0.03m" };
+  const details = parseBanDoDetails(JSON.stringify(old));
+  assert.equal(details.hovermaps, "");
+  assert.equal(isBanDoTicked(details.hovermaps), false);
+  const checked = parseBanDoDetails(stringifyBanDoDetails({ ...details, hovermaps: TICKED }));
+  assert.equal(isBanDoTicked(checked.hovermaps), true);
+  for (const [key, value] of Object.entries(old)) assert.equal(checked[key], value);
+  const unchecked = parseBanDoDetails(stringifyBanDoDetails({ ...checked, hovermaps: "" }));
+  assert.equal(isBanDoTicked(unchecked.hovermaps), false);
+  for (const [key, value] of Object.entries(old)) assert.equal(unchecked[key], value);
+});
+
 test("stringify: trống hết -> ''; có dữ liệu -> JSON đọc lại đúng (kể cả vung)", () => {
   assert.equal(stringifyBanDoDetails({ ...EMPTY_BANDO }), "");
   assert.equal(stringifyBanDoDetails({ ...EMPTY_BANDO, vung: "  " }), "");

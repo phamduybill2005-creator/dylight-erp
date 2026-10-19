@@ -32,7 +32,7 @@ BANDO = "Phòng Bản đồ"
 # Giá trị mới cho từng cột khoá quyền — dùng để thử "đổi 1 cột" với mọi vai trò.
 LOCKED_CHANGES = {
     "vung": "Kyushu", "ortho": "2", "riegl": "3", "qlcl": "5", "data": "1",
-    "analysis": "30", "trace": "1", "section": "4",
+    "analysis": "30", "hovermaps": "1", "trace": "1", "section": "4",
 }
 
 
@@ -182,6 +182,17 @@ class ProjectEvaluationPermissionTests(unittest.TestCase):
         for over in ({"data": ""}, {"analysis": "29"}):
             r = self._patch(self.staff, {"evaluation": bando_json(**{"data": "12", **over})})
             self.assertEqual(r.status_code, 403, f"{over}: {r.text}")
+
+    def test_hovermaps_keeps_checkbox_meaning_when_only_notes_change(self):
+        r = self._patch(self.lead, {"evaluation": bando_json(hovermaps="1")})
+        self.assertEqual(r.status_code, 200, r.text)
+        body = {"evaluation": bando_json(hovermaps="true", tieu_de="Updated note")}
+        r = self._patch(self.staff, body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self._evaluation(), body["evaluation"])
+        for value in ("", "0", "false"):
+            r = self._patch(self.staff, {"evaluation": bando_json(hovermaps=value)})
+            self.assertEqual(r.status_code, 403, r.text)
 
 
 if __name__ == "__main__":
