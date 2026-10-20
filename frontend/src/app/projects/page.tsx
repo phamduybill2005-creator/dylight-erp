@@ -1324,7 +1324,8 @@ export default function ProjectsPage() {
                   </td>
                   {isBanDoMode ? (
                     <>
-                      {/* VÙNG — chữ tự do, gợi ý các vùng đã dùng (datalist đặt dưới bảng). */}
+                      {/* VÙNG — chữ tự do, gợi ý các vùng đã dùng (datalist đặt dưới bảng).
+                          Ẩn mũi tên gợi ý Chrome tự chèn vào input[list] (chiếm ~12px bên phải, làm "IX"/"VIII" bị lẹm trong ô 36px). */}
                       <td className={`${TD} align-top p-0.5`} onClick={(e) => e.stopPropagation()}>
                         {canEditBanDo(p) ? (
                           <input
@@ -1336,7 +1337,7 @@ export default function ProjectsPage() {
                             onKeyDown={bandoKeys}
                             placeholder="Vùng"
                             title="Vùng / khu vực của dự án — rời ô (hoặc Enter) là tự lưu"
-                            className="h-6 w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[10.5px] text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white"
+                            className="h-6 w-full appearance-none rounded border border-transparent bg-transparent px-0.5 py-0.5 text-[10.5px] text-ink outline-none transition-colors placeholder:text-slate-300 hover:border-slate-300 focus:border-steel focus:bg-white [&::-webkit-calendar-picker-indicator]:hidden"
                           />
                         ) : (
                           <span className="block truncate text-[10.5px] text-muted" title={bando.vung}>
