@@ -36,7 +36,7 @@ import StudentScheduleModal from "@/components/student-schedule-modal";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
-import { getApprovedLeavesForDate, resolveLatestApprovedLeave } from "@/lib/schedule-helpers";
+import { getApprovedLeavesForDate, isStudentWeekLocked, resolveLatestApprovedLeave } from "@/lib/schedule-helpers";
 import { dateLocal, formatDate, todayLocal } from "@/lib/format";
 import type { LeaveRequest, User } from "@/lib/types";
 
@@ -382,6 +382,14 @@ export default function WorkSchedulePage() {
 
   // Xóa đơn nghỉ phép (nếu tạo nhầm hoặc test)
   const [deletingLeave, setDeletingLeave] = useState(false);
+  /** Quyền xóa như trước (quản lý+ hoặc chính chủ), NHƯNG lịch tuần sinh viên (source=SCHEDULE)
+   *  của tuần đã bắt đầu thì CHỈ Quản trị hệ thống mới xóa được — khớp chặn ở backend. */
+  const canDeleteLeave = (l: LeaveRequest) => {
+    if (!me) return false;
+    if (!(isManagerUp(me.role) || me.role === "ADMIN" || me.id === l.user_id)) return false;
+    if (l.source === "SCHEDULE" && isStudentWeekLocked(l.from_date, me.role)) return false;
+    return true;
+  };
   const handleDeleteLeave = async (leaveId: number) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa đơn nghỉ phép này không?")) return;
     setDeletingLeave(true);
@@ -956,7 +964,7 @@ export default function WorkSchedulePage() {
                                 {other.source === "SCHEDULE" ? "Lịch tuần" : "Đơn nghỉ phép"} • {formatDate(other.from_date)}
                               </div>
                             </div>
-                            {me && (isManagerUp(me.role) || me.role === "ADMIN" || me.id === other.user_id) && (
+                            {canDeleteLeave(other) && (
                               <button
                                 onClick={() => handleDeleteLeave(other.id)}
                                 disabled={deletingLeave}
@@ -974,7 +982,7 @@ export default function WorkSchedulePage() {
                 )}
 
                 <div className="flex items-center justify-between pt-2 border-t border-line">
-                  {me && (isManagerUp(me.role) || me.role === "ADMIN" || me.id === selectedCell.leave.user_id) ? (
+                  {canDeleteLeave(selectedCell.leave) ? (
                     <button
                       onClick={() => selectedCell.leave && handleDeleteLeave(selectedCell.leave.id)}
                       disabled={deletingLeave}

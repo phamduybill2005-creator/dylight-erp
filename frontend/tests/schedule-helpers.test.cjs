@@ -111,3 +111,29 @@ test("resolveLatestApprovedLeave handles tie breaking by creation time and id", 
   const active = resolveLatestApprovedLeave(leaves, 10, "2026-09-18");
   assert.equal(active.id, 205);
 });
+
+test("weekStartOf returns the Monday of the week (Mon-Sun)", () => {
+  const { weekStartOf } = loadTypeScript("src/lib/schedule-helpers.ts");
+  assert.equal(weekStartOf("2026-10-26"), "2026-10-26"); // Thứ Hai
+  assert.equal(weekStartOf("2026-10-28"), "2026-10-26"); // Thứ Tư
+  assert.equal(weekStartOf("2026-11-01"), "2026-10-26"); // Chủ nhật vẫn thuộc tuần 26/10
+  assert.equal(weekStartOf("2026-11-02"), "2026-11-02"); // Thứ Hai tuần sau
+});
+
+test("isStudentWeekLocked locks started weeks for everyone except ADMIN", () => {
+  const { isStudentWeekLocked } = loadTypeScript("src/lib/schedule-helpers.ts");
+  const today = "2026-10-28"; // Thứ Tư
+  // Tuần hiện tại (đã bắt đầu) và tuần trước: khóa với nhân viên + quản lý + giám đốc.
+  for (const role of ["FIELD_STAFF", "MANAGER_MID", "MANAGER", "DIRECTOR", undefined]) {
+    assert.equal(isStudentWeekLocked("2026-10-30", role, today), true, `current week ${role}`);
+    assert.equal(isStudentWeekLocked("2026-10-26", role, today), true, `monday of current week ${role}`);
+    assert.equal(isStudentWeekLocked("2026-10-21", role, today), true, `last week ${role}`);
+    // Tuần sau chưa bắt đầu -> vẫn đăng ký được.
+    assert.equal(isStudentWeekLocked("2026-11-02", role, today), false, `next week ${role}`);
+    assert.equal(isStudentWeekLocked("2026-11-07", role, today), false, `next saturday ${role}`);
+  }
+  // Chủ nhật 01/11 vẫn là tuần hiện tại -> khóa; nhưng ADMIN sửa được mọi tuần.
+  assert.equal(isStudentWeekLocked("2026-11-01", "FIELD_STAFF", today), true);
+  assert.equal(isStudentWeekLocked("2026-10-26", "ADMIN", today), false);
+  assert.equal(isStudentWeekLocked("2026-10-05", "ADMIN", today), false);
+});

@@ -19,6 +19,12 @@ from app.models import ActivityLog, Company, LeaveRequest, LeaveStatus, User, Us
 from app.routers.leave import router
 from app.services.leave_zalo_service import get_leave_zalo_service
 
+def next_week_day():
+    """Thứ Tư tuần SAU: luôn thuộc tuần chưa bắt đầu, nên lịch sinh viên chưa bị khóa
+    (tuần đã bắt đầu chỉ ADMIN mới sửa được — xem test_student_schedule_lock.py)."""
+    today = date.today()
+    return today - timedelta(days=today.weekday()) + timedelta(days=9)
+
 
 class LeaveWithdrawalTests(unittest.TestCase):
     def setUp(self):
@@ -71,7 +77,7 @@ class LeaveWithdrawalTests(unittest.TestCase):
         self.engine.dispose()
 
     def make_leave(self, status=LeaveStatus.PENDING, source="LEAVE"):
-        day = date.today() + timedelta(days=3)
+        day = next_week_day()
         with self.sessions() as db:
             row = LeaveRequest(company_id=self.owner.company_id, user_id=self.owner.id,
                 from_date=day, to_date=day, status=status, source=source, reason="Test")
@@ -168,14 +174,14 @@ class LeaveWithdrawalTests(unittest.TestCase):
     def test_student_schedule_all_day_does_not_delete_withdrawn_history(self):
         leave_id = self.make_leave()
         self.assertEqual(self.withdraw(leave_id).status_code, 200)
-        day = (date.today() + timedelta(days=3)).isoformat()
+        day = (next_week_day()).isoformat()
         response = self.client.post("/leave/student-week-schedule", json={"days": [{"date": day, "shift": "ALL_DAY"}]})
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(self.client.get(f"/leave/{leave_id}").json()["status"], "CANCELED")
 
     def test_student_schedule_locks_selected_leaves_until_its_write_commits(self):
         self.make_leave()
-        day = (date.today() + timedelta(days=3)).isoformat()
+        day = (next_week_day()).isoformat()
         selected = []
         original_all = Query.all
 
@@ -195,7 +201,7 @@ class LeaveWithdrawalTests(unittest.TestCase):
     def test_student_schedule_off_creates_separate_row_and_does_not_revive_withdrawn_id(self):
         leave_id = self.make_leave()
         self.assertEqual(self.withdraw(leave_id).status_code, 200)
-        day = (date.today() + timedelta(days=3)).isoformat()
+        day = (next_week_day()).isoformat()
         response = self.client.post("/leave/student-week-schedule", json={"days": [{"date": day, "shift": "OFF"}]})
         self.assertEqual(response.status_code, 200, response.text)
         self.assertNotEqual(response.json()[0]["id"], leave_id)

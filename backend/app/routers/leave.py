@@ -21,6 +21,25 @@ router = APIRouter(prefix="/leave", tags=["Nghỉ phép"])
 
 _MANAGER_ROLES = (UserRole.MANAGER, UserRole.DIRECTOR)
 
+_WEEK_LOCKED_MSG = (
+    "Tuần này đã bắt đầu nên không thể đăng ký hoặc thay đổi lịch nữa. "
+    "Chỉ Quản trị hệ thống mới có quyền sửa."
+)
+
+
+def _student_week_locked(day: date, user: User) -> bool:
+    """Tuần (Thứ Hai → Chủ nhật) chứa `day` đã BẮT ĐẦU theo giờ Việt Nam chưa.
+
+    Chốt với chủ doanh nghiệp: hễ thời gian đã sang tuần đó thì lịch sinh viên của
+    tuần đó bị khóa — không đăng ký lại, không sửa, không xóa — CHỈ Quản trị hệ thống
+    (ADMIN) mới được thay đổi. Quản lý/Giám đốc cũng bị khóa như nhân viên.
+    Frontend có bản sao `isStudentWeekLocked` để khóa giao diện; đây là chốt chặn thật.
+    """
+    if user.role == UserRole.ADMIN:
+        return False
+    week_start = day - timedelta(days=day.weekday())
+    return week_start <= vn_now().date()
+
 # ---------------- Thông báo cho đơn nghỉ ----------------
 _LEAVE_TYPE_VI = {
     "FULL": "nghỉ cả ngày",
@@ -348,6 +367,9 @@ def delete_leave(
     is_admin = current.role in _MANAGER_ROLES or current.role == UserRole.ADMIN
     if not is_admin and rec.user_id != current.id:
         raise HTTPException(403, "Không có quyền xóa đơn nghỉ này.")
+    # Lịch tuần sinh viên của tuần đã bắt đầu: chỉ ADMIN mới được xóa.
+    if rec.source == "SCHEDULE" and _student_week_locked(rec.from_date, current):
+        raise HTTPException(403, _WEEK_LOCKED_MSG)
     # The legacy DELETE must not bypass the owner's pending-only rule or
     # erase the history. Student schedules retain their separate delete flow.
     if rec.user_id == current.id and rec.source in (None, "LEAVE"):
@@ -377,6 +399,7 @@ def save_student_week_schedule(
       + AFTERNOON_ONLY: Làm chiều - Nghỉ sáng -> leave_type="MORNING"
       + OFF: Nghỉ cả ngày -> leave_type="FULL"
     - Tự động duyệt (APPROVED) để hiện ngay lập tức lên bảng Lịch làm việc tổng.
+    - Tuần đã bắt đầu (Thứ Hai ≤ hôm nay giờ VN) thì KHÓA: chỉ ADMIN mới được lưu.
     """
     target_user_id = current.id
     is_admin = current.role in _MANAGER_ROLES or current.role == UserRole.ADMIN
@@ -390,6 +413,9 @@ def save_student_week_schedule(
 
     if not payload.days:
         return []
+
+    if any(_student_week_locked(d.date, current) for d in payload.days):
+        raise HTTPException(403, _WEEK_LOCKED_MSG)
 
     dates = [d.date for d in payload.days]
     min_d = min(dates)

@@ -9,11 +9,12 @@ import {
   CheckCircleIcon,
   CalendarDaysIcon,
   DocumentDuplicateIcon,
+  LockClosedIcon,
 } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { isManagerUp } from "@/lib/roles";
 import { dateLocal, formatDate } from "@/lib/format";
-import { resolveLatestApprovedLeave } from "@/lib/schedule-helpers";
+import { isStudentWeekLocked, resolveLatestApprovedLeave } from "@/lib/schedule-helpers";
 import type { LeaveRequest, StudentDaySchedule, StudentShift, User } from "@/lib/types";
 
 interface StudentScheduleModalProps {
@@ -131,6 +132,12 @@ export default function StudentScheduleModal({
     return list;
   }, [currentWeekDate]);
 
+  /**
+   * Tuần đang xem đã BẮT ĐẦU (Thứ Hai ≤ hôm nay) -> khóa đăng ký/sửa với mọi người,
+   * trừ Quản trị hệ thống. Backend chặn y hệt; đây chỉ là khóa giao diện cho rõ ràng.
+   */
+  const weekLocked = weekDays.length > 0 && isStudentWeekLocked(weekDays[0].dateStr, currentUser?.role);
+
   // Trạng thái ca và lý do cho từng ngày trong tuần
   const [daySchedules, setDaySchedules] = useState<Record<string, { shift: StudentShift; reason: string }>>({});
   const [saving, setSaving] = useState(false);
@@ -245,6 +252,7 @@ export default function StudentScheduleModal({
   };
 
   const handleSave = async () => {
+    if (weekLocked) return;
     setSaving(true);
     setSuccessMsg("");
     try {
@@ -378,6 +386,27 @@ export default function StudentScheduleModal({
 
         {/* ==================== DANH SÁCH CÁC NGÀY TRONG TUẦN ==================== */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
+          {weekLocked && (
+            <div className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-2">
+                <LockClosedIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <div className="font-bold">Tuần này đã bắt đầu — lịch đã khóa, không thể đăng ký hoặc thay đổi.</div>
+                  <div className="text-[11px] text-rose-700/90">
+                    Chỉ Quản trị hệ thống mới có quyền sửa. Bạn vẫn có thể xem, hoặc chuyển sang tuần sau để đăng ký trước.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleNextWeek}
+                className="inline-flex shrink-0 items-center gap-1 self-start whitespace-nowrap rounded-lg border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 sm:self-auto"
+              >
+                Sang tuần sau
+                <ChevronRightIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           {weekDays.map((w) => {
             const current = daySchedules[w.dateStr] || { shift: "ALL_DAY", reason: "" };
             const isOffOrHalf = current.shift !== "ALL_DAY";
@@ -429,7 +458,8 @@ export default function StudentScheduleModal({
                           key={opt.key}
                           type="button"
                           onClick={() => setShiftForDay(w.dateStr, opt.key)}
-                          className={`flex items-center gap-1 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-bold transition ${
+                          disabled={weekLocked}
+                          className={`flex items-center gap-1 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                             isSelected
                               ? opt.activeClass
                               : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
@@ -466,7 +496,8 @@ export default function StudentScheduleModal({
                             key={preset}
                             type="button"
                             onClick={() => setReasonForDay(w.dateStr, preset)}
-                            className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-amber-100 hover:text-amber-900 transition"
+                            disabled={weekLocked}
+                            className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-amber-100 hover:text-amber-900 transition disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {preset}
                           </button>
@@ -478,8 +509,9 @@ export default function StudentScheduleModal({
                       type="text"
                       value={current.reason}
                       onChange={(e) => setReasonForDay(w.dateStr, e.target.value)}
+                      disabled={weekLocked}
                       placeholder="Ví dụ: Đi học trên trường, Bận thi học kỳ, Có việc bận..."
-                      className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                      className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
                     />
 
                     {/* Chips gợi ý trên mobile */}
@@ -489,7 +521,8 @@ export default function StudentScheduleModal({
                           key={preset}
                           type="button"
                           onClick={() => setReasonForDay(w.dateStr, preset)}
-                          className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600"
+                          disabled={weekLocked}
+                          className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {preset}
                         </button>
@@ -512,7 +545,9 @@ export default function StudentScheduleModal({
               </span>
             ) : (
               <span className="text-[11px] text-muted">
-                💡 Lịch đăng ký sẽ tự động hiển thị trực tiếp lên bảng Lịch làm việc.
+                {weekLocked
+                  ? "🔒 Tuần đã bắt đầu — chỉ Quản trị hệ thống mới sửa được lịch tuần này."
+                  : "💡 Lịch đăng ký sẽ tự động hiển thị trực tiếp lên bảng Lịch làm việc. Sang tuần là lịch tự khóa."}
               </span>
             )}
           </div>
@@ -529,10 +564,12 @@ export default function StudentScheduleModal({
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1.5 rounded-lg bg-amber px-4 py-1.5 text-xs font-bold text-ink hover:bg-amber-deep hover:text-white transition shadow-sm disabled:opacity-50"
+              disabled={saving || weekLocked}
+              title={weekLocked ? "Tuần đã bắt đầu — chỉ Quản trị hệ thống mới sửa được" : undefined}
+              className="flex items-center gap-1.5 rounded-lg bg-amber px-4 py-1.5 text-xs font-bold text-ink hover:bg-amber-deep hover:text-white transition shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? "Đang lưu lịch…" : "Lưu đăng ký lịch tuần"}
+              {weekLocked && <LockClosedIcon className="h-3.5 w-3.5" />}
+              {saving ? "Đang lưu lịch…" : weekLocked ? "Tuần đã khóa" : "Lưu đăng ký lịch tuần"}
             </button>
           </div>
         </div>

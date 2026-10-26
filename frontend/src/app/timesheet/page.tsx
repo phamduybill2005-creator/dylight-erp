@@ -271,12 +271,14 @@ export default function TimesheetPage() {
           <h1 className="text-base lg:text-xl font-bold">Thời gian thực hiện dự án</h1>
         </div>
         
-        {/* Badge thống kê giờ nhanh */}
+        {/* Badge thống kê giờ nhanh — đang xem Cá nhân thì chỉ hiện ô Cá nhân (ẩn Toàn đội). */}
         <div className="flex items-center gap-2 text-xs">
-          <div className="rounded-lg bg-teal-900/60 border border-teal-500/40 px-3 py-1.5 text-slate-200">
-            <span>{selectedDept ? selectedDept : "Toàn đội"}: </span>
-            <b className="text-amber">{num1(teamTotal)}h</b> ({num1(teamTotal / 8)} công)
-          </div>
+          {viewScope === "all" && (
+            <div className="rounded-lg bg-teal-900/60 border border-teal-500/40 px-3 py-1.5 text-slate-200">
+              <span>{selectedDept ? selectedDept : "Toàn đội"}: </span>
+              <b className="text-amber">{num1(teamTotal)}h</b> ({num1(teamTotal / 8)} công)
+            </div>
+          )}
           <div className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-slate-200">
             <span>Cá nhân: </span>
             <b className="text-emerald-400">{num1(personalTotal)}h</b> ({num1(personalTotal / 8)} công)

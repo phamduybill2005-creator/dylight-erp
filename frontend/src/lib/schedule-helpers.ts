@@ -1,4 +1,4 @@
-import type { LeaveRequest } from "./types";
+import type { LeaveRequest, Role } from "./types";
 
 /**
  * Lấy mốc thời gian xét duyệt hoặc tạo mới của đơn nghỉ.
@@ -59,4 +59,37 @@ export function resolveLatestApprovedLeave(
   dateStr: string,
 ): LeaveRequest | undefined {
   return getApprovedLeavesForDate(leaves, userId, dateStr)[0];
+}
+
+/** "YYYY-MM-DD" -> Date địa phương (không qua UTC để khỏi lệch ngày). */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Thứ Hai (YYYY-MM-DD) của tuần T2→CN chứa ngày đã cho. */
+export function weekStartOf(dateStr: string): string {
+  const d = parseLocalDate(dateStr);
+  const offset = (d.getDay() + 6) % 7; // T2=0 … CN=6
+  d.setDate(d.getDate() - offset);
+  return toDateStr(d);
+}
+
+/**
+ * Lịch sinh viên của tuần chứa `dateStr` đã KHÓA với người dùng này chưa.
+ * Quy tắc (chốt với chủ doanh nghiệp): hễ thời gian đã sang tuần đó (Thứ Hai ≤ hôm nay)
+ * thì không được đăng ký / sửa / xóa lịch tuần đó nữa — CHỈ Quản trị hệ thống (ADMIN) mới được.
+ * Khớp với kiểm tra ở backend (/leave/student-week-schedule và DELETE /leave/{id}).
+ */
+export function isStudentWeekLocked(
+  dateStr: string,
+  role: Role | undefined | null,
+  today: string = toDateStr(new Date()),
+): boolean {
+  if (role === "ADMIN") return false;
+  return weekStartOf(dateStr) <= today;
 }
