@@ -703,13 +703,13 @@ export default function ProjectTimesheet({
                                       tot > 0 ? "bg-emerald-50 font-bold text-emerald-800" : ""
                                     }`}
                                   >
-                                    <span className="text-[11px] tnum">
+                                    <span className="text-sm font-bold tnum">
                                       {tot > 0 ? num1(tot) : "–"}
                                     </span>
                                   </td>
                                 );
                               })}
-                              <td className="border-l border-line/40 px-2 py-1 text-center tnum text-amber-deep font-bold text-xs">
+                              <td className="border-l border-line/40 px-2 py-1 text-center tnum text-amber-deep font-bold text-sm">
                                 {taskWeekTotal > 0 ? num1(taskWeekTotal) : "–"}
                               </td>
                             </tr>
@@ -813,16 +813,14 @@ export default function ProjectTimesheet({
                                               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                                             }}
                                             placeholder="–"
-                                            className="h-7 w-full min-w-[32px] bg-transparent text-center text-xs font-bold text-ink outline-none placeholder:text-line/60 focus:bg-white focus:ring-1 focus:ring-amber-500"
+                                            className="h-7 w-full min-w-[32px] bg-transparent text-center text-[11px] font-normal text-slate-500 outline-none placeholder:text-line/60 focus:bg-white focus:text-ink focus:ring-1 focus:ring-amber-500"
                                           />
                                         ) : (
                                           // KHÓA: đầu việc đã xong / không phải giờ của mình / không phải đầu việc
                                           // của mình. Vẫn cho XEM số, chỉ bỏ ô nhập.
                                           <span
                                             title={lockReason(w.id, c)}
-                                            className={`block h-7 px-1 py-1.5 tnum text-xs font-bold cursor-not-allowed ${
-                                              isItemDone(c) ? "text-emerald-800/70" : "text-ink/60"
-                                            }`}
+                                            className="block h-7 px-1 py-1.5 tnum text-[11px] font-normal text-slate-500 cursor-not-allowed"
                                           >
                                             {v > 0 ? num1(v) : "–"}
                                           </span>
@@ -831,7 +829,7 @@ export default function ProjectTimesheet({
                                     );
                                   })}
 
-                                  <td className="border-l border-line/40 px-2 py-1 text-center tnum text-slate-800 font-semibold text-xs">
+                                  <td className="border-l border-line/40 px-2 py-1 text-center tnum text-slate-500 font-normal text-[11px]">
                                     {wTotal > 0 ? num1(wTotal) : "–"}
                                   </td>
                                 </tr>

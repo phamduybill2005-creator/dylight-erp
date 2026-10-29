@@ -4,7 +4,7 @@
 // có dòng tổng cộng. Cột tài chính (Giá trị HĐ / Chi phí / Lãi-lỗ) chỉ hiện cho
 // Giám đốc; Quản lý thấy bảng vận hành (không có tiền). Bấm 1 hàng để mở chi tiết.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
 import { useRevenueCalc } from "@/lib/revenue";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,7 @@ import {
   PROJECT_GROUPS, groupLabel, DEPT_JA, normalizeDept, geoDeptOf, getProjectDept, isBanDoUser, isBanDoView,
 } from "@/lib/groups";
 import { resolveDoscoLead } from "@/lib/project-lead";
+import { projectTemplateOptions, selectedProjectTemplateId } from "@/lib/project-templates";
 import { tickCellClass, tickInputClass } from "@/lib/bando-details";
 import {
   parseBanDoDetails, stringifyBanDoDetails, isBanDoTicked, analysisNumber, TICKED,
@@ -222,6 +223,10 @@ export default function ProjectsPage() {
   const [nfEndDate, setNfEndDate] = useState("");
   const [nfInternalDeadline, setNfInternalDeadline] = useState("");
   const [nfTemplateId, setNfTemplateId] = useState("");
+  const templateOptions = useMemo(() => projectTemplateOptions(projects, nfGroup), [projects, nfGroup]);
+  const selectedTemplateId = selectedProjectTemplateId(projects, nfGroup, nfTemplateId);
+  const isBanDoTemplateGroup = normalizeDept(nfGroup) === "Phòng Bản đồ";
+  const missingBanDoSample = isBanDoTemplateGroup && !selectedTemplateId;
   // Danh sách GEO担当 / DOSCO担当 đã dùng -> để CHỌN (datalist) khỏi gõ tay.
   const [mgrs, setMgrs] = useState<{ geo: string[]; dosco: string[] }>({ geo: [], dosco: [] });
 
@@ -245,17 +250,6 @@ export default function ProjectsPage() {
    *  hoặc chính chủ trì. NHÂN VIÊN thuần KHÔNG được sửa -> ẩn luôn nút. */
   const canEditProject = (p: Project) =>
     canManage || !!me?.has_subordinates || (!!me && p.lead_id === me.id);
-
-  // Gợi ý dự án mẫu CHỈ MỘT LẦN (lúc nạp xong danh sách). Trước đây effect chạy lại mỗi
-  // khi ô rỗng -> chọn "— Không sao chép hạng mục —" xong bị tự điền lại. Nay người dùng
-  // chọn gì thì giữ nguyên.
-  const templateAutoPicked = useRef(false);
-  useEffect(() => {
-    if (templateAutoPicked.current || projects.length === 0) return;
-    templateAutoPicked.current = true;
-    const template = projects.find((p) => p.code === "2739-0124" || p.name.includes("いちき串木野"));
-    if (template) setNfTemplateId(String(template.id));
-  }, [projects]);
 
   // Bộ lọc tìm kiếm
   const [searchQuery, setSearchQuery] = useStickyState("projects.search", "");
@@ -631,6 +625,10 @@ export default function ProjectsPage() {
   async function handleCreateOne() {
     const name = nfName.trim();
     if (!name) { setAddResult("Vui lòng nhập Tên dự án."); return; }
+    if (missingBanDoSample) {
+      setAddResult("Không tìm thấy Sample - Phòng Bản đồ. Vui lòng kiểm tra lại dự án mẫu trước khi tạo.");
+      return;
+    }
 
     const code = nfCode.trim();
     const groupName = nfGroup.trim();
@@ -666,11 +664,13 @@ export default function ProjectsPage() {
         end_date: nfEndDate || null,
         internal_deadline: nfInternalDeadline || null,
       });
-      if (nfTemplateId) {
+      let copyFailed = false;
+      if (selectedTemplateId) {
         try {
-          await api.copyProjectItemsTemplate(created.id, Number(nfTemplateId));
+          await api.copyProjectItemsTemplate(created.id, Number(selectedTemplateId));
         } catch (err) {
           console.error("Failed to copy template items:", err);
+          copyFailed = true;
         }
       }
       const fresh = await api.projects().catch(() => null);
@@ -678,7 +678,10 @@ export default function ProjectsPage() {
       // Reset để nhập dự án kế tiếp nhanh.
       setNfCode(""); setNfName(""); setNfGroup(""); setNfGeo(""); setNfDosco("");
       setNfEval(""); setNfStartDate(""); setNfEndDate(""); setNfInternalDeadline("");
-      setAddResult(`✓ Đã tạo dự án "${created.name}".`);
+      setNfTemplateId("");
+      setAddResult(copyFailed
+        ? `Đã tạo dự án "${created.name}" nhưng chưa sao chép được hạng mục mẫu. Vui lòng mở dự án để kiểm tra, không cần tạo lại.`
+        : `✓ Đã tạo dự án "${created.name}".`);
     } catch (e) {
       setAddResult(e instanceof Error ? e.message : "Tạo dự án thất bại.");
     } finally {
@@ -1621,7 +1624,7 @@ export default function ProjectsPage() {
                     </label>
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted">Nhóm (グループ)</span>
-                      <select value={nfGroup} onChange={(e) => setNfGroup(e.target.value)}
+                      <select value={nfGroup} onChange={(e) => { setNfGroup(e.target.value); setNfTemplateId(""); }}
                         className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
                         <option value="">— Chọn nhóm —</option>
                         {PROJECT_GROUPS.map((g) => (
@@ -1688,10 +1691,12 @@ export default function ProjectsPage() {
                   {canManage && (
                     <label className="block">
                       <span className="mb-1 block text-[11px] font-semibold text-muted font-bold text-steel">Sao chép hạng mục từ dự án mẫu</span>
-                      <select value={nfTemplateId} onChange={(e) => setNfTemplateId(e.target.value)}
-                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel">
-                        <option value="">— Không sao chép hạng mục —</option>
-                        {projects.map((p) => (
+                      <select value={selectedTemplateId} onChange={(e) => setNfTemplateId(e.target.value)}
+                        disabled={!nfGroup || templateOptions.length === 0 || isBanDoTemplateGroup}
+                        className="w-full rounded-xl2 border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel disabled:bg-slate-50 disabled:text-slate-600">
+                        {!isBanDoTemplateGroup && <option value="">{nfGroup ? "— Không sao chép hạng mục —" : "— Chọn nhóm trước —"}</option>}
+                        {missingBanDoSample && <option value="">— Chưa tìm thấy Sample - Phòng Bản đồ —</option>}
+                        {templateOptions.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.code ? `[${p.code}] ` : ""}{p.name}
                           </option>
@@ -1699,6 +1704,7 @@ export default function ProjectsPage() {
                       </select>
                     </label>
                   )}
+                  {missingBanDoSample && <p className="text-xs text-bad">Cần có dự án Sample - Phòng Bản đồ để sao chép hạng mục.</p>}
                   {addResult && <p className={`text-xs font-medium ${addResult.startsWith("✓") ? "text-ok" : "text-bad"}`}>{addResult}</p>}
                 </>
               ) : (
@@ -1729,7 +1735,7 @@ export default function ProjectsPage() {
                 Đóng
               </button>
               {addMode === "form" ? (
-                <button onClick={handleCreateOne} disabled={creating}
+                <button onClick={handleCreateOne} disabled={creating || missingBanDoSample}
                   className="inline-flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white hover:bg-steel disabled:opacity-50">
                   {creating ? "Đang tạo…" : <><CheckIcon className="h-4 w-4" /> Tạo dự án</>}
                 </button>
