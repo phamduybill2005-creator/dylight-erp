@@ -9,6 +9,7 @@ Nguyên tắc quyền:
   hiện tại của dự án (để chỉ huy trưởng tự điều phối đội của mình).
 """
 import json
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -823,3 +824,67 @@ def set_global_unit_price(
     db.commit()
     return {"unit_price": val}
 
+
+@router.get("/revenue/group-hours")
+def revenue_group_hours(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Giờ làm thực tế gom theo NHÓM HẠNG MỤC (nhóm cha) của từng dự án:
+    {project_id: {tên nhóm cha: giờ}} — nguồn cho 9 cột Phòng Bản đồ ở tab Doanh thu
+    (Ortho / RIEGL / QLCL / DATA / Ground / Grid_XML / HoverMaps / トレース / TD-TN theo
+    mẫu Sample - Phòng Bản đồ). Frontend tự khớp tên nhóm với cột (lib/bando-hours.ts).
+
+    Cộng giờ cùng luật với _total_timesheet_hours: chỉ đầu việc con đang hoạt động, hoặc
+    nhóm cha đang hoạt động mà chưa có đầu việc con. Giờ cấp dự án (không gắn hạng mục)
+    không thuộc nhóm nào nên không tính. Lọc theo khoảng ngày để khớp bộ lọc tháng.
+    Chỉ trả dự án người xem được thấy (cùng luật với danh sách dự án)."""
+    projects = db.query(Project).filter(
+        Project.company_id == current.company_id,
+        func.coalesce(Project.is_deleted, False) == False,
+    ).all()
+    if not (_is_director(current) or _is_senior_manager(db, current)):
+        projects = [p for p in projects if _is_project_in_user_depts(db, p, current)]
+    visible_ids = {p.id for p in projects}
+    if not visible_ids:
+        return {}
+
+    items = db.query(ProjectItem.id, ProjectItem.project_id, ProjectItem.parent_id, ProjectItem.name).filter(
+        ProjectItem.company_id == current.company_id,
+        ProjectItem.project_id.in_(visible_ids),
+        func.coalesce(ProjectItem.is_deleted, False) == False,
+    ).all()
+    parent_name = {it.id: (it.name or "").strip() for it in items if it.parent_id is None}
+    parents_with_children = {it.parent_id for it in items if it.parent_id is not None}
+    # Hạng mục -> tên nhóm nhận giờ của nó (bỏ nhóm cha đã có con: giờ nằm ở con).
+    group_of_item: dict[int, str] = {}
+    for it in items:
+        if it.parent_id is None:
+            if it.id not in parents_with_children:
+                group_of_item[it.id] = parent_name[it.id]
+        elif it.parent_id in parent_name:
+            group_of_item[it.id] = parent_name[it.parent_id]
+
+    q = db.query(
+        Timesheet.project_id, Timesheet.project_item_id, func.coalesce(func.sum(Timesheet.hours), 0),
+    ).filter(
+        Timesheet.company_id == current.company_id,
+        Timesheet.project_id.in_(visible_ids),
+        Timesheet.project_item_id.isnot(None),
+    )
+    if from_date:
+        q = q.filter(Timesheet.work_date >= from_date)
+    if to_date:
+        q = q.filter(Timesheet.work_date <= to_date)
+    q = q.group_by(Timesheet.project_id, Timesheet.project_item_id)
+
+    out: dict[int, dict[str, float]] = {}
+    for project_id, item_id, hours in q.all():
+        group = group_of_item.get(item_id)
+        if group is None or not hours:
+            continue
+        groups = out.setdefault(project_id, {})
+        groups[group] = groups.get(group, 0.0) + float(hours)
+    return {pid: {g: round(h, 1) for g, h in groups.items()} for pid, groups in out.items()}

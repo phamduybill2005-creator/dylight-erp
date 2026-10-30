@@ -5,6 +5,7 @@ import type { NotificationSendResult } from "./notification-send-result";
 import { leaveLoginPath } from "./leave-links";
 
 import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
+import type { ProjectGroupHours } from "./bando-hours";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
@@ -241,6 +242,14 @@ export const api = {
     }>(`/projects/exchange-rate/vcb${force ? "?force=true" : ""}`),
   getGlobalUnitPrice: () =>
     request<{ unit_price: number | null }>("/projects/revenue/global-unit-price"),
+  // Giờ realtime gom theo NHÓM HẠNG MỤC từng dự án -> 9 cột Phòng Bản đồ ở tab Doanh thu.
+  revenueGroupHours: (params?: { from?: string; to?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from_date", params.from);
+    if (params?.to) q.set("to_date", params.to);
+    const s = q.toString();
+    return request<ProjectGroupHours>(`/projects/revenue/group-hours${s ? `?${s}` : ""}`);
+  },
   setGlobalUnitPrice: (unitPrice: number | null) =>
     request<{ unit_price: number | null }>("/projects/revenue/global-unit-price", {
       method: "PUT",

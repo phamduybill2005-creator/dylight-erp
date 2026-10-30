@@ -4,8 +4,10 @@
 // Cách nhập: click vào hàng dự án → thanh chuyển đổi Vietcombank "kích hoạt" cho dự án đó.
 // Nhập số Yên ở thanh trên → chỉ cập nhật doanh thu của dự án đang chọn. Rời ô là tự lưu.
 // Doanh thu (VNĐ) = Time khách hàng (h) × Đơn giá Yên (¥/h) × Tỷ giá Vietcombank Realtime.
-// Xem theo Phòng Bản đồ: thêm nhóm cột Vùng / Ortho / RIEGL / QLCL / DATA / Analysis / Trace / Section
-// — CHỈ XEM, đồng bộ từ bảng Dự án (cùng JSON `evaluation`), muốn sửa thì sang tab Dự án.
+// Xem theo Phòng Bản đồ: sau Tên dự án có cột Vùng (đồng bộ từ bảng Dự án, JSON `evaluation`)
+// rồi 9 cột GIỜ theo 9 hạng mục của mẫu "Sample - Phòng Bản đồ" (Ortho / RIEGL / QLCL / DATA /
+// Ground / Grid_XML / HoverMaps / トレース / TD-TN). Mỗi ô = tổng giờ realtime người làm nhập ở
+// các đầu việc thuộc nhóm hạng mục đó (trang Tiến độ dự án) — CHỈ XEM, lọc tháng thì theo tháng.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
@@ -14,7 +16,6 @@ import {
   StarIcon as StarIconOutline,
   ArrowPathIcon,
   ArrowRightIcon,
-  CheckIcon,
   LockClosedIcon,
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
@@ -24,7 +25,9 @@ import { api } from "@/lib/api";
 import { isDirector, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept, isBanDoView } from "@/lib/groups";
-import { parseBanDoDetails, isBanDoTicked, analysisNumber } from "@/lib/bando-details";
+import { parseBanDoDetails } from "@/lib/bando-details";
+import { BANDO_HOUR_COLUMNS, hoursByColumn, formatGroupHours, type ProjectGroupHours } from "@/lib/bando-hours";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { formatVND, computeAutoStatus } from "@/lib/format";
 import { pickJpyRate, computeRevenueVnd, parseJpyInput } from "@/lib/revenue";
 import type { Project, User, Timesheet } from "@/lib/types";
@@ -57,6 +60,16 @@ function groupNumber(v: number | string | null | undefined): string {
   return Number.isFinite(n) ? n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) : "";
 }
 
+/** "2026-10" -> {from: "2026-10-01", to: "2026-10-31"}; rỗng -> undefined. */
+function monthRange(month: string): { from: string; to: string } | undefined {
+  if (!month) return undefined;
+  const [yStr, mStr] = month.split("-");
+  const y = parseInt(yStr, 10);
+  const m = parseInt(mStr, 10);
+  const lastDay = new Date(y, m, 0).getDate();
+  return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, "0")}` };
+}
+
 function parseTimestamp(s?: string | null): number | null {
   if (!s) return null;
   const str = s.trim();
@@ -84,20 +97,25 @@ export default function RevenuePage() {
 
   // Tải danh sách timesheets của tháng khi filterMonth thay đổi
   useEffect(() => {
-    if (!filterMonth) {
+    const range = monthRange(filterMonth);
+    if (!range) {
       setMonthTimesheets([]);
       return;
     }
-    const [yStr, mStr] = filterMonth.split("-");
-    const y = parseInt(yStr, 10);
-    const m = parseInt(mStr, 10);
-    const lastDay = new Date(y, m, 0).getDate();
-    const fromDate = `${filterMonth}-01`;
-    const toDate = `${filterMonth}-${String(lastDay).padStart(2, "0")}`;
-    api.timesheets({ from: fromDate, to: toDate })
+    api.timesheets(range)
       .then(setMonthTimesheets)
       .catch(() => setMonthTimesheets([]));
   }, [filterMonth]);
+
+  // Giờ realtime theo NHÓM HẠNG MỤC của từng dự án -> 9 cột Phòng Bản đồ. Lọc tháng thì
+  // chỉ lấy giờ nhập trong tháng (giống cột Realtime). Tự nạp lại khi có người sửa giờ /
+  // hạng mục ở trang Tiến độ (kênh trực tiếp), nên số luôn khớp mà không cần F5.
+  const [groupHours, setGroupHours] = useState<ProjectGroupHours>({});
+  const loadGroupHours = useCallback(() => {
+    api.revenueGroupHours(monthRange(filterMonth)).then(setGroupHours).catch(() => {});
+  }, [filterMonth]);
+  useEffect(() => { loadGroupHours(); }, [loadGroupHours]);
+  useAutoRefresh(loadGroupHours, { topics: ["timesheet", "project"] });
 
   // Tổng số giờ được nhập trong tháng theo từng dự án
   const monthHoursByProject = useMemo(() => {
@@ -237,9 +255,9 @@ export default function RevenuePage() {
   const canEdit = (p: Project) =>
     isSeniorManagerUp(me) || !!me?.has_subordinates || (!!me && p.lead_id === me.id);
 
-  // Bố cục Phòng Bản đồ (cùng điều kiện với bảng Dự án): thêm 7 cột chỉ xem sau Tên dự án.
+  // Bố cục Phòng Bản đồ (cùng điều kiện với bảng Dự án): thêm Vùng + 9 cột giờ chỉ xem sau Tên dự án.
   const isBanDoMode = isBanDoView(filterDept, me);
-  const colCount = isBanDoMode ? 16 : 8;
+  const colCount = isBanDoMode ? 9 + BANDO_HOUR_COLUMNS.length : 8;
 
   const uniqueDepts = useMemo(
     () =>
@@ -532,7 +550,7 @@ export default function RevenuePage() {
 
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
       <div className="mt-3 hidden max-h-[calc(100vh-200px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
-        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1200px]" : "min-w-[920px]"}`}>
+        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1320px]" : "min-w-[920px]"}`}>
           <colgroup>
             <col className="w-[40px]" />   {/* STT */}
             <col className="w-[26px]" />   {/* Ghim ★ */}
@@ -542,15 +560,9 @@ export default function RevenuePage() {
             <col className="w-[220px]" />  {/* Tên dự án */}
             {isBanDoMode && (
               <>
-                {/* Nhóm cột Phòng Bản đồ — cùng bề rộng với bảng Dự án */}
+                {/* Nhóm cột Phòng Bản đồ: Vùng + 9 cột giờ theo hạng mục */}
                 <col className="w-[60px]" />   {/* Vùng */}
-                <col className="w-[48px]" />   {/* Ortho */}
-                <col className="w-[48px]" />   {/* RIEGL */}
-                <col className="w-[48px]" />   {/* QLCL */}
-                <col className="w-[38px]" />   {/* DATA (ô tích) */}
-                <col className="w-[52px]" />   {/* Analysis (ha) */}
-                <col className="w-[38px]" />   {/* Trace (ô tích) */}
-                <col className="w-[48px]" />   {/* Section */}
+                {BANDO_HOUR_COLUMNS.map((c) => <col key={c.key} className="w-[54px]" />)}
               </>
             )}
             <col className="w-[96px]" />   {/* Manual time */}
@@ -567,13 +579,13 @@ export default function RevenuePage() {
               {isBanDoMode && (
                 <>
                   <th className={TH} title="Vùng / khu vực — nhập ở bảng Dự án">Vùng</th>
-                  {(["Ortho", "RIEGL", "QLCL", "DATA", "Analysis", "Trace", "Section"] as const).map((label) => (
+                  {BANDO_HOUR_COLUMNS.map((c) => (
                     <th
-                      key={label}
+                      key={c.key}
                       className="sticky top-0 z-10 border border-teal-200 bg-teal-50 px-0.5 py-2 text-center text-[9.5px] font-bold whitespace-nowrap text-teal-900"
-                      title="Đồng bộ từ bảng Dự án — chỉ xem"
+                      title={`${c.title} — tổng giờ người làm nhập ở các đầu việc thuộc hạng mục này (trang Tiến độ dự án)${filterMonth ? `, trong tháng ${filterMonth}` : ""}`}
                     >
-                      {label}
+                      {c.label}
                     </th>
                   ))}
                 </>
@@ -628,41 +640,29 @@ export default function RevenuePage() {
                     <div className="truncate" title={p.name}>{p.name}</div>
                   </td>
 
-                  {/* NHÓM CỘT PHÒNG BẢN ĐỒ — chỉ xem, đồng bộ từ bảng Dự án (JSON `evaluation`). */}
+                  {/* NHÓM CỘT PHÒNG BẢN ĐỒ — chỉ xem: Vùng (JSON `evaluation` ở bảng Dự án)
+                      + 9 cột giờ realtime gom theo nhóm hạng mục của mẫu Sample. */}
                   {isBanDoMode && (() => {
                     const bando = parseBanDoDetails(p.evaluation);
-                    const TDB = "border border-line align-middle px-1 py-2 text-center";
-                    const num = (v: string) => <span className="block font-mono text-[10.5px] text-ink">{v || "—"}</span>;
-                    const tick = (v: string) => {
-                      const on = isBanDoTicked(v);
-                      return (
-                        <span
-                          className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
-                            on ? "border-teal-700 bg-teal-700 text-white" : "border-slate-300 bg-white"
-                          }`}
-                          title={on ? "Đã tích ở bảng Dự án" : "Chưa tích"}
-                        >
-                          {on && <CheckIcon className="h-3 w-3" strokeWidth={3} />}
-                        </span>
-                      );
-                    };
-                    const ha = analysisNumber(bando.analysis);
+                    const hours = hoursByColumn(groupHours[String(p.id)]);
                     return (
                       <>
                         <td className="border border-line align-middle px-1 py-2">
                           <div className="truncate text-[10.5px] text-ink" title={bando.vung}>{bando.vung || "—"}</div>
                         </td>
-                        <td className={TDB}>{num(bando.ortho)}</td>
-                        <td className={TDB}>{num(bando.riegl)}</td>
-                        <td className={TDB}>{num(bando.qlcl)}</td>
-                        <td className={TDB}>{tick(bando.data)}</td>
-                        <td className={TDB}>
-                          <span className="block font-mono text-[10.5px] text-ink">
-                            {ha ? <>{ha} <span className="text-[9px] text-muted">ha</span></> : "—"}
-                          </span>
-                        </td>
-                        <td className={TDB}>{tick(bando.trace)}</td>
-                        <td className={TDB}>{num(bando.section)}</td>
+                        {BANDO_HOUR_COLUMNS.map((c) => {
+                          const h = hours[c.key];
+                          return (
+                            <td key={c.key} className="border border-line align-middle px-1 py-2 text-center">
+                              <span
+                                className={`block font-mono text-[10.5px] tnum ${h > 0 ? "font-semibold text-ink" : "text-slate-300"}`}
+                                title={h > 0 ? `${c.title}: ${h}h người làm đã nhập` : `${c.title}: chưa có giờ`}
+                              >
+                                {formatGroupHours(h)}
+                              </span>
+                            </td>
+                          );
+                        })}
                       </>
                     );
                   })()}

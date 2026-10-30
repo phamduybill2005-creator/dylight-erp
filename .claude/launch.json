@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev", "--", "-p", "3001"],
       "cwd": "frontend",
       "port": 3001
+    },
+    {
+      "name": "dosco-backend",
+      "runtimeExecutable": "D:\\dylight-erp\\backend\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8000"],
+      "cwd": "backend",
+      "port": 8000
     }
   ]
 }
