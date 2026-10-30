@@ -258,6 +258,8 @@ export default function RevenuePage() {
   // Bố cục Phòng Bản đồ (cùng điều kiện với bảng Dự án): thêm Vùng + 9 cột giờ chỉ xem sau Tên dự án.
   const isBanDoMode = isBanDoView(filterDept, me);
   const colCount = isBanDoMode ? 9 + BANDO_HOUR_COLUMNS.length : 8;
+  // Bề rộng từng cột giờ: tên dài (HoverMaps, Grid_XML, トレース) cần rộng hơn để không bị cắt chữ.
+  const BANDO_COL_W: Record<string, string> = { hovermaps: "w-[76px]", grid: "w-[66px]", trace: "w-[60px]", ground: "w-[58px]" };
 
   const uniqueDepts = useMemo(
     () =>
@@ -550,7 +552,7 @@ export default function RevenuePage() {
 
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
       <div className="mt-3 hidden max-h-[calc(100vh-200px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
-        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1320px]" : "min-w-[920px]"}`}>
+        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1380px]" : "min-w-[920px]"}`}>
           <colgroup>
             <col className="w-[40px]" />   {/* STT */}
             <col className="w-[26px]" />   {/* Ghim ★ */}
@@ -562,7 +564,7 @@ export default function RevenuePage() {
               <>
                 {/* Nhóm cột Phòng Bản đồ: Vùng + 9 cột giờ theo hạng mục */}
                 <col className="w-[60px]" />   {/* Vùng */}
-                {BANDO_HOUR_COLUMNS.map((c) => <col key={c.key} className="w-[54px]" />)}
+                {BANDO_HOUR_COLUMNS.map((c) => <col key={c.key} className={BANDO_COL_W[c.key] ?? "w-[52px]"} />)}
               </>
             )}
             <col className="w-[96px]" />   {/* Manual time */}
@@ -582,7 +584,7 @@ export default function RevenuePage() {
                   {BANDO_HOUR_COLUMNS.map((c) => (
                     <th
                       key={c.key}
-                      className="sticky top-0 z-10 border border-teal-200 bg-teal-50 px-0.5 py-2 text-center text-[9.5px] font-bold whitespace-nowrap text-teal-900"
+                      className="sticky top-0 z-10 border border-teal-200 bg-teal-50 px-0.5 py-2 text-center text-[9.5px] font-bold tracking-normal whitespace-nowrap text-teal-900"
                       title={`${c.title} — tổng giờ người làm nhập ở các đầu việc thuộc hạng mục này (trang Tiến độ dự án)${filterMonth ? `, trong tháng ${filterMonth}` : ""}`}
                     >
                       {c.label}
