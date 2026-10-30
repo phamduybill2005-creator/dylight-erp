@@ -201,6 +201,17 @@ export default function ProjectTimesheet({
     [parents]
   );
 
+  /** Ai được tick / bỏ tick "Đã xong" — KHỚP backend (project_items.update_item): người được
+   *  giao đầu việc, hoặc lãnh đạo được sửa giờ mọi người (Admin / Giám đốc / QL cấp cao).
+   *  Trước đây dòng con mở nút cho cả thành viên dự án -> bấm được nhưng backend từ chối. */
+  const canTickDone = useCallback(
+    (it: ProjectItem) =>
+      canEditAllHours || (currentUserId != null && it.assignee_id === currentUserId),
+    [canEditAllHours, currentUserId],
+  );
+  const TICK_DENIED_HINT =
+    "Chỉ người được giao đầu việc (hoặc Giám đốc / Quản trị hệ thống / Quản lý cấp cao) mới tích được";
+
   const canEditHours = useCallback(
     (uid: number, it: ProjectItem): boolean =>
       !isItemDone(it) && (canEditAllHours || (uid === currentUserId && ownsItem(it))),
@@ -555,13 +566,13 @@ export default function ProjectTimesheet({
                       <td className="px-1 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                         {(() => {
                           const done = !!g.done_date;
-                          const canTick = g.assignee_id != null && g.assignee_id === currentUserId;
+                          const canTick = canTickDone(g);
                           return (
                             <button
                               type="button"
                               disabled={!canTick}
                               onClick={() => toggleDone(g)}
-                              title={done ? "Đã xong — bấm để bỏ" : canTick ? "Đánh dấu đã xong" : "Chỉ nhóm trưởng mới tích được"}
+                              title={done ? (canTick ? "Đã xong — bấm để bỏ" : `Đã xong — ${TICK_DENIED_HINT}`) : canTick ? "Đánh dấu đã xong" : TICK_DENIED_HINT}
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
                                 done ? "bg-ok/15 text-ok" : "bg-line/50 text-muted"
                               } ${canTick ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
@@ -672,16 +683,13 @@ export default function ProjectTimesheet({
                               <td className="px-1 py-1.5 text-center">
                                 {(() => {
                                   const done = !!c.done_date;
-                                  const canTick =
-                                    canManage ||
-                                    !c.assignee_id ||
-                                    c.assignee_id === currentUserId ||
-                                    (currentUserId != null && members.some((m) => m.id === currentUserId));
+                                  const canTick = canTickDone(c);
                                   return (
                                     <button
                                       type="button"
                                       disabled={!canTick}
                                       onClick={() => toggleDone(c)}
+                                      title={done ? (canTick ? "Đã xong — bấm để bỏ" : `Đã xong — ${TICK_DENIED_HINT}`) : canTick ? "Đánh dấu đã xong" : TICK_DENIED_HINT}
                                       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
                                         done ? "bg-ok/15 text-ok" : "bg-line/50 text-muted"
                                       } ${canTick ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
