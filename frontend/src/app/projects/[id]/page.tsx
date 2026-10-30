@@ -295,7 +295,7 @@ export default function ProjectDetailPage() {
         evaluation: evalInput,
       }));
       setMembersModal(false);
-      loadData();
+      loadData(true);   // im lặng: không bật màn 'Đang tải', giữ vị trí cuộn
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra");
     } finally {
@@ -333,7 +333,7 @@ export default function ProjectDetailPage() {
       setProject(updated);   // lấy lại từ server: AUTO thì server tính lại giúp
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đổi trạng thái thất bại.");
-      loadData();
+      loadData(true);   // im lặng: không bật màn 'Đang tải', giữ vị trí cuộn
     }
   }
 
@@ -355,7 +355,7 @@ export default function ProjectDetailPage() {
     if (!window.confirm("Xóa mốc tiến độ này?")) return;
     try {
       await api.deleteProgress(id);
-      loadData();
+      loadData(true);   // im lặng: không bật màn 'Đang tải', giữ vị trí cuộn
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xóa mốc tiến độ thất bại.");
     }
@@ -421,7 +421,7 @@ export default function ProjectDetailPage() {
         quantity: "",
         status: "TODO",
       });
-      loadData();
+      loadData(true);   // im lặng: không bật màn 'Đang tải', giữ vị trí cuộn
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lưu tiến độ thất bại.");
     }
@@ -653,7 +653,10 @@ export default function ProjectDetailPage() {
             allUsers={allUsers}
             canManage={canManage}
             currentUserId={currentUser?.id ?? null}
-            onMemberAdded={loadData}
+            // Tải IM LẶNG: chỉ cần cập nhật danh sách thành viên. Trước đây gọi loadData()
+            // thường -> bật màn "Đang tải chi tiết dự án" thay cả trang -> tab hạng mục bị gỡ
+            // rồi gắn lại, mất vị trí đang cuộn, trông như bị F5 mỗi lần chọn Người làm.
+            onMemberAdded={() => loadData(true)}
           />
         )}
 
