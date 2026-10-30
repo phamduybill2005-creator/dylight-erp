@@ -188,6 +188,24 @@ Kiểm tra số dự án trước/sau khi chuyển phải khớp nhau rồi mớ
 
 Nên đặt lịch sao lưu hằng ngày bằng `cron`.
 
+### Script deploy một nút (kèm báo Telegram)
+
+Bản chuẩn của hai script trên VPS nằm trong repo: [`docs/vps/deploy.sh`](vps/deploy.sh) và
+[`docs/vps/deploy-with-telegram.sh`](vps/deploy-with-telegram.sh). Repo trên VPS ở `/opt/dosco-erp/app`,
+script ở `/opt/dosco-erp/`. Cập nhật script lên VPS (sau khi `git pull` trong `app`):
+
+```bash
+cd /opt/dosco-erp && cp app/docs/vps/deploy.sh app/docs/vps/deploy-with-telegram.sh . && chmod 750 deploy.sh deploy-with-telegram.sh
+```
+
+Điểm cần nhớ:
+- Script so với **commit đã deploy xong** (`current_commit`), không phải HEAD của repo. Build hỏng
+  giữa chừng thì bấm deploy lại là chạy tiếp, không còn bị "Không có code mới" như bản cũ.
+- Log từng lần ở `/opt/dosco-erp/logs/deploy-<thời điểm>.log`, `deploy-latest.log` trỏ vào lần mới nhất.
+  Tin Telegram ❌ kèm bước lỗi và 15 dòng log cuối.
+- `./deploy.sh --force` build + khởi động lại cả frontend lẫn backend dù không có code mới.
+- Health-check chờ tới 60 giây mỗi dịch vụ thay vì `sleep 5`.
+
 ---
 
 ## 9. Sau khi chạy ổn mới tắt Render

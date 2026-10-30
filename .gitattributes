@@ -1,0 +1,2 @@
+# Script shell chạy trên VPS (Linux) phải luôn là LF — CRLF làm bash báo lỗi "\r: command not found".
+*.sh text eol=lf
