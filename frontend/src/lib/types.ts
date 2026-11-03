@@ -580,9 +580,9 @@ export interface EvaluationMonthReview {
   late_kp?: number | null;         // ngày đi muộn không phép
   leave_cp?: number | null;        // ngày nghỉ có phép; null = chưa ghi đè -> dùng leave_cp_auto
   leave_kp?: number | null;        // ngày nghỉ không phép
-  score_attitude?: number | null;  // Ý thức, tối đa 25
-  score_quality?: number | null;   // Chất lượng công việc, tối đa 50
-  score_team?: number | null;      // Tập thể, tối đa 25
+  score_attitude?: number | null;  // Ý thức (%), tối đa 25
+  score_quality?: number | null;   // Chất lượng công việc (%), tối đa 50
+  score_team?: number | null;      // Tập thể (%), tối đa 25
   leave_cp_auto: number;           // ngày nghỉ có phép TỰ TÍNH từ đơn nghỉ đã duyệt
 }
 

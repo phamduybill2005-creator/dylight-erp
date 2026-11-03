@@ -639,9 +639,9 @@ class EvaluationMonthReviewOut(BaseModel):
     late_kp: float | None = None
     leave_cp: float | None = None        # None = chưa ghi đè -> giao diện dùng leave_cp_auto
     leave_kp: float | None = None
-    score_attitude: float | None = None  # tối đa 25
-    score_quality: float | None = None   # tối đa 50
-    score_team: float | None = None      # tối đa 25
+    score_attitude: float | None = None  # % tối đa 25
+    score_quality: float | None = None   # % tối đa 50
+    score_team: float | None = None      # % tối đa 25
     leave_cp_auto: float = 0             # ngày nghỉ CÓ PHÉP tự tính từ đơn nghỉ đã duyệt trong tháng
 
 

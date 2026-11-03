@@ -342,8 +342,8 @@ export default function EvaluationsPage() {
     return null;
   };
   type PeriodStats = Record<CountField, number> & Record<ScoreField, number | null> & { result: number | null; scoredMonths: number };
-  /** Cộng dồn cả kỳ: số ngày cộng các tháng; điểm & Kết quả theo quý = trung bình các tháng đã chấm.
-   *  Kết quả = Ý thức + Chất lượng CV + Tập thể (thang 100). */
+  /** Cộng dồn cả kỳ: số ngày cộng các tháng; % & Kết quả theo quý = trung bình các tháng đã chấm.
+   *  Kết quả (%) = Ý thức (tối đa 25%) + Chất lượng CV (tối đa 50%) + Tập thể (tối đa 25%). */
   const statsOf = (uid: number): PeriodStats => {
     const s: PeriodStats = {
       late_cp: 0, late_kp: 0, leave_cp: 0, leave_kp: 0,
@@ -381,7 +381,7 @@ export default function EvaluationsPage() {
     const txt = draft.replace(/,/g, ".").trim();
     const next = txt === "" ? null : Number(txt);
     if (next !== null && (!Number.isFinite(next) || next < 0 || next > REVIEW_MAX[f])) {
-      setRateMsg(`Giá trị không hợp lệ: ${f.startsWith("score") ? "điểm" : "số ngày"} từ 0 đến ${REVIEW_MAX[f]}.`);
+      setRateMsg(`Giá trị không hợp lệ: ${f.startsWith("score") ? "phần trăm" : "số ngày"} từ 0 đến ${REVIEW_MAX[f]}${f.startsWith("score") ? "%" : ""}.`);
       clear();
       return;
     }
@@ -438,19 +438,19 @@ export default function EvaluationsPage() {
       ? <span className={`font-bold tnum ${kp ? "text-bad" : "text-ink"}`}>{fmtNum(v)}</span>
       : <span className="text-muted">0</span>;
   };
-  /** Ô điểm Tổng hợp (Ý thức / Chất lượng CV / Tập thể). */
+  /** Ô % Tổng hợp (Ý thức / Chất lượng CV / Tập thể). */
   const scoreCell = (uid: number, f: ScoreField, st: PeriodStats, self: boolean) => {
-    if (canEditReview && !self) return reviewInput(uid, f, { title: `Tối đa ${REVIEW_MAX[f]} điểm` });
+    if (canEditReview && !self) return reviewInput(uid, f, { title: `Nhập phần trăm, tối đa ${REVIEW_MAX[f]}%` });
     const v = st[f];
-    return v != null ? <span className="font-semibold text-ink tnum">{fmtNum(v)}</span> : <span className="text-muted">—</span>;
+    return v != null ? <span className="font-semibold text-ink tnum">{fmtNum(v)}%</span> : <span className="text-muted">—</span>;
   };
   const resultCell = (st: PeriodStats) =>
     st.result == null
       ? <span className="text-muted">—</span>
       : (
         <span className="inline-flex items-baseline gap-1">
-          <span className="text-sm font-extrabold text-steel tnum">{fmtNum(st.result)}</span>
-          <span className="text-[10px] text-muted">/100{isQuarter ? ` · ${st.scoredMonths}/3 th` : ""}</span>
+          <span className="text-sm font-extrabold text-steel tnum">{fmtNum(st.result)}%</span>
+          {isQuarter && <span className="text-[10px] text-muted">{st.scoredMonths}/3 th</span>}
         </span>
       );
 
@@ -464,7 +464,7 @@ export default function EvaluationsPage() {
       const headers = [
         "STT", "Họ và tên", "Chức vụ", "Phòng ban",
         "Office time (giờ)", "P time (giờ)", "Muộn CP (ngày)", "Muộn KP (ngày)", "Nghỉ CP (ngày)", "Nghỉ KP (ngày)",
-        "Ý thức (/25)", "Chất lượng CV (/50)", "Tập thể (/25)", "Kết quả (/100)",
+        "Ý thức (%)", "Chất lượng CV (%)", "Tập thể (%)", "Kết quả (%)",
       ];
       const data = rows.map((r, i) => {
         const st = statsOf(r.user_id);
@@ -767,8 +767,8 @@ export default function EvaluationsPage() {
                 Đánh giá nhân sự {periodLabel}{selDept ? ` · ${selDept}` : ""} ({rows.length})
               </h2>
               <p className="mt-0.5 text-[11px] text-muted">
-                Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP, Nghỉ CP/KP</b> = số ngày do Giám đốc nhập (Nghỉ CP tự điền từ đơn nghỉ đã duyệt, sửa được) · <b className="text-steel">Tổng hợp</b> = Ý thức (tối đa 25) + Chất lượng CV (tối đa 50) + Tập thể (tối đa 25) → <b className="text-steel">Kết quả</b> thang 100.
-                {isQuarter ? " Xem theo quý là cộng dồn 3 tháng (điểm lấy trung bình các tháng đã chấm); muốn nhập thì chọn tháng." : canEditReview ? " Gõ số vào ô rồi Enter hoặc bấm ra ngoài để lưu; xoá trắng để bỏ." : ""}
+                Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP, Nghỉ CP/KP</b> = số ngày do Giám đốc nhập (Nghỉ CP tự điền từ đơn nghỉ đã duyệt, sửa được) · <b className="text-steel">Tổng hợp</b> nhập theo phần trăm: Ý thức (tối đa 25%) + Chất lượng CV (tối đa 50%) + Tập thể (tối đa 25%) → <b className="text-steel">Kết quả</b> (%).
+                {isQuarter ? " Xem theo quý là cộng dồn 3 tháng (% lấy trung bình các tháng đã chấm); muốn nhập thì chọn tháng." : canEditReview ? " Gõ số vào ô rồi Enter hoặc bấm ra ngoài để lưu; xoá trắng để bỏ." : ""}
               </p>
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
             </div>
@@ -810,7 +810,7 @@ export default function EvaluationsPage() {
                 Tháng này
               </button>
               {/* Quý 1–4 của năm thuộc tháng đang chọn: bấm lại quý đang chọn để quay về xem tháng. */}
-              <div className="flex items-center gap-0.5 rounded-lg border border-line bg-white p-0.5" title="Xem cộng dồn theo quý (3 tháng). Nhập điểm theo từng tháng.">
+              <div className="flex items-center gap-0.5 rounded-lg border border-line bg-white p-0.5" title="Xem cộng dồn theo quý (3 tháng). Nhập % theo từng tháng.">
                 {["1", "2", "3", "4"].map((q) => (
                   <button
                     key={q}
@@ -861,9 +861,9 @@ export default function EvaluationsPage() {
                           {box("Nghỉ KP", countCell(r.user_id, "leave_kp", st, self), "border-l border-line")}
                         </div>
                         <div className="grid grid-cols-3 text-center text-xs">
-                          {box("Ý thức /25", scoreCell(r.user_id, "score_attitude", st, self))}
-                          {box("Chất lượng CV /50", scoreCell(r.user_id, "score_quality", st, self), "border-x border-line")}
-                          {box("Tập thể /25", scoreCell(r.user_id, "score_team", st, self))}
+                          {box("Ý thức 25%", scoreCell(r.user_id, "score_attitude", st, self))}
+                          {box("Chất lượng CV 50%", scoreCell(r.user_id, "score_quality", st, self), "border-x border-line")}
+                          {box("Tập thể 25%", scoreCell(r.user_id, "score_team", st, self))}
                         </div>
                       </>
                     );
@@ -884,12 +884,12 @@ export default function EvaluationsPage() {
                     <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày nghỉ CÓ PHÉP: tự điền từ đơn nghỉ đã duyệt, Giám đốc sửa được">Nghỉ CP</th>
                     <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày nghỉ KHÔNG PHÉP (Giám đốc nhập)">Nghỉ KP</th>
                     <th colSpan={3} className="border-b border-l border-line bg-paper/60 px-2 py-1.5 text-center font-semibold">Tổng hợp</th>
-                    <th rowSpan={2} className="border-b border-l border-line px-2 py-2 text-center align-bottom font-semibold" title="Kết quả = Ý thức + Chất lượng CV + Tập thể (thang 100)">Kết quả</th>
+                    <th rowSpan={2} className="border-b border-l border-line px-2 py-2 text-center align-bottom font-semibold" title="Kết quả (%) = Ý thức + Chất lượng CV + Tập thể">Kết quả</th>
                   </tr>
                   <tr className="border-b border-line text-center text-[10px] uppercase tracking-wide text-muted">
-                    <th className="border-l border-line px-2 py-1.5 font-semibold">Ý thức<span className="block text-[9px] font-normal normal-case">tối đa 25</span></th>
-                    <th className="px-2 py-1.5 font-semibold">Chất lượng CV<span className="block text-[9px] font-normal normal-case">tối đa 50</span></th>
-                    <th className="px-2 py-1.5 font-semibold">Tập thể<span className="block text-[9px] font-normal normal-case">tối đa 25</span></th>
+                    <th className="border-l border-line px-2 py-1.5 font-semibold">Ý thức<span className="block text-[9px] font-normal normal-case">25%</span></th>
+                    <th className="px-2 py-1.5 font-semibold">Chất lượng CV<span className="block text-[9px] font-normal normal-case">50%</span></th>
+                    <th className="px-2 py-1.5 font-semibold">Tập thể<span className="block text-[9px] font-normal normal-case">25%</span></th>
                   </tr>
                 </thead>
                 <tbody className={overviewLoading ? "opacity-60" : ""}>

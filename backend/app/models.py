@@ -730,8 +730,8 @@ class EvaluationMonthReview(Base):
     """ĐÁNH GIÁ THÁNG NHẬP TAY (bảng Đánh giá; chỉ Giám đốc nhập): 1 dòng = (người, tháng "YYYY-MM").
     - Muộn CP / Muộn KP / Nghỉ CP / Nghỉ KP: số ngày, nhập tay. Nghỉ CP để NULL = dùng số TỰ TÍNH
       từ đơn nghỉ phép đã duyệt (router trả kèm leave_cp_auto); nhập số là ghi đè.
-    - Tổng hợp: Ý thức (tối đa 25), Chất lượng công việc (tối đa 50), Tập thể (tối đa 25);
-      Kết quả = tổng 3 mục (thang 100), giao diện tự cộng.
+    - Tổng hợp: Ý thức (tối đa 25%), Chất lượng công việc (tối đa 50%), Tập thể (tối đa 25%);
+      Kết quả (%) = tổng 3 mục, giao diện tự cộng.
     Tách khỏi bảng evaluations (sao theo tuần / dự án) để không đụng luồng chấm sao cũ."""
     __tablename__ = "evaluation_month_reviews"
     __table_args__ = (UniqueConstraint("user_id", "month", name="uq_evaluation_month_review"),)
@@ -744,9 +744,9 @@ class EvaluationMonthReview(Base):
     late_kp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # ngày đi muộn không phép
     leave_cp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True) # ngày nghỉ có phép (ghi đè số tự tính)
     leave_kp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True) # ngày nghỉ không phép
-    score_attitude: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # Ý thức, tối đa 25
-    score_quality: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)   # Chất lượng CV, tối đa 50
-    score_team: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)      # Tập thể, tối đa 25
+    score_attitude: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # Ý thức, tối đa 25%
+    score_quality: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)   # Chất lượng CV, tối đa 50%
+    score_team: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)      # Tập thể, tối đa 25%
     updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now, onupdate=vn_now)
 
