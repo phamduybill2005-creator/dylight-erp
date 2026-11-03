@@ -705,14 +705,34 @@ export default function RevenuePage() {
                         </td>
                         {BANDO_HOUR_COLUMNS.map((c) => {
                           const h = hours[c.key];
+                          const hoursTitle = h > 0 ? `${c.title}: ${h}h người làm đã nhập` : `${c.title}: chưa có giờ`;
+                          const hoursEl = (
+                            <span
+                              className={`block font-mono text-[10.5px] tnum ${h > 0 ? "font-semibold text-ink" : "text-slate-300"}`}
+                              title={hoursTitle}
+                            >
+                              {formatGroupHours(h)}
+                            </span>
+                          );
+                          // Ortho / RIEGL / QLCL: ô CHIA ĐÔI — trên là số đã nhập cho cột đó ở tab Dự án
+                          // (JSON `evaluation`), dưới là giờ realtime như các cột khác.
+                          const entered = c.key === "ortho" || c.key === "riegl" || c.key === "qlcl"
+                            ? (bando[c.key] || "").trim()
+                            : null;
+                          if (entered === null) {
+                            return (
+                              <td key={c.key} className="border border-line align-middle px-1 py-2 text-center">{hoursEl}</td>
+                            );
+                          }
                           return (
-                            <td key={c.key} className="border border-line align-middle px-1 py-2 text-center">
-                              <span
-                                className={`block font-mono text-[10.5px] tnum ${h > 0 ? "font-semibold text-ink" : "text-slate-300"}`}
-                                title={h > 0 ? `${c.title}: ${h}h người làm đã nhập` : `${c.title}: chưa có giờ`}
+                            <td key={c.key} className="border border-line p-0 text-center align-middle">
+                              <div
+                                className={`border-b border-line/70 px-1 py-1 text-[10.5px] tnum ${entered ? "font-semibold text-steel" : "text-slate-300"}`}
+                                title={entered ? `${c.title}: ${entered} — nhập ở tab Dự án` : `${c.title}: chưa nhập ở tab Dự án`}
                               >
-                                {formatGroupHours(h)}
-                              </span>
+                                {entered || "—"}
+                              </div>
+                              <div className="px-1 py-1">{hoursEl}</div>
                             </td>
                           );
                         })}
