@@ -36,6 +36,9 @@ function addDays(d: string, n: number): string {
   return dateLocal(new Date(y, m - 1, dd + n));
 }
 const fmtDay = (d: string) => `${Number(d.slice(8, 10))}/${Number(d.slice(5, 7))}`;
+/** Các phòng ban của một nhân sự (cột department có thể ghi nhiều phòng, ngăn bằng dấu phẩy). */
+const userDepts = (u: User | null | undefined): string[] =>
+  (u?.department || "").split(",").map((s) => s.trim()).filter(Boolean);
 const num1 = (n: number) => (Math.round(n * 10) / 10).toString();
 
 export default function TimesheetPage() {
@@ -178,21 +181,26 @@ export default function TimesheetPage() {
   }, [me, viewedUserId, allUsers]);
   const viewingOther = !!me && viewedUserId !== me.id;
 
-  // Người đã chọn không còn trong danh sách (nghỉ việc / bị xóa) -> quay về chính mình.
+  // Người đã chọn không còn trong danh sách (nghỉ việc / bị xóa), hoặc vừa đổi sang
+  // phòng ban mà người đó không thuộc -> quay về chính mình để hai ô luôn khớp nhau.
   useEffect(() => {
-    if (viewUserId != null && allUsers.length > 0 && !allUsers.some((u) => u.id === viewUserId)) {
+    if (viewUserId == null || allUsers.length === 0) return;
+    const u = allUsers.find((x) => x.id === viewUserId);
+    if (!u || (selectedDept !== "" && !userDepts(u).includes(selectedDept))) {
       setViewUserId(null);
     }
-  }, [allUsers, viewUserId, setViewUserId]);
+  }, [allUsers, viewUserId, selectedDept, setViewUserId]);
 
   // Danh sách cho ô chọn nhân sự: chính mình đứng đầu, rồi tài khoản đang hoạt động theo tên A-Z.
+  // Đang lọc Phòng ban thì CHỈ còn người thuộc phòng đó (chọn phòng -> chọn người).
   const pickableUsers = useMemo<User[]>(() => {
     if (!me) return [];
     const others = allUsers
       .filter((u) => u.id !== me.id && u.is_active)
+      .filter((u) => selectedDept === "" || userDepts(u).includes(selectedDept))
       .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "vi"));
     return [me, ...others];
-  }, [me, allUsers]);
+  }, [me, allUsers, selectedDept]);
 
   // Lọc entries theo Scope (Toàn đội / Cá nhân) & Phòng ban (chỉ tính dự án thuộc phòng ban được chọn)
   const filteredEntries = useMemo(() => {
@@ -366,7 +374,13 @@ export default function TimesheetPage() {
                 value={viewedUserId ?? me.id}
                 onChange={(e) => {
                   const id = Number(e.target.value);
-                  setViewUserId(id && id !== me.id ? id : null);
+                  const picked = pickableUsers.find((u) => u.id === id) ?? me;
+                  setViewUserId(picked.id !== me.id ? picked.id : null);
+                  // Chọn người -> ô Phòng ban nhảy theo phòng của người đó (không thuộc
+                  // phòng nào thì về "Tất cả"; đang đứng đúng một phòng của họ thì giữ nguyên).
+                  const depts = userDepts(picked);
+                  if (depts.length === 0) setSelectedDept("");
+                  else if (!depts.includes(selectedDept)) setSelectedDept(depts[0]);
                 }}
                 title="Chọn nhân sự để xem tiến độ cá nhân của người đó"
                 className="min-w-0 max-w-[240px] flex-1 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-ink outline-none focus:border-steel cursor-pointer transition-all hover:border-slate-400 sm:flex-none"
