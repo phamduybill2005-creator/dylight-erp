@@ -8,7 +8,7 @@
 //    time / Đi muộn) + bấm sao chấm mọi người (TRỪ Giám đốc — không ai chấm Giám đốc) + xuất Excel.
 //  Mỗi người (trừ Giám đốc) có mục RIÊNG TƯ "Đánh giá tôi nhận được" theo tháng: ai chấm mình bao nhiêu sao.
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, ChevronRightIcon, FunnelIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
@@ -21,7 +21,7 @@ import { useStickyState } from "@/lib/use-sticky-state";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { normalizeDept } from "@/lib/groups";
 import { splitDepts } from "@/components/filter-bar";
-import type { Evaluation, EvaluationOverviewRow, User, Project, Colleague } from "@/lib/types";
+import type { Evaluation, EvaluationOverviewRow, EvaluationMonthReview, User, Project, Colleague } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
   1: "Cần xem xét lại",
@@ -141,7 +141,8 @@ function EvalCard({ e, who, showDate = true }: { e: Evaluation; who: "evaluator"
 // timesheets với cột Project time nên cộng lại bằng đúng số ở cột đó.
 type ProjHourRow = { project_id: number; code: string; name: string; hours: number };
 
-function ProjectHoursDetail({ data, month }: { data: ProjHourRow[] | "loading" | "error" | undefined; month: string }) {
+function ProjectHoursDetail({ data, label }: { data: ProjHourRow[] | "loading" | "error" | undefined; label: string }) {
+  const capLabel = label.charAt(0).toUpperCase() + label.slice(1);
   if (data === undefined || data === "loading") {
     return <p className="ml-6 py-1 text-[11px] text-muted">Đang tải giờ dự án…</p>;
   }
@@ -149,13 +150,13 @@ function ProjectHoursDetail({ data, month }: { data: ProjHourRow[] | "loading" |
     return <p className="ml-6 py-1 text-[11px] font-semibold text-bad">Không tải được giờ dự án — bấm lại tên để thử lại.</p>;
   }
   if (data.length === 0) {
-    return <p className="ml-6 py-1 text-[11px] text-muted">Tháng {fmtMonth(month)} chưa khai giờ dự án nào.</p>;
+    return <p className="ml-6 py-1 text-[11px] text-muted">{capLabel} chưa khai giờ dự án nào.</p>;
   }
   const total = data.reduce((sum, p) => sum + p.hours, 0);
   return (
     <div className="ml-6 max-w-xl">
       <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
-        Giờ theo dự án · tháng {fmtMonth(month)} ({data.length} dự án)
+        Giờ theo dự án · {label} ({data.length} dự án)
       </p>
       <table className="w-full text-[11px]">
         <tbody>
@@ -241,8 +242,13 @@ export default function EvaluationsPage() {
   const [selMonth, setSelMonth] = useStickyState("evaluations.month", monthLocal());   // tháng đang chọn (bảng GĐ / form Nhân viên); nhớ qua F5
   const [overview, setOverview] = useState<EvaluationOverviewRow[]>([]);   // bảng đánh giá tháng
   const [overviewLoading, setOverviewLoading] = useState(false);
-  const [ratingUid, setRatingUid] = useState<number | null>(null);   // người đang lưu sao
   const [rateMsg, setRateMsg] = useState("");
+  // Lọc theo QUÝ (1–4) của năm đang chọn; "" = xem theo tháng. Quý chỉ XEM cộng dồn; nhập theo tháng.
+  const [selQuarter, setSelQuarter] = useStickyState("evaluations.quarter", "");
+  // Bảng đánh giá tháng NHẬP TAY (Giám đốc nhập): {`${user_id}:${month}`: dòng} + nháp ô đang gõ.
+  const [reviews, setReviews] = useState<Record<string, EvaluationMonthReview>>({});
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   // Bấm tên 1 người trong bảng tháng -> mở dòng giờ theo từng dự án (cache theo người + tháng).
   const [openUid, setOpenUid] = useState<number | null>(null);
   const [projHours, setProjHours] = useState<Record<string, ProjHourRow[] | "loading" | "error">>({});
@@ -254,32 +260,54 @@ export default function EvaluationsPage() {
   const tier = user ? roleTier(user.role) : "STAFF";
   const usesMonthTable = !!user && MONTH_TABLE_ROLES.includes(user.role);
 
-  // Bảng đánh giá: Office time / Project time / Đi muộn + sao mình đã chấm, CỘNG CẢ THÁNG đang
-  // chọn — cùng khoảng ngày với file Excel ở Tổng hợp chấm công nên số khớp nhau.
+  // KỲ ĐANG XEM: 1 tháng, hoặc quý (3 tháng) của năm thuộc tháng đang chọn.
+  const periodMonths = useMemo(() => {
+    const q = Number(selQuarter);
+    if (q >= 1 && q <= 4) {
+      const y = selMonth.slice(0, 4);
+      return [1, 2, 3].map((i) => `${y}-${String((q - 1) * 3 + i).padStart(2, "0")}`);
+    }
+    return [selMonth];
+  }, [selMonth, selQuarter]);
+  const isQuarter = periodMonths.length > 1;
+  const periodFrom = monthRange(periodMonths[0])[0];
+  const periodTo = monthRange(periodMonths[periodMonths.length - 1])[1];
+  const periodLabel = isQuarter ? `quý ${selQuarter}/${selMonth.slice(0, 4)}` : `tháng ${fmtMonth(selMonth)}`;
+
+  // Bảng đánh giá: Office time / Project time cộng cả kỳ (cùng khoảng ngày với Excel ở Tổng hợp
+  // chấm công) + các ô nhập tay theo từng tháng trong kỳ.
   useEffect(() => {
     if (!user || !MONTH_TABLE_ROLES.includes(user.role)) return;
     let alive = true;
     setOverviewLoading(true);
     setRateMsg("");
-    const [from, to] = monthRange(selMonth);
-    api.evaluationsOverview(from, to)
-      .then((rows) => { if (alive) setOverview(rows); })
-      .catch(() => { if (alive) setOverview([]); })
+    Promise.all([
+      api.evaluationsOverview(periodFrom, periodTo),
+      api.evaluationMonthReviews(periodMonths[0], periodMonths[periodMonths.length - 1]),
+    ])
+      .then(([rows, revs]) => {
+        if (!alive) return;
+        setOverview(rows);
+        const map: Record<string, EvaluationMonthReview> = {};
+        for (const r of revs) map[`${r.user_id}:${r.month}`] = r;
+        setReviews(map);
+      })
+      .catch(() => { if (alive) { setOverview([]); setReviews({}); } })
       .finally(() => { if (alive) setOverviewLoading(false); });
     return () => { alive = false; };
-  }, [user, selMonth]);
+  }, [user, periodFrom, periodTo, periodMonths]);
 
-  // Đổi tháng -> đóng dòng chi tiết đang mở (số của tháng cũ không còn đúng).
-  useEffect(() => { setOpenUid(null); }, [selMonth]);
+  // Đổi kỳ -> đóng dòng chi tiết đang mở (số của kỳ cũ không còn đúng).
+  useEffect(() => { setOpenUid(null); }, [periodFrom, periodTo]);
 
   async function toggleProjects(uid: number) {
     if (openUid === uid) { setOpenUid(null); return; }
     setOpenUid(uid);
-    const key = `${uid}:${selMonth}`;
+    const key = `${uid}:${periodFrom}:${periodTo}`;
     if (Array.isArray(projHours[key]) || projHours[key] === "loading") return;
     setProjHours((m) => ({ ...m, [key]: "loading" }));
     try {
-      const [from, to] = monthRange(selMonth);
+      const [from, to] = [periodFrom, periodTo];
       const list = await api.timesheets({ from, to, userId: uid });
       const byProject = new Map<number, ProjHourRow>();
       for (const t of list) {
@@ -295,28 +323,136 @@ export default function EvaluationsPage() {
     }
   }
 
-  // Bấm sao: lưu phiếu CHUNG (không gắn dự án) vào NGÀY 1 của tháng đang xem — cùng 1 ngày nên
-  // bấm sao khác là SỬA phiếu đó. Bấm lại ĐÚNG sao đang chọn = BỎ SAO (xoá phiếu tháng đó).
-  async function rateUser(uid: number, stars: number) {
-    if (uid === user?.id) return;
-    const before = overview.find((r) => r.user_id === uid)?.my_rating ?? null;
-    const unrate = before === stars;
-    const setMine = (v: number | null) =>
-      setOverview((rows) => rows.map((r) => (r.user_id === uid ? { ...r, my_rating: v } : r)));
-    setMine(unrate ? null : stars);
-    setRatingUid(uid);
+  // ===== BẢNG ĐÁNH GIÁ THÁNG NHẬP TAY (Giám đốc nhập; người khác chỉ xem) =====
+  type ReviewField = "late_cp" | "late_kp" | "leave_cp" | "leave_kp" | "score_attitude" | "score_quality" | "score_team";
+  type CountField = "late_cp" | "late_kp" | "leave_cp" | "leave_kp";
+  type ScoreField = "score_attitude" | "score_quality" | "score_team";
+  const REVIEW_MAX: Record<ReviewField, number> = {
+    late_cp: 100, late_kp: 100, leave_cp: 100, leave_kp: 100, score_attitude: 25, score_quality: 50, score_team: 25,
+  };
+  // Chỉ Giám đốc nhập, và chỉ khi xem theo THÁNG (quý là cộng dồn chỉ xem).
+  const canEditReview = user?.role === "DIRECTOR" && !isQuarter;
+  const reviewOf = (uid: number, month: string): EvaluationMonthReview | undefined => reviews[`${uid}:${month}`];
+  /** Giá trị hiệu lực 1 ô trong 1 tháng: Nghỉ CP chưa ghi đè -> số tự tính từ đơn nghỉ đã duyệt. */
+  const fieldValue = (uid: number, month: string, f: ReviewField): number | null => {
+    const r = reviewOf(uid, month);
+    const v = r?.[f];
+    if (v != null) return Number(v);
+    if (f === "leave_cp") return r?.leave_cp_auto ?? 0;
+    return null;
+  };
+  type PeriodStats = Record<CountField, number> & Record<ScoreField, number | null> & { result: number | null; scoredMonths: number };
+  /** Cộng dồn cả kỳ: số ngày cộng các tháng; điểm & Kết quả theo quý = trung bình các tháng đã chấm.
+   *  Kết quả = Ý thức + Chất lượng CV + Tập thể (thang 100). */
+  const statsOf = (uid: number): PeriodStats => {
+    const s: PeriodStats = {
+      late_cp: 0, late_kp: 0, leave_cp: 0, leave_kp: 0,
+      score_attitude: null, score_quality: null, score_team: null, result: null, scoredMonths: 0,
+    };
+    let sumA = 0, sumQ = 0, sumT = 0, scored = 0;
+    for (const m of periodMonths) {
+      s.late_cp += fieldValue(uid, m, "late_cp") ?? 0;
+      s.late_kp += fieldValue(uid, m, "late_kp") ?? 0;
+      s.leave_cp += fieldValue(uid, m, "leave_cp") ?? 0;
+      s.leave_kp += fieldValue(uid, m, "leave_kp") ?? 0;
+      const a = fieldValue(uid, m, "score_attitude");
+      const q = fieldValue(uid, m, "score_quality");
+      const tt = fieldValue(uid, m, "score_team");
+      if (a != null || q != null || tt != null) {
+        scored += 1;
+        sumA += a ?? 0; sumQ += q ?? 0; sumT += tt ?? 0;
+      }
+    }
+    if (scored > 0) {
+      const r1 = (n: number) => Math.round((n / scored) * 10) / 10;
+      s.score_attitude = r1(sumA); s.score_quality = r1(sumQ); s.score_team = r1(sumT);
+      s.result = r1(sumA + sumQ + sumT);
+      s.scoredMonths = scored;
+    }
+    return s;
+  };
+  const fmtNum = (n: number) => (Math.round(n * 10) / 10).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+
+  async function saveReview(uid: number, f: ReviewField) {
+    const k = `${uid}:${f}`;
+    const draft = edits[k];
+    if (draft === undefined) return;
+    const clear = () => setEdits((s) => { const n = { ...s }; delete n[k]; return n; });
+    const txt = draft.replace(/,/g, ".").trim();
+    const next = txt === "" ? null : Number(txt);
+    if (next !== null && (!Number.isFinite(next) || next < 0 || next > REVIEW_MAX[f])) {
+      setRateMsg(`Giá trị không hợp lệ: ${f.startsWith("score") ? "điểm" : "số ngày"} từ 0 đến ${REVIEW_MAX[f]}.`);
+      clear();
+      return;
+    }
+    const curRaw = reviewOf(uid, selMonth)?.[f];
+    const cur = curRaw == null ? null : Number(curRaw);
+    if (cur === next) { clear(); return; }
+    setSavingKey(k);
     setRateMsg("");
     try {
-      const [from, to] = monthRange(selMonth);
-      if (unrate) await api.deleteMyEvaluation(uid, from, to);
-      else await api.createEvaluation({ evaluatee_id: uid, eval_date: from, project_id: null, rating: stars });
+      const res = await api.setEvaluationMonthReview(uid, selMonth, { [f]: next });
+      setReviews((m) => ({ ...m, [`${uid}:${selMonth}`]: res }));
     } catch (err) {
-      setMine(before);
-      setRateMsg(err instanceof Error ? err.message : unrate ? "Không bỏ được sao." : "Không lưu được đánh giá.");
+      setRateMsg(err instanceof Error ? err.message : "Không lưu được ô vừa nhập.");
     } finally {
-      setRatingUid(null);
+      setSavingKey(null);
+      clear();
     }
   }
+
+  const reviewInput = (uid: number, f: ReviewField, opts?: { placeholder?: string; title?: string }) => {
+    const k = `${uid}:${f}`;
+    const stored = reviewOf(uid, selMonth)?.[f];
+    const shown = edits[k] ?? (stored == null ? "" : String(Number(stored)));
+    return (
+      <input
+        type="text" inputMode="decimal" value={shown} disabled={savingKey === k}
+        onChange={(e) => setEdits((s) => ({ ...s, [k]: e.target.value }))}
+        onBlur={() => saveReview(uid, f)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+          if (e.key === "Escape") setEdits((s) => { const n = { ...s }; delete n[k]; return n; });
+        }}
+        placeholder={opts?.placeholder ?? "—"} title={opts?.title}
+        aria-label={f}
+        className="w-12 rounded border border-line/70 bg-white px-1 py-0.5 text-center text-[12px] font-semibold text-ink tnum outline-none placeholder:text-slate-400 focus:border-steel disabled:opacity-60"
+      />
+    );
+  };
+  /** Ô số ngày (Muộn CP/KP, Nghỉ CP/KP): Giám đốc xem tháng -> ô nhập; còn lại hiện số. */
+  const countCell = (uid: number, f: CountField, st: PeriodStats, self: boolean) => {
+    if (canEditReview && !self) {
+      if (f === "leave_cp") {
+        const auto = reviewOf(uid, selMonth)?.leave_cp_auto ?? 0;
+        return reviewInput(uid, f, {
+          placeholder: fmtNum(auto),
+          title: `Tự tính từ đơn nghỉ đã duyệt: ${fmtNum(auto)} ngày — gõ số để ghi đè, xoá trắng để dùng lại số tự tính`,
+        });
+      }
+      return reviewInput(uid, f, { title: "Số ngày (Giám đốc nhập)" });
+    }
+    const v = st[f];
+    const kp = f.endsWith("_kp");
+    return v > 0
+      ? <span className={`font-bold tnum ${kp ? "text-bad" : "text-ink"}`}>{fmtNum(v)}</span>
+      : <span className="text-muted">0</span>;
+  };
+  /** Ô điểm Tổng hợp (Ý thức / Chất lượng CV / Tập thể). */
+  const scoreCell = (uid: number, f: ScoreField, st: PeriodStats, self: boolean) => {
+    if (canEditReview && !self) return reviewInput(uid, f, { title: `Tối đa ${REVIEW_MAX[f]} điểm` });
+    const v = st[f];
+    return v != null ? <span className="font-semibold text-ink tnum">{fmtNum(v)}</span> : <span className="text-muted">—</span>;
+  };
+  const resultCell = (st: PeriodStats) =>
+    st.result == null
+      ? <span className="text-muted">—</span>
+      : (
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-sm font-extrabold text-steel tnum">{fmtNum(st.result)}</span>
+          <span className="text-[10px] text-muted">/100{isQuarter ? ` · ${st.scoredMonths}/3 th` : ""}</span>
+        </span>
+      );
 
   // Xuất Excel ĐÚNG bảng đang xem (tháng đang chọn, cùng thứ tự dòng).
   async function exportExcel(rows: EvaluationOverviewRow[]) {
@@ -327,27 +463,32 @@ export default function EvaluationsPage() {
       const r1 = (h: number) => Math.round(h * 10) / 10;
       const headers = [
         "STT", "Họ và tên", "Chức vụ", "Phòng ban",
-        "Office time (giờ)", "Project time (giờ)", "Đi muộn (ngày)", "Đánh giá (sao)", "Xếp loại",
+        "Office time (giờ)", "P time (giờ)", "Muộn CP (ngày)", "Muộn KP (ngày)", "Nghỉ CP (ngày)", "Nghỉ KP (ngày)",
+        "Ý thức (/25)", "Chất lượng CV (/50)", "Tập thể (/25)", "Kết quả (/100)",
       ];
-      const data = rows.map((r, i) => [
-        i + 1,
-        r.full_name,
-        ROLE_LABEL[r.role] || "Nhân viên",
-        r.department || "",
-        r1(r.office_hours),
-        r1(r.project_hours),
-        r.late_days,
-        r.my_rating ?? "",
-        r.my_rating ? RATING_LABELS[r.my_rating] : "",
-      ]);
+      const data = rows.map((r, i) => {
+        const st = statsOf(r.user_id);
+        return [
+          i + 1,
+          r.full_name,
+          ROLE_LABEL[r.role] || "Nhân viên",
+          r.department || "",
+          r1(r.office_hours),
+          r1(r.project_hours),
+          st.late_cp, st.late_kp, st.leave_cp, st.leave_kp,
+          st.score_attitude ?? "", st.score_quality ?? "", st.score_team ?? "", st.result ?? "",
+        ];
+      });
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
       ws["!cols"] = [
         { wch: 6 }, { wch: 22 }, { wch: 18 }, { wch: 30 },
-        { wch: 16 }, { wch: 17 }, { wch: 14 }, { wch: 14 }, { wch: 18 },
+        { wch: 16 }, { wch: 13 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+        { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 14 },
       ];
+      const tag = isQuarter ? `Q${selQuarter}-${selMonth.slice(0, 4)}` : selMonth;
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, `Đánh giá ${selMonth}`);
-      XLSX.writeFile(wb, `Danh_gia_nhan_su_${selMonth}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, `Đánh giá ${tag}`);
+      XLSX.writeFile(wb, `Danh_gia_nhan_su_${tag}.xlsx`);
     } catch (err) {
       setRateMsg(err instanceof Error ? `Không xuất được Excel: ${err.message}` : "Không xuất được Excel.");
     } finally {
@@ -623,10 +764,11 @@ export default function EvaluationsPage() {
           <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-ink">
-                Đánh giá nhân sự tháng {fmtMonth(selMonth)}{selDept ? ` · ${selDept}` : ""} ({rows.length})
+                Đánh giá nhân sự {periodLabel}{selDept ? ` · ${selDept}` : ""} ({rows.length})
               </h2>
               <p className="mt-0.5 text-[11px] text-muted">
-                Cộng cả tháng: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">Project time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Đi muộn</b> = số ngày vào trễ (đơn đi muộn đã duyệt không tính). Bấm sao để chấm tháng này, bấm sao khác để sửa, bấm lại đúng sao đang chọn để bỏ.
+                Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP, Nghỉ CP/KP</b> = số ngày do Giám đốc nhập (Nghỉ CP tự điền từ đơn nghỉ đã duyệt, sửa được) · <b className="text-steel">Tổng hợp</b> = Ý thức (tối đa 25) + Chất lượng CV (tối đa 50) + Tập thể (tối đa 25) → <b className="text-steel">Kết quả</b> thang 100.
+                {isQuarter ? " Xem theo quý là cộng dồn 3 tháng (điểm lấy trung bình các tháng đã chấm); muốn nhập thì chọn tháng." : canEditReview ? " Gõ số vào ô rồi Enter hoặc bấm ra ngoài để lưu; xoá trắng để bỏ." : ""}
               </p>
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
             </div>
@@ -658,17 +800,28 @@ export default function EvaluationsPage() {
               <input
                 type="month"
                 value={selMonth}
-                disabled={ratingUid !== null}
                 onChange={(e) => e.target.value && setSelMonth(e.target.value)}
-                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel disabled:opacity-60"
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-steel"
               />
               <button
-                onClick={() => setSelMonth(monthLocal())}
-                disabled={ratingUid !== null}
-                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper disabled:opacity-60"
+                onClick={() => { setSelMonth(monthLocal()); setSelQuarter(""); }}
+                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-steel hover:bg-paper"
               >
                 Tháng này
               </button>
+              {/* Quý 1–4 của năm thuộc tháng đang chọn: bấm lại quý đang chọn để quay về xem tháng. */}
+              <div className="flex items-center gap-0.5 rounded-lg border border-line bg-white p-0.5" title="Xem cộng dồn theo quý (3 tháng). Nhập điểm theo từng tháng.">
+                {["1", "2", "3", "4"].map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => setSelQuarter(selQuarter === q ? "" : q)}
+                    className={`rounded px-2 py-1 text-xs font-semibold transition-colors ${selQuarter === q ? "bg-steel text-white" : "text-muted hover:bg-paper"}`}
+                  >
+                    Quý {q}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           {rows.length === 0 ? (
@@ -688,32 +841,55 @@ export default function EvaluationsPage() {
                     </span>
                     <ChevronRightIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${openUid === r.user_id ? "rotate-90" : ""}`} />
                   </button>
-                  <div className="grid grid-cols-3 border-y border-line bg-paper/60 text-center">
-                    <div className="px-2 py-2"><p className="text-[9px] text-muted">Office</p><p className="text-sm font-bold text-ink tnum">{r.office_hours.toFixed(1)}h</p></div>
-                    <div className="border-x border-line px-2 py-2"><p className="text-[9px] text-muted">Dự án</p><p className="text-sm font-bold text-steel tnum">{r.project_hours.toFixed(1)}h</p></div>
-                    <div className="px-2 py-2"><p className="text-[9px] text-muted">Đi muộn</p><p className={`text-sm font-bold tnum ${r.late_days > 0 ? "text-bad" : "text-ink"}`}>{r.late_days}</p></div>
-                  </div>
-                  <div className="flex min-h-14 items-center justify-between gap-2 px-3 py-2">
-                    <span className="text-xs font-semibold text-muted">Đánh giá tháng</span>
-                    {r.user_id === user.id ? (
-                      <span className="text-xs text-muted" title="Không thể tự đánh giá chính mình.">Chính bạn</span>
-                    ) : (
-                      <RateStars value={r.my_rating ?? 0} busy={ratingUid === r.user_id} onRate={(n) => rateUser(r.user_id, n)} />
-                    )}
-                  </div>
-                  {openUid === r.user_id && <div className="border-t border-line bg-paper/60 px-3 py-2"><ProjectHoursDetail data={projHours[`${r.user_id}:${selMonth}`]} month={selMonth} /></div>}
+                  {(() => {
+                    const st = statsOf(r.user_id);
+                    const self = r.user_id === user.id;
+                    const box = (label: string, node: ReactNode, extra = "") => (
+                      <div className={`px-1.5 py-1.5 ${extra}`}><p className="text-[9px] text-muted">{label}</p><div className="mt-0.5 flex justify-center text-sm">{node}</div></div>
+                    );
+                    return (
+                      <>
+                        <div className="grid grid-cols-3 border-y border-line bg-paper/60 text-center">
+                          {box("Office", <span className="font-bold text-ink tnum">{r.office_hours.toFixed(1)}h</span>)}
+                          {box("P time", <span className="font-bold text-steel tnum">{r.project_hours.toFixed(1)}h</span>, "border-x border-line")}
+                          {box("Kết quả", resultCell(st))}
+                        </div>
+                        <div className="grid grid-cols-4 border-b border-line text-center text-xs">
+                          {box("Muộn CP", countCell(r.user_id, "late_cp", st, self))}
+                          {box("Muộn KP", countCell(r.user_id, "late_kp", st, self), "border-l border-line")}
+                          {box("Nghỉ CP", countCell(r.user_id, "leave_cp", st, self), "border-l border-line")}
+                          {box("Nghỉ KP", countCell(r.user_id, "leave_kp", st, self), "border-l border-line")}
+                        </div>
+                        <div className="grid grid-cols-3 text-center text-xs">
+                          {box("Ý thức /25", scoreCell(r.user_id, "score_attitude", st, self))}
+                          {box("Chất lượng CV /50", scoreCell(r.user_id, "score_quality", st, self), "border-x border-line")}
+                          {box("Tập thể /25", scoreCell(r.user_id, "score_team", st, self))}
+                        </div>
+                      </>
+                    );
+                  })()}
+                  {openUid === r.user_id && <div className="border-t border-line bg-paper/60 px-3 py-2"><ProjectHoursDetail data={projHours[`${r.user_id}:${periodFrom}:${periodTo}`]} label={periodLabel} /></div>}
                 </article>
               ))}
             </div>
             <div className="hidden overflow-x-auto rounded-xl2 bg-white shadow-card lg:block">
-              <table className="w-full min-w-[640px] text-xs">
+              <table className="w-full min-w-[1040px] text-xs">
                 <thead>
-                  <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
-                    <th className="px-3 py-2 font-semibold">Người</th>
-                    <th className="px-3 py-2 text-center font-semibold">Office time</th>
-                    <th className="px-3 py-2 text-center font-semibold">Project time</th>
-                    <th className="px-3 py-2 text-center font-semibold">Đi muộn</th>
-                    <th className="px-3 py-2 text-center font-semibold">Đánh giá</th>
+                  <tr className="text-left text-[10px] uppercase tracking-wide text-muted">
+                    <th rowSpan={2} className="border-b border-line px-3 py-2 align-bottom font-semibold">Người</th>
+                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold">Office time</th>
+                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Project time — giờ khai ở bảng tiến độ dự án">P time</th>
+                    <th rowSpan={2} className="border-b border-l border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày đi muộn CÓ PHÉP (Giám đốc nhập)">Muộn CP</th>
+                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày đi muộn KHÔNG PHÉP (Giám đốc nhập)">Muộn KP</th>
+                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày nghỉ CÓ PHÉP: tự điền từ đơn nghỉ đã duyệt, Giám đốc sửa được">Nghỉ CP</th>
+                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày nghỉ KHÔNG PHÉP (Giám đốc nhập)">Nghỉ KP</th>
+                    <th colSpan={3} className="border-b border-l border-line bg-paper/60 px-2 py-1.5 text-center font-semibold">Tổng hợp</th>
+                    <th rowSpan={2} className="border-b border-l border-line px-2 py-2 text-center align-bottom font-semibold" title="Kết quả = Ý thức + Chất lượng CV + Tập thể (thang 100)">Kết quả</th>
+                  </tr>
+                  <tr className="border-b border-line text-center text-[10px] uppercase tracking-wide text-muted">
+                    <th className="border-l border-line px-2 py-1.5 font-semibold">Ý thức<span className="block text-[9px] font-normal normal-case">tối đa 25</span></th>
+                    <th className="px-2 py-1.5 font-semibold">Chất lượng CV<span className="block text-[9px] font-normal normal-case">tối đa 50</span></th>
+                    <th className="px-2 py-1.5 font-semibold">Tập thể<span className="block text-[9px] font-normal normal-case">tối đa 25</span></th>
                   </tr>
                 </thead>
                 <tbody className={overviewLoading ? "opacity-60" : ""}>
@@ -742,31 +918,27 @@ export default function EvaluationsPage() {
                       </td>
                       <td className="px-3 py-2 text-center tnum">{hoursCell(r.office_hours)}</td>
                       <td className="px-3 py-2 text-center tnum">{hoursCell(r.project_hours)}</td>
-                      <td className="px-3 py-2 text-center tnum">
-                        {r.late_days > 0 ? (
-                          <span className="rounded-full bg-bad/10 px-2 py-0.5 text-[11px] font-bold text-bad">{r.late_days}</span>
-                        ) : (
-                          <span className="text-muted">0</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex justify-center">
-                          {r.user_id === user.id ? (
-                            <span className="text-xs text-muted" title="Không thể tự đánh giá chính mình.">Chính bạn</span>
-                          ) : (
-                            <RateStars
-                              value={r.my_rating ?? 0}
-                              busy={ratingUid === r.user_id}
-                              onRate={(n) => rateUser(r.user_id, n)}
-                            />
-                          )}
-                        </div>
-                      </td>
+                      {(() => {
+                        const st = statsOf(r.user_id);
+                        const self = r.user_id === user.id;
+                        return (
+                          <>
+                            <td className="border-l border-line px-2 py-2 text-center tnum">{countCell(r.user_id, "late_cp", st, self)}</td>
+                            <td className="px-2 py-2 text-center tnum">{countCell(r.user_id, "late_kp", st, self)}</td>
+                            <td className="px-2 py-2 text-center tnum">{countCell(r.user_id, "leave_cp", st, self)}</td>
+                            <td className="px-2 py-2 text-center tnum">{countCell(r.user_id, "leave_kp", st, self)}</td>
+                            <td className="border-l border-line px-2 py-2 text-center tnum">{scoreCell(r.user_id, "score_attitude", st, self)}</td>
+                            <td className="px-2 py-2 text-center tnum">{scoreCell(r.user_id, "score_quality", st, self)}</td>
+                            <td className="px-2 py-2 text-center tnum">{scoreCell(r.user_id, "score_team", st, self)}</td>
+                            <td className="border-l border-line px-2 py-2 text-center tnum">{resultCell(st)}</td>
+                          </>
+                        );
+                      })()}
                     </tr>
                     {openUid === r.user_id && (
                       <tr className="border-b border-line/50 bg-paper/60">
-                        <td colSpan={5} className="px-3 py-2">
-                          <ProjectHoursDetail data={projHours[`${r.user_id}:${selMonth}`]} month={selMonth} />
+                        <td colSpan={11} className="px-3 py-2">
+                          <ProjectHoursDetail data={projHours[`${r.user_id}:${periodFrom}:${periodTo}`]} label={periodLabel} />
                         </td>
                       </tr>
                     )}

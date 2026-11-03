@@ -621,6 +621,30 @@ class EvaluationOverviewRow(BaseModel):
     my_rating: int | None = None   # sao NGƯỜI XEM đã chấm người này trong khoảng ngày; None = chưa chấm
 
 
+class EvaluationMonthReviewIn(BaseModel):
+    """Giám đốc nhập/sửa ô của bảng đánh giá tháng: chỉ gửi trường cần đổi; None = xoá trắng."""
+    late_cp: Decimal | None = Field(default=None, ge=0, le=100)
+    late_kp: Decimal | None = Field(default=None, ge=0, le=100)
+    leave_cp: Decimal | None = Field(default=None, ge=0, le=100)
+    leave_kp: Decimal | None = Field(default=None, ge=0, le=100)
+    score_attitude: Decimal | None = Field(default=None, ge=0, le=25)
+    score_quality: Decimal | None = Field(default=None, ge=0, le=50)
+    score_team: Decimal | None = Field(default=None, ge=0, le=25)
+
+
+class EvaluationMonthReviewOut(BaseModel):
+    user_id: int
+    month: str                           # "YYYY-MM"
+    late_cp: float | None = None
+    late_kp: float | None = None
+    leave_cp: float | None = None        # None = chưa ghi đè -> giao diện dùng leave_cp_auto
+    leave_kp: float | None = None
+    score_attitude: float | None = None  # tối đa 25
+    score_quality: float | None = None   # tối đa 50
+    score_team: float | None = None      # tối đa 25
+    leave_cp_auto: float = 0             # ngày nghỉ CÓ PHÉP tự tính từ đơn nghỉ đã duyệt trong tháng
+
+
 # --------- Đánh giá theo DỰ ÁN (chấm chéo 360° giữa các thành viên) ---------
 class ProjectEvaluationCreate(BaseModel):
     project_id: int

@@ -4,7 +4,7 @@
 import type { NotificationSendResult } from "./notification-send-result";
 import { leaveLoginPath } from "./leave-links";
 
-import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
+import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, EvaluationMonthReview, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 import type { ProjectGroupHours } from "./bando-hours";
 
 export const API_BASE =
@@ -400,6 +400,19 @@ export const api = {
     request<EvaluationSummary[]>(`/evaluations/summary?period=${period}`),
   evaluationsOverview: (fromDate: string, toDate: string) =>
     request<EvaluationOverviewRow[]>(`/evaluations/overview?from_date=${fromDate}&to_date=${toDate}`),
+  // Bảng đánh giá tháng NHẬP TAY (Muộn CP/KP, Nghỉ CP/KP, 3 mục Tổng hợp) theo khoảng tháng "YYYY-MM".
+  evaluationMonthReviews: (fromMonth: string, toMonth: string) =>
+    request<EvaluationMonthReview[]>(`/evaluations/month-reviews?from_month=${fromMonth}&to_month=${toMonth}`),
+  // Giám đốc nhập/sửa 1 ô: gửi đúng trường cần đổi (null = xoá trắng).
+  setEvaluationMonthReview: (
+    userId: number,
+    month: string,
+    patch: Partial<Omit<EvaluationMonthReview, "user_id" | "month" | "leave_cp_auto">>,
+  ) =>
+    request<EvaluationMonthReview>(`/evaluations/month-reviews/${userId}/${month}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    }),
 
   // --- Đánh giá theo DỰ ÁN (chấm chéo 360°) ---
   projectEvaluations: (projectId: number) =>

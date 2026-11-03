@@ -11,6 +11,8 @@ KHÔNG có API xem phiếu (ai chấm ai bao nhiêu sao) của người khác �
 Chấm THEO TỪNG NGÀY (eval_date) & TỪNG DỰ ÁN (project_id, tùy chọn) — mỗi (ngày, dự án)
 một phiếu (gửi lại thì ghi đè); kỳ tuần (period = Thứ 7) tự suy từ ngày để TỔNG HỢP THEO TUẦN.
 """
+import re
+from calendar import monthrange
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,14 +22,15 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import (
-    Attendance, Evaluation, EvaluationDirection, Project, ProjectEvaluation, ProjectItem,
-    Timesheet, User, UserRole,
+    Attendance, Evaluation, EvaluationDirection, EvaluationMonthReview, LeaveRequest, LeaveStatus,
+    Project, ProjectEvaluation, ProjectItem, Timesheet, User, UserRole,
 )
 # Dùng CHUNG luật miễn trễ (đơn đi muộn được duyệt) với trang Chấm công để số
 # "Đi muộn" ở bảng Đánh giá khớp đúng số ở Tổng hợp.
 from app.routers.attendance import _apply_late_exemption
 from app.schemas import (
-    EvaluationCreate, EvaluationOut, EvaluationOverviewRow, EvaluationSummary, StarOverviewRow,
+    EvaluationCreate, EvaluationMonthReviewIn, EvaluationMonthReviewOut, EvaluationOut,
+    EvaluationOverviewRow, EvaluationSummary, StarOverviewRow,
 )
 
 router = APIRouter(prefix="/evaluations", tags=["Đánh giá"])
@@ -336,3 +339,138 @@ def evaluation_overview(
         )
         for u in users
     ]
+
+
+# ---------------------------------------------------------------------------
+# BẢNG ĐÁNH GIÁ THÁNG NHẬP TAY: Muộn CP/KP, Nghỉ CP/KP, Ý thức / Chất lượng CV / Tập thể
+# ---------------------------------------------------------------------------
+_MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+# Đơn nghỉ phép đã duyệt -> số ngày nghỉ CÓ PHÉP: cả ngày = 1, nửa ngày = 0,5; đơn đi muộn
+# (LATE_*) không phải nghỉ nên không tính.
+_LEAVE_DAY_VALUE = {"FULL": 1.0, "MORNING": 0.5, "AFTERNOON": 0.5}
+
+
+def _month_bounds(month: str) -> tuple[date, date]:
+    y, m = int(month[:4]), int(month[5:7])
+    return date(y, m, 1), date(y, m, monthrange(y, m)[1])
+
+
+def _months_between(from_month: str, to_month: str) -> list[str]:
+    out: list[str] = []
+    y, m = int(from_month[:4]), int(from_month[5:7])
+    while f"{y:04d}-{m:02d}" <= to_month and len(out) < 24:
+        out.append(f"{y:04d}-{m:02d}")
+        m += 1
+        if m > 12:
+            m, y = 1, y + 1
+    return out
+
+
+def _auto_leave_cp(db: Session, cid: int, months: list[str]) -> dict[tuple[int, str], float]:
+    """Ngày nghỉ CÓ PHÉP tự tính theo (người, tháng) từ đơn nghỉ phép ĐÃ DUYỆT.
+    Lịch sinh viên đăng ký (source "SCHEDULE") là lịch làm việc riêng, KHÔNG phải nghỉ phép
+    nên không tính. Bỏ Chủ nhật. Giám đốc vẫn ghi đè được số này ở ô Nghỉ CP."""
+    first, _ = _month_bounds(months[0])
+    _, last = _month_bounds(months[-1])
+    reqs = (
+        db.query(LeaveRequest)
+        .filter(
+            LeaveRequest.company_id == cid,
+            LeaveRequest.status == LeaveStatus.APPROVED,
+            or_(LeaveRequest.source.is_(None), LeaveRequest.source != "SCHEDULE"),
+            LeaveRequest.from_date <= last, LeaveRequest.to_date >= first,
+        )
+        .all()
+    )
+    out: dict[tuple[int, str], float] = {}
+    for r in reqs:
+        val = _LEAVE_DAY_VALUE.get((r.leave_type or "FULL").upper())
+        if not val:
+            continue
+        d, end = max(r.from_date, first), min(r.to_date, last)
+        while d <= end:
+            if d.weekday() != 6:
+                key = (r.user_id, d.strftime("%Y-%m"))
+                out[key] = out.get(key, 0.0) + val
+            d += timedelta(days=1)
+    return out
+
+
+def _review_out(rec: EvaluationMonthReview | None, user_id: int, month: str, auto: float) -> EvaluationMonthReviewOut:
+    f = lambda v: float(v) if v is not None else None  # noqa: E731
+    return EvaluationMonthReviewOut(
+        user_id=user_id, month=month,
+        late_cp=f(rec.late_cp) if rec else None,
+        late_kp=f(rec.late_kp) if rec else None,
+        leave_cp=f(rec.leave_cp) if rec else None,
+        leave_kp=f(rec.leave_kp) if rec else None,
+        score_attitude=f(rec.score_attitude) if rec else None,
+        score_quality=f(rec.score_quality) if rec else None,
+        score_team=f(rec.score_team) if rec else None,
+        leave_cp_auto=round(auto, 1),
+    )
+
+
+@router.get("/month-reviews", response_model=list[EvaluationMonthReviewOut])
+def month_reviews(
+    from_month: str,
+    to_month: str,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(*_TABLE_ROLES)),
+):
+    """Dòng đánh giá tháng nhập tay của mọi người trong công ty, các tháng từ from_month
+    đến to_month (tối đa 24 tháng; xem theo quý = 3 tháng). Chỉ trả (người, tháng) đã có
+    dữ liệu nhập hoặc có ngày nghỉ có phép tự tính; thiếu = chưa nhập gì."""
+    if not (_MONTH_RE.match(from_month or "") and _MONTH_RE.match(to_month or "")):
+        raise HTTPException(400, "Tháng không hợp lệ, cần dạng YYYY-MM.")
+    if to_month < from_month:
+        raise HTTPException(400, "Tháng kết thúc phải sau tháng bắt đầu.")
+    months = _months_between(from_month, to_month)
+    cid = current.company_id
+    recs = (
+        db.query(EvaluationMonthReview)
+        .filter(EvaluationMonthReview.company_id == cid, EvaluationMonthReview.month.in_(months))
+        .all()
+    )
+    auto = _auto_leave_cp(db, cid, months)
+    by = {(r.user_id, r.month): r for r in recs}
+    keys = set(by) | set(auto)
+    return [_review_out(by.get(k), k[0], k[1], auto.get(k, 0.0)) for k in sorted(keys)]
+
+
+@router.put("/month-reviews/{user_id}/{month}", response_model=EvaluationMonthReviewOut)
+def set_month_review(
+    user_id: int,
+    month: str,
+    payload: EvaluationMonthReviewIn,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Giám đốc nhập/sửa bảng đánh giá tháng của 1 người: gửi đúng trường cần đổi
+    (None = xoá trắng; Nghỉ CP xoá trắng = quay về số tự tính)."""
+    if current.role != UserRole.DIRECTOR:
+        raise HTTPException(403, "Chỉ Giám đốc mới được nhập bảng đánh giá tháng.")
+    if not _MONTH_RE.match(month or ""):
+        raise HTTPException(400, "Tháng không hợp lệ, cần dạng YYYY-MM.")
+    target = db.get(User, user_id)
+    if not target or target.company_id != current.company_id:
+        raise HTTPException(404, "Không tìm thấy nhân sự.")
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(400, "Chưa có trường nào để lưu.")
+
+    rec = (
+        db.query(EvaluationMonthReview)
+        .filter(EvaluationMonthReview.user_id == user_id, EvaluationMonthReview.month == month)
+        .first()
+    )
+    if rec is None:
+        rec = EvaluationMonthReview(company_id=current.company_id, user_id=user_id, month=month)
+        db.add(rec)
+    for key, value in data.items():
+        setattr(rec, key, value)
+    rec.updated_by_id = current.id
+    db.commit()
+    db.refresh(rec)
+    auto = _auto_leave_cp(db, current.company_id, [month]).get((user_id, month), 0.0)
+    return _review_out(rec, user_id, month, auto)
