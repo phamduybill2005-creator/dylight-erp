@@ -28,7 +28,7 @@ import { getProjectDept, isBanDoView } from "@/lib/groups";
 import { parseBanDoDetails } from "@/lib/bando-details";
 import { BANDO_HOUR_COLUMNS, hoursByColumn, formatGroupHours, type ProjectGroupHours } from "@/lib/bando-hours";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { formatVND, computeAutoStatus } from "@/lib/format";
+import { formatVND, todayLocal } from "@/lib/format";
 import { pickJpyRate, computeRevenueVnd, parseJpyInput } from "@/lib/revenue";
 import type { Project, User, Timesheet } from "@/lib/types";
 import { revenueMobileFacts } from "@/lib/mobile-view-models";
@@ -95,9 +95,13 @@ export default function RevenuePage() {
   const [filterMonth, setFilterMonth] = useStickyState("revenue.month", "");
   const [monthTimesheets, setMonthTimesheets] = useState<Timesheet[]>([]);
 
-  // Tải danh sách timesheets của tháng khi filterMonth thay đổi
-  useEffect(() => {
-    const range = monthRange(filterMonth);
+  // THÁNG ĐANG XEM cho 2 cột (Month): tháng đã lọc; chưa lọc thì tháng hiện tại.
+  const viewMonth = filterMonth || todayLocal().slice(0, 7);
+  const monthLabel = `T${Number(viewMonth.slice(5, 7))}/${viewMonth.slice(0, 4)}`;
+
+  // Giờ realtime nhập trong tháng đang xem (cột Time (Month)); tự nạp lại khi có người khai giờ.
+  const loadMonthTimesheets = useCallback(() => {
+    const range = monthRange(viewMonth);
     if (!range) {
       setMonthTimesheets([]);
       return;
@@ -105,7 +109,28 @@ export default function RevenuePage() {
     api.timesheets(range)
       .then(setMonthTimesheets)
       .catch(() => setMonthTimesheets([]));
-  }, [filterMonth]);
+  }, [viewMonth]);
+  useEffect(() => { loadMonthTimesheets(); }, [loadMonthTimesheets]);
+  useAutoRefresh(loadMonthTimesheets, { topics: ["timesheet"] });
+
+  // TIME KHÁCH HÀNG THEO THÁNG: {project_id: {"YYYY-MM": giờ}} — Customer (Month) đọc đúng
+  // tháng, Customer (All) cộng mọi tháng. Backend đã ghi tổng vào project.client_hours.
+  const [clientMonthHours, setClientMonthHours] = useState<Record<string, Record<string, number>>>({});
+  const loadClientHours = useCallback(() => {
+    api.revenueClientHours().then(setClientMonthHours).catch(() => {});
+  }, []);
+  useEffect(() => { loadClientHours(); }, [loadClientHours]);
+  useAutoRefresh(loadClientHours, { topics: ["project"] });
+  /** Giờ khách hàng của dự án: có `month` -> đúng tháng đó; không -> tổng các tháng. */
+  const clientHoursOf = useCallback(
+    (p: Project, month?: string): number => {
+      const byMonth = clientMonthHours[String(p.id)];
+      if (month) return Number(byMonth?.[month] ?? 0);
+      if (byMonth) return Object.values(byMonth).reduce((s, h) => s + Number(h || 0), 0);
+      return Number(p.client_hours ?? 0); // chưa tải xong -> tổng backend đã lưu sẵn
+    },
+    [clientMonthHours],
+  );
 
   // Giờ realtime theo NHÓM HẠNG MỤC của từng dự án -> 9 cột Phòng Bản đồ. Lọc tháng thì
   // chỉ lấy giờ nhập trong tháng (giống cột Realtime). Tự nạp lại khi có người sửa giờ /
@@ -252,12 +277,9 @@ export default function RevenuePage() {
     return () => { alive = false; clearInterval(timer); };
   }, []);
 
-  const canEdit = (p: Project) =>
-    isSeniorManagerUp(me) || !!me?.has_subordinates || (!!me && p.lead_id === me.id);
-
   // Bố cục Phòng Bản đồ (cùng điều kiện với bảng Dự án): thêm Vùng + 9 cột giờ chỉ xem sau Tên dự án.
   const isBanDoMode = isBanDoView(filterDept, me);
-  const colCount = isBanDoMode ? 9 + BANDO_HOUR_COLUMNS.length : 8;
+  const colCount = isBanDoMode ? 10 + BANDO_HOUR_COLUMNS.length : 9;
   // Bề rộng từng cột giờ: tên dài (HoverMaps, Grid_XML, トレース) cần rộng hơn để không bị cắt chữ.
   const BANDO_COL_W: Record<string, string> = { hovermaps: "w-[76px]", grid: "w-[66px]", trace: "w-[60px]", ground: "w-[58px]" };
 
@@ -272,10 +294,16 @@ export default function RevenuePage() {
   // Tỷ giá + công thức lấy từ lib/revenue -> bảng Dự án dùng CHUNG, không lệch số.
   const currentVcbRate = useMemo(() => pickJpyRate(vcbData, rateType), [vcbData, rateType]);
 
+  /** Giờ khách hàng dùng để TÍNH TIỀN: đang lọc tháng -> Customer (Month); không -> Customer (All). */
+  const billableHoursOf = useCallback(
+    (p: Project): number => clientHoursOf(p, filterMonth || undefined),
+    [clientHoursOf, filterMonth],
+  );
   /** Doanh thu từng dự án (VNĐ) = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank */
   const revenueOf = useCallback(
-    (p: Project): number => computeRevenueVnd(p, parseJpyInput(globalJpyDraft), currentVcbRate),
-    [currentVcbRate, globalJpyDraft],
+    (p: Project): number =>
+      computeRevenueVnd({ ...p, client_hours: billableHoursOf(p) }, parseJpyInput(globalJpyDraft), currentVcbRate),
+    [currentVcbRate, globalJpyDraft, billableHoursOf],
   );
 
   const rows = useMemo(() => {
@@ -288,7 +316,9 @@ export default function RevenuePage() {
       if (filterMonth) {
         const startMonth = (p.start_date || "").slice(0, 7);
         const hasHoursInMonth = (monthHoursByProject[p.id] || 0) > 0;
-        if (startMonth !== filterMonth && !hasHoursInMonth) return false;
+        // Có Time khách hàng của tháng đó cũng là "có việc trong tháng" -> vẫn hiện.
+        const hasClientInMonth = clientHoursOf(p, filterMonth) > 0;
+        if (startMonth !== filterMonth && !hasHoursInMonth && !hasClientInMonth) return false;
       }
       return true;
     });
@@ -304,48 +334,54 @@ export default function RevenuePage() {
       if (tb !== null) return 1;
       return (a.code || "").localeCompare(b.code || "", "vi");
     });
-  }, [projects, searchQuery, filterDept, filterMonth, pinnedIds, monthHoursByProject]);
+  }, [projects, searchQuery, filterDept, filterMonth, pinnedIds, monthHoursByProject, clientHoursOf]);
 
   const tong = useMemo(() => rows.reduce((s, p) => s + revenueOf(p), 0), [rows, revenueOf]);
   const soCoDoanhThu = useMemo(() => rows.filter((p) => revenueOf(p) > 0).length, [rows, revenueOf]);
-  const tongGioKhach = useMemo(() => rows.reduce((s, p) => s + Number(p.client_hours ?? 0), 0), [rows]);
+  const tongGioKhach = useMemo(() => rows.reduce((s, p) => s + billableHoursOf(p), 0), [rows, billableHoursOf]);
 
   // Số Yên global và VNĐ quy đổi tương ứng (cho widget nhỏ)
   const parsedGlobalJpy = Number(globalJpyDraft.replace(/\./g, "").replace(/,/g, "").replace(/[^\d]/g, "")) || 0;
   const calcGlobalVnd = Math.round(parsedGlobalJpy * currentVcbRate);
 
-  type RowField = "manual_hours" | "client_hours";
-  const keyOf = (p: Project, f: RowField) => `${p.id}:${f}`;
+  // Ô nhập TIME KHÁCH HÀNG THEO THÁNG (chỉ Giám đốc). Khoá nháp: "<dự án>:<tháng>".
+  const monthKey = (p: Project, month: string) => `${p.id}:${month}`;
 
-  async function saveRowField(p: Project, field: RowField) {
-    if (field === "client_hours" && me?.role !== "DIRECTOR") {
+  async function saveClientMonth(p: Project, month: string) {
+    if (!isDirectorUser) {
       alert("Chỉ tài khoản Giám đốc mới có quyền nhập Time khách hàng.");
       return;
     }
-    const k = keyOf(p, field);
+    const k = monthKey(p, month);
     const draft = edits[k];
     if (draft === undefined) return;
     const clear = () => setEdits((s) => { const n = { ...s }; delete n[k]; return n; });
     const next = parseHours(draft);
-    const cur = p[field] == null || p[field] === "" ? null : Number(p[field]);
-    if (next === cur) { clear(); return; }
+    const cur = clientHoursOf(p, month) || null;
+    if ((next || null) === cur) { clear(); return; }
     try {
-      const updated = await api.updateProject(p.id, { [field]: next });
-      setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      const res = await api.setProjectClientHours(p.id, month, next);
+      setClientMonthHours((prev) => {
+        const mine = { ...(prev[String(p.id)] || {}) };
+        if (res.hours == null) delete mine[month]; else mine[month] = res.hours;
+        return { ...prev, [String(p.id)]: mine };
+      });
+      // Tổng các tháng đã được backend ghi vào client_hours -> cập nhật tại chỗ cho khớp.
+      setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, client_hours: res.total_hours } : x)));
     } catch (err: any) {
       alert(err?.message || "Không lưu được, thử lại giúp mình.");
     } finally { clear(); }
   }
 
-  const cellInput = (p: Project, field: RowField, opts: { align: string; title: string }) => {
-    const k = keyOf(p, field);
-    const shown = edits[k] ?? plainNumber(p[field]);
+  const clientMonthInput = (p: Project, month: string, opts: { align: string; title: string }) => {
+    const k = monthKey(p, month);
+    const shown = edits[k] ?? plainNumber(clientHoursOf(p, month) || null);
     return (
       <input
         type="text" inputMode="decimal"
         value={shown}
         onChange={(e) => setEdits((st) => ({ ...st, [k]: e.target.value }))}
-        onBlur={() => saveRowField(p, field)}
+        onBlur={() => saveClientMonth(p, month)}
         onKeyDown={(e) => {
           if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
           if (e.key === "Escape") setEdits((st) => { const n = { ...st }; delete n[k]; return n; });
@@ -355,6 +391,9 @@ export default function RevenuePage() {
       />
     );
   };
+
+  /** Số giờ -> "12,5" gọn cho ô hiển thị. */
+  const fmtH = (h: number) => h.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 
   const TH = "border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 px-2 py-2";
   const TD = "border border-line align-middle px-2 py-2";
@@ -470,7 +509,7 @@ export default function RevenuePage() {
             <span className="block text-xl font-extrabold text-emerald-700 tnum">{formatVND(tong)}</span>
           </div>
           <div className="border-l border-line pl-3.5">
-            <span className="block text-[10px] text-muted">Công khách hàng</span>
+            <span className="block text-[10px] text-muted">Công khách hàng{filterMonth ? ` ${monthLabel}` : " (All)"}</span>
             <span className="block text-sm font-bold text-steel tnum">
               {hoursToDays(tongGioKhach)} công <span className="text-[10px] font-normal text-muted">({tongGioKhach.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h)</span>
             </span>
@@ -539,11 +578,15 @@ export default function RevenuePage() {
                 <p className="mt-0.5 text-xl font-extrabold text-emerald-800 tnum">{facts.revenue > 0 ? formatVND(facts.revenue) : "—"}</p>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Giờ thực tế</p><p className="mt-0.5 font-bold text-ink tnum">{facts.actualHours.toLocaleString("vi-VN")}h</p></div>
+                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Time ({monthLabel})</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(monthHoursByProject[project.id] || 0)}h</p></div>
                 <div className="rounded-lg bg-paper px-2.5 py-2" onClick={(event) => event.stopPropagation()}>
-                  <p className="text-[10px] text-muted">Giờ khách hàng</p>
-                  {isDirectorUser ? cellInput(project, "client_hours", { align: "text-left", title: "Nhập số giờ khách hàng" }) : <p className="mt-0.5 font-bold text-ink tnum">{facts.clientHours.toLocaleString("vi-VN")}h</p>}
+                  <p className="text-[10px] text-muted">Customer ({monthLabel})</p>
+                  {isDirectorUser
+                    ? clientMonthInput(project, viewMonth, { align: "text-left", title: `Nhập số giờ khách hàng tháng ${monthLabel}` })
+                    : <p className="mt-0.5 font-bold text-ink tnum">{fmtH(clientHoursOf(project, viewMonth))}h</p>}
                 </div>
+                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Time (All)</p><p className="mt-0.5 font-bold text-ink tnum">{facts.actualHours.toLocaleString("vi-VN")}h</p></div>
+                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Customer (All)</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(clientHoursOf(project))}h</p></div>
               </div>
             </article>
           );
@@ -552,25 +595,26 @@ export default function RevenuePage() {
 
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
       <div className="mt-3 hidden max-h-[calc(100vh-200px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
-        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1380px]" : "min-w-[920px]"}`}>
+        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1440px]" : "min-w-[980px]"}`}>
           <colgroup>
-            <col className="w-[40px]" />   {/* STT */}
-            <col className="w-[26px]" />   {/* Ghim ★ */}
+            <col className="w-[40px]" />{/* STT */}
+            <col className="w-[26px]" />{/* Ghim ★ */}
             {/* Mã QL: thu nhỏ khít theo chữ */}
-            <col className="w-[90px]" />   {/* Mã QL */}
+            <col className="w-[90px]" />{/* Mã QL */}
             {/* Tên dự án: thu nhỏ khít theo tên */}
-            <col className="w-[220px]" />  {/* Tên dự án */}
+            <col className="w-[220px]" />{/* Tên dự án */}
             {isBanDoMode && (
               <>
                 {/* Nhóm cột Phòng Bản đồ: Vùng + 9 cột giờ theo hạng mục */}
-                <col className="w-[60px]" />   {/* Vùng */}
+                <col className="w-[60px]" />{/* Vùng */}
                 {BANDO_HOUR_COLUMNS.map((c) => <col key={c.key} className={BANDO_COL_W[c.key] ?? "w-[52px]"} />)}
               </>
             )}
-            <col className="w-[96px]" />   {/* Manual time */}
-            <col className="w-[96px]" />   {/* Realtime (AI) */}
-            <col className="w-[120px]" />  {/* Time khách hàng */}
-            <col className="w-[170px]" />  {/* Doanh thu (VNĐ) */}
+            <col className="w-[84px]" />{/* Time (Month) */}
+            <col className="w-[100px]" />{/* Customer (Month) */}
+            <col className="w-[84px]" />{/* Time (All) */}
+            <col className="w-[92px]" />{/* Customer (All) */}
+            <col className="w-[170px]" />{/* Doanh thu (VNĐ) */}
           </colgroup>
           <thead>
             <tr className="bg-paper text-left text-[11px] uppercase tracking-wide text-muted">
@@ -592,11 +636,18 @@ export default function RevenuePage() {
                   ))}
                 </>
               )}
-              <th className={`${TH} text-center whitespace-nowrap`}>Manual time</th>
-              <th className={`${TH} text-center whitespace-nowrap`} title={filterMonth ? `Thời gian làm thực tế nhập trong tháng ${filterMonth}` : "Thời gian làm thực tế realtime (AI)"}>
-                Realtime (AI)
+              <th className={`${TH} text-center`} title={`Thời gian làm thực tế người làm đã nhập trong tháng ${monthLabel}`}>
+                Time <span className="block text-[9px] font-normal normal-case text-slate-500">({monthLabel})</span>
               </th>
-              <th className={`${TH} text-center whitespace-nowrap`}>Time khách hàng (công)</th>
+              <th className={`${TH} text-center`} title={`Time khách hàng (công) của tháng ${monthLabel} — chỉ Giám đốc nhập`}>
+                Customer <span className="block text-[9px] font-normal normal-case text-slate-500">({monthLabel})</span>
+              </th>
+              <th className={`${TH} text-center`} title="Tổng thời gian làm thực tế của dự án qua mọi tháng">
+                Time <span className="block text-[9px] font-normal normal-case text-slate-500">(All)</span>
+              </th>
+              <th className={`${TH} text-center`} title="Tổng Time khách hàng (công) của dự án qua mọi tháng">
+                Customer <span className="block text-[9px] font-normal normal-case text-slate-500">(All)</span>
+              </th>
               <th className={`${TH} text-right whitespace-nowrap`} title="Click hàng dự án để nhập đơn giá Yên trên thanh bên trên">
                 Doanh thu (VNĐ)
               </th>
@@ -669,71 +720,30 @@ export default function RevenuePage() {
                     );
                   })()}
 
-                  {/* MANUAL TIME */}
-                  <td className={`${TD} whitespace-nowrap text-center`} onClick={(e) => e.stopPropagation()}>
-                    {(() => {
-                      const shown = edits[keyOf(p, "manual_hours")] ?? plainNumber(p.manual_hours);
-                      const h = parseHours(shown) ?? 0;
-                      return (
-                        <div className="flex flex-col items-center">
-                          <span className="text-[11px] font-bold text-ink tnum">{h > 0 ? `${hoursToDays(h)} ngày` : "0 ngày"}</span>
-                          {canEdit(p) ? (
-                            <span className="flex items-center justify-center text-[10px] text-muted">(
-                              <span className="w-14">{cellInput(p, "manual_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 ngày)" })}</span>
-                              h)
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-muted tnum font-mono">({h > 0 ? `${h}h` : "— h"})</span>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </td>
-
-                  {/* REALTIME (AI) */}
+                  {/* TIME (MONTH) — giờ realtime người làm nhập trong tháng đang xem */}
                   <td className={`${TD} whitespace-nowrap text-center`}>
                     {(() => {
-                      const isDoing = computeAutoStatus(p) === "IN_PROGRESS";
-                      if (filterMonth && isDoing) {
-                        const mHours = Math.round((monthHoursByProject[p.id] || 0) * 10) / 10;
-                        const mDays = Math.round((mHours / 8) * 10) / 10;
-                        return (
-                          <div className="flex flex-col items-center" title={`Giờ làm thực tế nhập trong tháng ${filterMonth}: ${mHours}h (${mDays} ngày)`}>
-                            <span className="text-[11px] font-bold text-emerald-700 tnum">{mDays > 0 ? `${mDays} ngày` : "0 ngày"}</span>
-                            <span className="text-[10px] text-emerald-600 font-mono tnum">({mHours}h)</span>
-                          </div>
-                        );
-                      }
-                      if (filterMonth && !isDoing && (monthHoursByProject[p.id] || 0) > 0) {
-                        const mHours = Math.round((monthHoursByProject[p.id] || 0) * 10) / 10;
-                        const mDays = Math.round((mHours / 8) * 10) / 10;
-                        return (
-                          <div className="flex flex-col items-center" title={`Giờ làm thực tế nhập trong tháng ${filterMonth}: ${mHours}h (${mDays} ngày). Tổng: ${p.total_hours || 0}h`}>
-                            <span className="text-[11px] font-bold text-ink tnum">{mDays > 0 ? `${mDays} ngày` : "0 ngày"}</span>
-                            <span className="text-[10px] text-muted font-mono tnum">({mHours}h)</span>
-                          </div>
-                        );
-                      }
+                      const mHours = Math.round((monthHoursByProject[p.id] || 0) * 10) / 10;
                       return (
-                        <div className="flex flex-col items-center" title={`Tổng thời gian thực tế: ${p.total_hours || 0}h (${p.total_days || 0} ngày)`}>
-                          <span className="text-[11px] font-bold text-ink tnum">{p.total_days && p.total_days > 0 ? `${p.total_days} ngày` : "0 ngày"}</span>
-                          {p.total_hours && p.total_hours > 0 ? <span className="text-[10px] text-muted tnum font-mono">({p.total_hours}h)</span> : null}
+                        <div className="flex flex-col items-center" title={`Giờ làm thực tế nhập trong tháng ${monthLabel}: ${mHours}h`}>
+                          <span className={`text-[11px] font-bold tnum ${mHours > 0 ? "text-emerald-700" : "text-ink"}`}>{mHours > 0 ? `${hoursToDays(mHours)} ngày` : "0 ngày"}</span>
+                          <span className={`text-[10px] font-mono tnum ${mHours > 0 ? "text-emerald-600" : "text-muted"}`}>({mHours > 0 ? `${mHours}h` : "— h"})</span>
                         </div>
                       );
                     })()}
                   </td>
 
-                  {/* TIME KHÁCH HÀNG — CHỈ GIÁM ĐỐC NHẬP */}
+                  {/* CUSTOMER (MONTH) — Time khách hàng của tháng đang xem, CHỈ GIÁM ĐỐC NHẬP */}
                   <td className={`${TD} whitespace-nowrap text-center`} onClick={(e) => e.stopPropagation()}>
                     {(() => {
-                      const shown = edits[keyOf(p, "client_hours")] ?? plainNumber(p.client_hours);
+                      const shown = edits[monthKey(p, viewMonth)] ?? plainNumber(clientHoursOf(p, viewMonth) || null);
                       const h = parseHours(shown) ?? 0;
                       return (
                         <div className="flex flex-col items-center">
                           <span className="text-[11px] font-bold text-ink tnum">{h > 0 ? `${hoursToDays(h)} công` : "0 công"}</span>
                           {isDirectorUser ? (
                             <span className="flex items-center justify-center text-[10px] text-muted">(
-                              <span className="w-14">{cellInput(p, "client_hours", { align: "text-center", title: "Nhập SỐ GIỜ (8 giờ = 1 công)" })}</span>
+                              <span className="w-14">{clientMonthInput(p, viewMonth, { align: "text-center", title: `Nhập SỐ GIỜ khách hàng tháng ${monthLabel} (8 giờ = 1 công)` })}</span>
                               h)
                             </span>
                           ) : (
@@ -746,6 +756,31 @@ export default function RevenuePage() {
                     })()}
                   </td>
 
+                  {/* TIME (ALL) — tổng giờ realtime của dự án qua mọi tháng */}
+                  <td className={`${TD} whitespace-nowrap text-center`}>
+                    <div className="flex flex-col items-center" title={`Tổng thời gian thực tế: ${p.total_hours || 0}h (${p.total_days || 0} ngày)`}>
+                      <span className="text-[11px] font-bold text-ink tnum">{Number(p.total_hours || 0) > 0 ? `${hoursToDays(Number(p.total_hours))} ngày` : "0 ngày"}</span>
+                      <span className="text-[10px] text-muted tnum font-mono">({p.total_hours && p.total_hours > 0 ? `${p.total_hours}h` : "— h"})</span>
+                    </div>
+                  </td>
+
+                  {/* CUSTOMER (ALL) — tổng Time khách hàng các tháng (chỉ xem; nhập ở cột tháng) */}
+                  <td className={`${TD} whitespace-nowrap text-center`}>
+                    {(() => {
+                      const all = clientHoursOf(p);
+                      const months = Object.entries(clientMonthHours[String(p.id)] || {}).sort(([a], [b]) => a.localeCompare(b));
+                      const tip = months.length
+                        ? `Theo tháng: ${months.map(([m, h]) => `${Number(m.slice(5, 7))}/${m.slice(0, 4)} = ${h}h`).join(" · ")}`
+                        : "Chưa nhập Time khách hàng tháng nào";
+                      return (
+                        <div className="flex flex-col items-center" title={tip}>
+                          <span className="text-[11px] font-bold text-ink tnum">{all > 0 ? `${hoursToDays(all)} công` : "0 công"}</span>
+                          <span className="text-[10px] text-muted tnum font-mono">({all > 0 ? `${fmtH(all)}h` : "— h"})</span>
+                        </div>
+                      );
+                    })()}
+                  </td>
+
                   {/* DOANH THU */}
                   <td className={`${TD} whitespace-nowrap text-right`}>
                     <div className="flex flex-col items-end">
@@ -753,7 +788,7 @@ export default function RevenuePage() {
                         <>
                           <span
                             className="font-extrabold text-emerald-800 text-[12px] tnum"
-                            title={`${Number(p.client_hours)}h × ${parsedGlobalJpy > 0 ? parsedGlobalJpy : groupNumber(p.unit_price)}¥ × ${currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}₫/¥ = ${formatVND(rev)}`}
+                            title={`${fmtH(billableHoursOf(p))}h × ${parsedGlobalJpy > 0 ? parsedGlobalJpy : groupNumber(p.unit_price)}¥ × ${currentVcbRate.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}₫/¥ = ${formatVND(rev)}`}
                           >
                             {formatVND(rev)}
                           </span>
@@ -788,7 +823,7 @@ export default function RevenuePage() {
 
       <p className="mt-2 text-[11px] text-muted">
         <b className="text-ink">Nhập đơn giá ¥/h</b> vào ô nhỏ bên góc phải để tính doanh thu cho toàn bộ dự án.{" "}
-        Hoặc vào trang chi tiết từng dự án để đặt đơn giá riêng. Doanh thu = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime.
+        Hoặc vào trang chi tiết từng dự án để đặt đơn giá riêng. Doanh thu = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime (đang lọc tháng thì lấy Customer của tháng đó, không lọc thì Customer (All)).
       </p>
     </AppShell>
   );

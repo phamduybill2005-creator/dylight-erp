@@ -250,6 +250,15 @@ export const api = {
     const s = q.toString();
     return request<ProjectGroupHours>(`/projects/revenue/group-hours${s ? `?${s}` : ""}`);
   },
+  // Time khách hàng THEO THÁNG của mọi dự án mình thấy: {project_id: {"YYYY-MM": giờ}}
+  // -> cột Customer (Month) / Customer (All) ở tab Doanh thu.
+  revenueClientHours: () => request<Record<string, Record<string, number>>>("/projects/revenue/client-hours"),
+  // Giám đốc nhập Time khách hàng của 1 dự án trong 1 tháng; null/0 = xoá. Trả về tổng các tháng.
+  setProjectClientHours: (projectId: number, month: string, hours: number | null) =>
+    request<{ project_id: number; month: string; hours: number | null; total_hours: number }>(
+      `/projects/${projectId}/client-hours/${month}`,
+      { method: "PUT", body: JSON.stringify({ hours }) },
+    ),
   setGlobalUnitPrice: (unitPrice: number | null) =>
     request<{ unit_price: number | null }>("/projects/revenue/global-unit-price", {
       method: "PUT",

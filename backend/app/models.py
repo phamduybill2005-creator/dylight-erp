@@ -293,6 +293,25 @@ class Project(Base):
         return self.lead.department if self.lead else None
 
 
+class ProjectClientHoursMonth(Base):
+    """TIME KHÁCH HÀNG THEO THÁNG — số giờ tính tiền với khách của MỘT dự án trong MỘT tháng
+    (tab Doanh thu: cột Customer (Month); chỉ Giám đốc nhập). Tổng các tháng được ghi ngược
+    về projects.client_hours (= Customer (All)) nên doanh thu ở bảng Dự án / Tổng quan vẫn
+    tính như cũ. Bảng mới -> create_all tự tạo; số cũ được chuyển vào tháng bắt đầu dự án
+    ở app/main.py (_backfill_client_hours_months)."""
+    __tablename__ = "project_client_hours_month"
+    __table_args__ = (UniqueConstraint("project_id", "month", name="uq_project_client_hours_month"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)          # "YYYY-MM"
+    hours: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)  # giờ khách hàng trong tháng
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now, onupdate=vn_now)
+
+    project: Mapped["Project"] = relationship("Project")
+
+
 # --------------------------------------------------------------------------
 # 5. CONTRACTS — hợp đồng thuộc dự án (đây là "Tổng giá trị HD" trên dashboard)
 # --------------------------------------------------------------------------

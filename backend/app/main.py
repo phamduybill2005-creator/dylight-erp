@@ -335,6 +335,41 @@ def _ensure_schema() -> None:
 
 _ensure_schema()
 
+
+def _backfill_client_hours_months() -> None:
+    """Time khách hàng trước đây là MỘT số cho cả dự án (projects.client_hours). Nay nhập
+    THEO THÁNG (bảng project_client_hours_month) và tổng các tháng ghi ngược về cột cũ.
+    Dự án đã có số cũ nhưng chưa có dòng tháng nào -> đưa nguyên số cũ vào THÁNG BẮT ĐẦU
+    dự án (không có ngày bắt đầu thì tháng tạo dự án) để không mất số đã nhập. Chạy lại
+    nhiều lần vô hại: dự án đã có dòng tháng thì bỏ qua."""
+    try:
+        from app.database import SessionLocal, vn_now
+        from app.models import Project, ProjectClientHoursMonth
+        db = SessionLocal()
+        try:
+            done = {pid for (pid,) in db.query(ProjectClientHoursMonth.project_id).distinct().all()}
+            legacy = db.query(Project).filter(Project.client_hours.isnot(None), Project.client_hours > 0).all()
+            added = 0
+            for p in legacy:
+                if p.id in done:
+                    continue
+                base = p.start_date or (p.created_at.date() if p.created_at else vn_now().date())
+                db.add(ProjectClientHoursMonth(
+                    company_id=p.company_id, project_id=p.id,
+                    month=base.strftime("%Y-%m"), hours=p.client_hours,
+                ))
+                added += 1
+            if added:
+                db.commit()
+                print(f"[backfill-client-hours] da chuyen Time khach hang cu cua {added} du an sang theo thang.")
+        finally:
+            db.close()
+    except Exception as _e:  # noqa: BLE001 — không để bước chuyển số làm sập app
+        print(f"[backfill-client-hours] bo qua: {_e}")
+
+
+_backfill_client_hours_months()
+
 # Tự nạp dữ liệu mẫu khi CSDL trống (tiện deploy — khỏi vào Shell chạy seed).
 # seed.run() đã tự bỏ qua nếu đã có dữ liệu; bọc try để lỗi seed không làm sập app.
 if settings.AUTO_SEED:

@@ -9,15 +9,19 @@ Nguyên tắc quyền:
   hiện tại của dự án (để chỉ huy trưởng tự điều phối đội của mình).
 """
 import json
+import re
 from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
 from app.audit import log_activity
+from app.events import publish
+from app.models import ProjectClientHoursMonth
 from app.deps import get_current_user, SENIOR_MANAGER_EMAILS
 from app.models import (
     Assignment, ChatMessage, Company, Contract, Conversation, ConversationMember, DesignDocument,
@@ -888,3 +892,97 @@ def revenue_group_hours(
         groups = out.setdefault(project_id, {})
         groups[group] = groups.get(group, 0.0) + float(hours)
     return {pid: {g: round(h, 1) for g, h in groups.items()} for pid, groups in out.items()}
+
+
+# ---------------------------------------------------------------------------
+# TIME KHÁCH HÀNG THEO THÁNG (tab Doanh thu: Customer (Month) / Customer (All))
+# ---------------------------------------------------------------------------
+_MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+def _sync_client_hours_total(db: Session, project: Project) -> Decimal:
+    """projects.client_hours = TỔNG Time khách hàng các tháng (Customer (All)). Giữ cột cũ
+    luôn đúng để doanh thu ở bảng Dự án / Tổng quan (tính từ client_hours) không lệch."""
+    total = db.query(func.coalesce(func.sum(ProjectClientHoursMonth.hours), 0)).filter(
+        ProjectClientHoursMonth.project_id == project.id,
+    ).scalar()
+    total = Decimal(str(total or 0))
+    project.client_hours = total if total > 0 else None
+    return total
+
+
+@router.get("/revenue/client-hours")
+def revenue_client_hours(
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Time khách hàng theo THÁNG của mọi dự án người xem thấy: {project_id: {"YYYY-MM": giờ}}.
+    Cột Customer (Month) đọc đúng tháng; Customer (All) cộng các tháng. Ai xem được dự án thì
+    xem được số này (như cột Time khách hàng cũ); chỉ Giám đốc mới NHẬP (endpoint PUT dưới)."""
+    projects = db.query(Project).filter(
+        Project.company_id == current.company_id,
+        func.coalesce(Project.is_deleted, False) == False,
+    ).all()
+    if not (_is_director(current) or _is_senior_manager(db, current)):
+        projects = [p for p in projects if _is_project_in_user_depts(db, p, current)]
+    visible_ids = {p.id for p in projects}
+    if not visible_ids:
+        return {}
+    rows = db.query(ProjectClientHoursMonth).filter(
+        ProjectClientHoursMonth.company_id == current.company_id,
+        ProjectClientHoursMonth.project_id.in_(visible_ids),
+    ).all()
+    out: dict[int, dict[str, float]] = {}
+    for r in rows:
+        if r.hours and r.hours > 0:
+            out.setdefault(r.project_id, {})[r.month] = float(r.hours)
+    return out
+
+
+class ClientHoursMonthIn(BaseModel):
+    # None hoặc 0 = xoá Time khách hàng của tháng đó.
+    hours: Decimal | None = Field(default=None, ge=0, le=100000)
+
+
+@router.put("/{project_id}/client-hours/{month}")
+def set_project_client_hours_month(
+    project_id: int,
+    month: str,
+    payload: ClientHoursMonthIn,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Giám đốc nhập Time khách hàng (giờ) của MỘT dự án trong MỘT tháng ("YYYY-MM").
+    Trả về giờ của tháng vừa lưu + tổng các tháng (đã ghi vào projects.client_hours)."""
+    if current.role != UserRole.DIRECTOR:
+        raise HTTPException(403, "Chỉ tài khoản Giám đốc mới có quyền nhập Time khách hàng.")
+    if not _MONTH_RE.match(month or ""):
+        raise HTTPException(400, "Tháng không hợp lệ, cần dạng YYYY-MM.")
+    p = db.get(Project, project_id)
+    if not p or p.company_id != current.company_id or p.is_deleted:
+        raise HTTPException(404, "Không tìm thấy dự án.")
+
+    rec = db.query(ProjectClientHoursMonth).filter(
+        ProjectClientHoursMonth.project_id == p.id,
+        ProjectClientHoursMonth.month == month,
+    ).first()
+    hours = payload.hours
+    if hours is None or hours <= 0:
+        if rec is not None:
+            db.delete(rec)
+        hours = None
+    else:
+        if rec is None:
+            rec = ProjectClientHoursMonth(company_id=p.company_id, project_id=p.id, month=month)
+            db.add(rec)
+        rec.hours = hours
+    db.flush()
+    total = _sync_client_hours_total(db, p)
+    db.commit()
+    publish(current.company_id, "project")
+    return {
+        "project_id": p.id,
+        "month": month,
+        "hours": float(hours) if hours is not None else None,
+        "total_hours": float(total),
+    }
