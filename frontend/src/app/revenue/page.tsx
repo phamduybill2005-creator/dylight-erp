@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   StarIcon as StarIconOutline,
   ArrowPathIcon,
@@ -84,7 +84,6 @@ function parseTimestamp(s?: string | null): number | null {
 }
 
 export default function RevenuePage() {
-  const router = useRouter();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [me, setMe] = useState<User | null>(null);
@@ -562,7 +561,7 @@ export default function RevenuePage() {
           const facts = revenueMobileFacts(project, revenue);
           const pinned = pinnedIds.includes(project.id);
           return (
-            <article key={project.id} onClick={() => router.push(`/projects/${project.id}`)} className={`cursor-pointer rounded-xl border bg-white p-3 shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
+            <article key={project.id} className={`rounded-xl border bg-white p-3 shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
               <div className="flex items-start gap-2">
                 <span className="pt-1 font-mono text-xs font-bold text-slate-400">{index + 1}</span>
                 <button type="button" onClick={(event) => { event.stopPropagation(); togglePin(project.id); }} className="flex h-11 w-9 shrink-0 items-start justify-center pt-1" aria-label={pinned ? "Bỏ ghim dự án" : "Ghim dự án"}>
@@ -570,7 +569,9 @@ export default function RevenuePage() {
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className="font-mono text-xs font-bold text-bad">{project.code}</p>
-                  <h2 className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug text-ink">{project.name}</h2>
+                  <h2 className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug text-ink">
+                    <Link href={`/projects/${project.id}`} className="hover:text-steel hover:underline">{project.name}</Link>
+                  </h2>
                 </div>
               </div>
               <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2.5">
@@ -667,14 +668,9 @@ export default function RevenuePage() {
               return (
                 <tr
                   key={p.id}
-                  className={`cursor-pointer transition-all duration-150 ${
+                  className={`transition-all duration-150 ${
                     i % 2 === 0 ? "bg-white hover:bg-emerald-50/30" : "bg-slate-50/30 hover:bg-emerald-50/30"
                   }`}
-                  onClick={(e) => {
-                    // Nếu click vào ô đang edit (input) thì không chuyển trang
-                    if ((e.target as HTMLElement).tagName === "INPUT") return;
-                    router.push(`/projects/${p.id}`);
-                  }}
                 >
                   <td className={`${TD} text-center text-[10px] text-slate-500`}>{i + 1}</td>
 
@@ -690,7 +686,13 @@ export default function RevenuePage() {
                     <div className="truncate" title={p.code}>{p.code}</div>
                   </td>
                   <td className={`${TD} font-semibold text-ink`}>
-                    <div className="truncate" title={p.name}>{p.name}</div>
+                    <Link
+                      href={`/projects/${p.id}`}
+                      className="block truncate rounded hover:text-steel hover:underline focus-visible:outline-steel"
+                      title={`${p.name} — mở chi tiết dự án`}
+                    >
+                      {p.name}
+                    </Link>
                   </td>
 
                   {/* NHÓM CỘT PHÒNG BẢN ĐỒ — chỉ xem: Vùng (JSON `evaluation` ở bảng Dự án)

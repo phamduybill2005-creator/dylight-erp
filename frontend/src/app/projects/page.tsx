@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useStickyState } from "@/lib/use-sticky-state";
 import { useRevenueCalc } from "@/lib/revenue";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PlusIcon, XMarkIcon, CheckIcon, PencilSquareIcon, TrashIcon, ArchiveBoxIcon, StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import AppShell from "@/components/app-shell";
@@ -156,7 +156,6 @@ function MobileFact({ label, value, sub, className = "" }: { label: string; valu
 }
 
 export default function ProjectsPage() {
-  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   // Bộ lọc: theo phòng ban (thành viên) / người chủ trì / dự án cụ thể.
   const [filters, setFilters] = useStickyState<Filters>("projects.filters", NO_FILTERS);
@@ -848,8 +847,8 @@ export default function ProjectsPage() {
             </span>
           );
           return (
-            <article key={project.id} onClick={() => router.push(`/projects/${project.id}`)} className={`cursor-pointer rounded-xl border bg-white p-3 shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
-              {/* Hàng đầu: STT · ghim · Mã QL / Tên / Nhóm · Trạng thái */}
+            <article key={project.id} className={`rounded-xl border bg-white p-3 shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
+              {/* Hàng đầu: STT · ghim · Mã QL / Tên (link chi tiết) / Nhóm · Trạng thái */}
               <div className="flex items-start gap-2">
                 <span className="pt-1 font-mono text-xs font-bold text-slate-400">{index + 1}</span>
                 <button type="button" onClick={(event) => { event.stopPropagation(); togglePin(project.id); }} className="flex h-11 w-9 shrink-0 items-start justify-center pt-1" aria-label={pinned ? "Bỏ ghim dự án" : "Ghim dự án"}>
@@ -857,7 +856,9 @@ export default function ProjectsPage() {
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className="font-mono text-xs font-bold text-bad">{project.code}</p>
-                  <h2 className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug text-ink">{project.name}</h2>
+                  <h2 className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug text-ink">
+                    <Link href={`/projects/${project.id}`} className="hover:text-steel hover:underline">{project.name}</Link>
+                  </h2>
                   <p className="mt-0.5 truncate text-[11px] text-muted" title={groupLabel(project.group_name)}>
                     Nhóm: <span className="font-semibold text-slate-600">{groupLabel(project.group_name) || "—"}</span>
                   </p>
@@ -1274,8 +1275,7 @@ export default function ProjectsPage() {
               return (
                 <tr
                   key={p.id}
-                  onClick={() => router.push(`/projects/${p.id}`)}
-                  className={`cursor-pointer transition-colors ${
+                  className={`transition-colors ${
                     isPinned
                       ? "bg-amber/10 hover:bg-amber/15 font-medium"
                       : "odd:bg-white even:bg-paper/40 hover:bg-amber/10"
@@ -1305,7 +1305,13 @@ export default function ProjectsPage() {
                     <div className="truncate" title={p.code}>{p.code}</div>
                   </td>
                   <td className={`${TD} font-semibold text-ink`}>
-                    <div className="truncate" title={p.name}>{p.name}</div>
+                    <Link
+                      href={`/projects/${p.id}`}
+                      className="block truncate rounded hover:text-steel hover:underline focus-visible:outline-steel"
+                      title={`${p.name} — mở chi tiết dự án`}
+                    >
+                      {p.name}
+                    </Link>
                   </td>
                   <td className={`${TD} text-muted`}>
                     <div className="truncate" title={groupLabel(p.group_name)}>
