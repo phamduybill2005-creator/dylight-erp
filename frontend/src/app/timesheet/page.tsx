@@ -3,6 +3,8 @@
 // Bảng NHÂN CÔNG theo ngày — CHẾ ĐỘ CHỈ ĐỌC.
 // Tổng hợp giá trị real-time từ phần Tiến độ của từng Dự án (bảng timesheets).
 // Tất cả tài khoản đều nhìn thấy dữ liệu nhưng không sửa/nhập được.
+// Chế độ "Cá nhân" mặc định là giờ của CHÍNH MÌNH; Quản trị hệ thống / Giám đốc
+// có thêm ô chọn nhân sự để xem tiến độ cá nhân của TỪNG người.
 // Bấm vào mã/tên dự án ở cột đầu để mở trang chi tiết dự án đó.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,7 +19,7 @@ import { api } from "@/lib/api";
 import { dateLocal, todayLocal } from "@/lib/format";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept } from "@/lib/groups";
-import { isSeniorManagerUp } from "@/lib/roles";
+import { isDirector, isSeniorManagerUp } from "@/lib/roles";
 import { summarizeTimesheetProject, timesheetCellKey } from "@/lib/mobile-view-models";
 import type { Timesheet, Project, User, Department } from "@/lib/types";
 
@@ -47,6 +49,9 @@ export default function TimesheetPage() {
   const [viewPeriod, setViewPeriod] = useStickyState<"week" | "month">("timesheet.period", "week");
   const [monthStr, setMonthStr] = useStickyState("timesheet.month", todayLocal().slice(0, 7)); // YYYY-MM
   const [viewScope, setViewScope] = useStickyState<"all" | "personal">("timesheet.scope", "all");
+  // Người đang được xem ở chế độ Cá nhân: null = chính mình. Chỉ Quản trị hệ
+  // thống / Giám đốc đổi được sang người khác (xem canPickPerson bên dưới).
+  const [viewUserId, setViewUserId] = useStickyState<number | null>("timesheet.viewUser", null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDept, setSelectedDept] = useStickyState("timesheet.dept", "");
@@ -162,10 +167,37 @@ export default function TimesheetPage() {
     return map;
   }, [allUsers]);
 
+  // Quản trị hệ thống / Giám đốc được xem tiến độ CÁ NHÂN của từng người.
+  // Vai trò khác luôn xem giờ của chính mình (bỏ qua lựa chọn đã lưu, nếu có).
+  const canPickPerson = isDirector(me?.role);
+  const viewedUserId = canPickPerson && viewUserId != null ? viewUserId : me?.id;
+  const viewedUser = useMemo<User | null>(() => {
+    if (!me) return null;
+    if (viewedUserId === me.id) return me;
+    return allUsers.find((u) => u.id === viewedUserId) ?? null;
+  }, [me, viewedUserId, allUsers]);
+  const viewingOther = !!me && viewedUserId !== me.id;
+
+  // Người đã chọn không còn trong danh sách (nghỉ việc / bị xóa) -> quay về chính mình.
+  useEffect(() => {
+    if (viewUserId != null && allUsers.length > 0 && !allUsers.some((u) => u.id === viewUserId)) {
+      setViewUserId(null);
+    }
+  }, [allUsers, viewUserId, setViewUserId]);
+
+  // Danh sách cho ô chọn nhân sự: chính mình đứng đầu, rồi tài khoản đang hoạt động theo tên A-Z.
+  const pickableUsers = useMemo<User[]>(() => {
+    if (!me) return [];
+    const others = allUsers
+      .filter((u) => u.id !== me.id && u.is_active)
+      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "vi"));
+    return [me, ...others];
+  }, [me, allUsers]);
+
   // Lọc entries theo Scope (Toàn đội / Cá nhân) & Phòng ban (chỉ tính dự án thuộc phòng ban được chọn)
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => {
-      if (viewScope === "personal" && e.user_id !== me?.id) {
+      if (viewScope === "personal" && e.user_id !== viewedUserId) {
         return false;
       }
       if (selectedDept !== "") {
@@ -175,7 +207,7 @@ export default function TimesheetPage() {
       }
       return true;
     });
-  }, [entries, viewScope, me?.id, selectedDept, projects]);
+  }, [entries, viewScope, viewedUserId, selectedDept, projects]);
 
   // Khóa ô dùng CHUNG với thẻ điện thoại (summarizeTimesheetProject) — không tự định nghĩa riêng.
   const key = timesheetCellKey;
@@ -193,9 +225,9 @@ export default function TimesheetPage() {
   // Tổng giờ cá nhân & tổng giờ toàn đội/phòng ban trong khoảng thời gian đang chọn
   const personalTotal = useMemo(() => {
     return entries
-      .filter((e) => e.user_id === me?.id && days.includes(e.work_date))
+      .filter((e) => e.user_id === viewedUserId && days.includes(e.work_date))
       .reduce((s, e) => s + Number(e.hours), 0);
-  }, [entries, me?.id, days]);
+  }, [entries, viewedUserId, days]);
 
   const teamTotal = useMemo(() => {
     return filteredEntries
@@ -253,6 +285,15 @@ export default function TimesheetPage() {
   const dayTotal = (d: string) => rowProjects.reduce((s, p) => s + (cellHours.get(key(p.id, d)) ?? 0), 0);
   const grandTotal = days.reduce((s, d) => s + dayTotal(d), 0);
 
+  // Dòng báo trống: đang xem cá nhân NGƯỜI KHÁC thì nêu rõ tên để khỏi nhầm với giờ của mình.
+  const periodLabel = viewPeriod === "week" ? "tuần" : "tháng";
+  const emptyText =
+    hiddenEmptyCount > 0
+      ? viewScope === "personal" && viewingOther
+        ? `${viewedUser?.full_name ?? "Nhân sự này"} chưa nhập giờ dự án nào trong ${periodLabel} này.`
+        : `Chưa có dự án nào được nhập giờ trong ${periodLabel} này.`
+      : "Chưa có dự án nào.";
+
   if (loading || !me) {
     return (
       <AppShell><div className="flex min-h-[70vh] items-center justify-center">
@@ -280,7 +321,7 @@ export default function TimesheetPage() {
             </div>
           )}
           <div className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-slate-200">
-            <span>Cá nhân: </span>
+            <span>{viewingOther ? (viewedUser?.full_name ?? "Nhân sự") : "Cá nhân"}: </span>
             <b className="text-emerald-400">{num1(personalTotal)}h</b> ({num1(personalTotal / 8)} công)
           </div>
         </div>
@@ -311,9 +352,33 @@ export default function TimesheetPage() {
               }`}
             >
               <UserIcon className="h-3.5 w-3.5" />
-              Cá nhân ({me.full_name?.split(" ").pop() ?? "Tôi"})
+              Cá nhân ({(viewedUser ?? me).full_name?.split(" ").pop() ?? "Tôi"})
             </button>
           </div>
+
+          {/* Ô chọn nhân sự — CHỈ Quản trị hệ thống / Giám đốc, và chỉ khi đang xem Cá nhân:
+              xem tiến độ cá nhân của từng người thay vì chỉ của chính mình. */}
+          {canPickPerson && viewScope === "personal" && (
+            <div className={`flex items-center gap-1.5 rounded-lg border border-line bg-slate-100/70 px-2.5 py-1 text-xs mr-2 ${viewPeriod === "month" ? "w-full sm:w-auto" : ""}`}>
+              <UserIcon className="h-4 w-4 text-steel shrink-0" />
+              <span className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">Nhân sự:</span>
+              <select
+                value={viewedUserId ?? me.id}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  setViewUserId(id && id !== me.id ? id : null);
+                }}
+                title="Chọn nhân sự để xem tiến độ cá nhân của người đó"
+                className="min-w-0 max-w-[240px] flex-1 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-ink outline-none focus:border-steel cursor-pointer transition-all hover:border-slate-400 sm:flex-none"
+              >
+                {pickableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.id === me.id ? `${u.full_name} (tôi)` : u.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Bộ lọc chọn Phòng ban (CHỈ HIỆN với Giám đốc, Quản trị & Quản lý cấp cao xem từng phòng) */}
           {isSeniorManagerUp(me) && (
@@ -434,9 +499,7 @@ export default function TimesheetPage() {
       <section className="mt-3 space-y-2 lg:hidden" aria-label="Tiến độ dự án trên điện thoại">
         {rowProjects.length === 0 ? (
           <p className="rounded-xl2 border border-line bg-white px-4 py-8 text-center text-sm text-muted shadow-card">
-            {hiddenEmptyCount > 0
-              ? `Chưa có dự án nào được nhập giờ trong ${viewPeriod === "week" ? "tuần" : "tháng"} này.`
-              : "Chưa có dự án nào."}
+            {emptyText}
           </p>
         ) : rowProjects.map((project, index) => {
           const summary = summarizeTimesheetProject(project.id, days, cellHours);
@@ -549,9 +612,7 @@ export default function TimesheetPage() {
                 {rowProjects.length === 0 ? (
                   <tr>
                     <td colSpan={days.length + 3} className="border border-line px-2 py-5 text-center text-muted">
-                      {hiddenEmptyCount > 0
-                        ? `Chưa có dự án nào được nhập giờ trong ${viewPeriod === "week" ? "tuần" : "tháng"} này.`
-                        : "Chưa có dự án nào."}
+                      {emptyText}
                     </td>
                   </tr>
                 ) : (
