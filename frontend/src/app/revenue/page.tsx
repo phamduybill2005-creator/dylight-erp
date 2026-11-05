@@ -640,14 +640,14 @@ export default function RevenuePage() {
               <th className={`${TH} text-center`} title={`Thời gian làm thực tế người làm đã nhập trong tháng ${monthLabel}`}>
                 Time <span className="block text-[9px] font-normal normal-case text-slate-500">({monthLabel})</span>
               </th>
-              <th className={`${TH} text-center`} title={`Time khách hàng (công) của tháng ${monthLabel} — chỉ Giám đốc nhập`}>
+              <th className={`${TH} text-center`} title={`Time khách hàng (giờ) của tháng ${monthLabel} — chỉ Giám đốc nhập`}>
                 <span className="block whitespace-nowrap normal-case">TIME KHÁCH HÀNG</span>
                 <span className="block text-[9px] font-normal normal-case text-slate-500">({monthLabel})</span>
               </th>
               <th className={`${TH} text-center`} title="Tổng thời gian làm thực tế của dự án qua mọi tháng">
                 Time <span className="block text-[9px] font-normal normal-case text-slate-500">(All)</span>
               </th>
-              <th className={`${TH} text-center`} title="Tổng Time khách hàng (công) của dự án qua mọi tháng">
+              <th className={`${TH} text-center`} title="Tổng Time khách hàng (giờ) của dự án qua mọi tháng">
                 <span className="block whitespace-nowrap normal-case">TIME KHÁCH HÀNG</span>
                 <span className="block text-[9px] font-normal normal-case text-slate-500">(All)</span>
               </th>
@@ -784,8 +784,7 @@ export default function RevenuePage() {
                       const mHours = Math.round((monthHoursByProject[p.id] || 0) * 10) / 10;
                       return (
                         <div className="flex flex-col items-center" title={`Giờ làm thực tế nhập trong tháng ${monthLabel}: ${mHours}h`}>
-                          <span className={`text-[11px] font-bold tnum ${mHours > 0 ? "text-emerald-700" : "text-ink"}`}>{mHours > 0 ? `${hoursToDays(mHours)} ngày` : "0 ngày"}</span>
-                          <span className={`text-[10px] font-mono tnum ${mHours > 0 ? "text-emerald-600" : "text-muted"}`}>({mHours > 0 ? `${mHours}h` : "— h"})</span>
+                          <span className={`text-[11px] font-bold tnum ${mHours > 0 ? "text-emerald-700" : "text-ink"}`}>{fmtH(mHours)}h</span>
                         </div>
                       );
                     })()}
@@ -798,15 +797,14 @@ export default function RevenuePage() {
                       const h = parseHours(shown) ?? 0;
                       return (
                         <div className="flex flex-col items-center">
-                          <span className="text-[11px] font-bold text-ink tnum">{h > 0 ? `${hoursToDays(h)} công` : "0 công"}</span>
                           {isDirectorUser ? (
-                            <span className="flex items-center justify-center text-[10px] text-muted">(
-                              <span className="w-14">{clientMonthInput(p, viewMonth, { align: "text-center", title: `Nhập SỐ GIỜ khách hàng tháng ${monthLabel} (8 giờ = 1 công)` })}</span>
-                              h)
+                            <span className="flex items-center justify-center text-[11px] font-bold text-ink tnum">
+                              <span className="w-14">{clientMonthInput(p, viewMonth, { align: "text-center", title: `Nhập số giờ khách hàng tháng ${monthLabel}` })}</span>
+                              h
                             </span>
                           ) : (
-                            <span className="text-[10px] text-muted tnum font-mono" title="Chỉ tài khoản Giám đốc mới có quyền nhập Time khách hàng">
-                              ({h > 0 ? `${h}h` : "— h"})
+                            <span className="text-[11px] font-bold text-ink tnum" title="Chỉ tài khoản Giám đốc mới có quyền nhập Time khách hàng">
+                              {fmtH(h)}h
                             </span>
                           )}
                         </div>
@@ -816,9 +814,8 @@ export default function RevenuePage() {
 
                   {/* TIME (ALL) — tổng giờ realtime của dự án qua mọi tháng */}
                   <td className={`${TD} whitespace-nowrap text-center`}>
-                    <div className="flex flex-col items-center" title={`Tổng thời gian thực tế: ${p.total_hours || 0}h (${p.total_days || 0} ngày)`}>
-                      <span className="text-[11px] font-bold text-ink tnum">{Number(p.total_hours || 0) > 0 ? `${hoursToDays(Number(p.total_hours))} ngày` : "0 ngày"}</span>
-                      <span className="text-[10px] text-muted tnum font-mono">({p.total_hours && p.total_hours > 0 ? `${p.total_hours}h` : "— h"})</span>
+                    <div className="flex flex-col items-center" title={`Tổng thời gian thực tế: ${fmtH(Number(p.total_hours || 0))}h`}>
+                      <span className="text-[11px] font-bold text-ink tnum">{fmtH(Number(p.total_hours || 0))}h</span>
                     </div>
                   </td>
 
@@ -832,8 +829,7 @@ export default function RevenuePage() {
                         : "Chưa nhập Time khách hàng tháng nào";
                       return (
                         <div className="flex flex-col items-center" title={tip}>
-                          <span className="text-[11px] font-bold text-ink tnum">{all > 0 ? `${hoursToDays(all)} công` : "0 công"}</span>
-                          <span className="text-[10px] text-muted tnum font-mono">({all > 0 ? `${fmtH(all)}h` : "— h"})</span>
+                          <span className="text-[11px] font-bold text-ink tnum">{fmtH(all)}h</span>
                         </div>
                       );
                     })()}
