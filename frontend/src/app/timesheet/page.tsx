@@ -58,8 +58,6 @@ export default function TimesheetPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDept, setSelectedDept] = useStickyState("timesheet.dept", "");
-  // Mặc định ẨN dự án chưa nhập giờ trong kỳ đang xem (bật "Hiện tất cả" để xem cả).
-  const [showEmpty, setShowEmpty] = useStickyState("timesheet.showEmpty", false);
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -255,29 +253,17 @@ export default function TimesheetPage() {
     () => (selectedDept !== "" ? projects.filter((p) => getProjectDept(p) === selectedDept) : projects),
     [projects, selectedDept],
   );
-  // Số dự án đang bị ẩn vì chưa nhập giờ trong kỳ.
-  const hiddenEmptyCount = useMemo(
-    () => deptProjects.filter((p) => !projectsWithHours.has(p.id)).length,
-    [deptProjects, projectsWithHours],
-  );
-
   // Hàng = dự án. Khi chọn Phòng ban, chỉ hiển thị đúng các dự án thuộc phòng ban đó.
-  // Mặc định CHỈ hiện dự án đã nhập giờ trong kỳ — nhập giờ ở Tiến độ dự án là tự hiện lại;
-  // bật "Hiện tất cả" mới thấy cả dự án trống.
-  // Thứ tự sắp xếp: 1. Dự án GHIM (Pinned) -> 2. Dự án có giờ -> 3. Tên A-Z.
+  // CHỈ hiện dự án đã nhập giờ trong kỳ — nhập giờ ở Tiến độ dự án là tự hiện lên.
+  // Thứ tự sắp xếp: 1. Dự án GHIM (Pinned) -> 2. Ngày bắt đầu -> 3. Tên A-Z.
   const rowProjects = useMemo(() => {
-    const list = showEmpty ? deptProjects : deptProjects.filter((p) => projectsWithHours.has(p.id));
-    const has = projectsWithHours;
+    const list = deptProjects.filter((p) => projectsWithHours.has(p.id));
     const pinnedSet = new Set(pinnedIds);
 
     return [...list].sort((a, b) => {
       const aPin = pinnedSet.has(a.id) ? 1 : 0;
       const bPin = pinnedSet.has(b.id) ? 1 : 0;
       if (aPin !== bPin) return bPin - aPin;
-
-      const aHas = has.has(a.id) ? 1 : 0;
-      const bHas = has.has(b.id) ? 1 : 0;
-      if (aHas !== bHas) return bHas - aHas;
 
       const da = a.start_date ? a.start_date.trim() : "";
       const db = b.start_date ? b.start_date.trim() : "";
@@ -287,7 +273,7 @@ export default function TimesheetPage() {
 
       return a.name.localeCompare(b.name, "vi");
     });
-  }, [deptProjects, projectsWithHours, pinnedIds, showEmpty]);
+  }, [deptProjects, projectsWithHours, pinnedIds]);
 
   const projTotal = (pid: number) => days.reduce((s, d) => s + (cellHours.get(key(pid, d)) ?? 0), 0);
   const dayTotal = (d: string) => rowProjects.reduce((s, p) => s + (cellHours.get(key(p.id, d)) ?? 0), 0);
@@ -296,11 +282,9 @@ export default function TimesheetPage() {
   // Dòng báo trống: đang xem cá nhân NGƯỜI KHÁC thì nêu rõ tên để khỏi nhầm với giờ của mình.
   const periodLabel = viewPeriod === "week" ? "tuần" : "tháng";
   const emptyText =
-    hiddenEmptyCount > 0
-      ? viewScope === "personal" && viewingOther
-        ? `${viewedUser?.full_name ?? "Nhân sự này"} chưa nhập giờ dự án nào trong ${periodLabel} này.`
-        : `Chưa có dự án nào được nhập giờ trong ${periodLabel} này.`
-      : "Chưa có dự án nào.";
+    viewScope === "personal" && viewingOther
+      ? `${viewedUser?.full_name ?? "Nhân sự này"} chưa nhập giờ dự án nào trong ${periodLabel} này.`
+      : `Chưa có dự án nào được nhập giờ trong ${periodLabel} này.`;
 
   if (loading || !me) {
     return (
@@ -490,24 +474,6 @@ export default function TimesheetPage() {
           )}
         </div>
       </div>
-
-      {/* Dự án chưa nhập giờ trong kỳ được ẩn cho gọn; báo số lượng + nút xem cả */}
-      {(hiddenEmptyCount > 0 || showEmpty) && (
-        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
-          {showEmpty ? (
-            <span>Đang hiện cả <b className="text-ink">{hiddenEmptyCount}</b> dự án chưa nhập giờ trong {viewPeriod === "week" ? "tuần" : "tháng"} này.</span>
-          ) : (
-            <span>Đang ẩn <b className="text-ink">{hiddenEmptyCount}</b> dự án chưa nhập giờ trong {viewPeriod === "week" ? "tuần" : "tháng"} này — nhập giờ ở Tiến độ dự án là tự hiện lại.</span>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowEmpty(!showEmpty)}
-            className="rounded-full border border-line bg-white px-2.5 py-0.5 font-semibold text-steel hover:bg-paper"
-          >
-            {showEmpty ? "Chỉ hiện dự án có giờ" : "Hiện tất cả"}
-          </button>
-        </p>
-      )}
 
       {/* Điện thoại: ưu tiên tổng giờ/công, chạm để xem chi tiết từng ngày. */}
       <section className="mt-3 space-y-2 lg:hidden" aria-label="Tiến độ dự án trên điện thoại">
