@@ -6,7 +6,7 @@ Router Chấm công (Attendance).
 - Máy chấm công gọi /attendance/punch (xác thực bằng X-API-Key, KHÔNG dùng JWT).
 """
 import hmac
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
@@ -61,6 +61,7 @@ def _today_record(db: Session, user: User) -> Attendance | None:
     return (
         db.query(Attendance)
         .filter(Attendance.user_id == user.id, Attendance.work_date == date.today())
+        .with_for_update()
         .first()
     )
 
@@ -75,7 +76,7 @@ def check_in(db: Session = Depends(get_db), current: User = Depends(get_current_
             check_in=vn_now(), source=AttendanceSource.MANUAL,
         )
         db.add(rec)
-    elif rec.check_in is None:
+    elif rec.check_in is None and not rec.check_in_corrected:
         rec.check_in = vn_now()
     db.commit()
     db.refresh(rec)
@@ -96,6 +97,8 @@ def check_out(db: Session = Depends(get_db), current: User = Depends(get_current
         now = vn_now()
         # Chỉ CHẶN khi giờ ra SỚM HƠN giờ vào (bấm nhầm / lệch đồng hồ) làm giờ công về 0.
         # Cho phép bằng nhau (vào-ra cùng giây) — tránh chặn oan.
+        if rec.check_out_corrected:
+            return rec
         if rec.check_in is None or now >= rec.check_in:
             rec.check_out = now
         else:
@@ -204,13 +207,41 @@ def update_attendance(
     db: Session = Depends(get_db),
     current: User = Depends(require_roles(UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)),
 ):
-    """Sửa mác đi trễ & ghi chú lý do của 1 bản ghi chấm công (CHỈ Quản trị hệ thống, Giám đốc, Quản lý cấp cao)."""
+    """Cấp cao sửa mác trễ/ghi chú; chỉ ADMIN được sửa giờ vào/ra."""
     if not _is_senior_manager_up(current):
         raise HTTPException(403, "Chỉ Quản trị hệ thống, Giám đốc và Quản lý cấp cao mới được chỉnh sửa mác đi trễ và ghi chú lý do.")
 
-    rec = db.get(Attendance, attendance_id)
+    rec = db.query(Attendance).filter(Attendance.id == attendance_id).with_for_update().first()
     if not rec or rec.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy bản ghi chấm công.")
+
+    time_fields = payload.model_fields_set & {"check_in", "check_out"}
+    changes = []
+    if time_fields:
+        if current.role != UserRole.ADMIN:
+            raise HTTPException(403, "Chỉ Quản trị hệ thống được sửa giờ vào/ra.")
+        if rec.check_in is None and rec.check_out is None:
+            raise HTTPException(400, "Chỉ sửa ngày đã có ít nhất một mốc giờ.")
+        times = {"check_in": rec.check_in, "check_out": rec.check_out}
+        for field in time_fields:
+            value = getattr(payload, field)
+            if value is not None:
+                if value.tzinfo is not None:
+                    value = value.astimezone(timezone(timedelta(hours=7))).replace(tzinfo=None)
+                if value.date() != rec.work_date:
+                    raise HTTPException(400, "Giờ vào/ra phải thuộc ngày chấm công.")
+            times[field] = value
+        if not any(times.values()):
+            raise HTTPException(400, "Phải giữ ít nhất một mốc giờ.")
+        if times["check_in"] and times["check_out"] and times["check_out"] < times["check_in"]:
+            raise HTTPException(400, "Giờ ra không được sớm hơn giờ vào.")
+        for field in sorted(time_fields):
+            before, after = getattr(rec, field), times[field]
+            if before != after:
+                label = "Giờ vào" if field == "check_in" else "Giờ ra"
+                changes.append(f"{label}: {before.strftime('%H:%M') if before else '—'} → {after.strftime('%H:%M') if after else '—'}")
+                setattr(rec, field, after)
+                setattr(rec, f"{field}_corrected", True)
 
     was_late = rec.is_late          # trạng thái đang hiển thị (tự tính hoặc đã đè)
     if payload.is_late_override is not None:
@@ -219,6 +250,10 @@ def update_attendance(
         rec.note = payload.note
     db.commit()
     db.refresh(rec)
+    if changes:
+        log_activity(db, current, "attendance.time_edit", "attendance", rec.id,
+                     f"{rec.user_name or f'#{rec.user_id}'} · {date_vi(rec.work_date)}: " + "; ".join(changes))
+        db.refresh(rec)
     # Đổi mác đi muộn làm đổi thẳng cột "Đi muộn" ở Tổng hợp & Đánh giá -> ghi lại.
     # Chỉ sửa ghi chú thì không ghi.
     if rec.is_late != was_late:
@@ -229,6 +264,7 @@ def update_attendance(
                      f"{before} → {after}")
         db.refresh(rec)
     publish(current.company_id, "attendance")
+    _apply_late_exemption(db, current.company_id, [rec])
     return rec
 
 
@@ -317,18 +353,19 @@ def import_attendance(
         rec = (
             db.query(Attendance)
             .filter(Attendance.user_id == uid, Attendance.work_date == d)
+            .with_for_update()
             .first()
         )
         if rec is None:
             rec = Attendance(company_id=cid, user_id=uid, work_date=d, source=AttendanceSource.MACHINE)
             db.add(rec)
-        if rec.check_in is None or tmin < rec.check_in:
+        if not rec.check_in_corrected and (rec.check_in is None or tmin < rec.check_in) and (not rec.check_out_corrected or rec.check_out is None or tmin <= rec.check_out):
             rec.check_in = tmin
-        if tmax > tmin and (rec.check_out is None or tmax > rec.check_out):
+        if not rec.check_out_corrected and tmax > tmin and (rec.check_out is None or tmax > rec.check_out) and (rec.check_in is None or tmax >= rec.check_in):
             rec.check_out = tmax
         rec.source = AttendanceSource.MACHINE
         days += 1
-        if rec.check_out is None or rec.check_out <= rec.check_in:
+        if rec.check_out is None or rec.check_in is None or rec.check_out <= rec.check_in:
             days_no_checkout += 1
 
     db.commit()
@@ -419,6 +456,7 @@ def machine_punch(
     rec = (
         db.query(Attendance)
         .filter(Attendance.user_id == user.id, Attendance.work_date == ts.date())
+        .with_for_update()
         .first()
     )
     if rec is None:
@@ -431,10 +469,11 @@ def machine_punch(
     if payload.device_id:
         rec.device_id = payload.device_id
     if payload.direction == PaymentDirection.IN:
-        if rec.check_in is None:
+        if rec.check_in is None and not rec.check_in_corrected and (rec.check_out is None or ts <= rec.check_out):
             rec.check_in = ts
     else:
-        rec.check_out = ts
+        if not rec.check_out_corrected and (rec.check_in is None or ts >= rec.check_in):
+            rec.check_out = ts
     db.commit()
     db.refresh(rec)
     return rec

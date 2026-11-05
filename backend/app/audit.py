@@ -54,6 +54,7 @@ ACTION_LABELS: dict[str, str] = {
     "timesheet.delete_other": "Xóa giờ công của người khác",
     "timesheet.clear_other": "Xóa sạch giờ công của người khác",
     "attendance.late_override": "Sửa mác đi muộn",
+    "attendance.time_edit": "Sửa giờ vào/ra chấm công",
 }
 
 ENTITY_LABELS: dict[str, str] = {

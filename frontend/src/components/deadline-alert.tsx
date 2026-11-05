@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ExclamationTriangleIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import { roleTier } from "@/lib/roles";
@@ -15,6 +16,7 @@ import { projectsDueToday, type DeadlineAlertEntry } from "@/lib/deadline-alert"
 import { todayLocal } from "@/lib/format";
 import { desktopPermission, showDesktopNotification, dispatchDesktopClick, DESKTOP_CLICK_EVENT, type DesktopClick, type DesktopPermission } from "@/lib/desktop-notifications";
 import type { User } from "@/lib/types";
+import DeadlineProjectLink from "./deadline-project-link";
 
 // Mốc THỜI ĐIỂM (epoch ms) lần nhắc gần nhất — để giới hạn tối đa 15 phút/lần.
 const SHOWN_KEY = "deadlineAlertLastMs";
@@ -61,6 +63,7 @@ function playAlertSound(): void {
 }
 
 export default function DeadlineAlert({ user }: { user: User | null }) {
+  const router = useRouter();
   const [near, setNear] = useState<DeadlineAlertEntry[]>([]);
   const [open, setOpen] = useState(false);
   const [canNotify, setCanNotify] = useState<DesktopPermission>("unsupported");
@@ -84,7 +87,7 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
     showDesktopNotification("🔔 NHẮC HẠN NỘP HÔM NAY", {
       body:
         `${list.length} dự án đến hạn nộp hôm nay.\n` +
-        `${first.p.name} — hạn ${first.due}`,
+        `[${first.p.code}] ${first.p.name} — hạn ${first.due}`,
       tag: "dosco-deadline",
       requireInteraction: true,
     }, () => dispatchDesktopClick({ kind: "deadline", entries: list }));
@@ -97,12 +100,17 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
       if (detail?.kind !== "deadline") return;
       const list = projectsDueToday(detail.entries.map((entry) => entry.p), todayLocal());
       if (!list.length) return;
+      if (list.length === 1) {
+        setOpen(false);
+        router.push(`/projects/${list[0].p.id}`);
+        return;
+      }
       setNear(list);
       setOpen(true);
     };
     window.addEventListener(DESKTOP_CLICK_EVENT, onDesktopClick);
     return () => window.removeEventListener(DESKTOP_CLICK_EVENT, onDesktopClick);
-  }, [user]);
+  }, [user, router]);
 
   /** Kêu + báo desktop ngay lập tức (dùng cho lần đầu và mỗi lần nhắc lại). */
   const alertNow = useCallback(
@@ -180,19 +188,7 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
 
         <div className="max-h-[50vh] space-y-2 overflow-y-auto p-4">
           {near.map(({ p, due }) => (
-            <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl2 border border-line p-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                <p className="text-[11px] text-muted">
-                  Hạn nộp: <b className="text-ink">{due}</b>
-                  {p.internal_deadline && due === p.internal_deadline.slice(0, 10) ? " (hạn nội bộ)" : ""}
-                  {" · Quản lý: "}{p.manager_name || "—"}
-                </p>
-              </div>
-              <span className="shrink-0 rounded-full bg-amber/20 px-2.5 py-1 text-xs font-bold text-amber-deep">
-                Hôm nay!
-              </span>
-            </div>
+            <DeadlineProjectLink key={p.id} project={p} due={due} onOpen={dismiss} />
           ))}
         </div>
 
@@ -214,7 +210,7 @@ export default function DeadlineAlert({ user }: { user: User | null }) {
             <SpeakerWaveIcon className="h-4 w-4" /> Kêu thử
           </button>
           <Link
-            href="/projects"
+            href={`/projects/${near[0].p.id}`}
             onClick={dismiss}
             className="flex-1 rounded-xl2 bg-ink py-2.5 text-center text-xs font-semibold text-white hover:bg-steel"
           >

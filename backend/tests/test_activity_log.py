@@ -8,6 +8,7 @@ Chạy từ thư mục backend: python -m unittest tests.test_activity_log -v
 import os
 import unittest
 from datetime import date, datetime
+from unittest.mock import patch
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["DEBUG"] = "true"
@@ -22,6 +23,7 @@ from app.database import Base, get_db
 from app.deps import get_current_user
 from app.models import (
     ActivityLog, Attendance, Company, Project, ProjectItem, Timesheet, User, UserRole,
+    LeaveRequest, LeaveStatus,
 )
 from app.routers import archive, attendance, audit, auth, project_items, projects, timesheets
 
@@ -227,6 +229,129 @@ class ActivityLogTests(unittest.TestCase):
         self.assertEqual(log.detail, "N.V.HOA · 14/09/2026: tính đi muộn → không tính đi muộn")
 
     # --------- Trang nhật ký: nhãn tiếng Việt ---------
+
+    def test_admin_can_correct_time_and_reload_summary(self):
+        with self.sessions() as db:
+            admin = db.get(User, self.director.id)
+            admin.role = UserRole.ADMIN
+            db.commit()
+        self.current = self.director
+        resp = self.client.put(f"/attendance/{self.att_id}", json={
+            "check_in": "2026-09-14T08:00:00+07:00",
+            "check_out": "2026-09-14T17:00:00+07:00",
+        })
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(resp.json()["worked_minutes"], 435)
+        rows = self.client.get("/attendance", params={"user_id": self.staff.id}).json()
+        self.assertEqual(rows[0]["check_out"], "2026-09-14T17:00:00")
+        summary = self.client.get("/attendance/summary?period=2026-09").json()
+        self.assertEqual(summary[0]["total_hours"], 7.25)
+        self.assertEqual(len(self._logs("attendance.time_edit")), 1)
+
+    def test_non_admin_cannot_send_time_fields_even_null(self):
+        for role in (UserRole.DIRECTOR, UserRole.MANAGER, UserRole.FIELD_STAFF):
+            with self.sessions() as db:
+                db.get(User, self.director.id).role = role
+                db.commit()
+            for value in (None, "2026-09-14T17:00:00"):
+                resp = self.client.put(f"/attendance/{self.att_id}", json={"check_out": value})
+                self.assertEqual(resp.status_code, 403, resp.text)
+
+    def test_admin_time_validation_and_partial_update(self):
+        with self.sessions() as db:
+            db.get(User, self.director.id).role = UserRole.ADMIN
+            db.commit()
+        for payload in (
+            {"check_out": "2026-09-14T09:00:00"},
+            {"check_out": "2026-09-15T17:00:00"},
+            {"check_in": None, "check_out": None},
+        ):
+            resp = self.client.put(f"/attendance/{self.att_id}", json=payload)
+            self.assertEqual(resp.status_code, 400, resp.text)
+        resp = self.client.put(f"/attendance/{self.att_id}", json={"check_out": "2026-09-14T17:00:00"})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(resp.json()["check_in"], "2026-09-14T10:30:00")
+
+    def test_admin_cannot_edit_another_company_or_empty_record(self):
+        with self.sessions() as db:
+            admin = db.get(User, self.director.id)
+            admin.role = UserRole.ADMIN
+            rec = db.get(Attendance, self.att_id)
+            rec.check_in = None
+            db.commit()
+        resp = self.client.put(f"/attendance/{self.att_id}", json={"check_in": "2026-09-14T08:00:00"})
+        self.assertEqual(resp.status_code, 400)
+        with self.sessions() as db:
+            other = Company(name="Other", code="OTHER")
+            db.add(other)
+            db.flush()
+            db.get(Attendance, self.att_id).company_id = other.id
+            db.commit()
+        resp = self.client.put(f"/attendance/{self.att_id}", json={"check_out": None})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_corrected_times_survive_machine_csv_import(self):
+        with self.sessions() as db:
+            db.get(User, self.director.id).role = UserRole.ADMIN
+            db.commit()
+        resp = self.client.put(f"/attendance/{self.att_id}", json={
+            "check_in": "2026-09-14T11:00:00", "check_out": "2026-09-14T17:00:00",
+        })
+        self.assertEqual(resp.status_code, 200)
+        resp = self.client.post("/attendance/import", json={"punches": [
+            {"employee_ref": str(self.staff.id), "timestamp": "2026-09-14T07:00:00"},
+            {"employee_ref": str(self.staff.id), "timestamp": "2026-09-14T20:00:00"},
+        ]})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        rows = self.client.get("/attendance", params={"user_id": self.staff.id}).json()
+        self.assertEqual(rows[0]["check_in"], "2026-09-14T11:00:00")
+        self.assertEqual(rows[0]["check_out"], "2026-09-14T17:00:00")
+
+    def test_partial_machine_batch_cannot_invert_corrected_time_range(self):
+        with self.sessions() as db:
+            db.get(User, self.director.id).role = UserRole.ADMIN
+            db.commit()
+        resp = self.client.put(f"/attendance/{self.att_id}", json={"check_in": "2026-09-14T19:00:00"})
+        self.assertEqual(resp.status_code, 200)
+        resp = self.client.post("/attendance/import", json={"punches": [
+            {"employee_ref": str(self.staff.id), "timestamp": "2026-09-14T07:00:00"},
+            {"employee_ref": str(self.staff.id), "timestamp": "2026-09-14T17:00:00"},
+        ]})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        rows = self.client.get("/attendance", params={"user_id": self.staff.id}).json()
+        self.assertIsNone(rows[0]["check_out"])
+
+    def test_yunatt_preserves_corrected_checkout_while_updating_unmodified_checkin(self):
+        with self.sessions() as db:
+            db.get(User, self.director.id).role = UserRole.ADMIN
+            db.commit()
+        resp = self.client.put(f"/attendance/{self.att_id}", json={"check_out": "2026-09-14T17:00:00"})
+        self.assertEqual(resp.status_code, 200)
+        from app.services import yunatt_service
+        punches = [{"staff_number": "1", "staff_name": "N.V.HOA", "timestamp": t} for t in (
+            datetime(2026, 9, 14, 8), datetime(2026, 9, 14, 20),
+        )]
+        with self.sessions() as db:
+            staff = db.get(User, self.staff.id)
+            with patch.object(yunatt_service, "fetch_months", return_value=([], punches)), \
+                 patch.object(yunatt_service, "_resolve", return_value=staff):
+                yunatt_service.run_sync(db, self.company_id, ["2026-09"])
+        rows = self.client.get("/attendance", params={"user_id": self.staff.id}).json()
+        self.assertEqual(rows[0]["check_in"], "2026-09-14T08:00:00")
+        self.assertEqual(rows[0]["check_out"], "2026-09-14T17:00:00")
+
+    def test_time_edit_response_respects_approved_late_leave(self):
+        with self.sessions() as db:
+            db.get(User, self.director.id).role = UserRole.ADMIN
+            db.add(LeaveRequest(company_id=self.company_id, user_id=self.staff.id,
+                                from_date=date(2026, 9, 14), to_date=date(2026, 9, 14),
+                                leave_type="LATE_MORNING", status=LeaveStatus.APPROVED))
+            db.commit()
+        resp = self.client.put(f"/attendance/{self.att_id}", json={"check_out": "2026-09-14T17:00:00"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["is_late"])
+        with self.sessions() as db:
+            self.assertIsNone(db.get(Attendance, self.att_id).is_late_override)
 
     def test_audit_api_returns_vietnamese_labels_for_new_and_old_codes(self):
         with self.sessions() as db:

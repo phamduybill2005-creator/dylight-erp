@@ -102,14 +102,15 @@ async def cdata_upload(request: Request, db: Session = Depends(get_db)):
         rec = (
             db.query(Attendance)
             .filter(Attendance.user_id == uid, Attendance.work_date == d)
+            .with_for_update()
             .first()
         )
         if rec is None:
             rec = Attendance(company_id=cid, user_id=uid, work_date=d, source=AttendanceSource.MACHINE, device_id=sn)
             db.add(rec)
-        if rec.check_in is None or tmin < rec.check_in:
+        if not rec.check_in_corrected and (rec.check_in is None or tmin < rec.check_in) and (not rec.check_out_corrected or rec.check_out is None or tmin <= rec.check_out):
             rec.check_in = tmin
-        if tmax > tmin and (rec.check_out is None or tmax > rec.check_out):
+        if not rec.check_out_corrected and tmax > tmin and (rec.check_out is None or tmax > rec.check_out) and (rec.check_in is None or tmax >= rec.check_in):
             rec.check_out = tmax
         rec.source = AttendanceSource.MACHINE
         rec.device_id = sn

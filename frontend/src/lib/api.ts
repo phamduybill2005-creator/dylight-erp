@@ -371,7 +371,7 @@ export const api = {
     const s = qs.toString();
     return request<Attendance[]>(`/attendance${s ? `?${s}` : ""}`);
   },
-  updateAttendance: (id: number, data: { is_late_override?: boolean | null; note?: string | null }) =>
+  updateAttendance: (id: number, data: { check_in?: string | null; check_out?: string | null; is_late_override?: boolean | null; note?: string | null }) =>
     request<Attendance>(`/attendance/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   attendanceSummary: (period?: string) =>
     request<AttendanceSummary[]>(`/attendance/summary${period ? `?period=${period}` : ""}`),

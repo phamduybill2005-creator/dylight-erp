@@ -466,6 +466,8 @@ class AttendanceOut(BaseModel):
 
 
 class AttendanceUpdate(BaseModel):
+    check_in: datetime | None = None
+    check_out: datetime | None = None
     is_late_override: bool | None = None
     note: str | None = None
 

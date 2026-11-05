@@ -18,6 +18,7 @@ import {
 } from "@heroicons/react/24/outline";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
+import AttendanceTimeEditor from "@/components/attendance-time-editor";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { roleTier, isSeniorManagerUp } from "@/lib/roles";
@@ -665,6 +666,15 @@ export default function AttendancePage() {
                                 <span className="text-ink">{fmtTime(r.check_in)} - {fmtTime(r.check_out)}</span>
                                 <span className="font-bold text-steel">{fmtHours(r.worked_minutes)}</span>
                               </div>
+                              {user.role === "ADMIN" && (r.check_in || r.check_out) && (
+                                <div className="col-span-2 sm:w-full">
+                                  <AttendanceTimeEditor record={r} onSaved={(updated) => {
+                                    setDetailRecs((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+                                    setDayList((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+                                    api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
+                                  }} />
+                                </div>
+                              )}
                             </div>
                           ))}
                       </div>

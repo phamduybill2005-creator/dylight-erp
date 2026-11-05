@@ -568,6 +568,8 @@ class Attendance(Base):
     work_date: Mapped[date] = mapped_column(Date, index=True)     # ngày làm việc
     check_in: Mapped[datetime | None] = mapped_column(DateTime)   # giờ vào
     check_out: Mapped[datetime | None] = mapped_column(DateTime)  # giờ ra
+    check_in_corrected: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    check_out_corrected: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     source: Mapped[AttendanceSource] = mapped_column(SAEnum(AttendanceSource), default=AttendanceSource.MANUAL)
     device_id: Mapped[str | None] = mapped_column(String(100))    # mã máy chấm công (nếu có)
     is_late_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)  # đè trạng thái trễ (True/False/None)

@@ -220,6 +220,10 @@ def _ensure_schema() -> None:
         # BỎ QUA + cảnh báo để admin tự gộp (tránh tự ý xóa chấm công trên prod).
         if "attendance" in insp.get_table_names():
             acols = {c["name"] for c in insp.get_columns("attendance")}
+            for column in ("check_in_corrected", "check_out_corrected"):
+                if column not in acols:
+                    with engine.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE attendance ADD COLUMN {column} BOOLEAN NOT NULL DEFAULT FALSE"))
             if "is_late_override" not in acols:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE attendance ADD COLUMN is_late_override BOOLEAN"))
