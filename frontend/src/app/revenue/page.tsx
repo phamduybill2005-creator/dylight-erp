@@ -25,7 +25,7 @@ import { api } from "@/lib/api";
 import { isDirector, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept, isBanDoView } from "@/lib/groups";
-import { parseBanDoDetails, analysisNumber } from "@/lib/bando-details";
+import { parseBanDoDetails, analysisNumber, isBanDoTicked, tickInputClass } from "@/lib/bando-details";
 import { BANDO_HOUR_COLUMNS, hoursByColumn, formatGroupHours, type ProjectGroupHours } from "@/lib/bando-hours";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { formatVND, todayLocal } from "@/lib/format";
@@ -728,6 +728,29 @@ export default function RevenuePage() {
                           const enteredTitle = c.key === "data" || c.key === "ground" || c.key === "grid"
                             ? (entered ? `Analysis: ${entered} — nhập ở tab Dự án` : "Analysis: chưa nhập ở tab Dự án")
                             : (entered ? `${c.title}: ${entered} — nhập ở tab Dự án` : `${c.title}: chưa nhập ở tab Dự án`);
+                          // HoverMaps: ở tab Dự án là Ô TÍCH -> nửa trên hiện đúng trạng thái tích (chỉ xem),
+                          // chưa tích thì ô mờ như bên Dự án; nửa dưới là giờ.
+                          if (c.key === "hovermaps") {
+                            const ticked = isBanDoTicked(bando.hovermaps);
+                            return (
+                              <td key={c.key} className="border border-line p-0 text-center align-middle">
+                                <div
+                                  className="flex items-center justify-center border-b border-line/70 px-1 py-1"
+                                  title={ticked ? "HoverMaps: đã tích ở tab Dự án" : "HoverMaps: chưa tích ở tab Dự án"}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={ticked}
+                                    readOnly
+                                    tabIndex={-1}
+                                    aria-label="HoverMaps"
+                                    className={`h-3.5 w-3.5 rounded border ${tickInputClass(ticked)} accent-teal-700 ${ticked ? "" : "opacity-60"} pointer-events-none`}
+                                  />
+                                </div>
+                                <div className="px-1 py-1">{hoursEl}</div>
+                              </td>
+                            );
+                          }
                           if (entered === null) {
                             return (
                               <td key={c.key} className="border border-line align-middle px-1 py-2 text-center">{hoursEl}</td>
