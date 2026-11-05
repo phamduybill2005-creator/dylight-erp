@@ -25,7 +25,7 @@ import { api } from "@/lib/api";
 import { isDirector, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept, isBanDoView } from "@/lib/groups";
-import { parseBanDoDetails } from "@/lib/bando-details";
+import { parseBanDoDetails, analysisNumber } from "@/lib/bando-details";
 import { BANDO_HOUR_COLUMNS, hoursByColumn, formatGroupHours, type ProjectGroupHours } from "@/lib/bando-hours";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { formatVND, todayLocal } from "@/lib/format";
@@ -716,11 +716,18 @@ export default function RevenuePage() {
                               {formatGroupHours(h)}
                             </span>
                           );
-                          // Ortho / RIEGL / QLCL: ô CHIA ĐÔI — trên là số đã nhập cho cột đó ở tab Dự án
-                          // (JSON `evaluation`), dưới là giờ realtime như các cột khác.
+                          // Ô CHIA ĐÔI — trên là số đã nhập ở tab Dự án (JSON `evaluation`), dưới là giờ
+                          // realtime như các cột khác. Ortho / RIEGL / QLCL lấy đúng cột cùng tên;
+                          // DATA / Ground / Grid_XML cùng lấy số Analysis (ha) theo yêu cầu Phòng Bản đồ.
+                          const analysisHa = analysisNumber(bando.analysis);
                           const entered = c.key === "ortho" || c.key === "riegl" || c.key === "qlcl"
                             ? (bando[c.key] || "").trim()
-                            : null;
+                            : c.key === "data" || c.key === "ground" || c.key === "grid"
+                              ? (analysisHa ? `${analysisHa} ha` : "")
+                              : null;
+                          const enteredTitle = c.key === "data" || c.key === "ground" || c.key === "grid"
+                            ? (entered ? `Analysis: ${entered} — nhập ở tab Dự án` : "Analysis: chưa nhập ở tab Dự án")
+                            : (entered ? `${c.title}: ${entered} — nhập ở tab Dự án` : `${c.title}: chưa nhập ở tab Dự án`);
                           if (entered === null) {
                             return (
                               <td key={c.key} className="border border-line align-middle px-1 py-2 text-center">{hoursEl}</td>
@@ -730,7 +737,7 @@ export default function RevenuePage() {
                             <td key={c.key} className="border border-line p-0 text-center align-middle">
                               <div
                                 className={`border-b border-line/70 px-1 py-1 text-[10.5px] tnum ${entered ? "font-semibold text-steel" : "text-slate-300"}`}
-                                title={entered ? `${c.title}: ${entered} — nhập ở tab Dự án` : `${c.title}: chưa nhập ở tab Dự án`}
+                                title={enteredTitle}
                               >
                                 {entered || "—"}
                               </div>
