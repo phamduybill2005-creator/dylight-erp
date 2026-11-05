@@ -718,16 +718,20 @@ export default function RevenuePage() {
                           );
                           // Ô CHIA ĐÔI — trên là số đã nhập ở tab Dự án (JSON `evaluation`), dưới là giờ
                           // realtime như các cột khác. Ortho / RIEGL / QLCL lấy đúng cột cùng tên;
-                          // DATA / Ground / Grid_XML cùng lấy số Analysis (ha) theo yêu cầu Phòng Bản đồ.
+                          // DATA / Ground / Grid_XML / トレース lấy Analysis (ha); TD-TN lấy Section.
                           const analysisHa = analysisNumber(bando.analysis);
                           const entered = c.key === "ortho" || c.key === "riegl" || c.key === "qlcl"
                             ? (bando[c.key] || "").trim()
-                            : c.key === "data" || c.key === "ground" || c.key === "grid"
+                            : c.key === "data" || c.key === "ground" || c.key === "grid" || c.key === "trace"
                               ? (analysisHa ? `${analysisHa} ha` : "")
-                              : null;
-                          const enteredTitle = c.key === "data" || c.key === "ground" || c.key === "grid"
+                              : c.key === "tdtn"
+                                ? bando.section.trim()
+                                : null;
+                          const enteredTitle = c.key === "data" || c.key === "ground" || c.key === "grid" || c.key === "trace"
                             ? (entered ? `Analysis: ${entered} — nhập ở tab Dự án` : "Analysis: chưa nhập ở tab Dự án")
-                            : (entered ? `${c.title}: ${entered} — nhập ở tab Dự án` : `${c.title}: chưa nhập ở tab Dự án`);
+                            : c.key === "tdtn"
+                              ? (entered ? `Section: ${entered} — nhập ở tab Dự án` : "Section: chưa nhập ở tab Dự án")
+                              : (entered ? `${c.title}: ${entered} — nhập ở tab Dự án` : `${c.title}: chưa nhập ở tab Dự án`);
                           // HoverMaps: ở tab Dự án là Ô TÍCH -> nửa trên hiện đúng trạng thái tích (chỉ xem),
                           // chưa tích thì ô mờ như bên Dự án; nửa dưới là giờ.
                           if (c.key === "hovermaps") {

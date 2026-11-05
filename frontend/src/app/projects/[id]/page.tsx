@@ -453,18 +453,18 @@ export default function ProjectDetailPage() {
       {/* Nút quay lại */}
       <button
         onClick={() => router.push("/projects")}
-        className="flex items-center gap-1 text-xs text-muted hover:text-ink mb-4 font-semibold"
+        className="flex items-center gap-1 text-xs text-muted hover:text-ink mb-2 font-semibold"
       >
         <ArrowLeftIcon className="h-4 w-4" />
         Quay lại dự án
       </button>
 
       {/* Thông tin chung dự án */}
-      <div className="rounded-xl2 bg-white p-4 lg:p-6 shadow-card border border-line/50">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="rounded-xl2 bg-white p-3 lg:px-4 shadow-card border border-line/50">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <span className="font-mono text-sm font-bold text-bad">{project.code}</span>
-            <h1 className="break-words text-lg font-bold leading-snug text-ink lg:text-xl">{project.name}</h1>
+            <h1 className="break-words text-base font-bold leading-snug text-ink lg:text-lg">{project.name}</h1>
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:shrink-0 lg:justify-end">
             <button
@@ -526,7 +526,7 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2 text-xs text-muted sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-2 lg:grid-cols-3">
           {project.location && (
             <p className="flex items-center gap-1.5">
               <MapPinIcon className="h-4 w-4 text-muted/80" />
@@ -572,7 +572,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Thành viên thực hiện dự án */}
-        <div className="mt-4 border-t border-line/60 pt-3">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line/60 pt-2">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
               <UsersIcon className="h-4 w-4" />
@@ -580,7 +580,7 @@ export default function ProjectDetailPage() {
             </h3>
           </div>
           
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {(() => {
               // Hiện CẢ chủ trì để số đếm "(N)" khớp với danh sách bên dưới —
               // trước đây lọc bỏ chủ trì nên thấy "(1)" mà lại báo "Chưa phân công".
@@ -633,14 +633,14 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Tabs điều hướng */}
-      <div className="mt-6 flex border-b border-line">
+      <div className="mt-3 flex border-b border-line">
         <TabButton active={activeTab === "items"} onClick={() => switchTab("items")} label="Hạng mục" icon={TableCellsIcon} />
         <TabButton active={activeTab === "progress"} onClick={() => switchTab("progress")} label="Tiến độ" icon={ClockIcon} count={progressLogs.length} />
         <TabButton active={activeTab === "team"} onClick={() => switchTab("team")} label="Phân công" icon={UsersIcon} count={project.members?.length ?? 0} />
       </div>
 
       {/* Nội dung Tab */}
-      <div className="mt-4">
+      <div className="mt-2">
 
         {/* Tab Hạng mục (bảng dự toán Excel) */}
         {/* Bảng dự toán: ẩn Khối lượng + Đơn giá + Thành tiền + tiểu tổng + tổng cho MỌI
@@ -1178,7 +1178,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex-1 pb-2 flex flex-col items-center gap-1 border-b-2 text-center transition-all ${
+      className={`flex-1 py-2 flex flex-col items-center justify-center gap-1 border-b-2 text-center transition-all lg:flex-row lg:gap-1.5 ${
         active ? "border-amber text-ink font-semibold" : "border-transparent text-muted"
       }`}
     >

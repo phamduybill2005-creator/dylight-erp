@@ -548,47 +548,19 @@ export default function ProjectItemsTab({
 
   return (
     <div className="space-y-3 lg:space-y-4">
-      {/* Thanh tiêu đề + hành động */}
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h3 className="text-xs font-semibold text-muted uppercase lg:text-sm">
-            Bảng dự toán chi tiết ({groups.length} nhóm)
-          </h3>
-          {canSeeMoney && (
-            <p className="text-[11px] text-muted lg:text-xs">Tổng dự toán: <span className="font-bold text-ink tnum">{formatVND(grandTotal)}</span></p>
-          )}
+      {canSeeMoney && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] text-muted lg:text-xs">Tổng dự toán: <span className="font-bold text-ink tnum">{formatVND(grandTotal)}</span></p>
+          <button
+            onClick={exportCSV}
+            disabled={items.length === 0}
+            className="flex items-center gap-1.5 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow hover:bg-ink transition-all disabled:opacity-50"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            Xuất Excel
+          </button>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {canManage && (
-            <button
-              onClick={() => { setShowCopyModal(true); }}
-              className="flex items-center gap-1.5 rounded-xl2 bg-slate-100 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 shadow hover:bg-slate-200 transition-all"
-            >
-              <TableCellsIcon className="h-4 w-4 text-slate-500" />
-              Sao chép từ dự án mẫu
-            </button>
-          )}
-          {canManage && (
-            <button
-              onClick={() => { setShowForm((s) => !s); setFormMsg(""); if (fGroupId === "" && groups.length > 0) setFGroupId(String(groups[0].id)); }}
-              className="flex items-center gap-1.5 rounded-xl2 bg-amber px-3 py-2 text-xs font-semibold text-ink shadow hover:bg-amber-deep hover:text-white transition-all"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Thêm hạng mục
-            </button>
-          )}
-          {canSeeMoney && (
-            <button
-              onClick={exportCSV}
-              disabled={items.length === 0}
-              className="flex items-center gap-1.5 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow hover:bg-ink transition-all disabled:opacity-50"
-            >
-              <ArrowDownTrayIcon className="h-4 w-4" />
-              Xuất Excel
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* FORM thêm hạng mục — mỗi thông số một ô riêng, dễ nhập (nhất là trên điện thoại) */}
       {showForm && (
