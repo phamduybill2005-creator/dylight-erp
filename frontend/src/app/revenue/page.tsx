@@ -581,13 +581,13 @@ export default function RevenuePage() {
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Time ({monthLabel})</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(monthHoursByProject[project.id] || 0)}h</p></div>
                 <div className="rounded-lg bg-paper px-2.5 py-2" onClick={(event) => event.stopPropagation()}>
-                  <p className="text-[10px] text-muted">TIME khách hàng ({monthLabel})</p>
+                  <p className="text-[10px] text-muted">TIME KHÁCH HÀNG ({monthLabel})</p>
                   {isDirectorUser
                     ? clientMonthInput(project, viewMonth, { align: "text-left", title: `Nhập số giờ khách hàng tháng ${monthLabel}` })
                     : <p className="mt-0.5 font-bold text-ink tnum">{fmtH(clientHoursOf(project, viewMonth))}h</p>}
                 </div>
                 <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Time (All)</p><p className="mt-0.5 font-bold text-ink tnum">{facts.actualHours.toLocaleString("vi-VN")}h</p></div>
-                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">TIME khách hàng (All)</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(clientHoursOf(project))}h</p></div>
+                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">TIME KHÁCH HÀNG (All)</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(clientHoursOf(project))}h</p></div>
               </div>
             </article>
           );
@@ -612,9 +612,9 @@ export default function RevenuePage() {
               </>
             )}
             <col className="w-[84px]" />{/* Time (Month) */}
-            <col className="w-[140px]" />{/* TIME khách hàng (Month) */}
+            <col className="w-[140px]" />{/* TIME KHÁCH HÀNG (Month) */}
             <col className="w-[84px]" />{/* Time (All) */}
-            <col className="w-[140px]" />{/* TIME khách hàng (All) */}
+            <col className="w-[140px]" />{/* TIME KHÁCH HÀNG (All) */}
             <col className="w-[170px]" />{/* Doanh thu (VNĐ) */}
           </colgroup>
           <thead>
@@ -641,14 +641,14 @@ export default function RevenuePage() {
                 Time <span className="block text-[9px] font-normal normal-case text-slate-500">({monthLabel})</span>
               </th>
               <th className={`${TH} text-center`} title={`Time khách hàng (công) của tháng ${monthLabel} — chỉ Giám đốc nhập`}>
-                <span className="block whitespace-nowrap normal-case">TIME khách hàng</span>
+                <span className="block whitespace-nowrap normal-case">TIME KHÁCH HÀNG</span>
                 <span className="block text-[9px] font-normal normal-case text-slate-500">({monthLabel})</span>
               </th>
               <th className={`${TH} text-center`} title="Tổng thời gian làm thực tế của dự án qua mọi tháng">
                 Time <span className="block text-[9px] font-normal normal-case text-slate-500">(All)</span>
               </th>
               <th className={`${TH} text-center`} title="Tổng Time khách hàng (công) của dự án qua mọi tháng">
-                <span className="block whitespace-nowrap normal-case">TIME khách hàng</span>
+                <span className="block whitespace-nowrap normal-case">TIME KHÁCH HÀNG</span>
                 <span className="block text-[9px] font-normal normal-case text-slate-500">(All)</span>
               </th>
               <th className={`${TH} text-right whitespace-nowrap`} title="Click hàng dự án để nhập đơn giá Yên trên thanh bên trên">
@@ -881,7 +881,7 @@ export default function RevenuePage() {
 
       <p className="mt-2 text-[11px] text-muted">
         <b className="text-ink">Nhập đơn giá ¥/h</b> vào ô nhỏ bên góc phải để tính doanh thu cho toàn bộ dự án.{" "}
-        Hoặc vào trang chi tiết từng dự án để đặt đơn giá riêng. Doanh thu = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime (đang lọc tháng thì lấy TIME khách hàng của tháng đó, không lọc thì TIME khách hàng (All)).
+        Hoặc vào trang chi tiết từng dự án để đặt đơn giá riêng. Doanh thu = Time khách hàng × Đơn giá Yên × Tỷ giá Vietcombank Realtime (đang lọc tháng thì lấy TIME KHÁCH HÀNG của tháng đó, không lọc thì TIME KHÁCH HÀNG (All)).
       </p>
     </AppShell>
   );
