@@ -19,7 +19,6 @@ import {
 import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
 import AttendanceTimeEditor from "@/components/attendance-time-editor";
-import AttendanceReconciliationPanel from "@/components/attendance-reconciliation-panel";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { roleTier, isSeniorManagerUp } from "@/lib/roles";
@@ -344,11 +343,6 @@ export default function AttendancePage() {
           <h1 className="text-base font-bold lg:text-xl">Chấm công của tôi</h1>
         </header>
 
-        <label className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-ink">Ngày đối chiếu
-          <input type="date" aria-label="Ngày đối chiếu cá nhân" value={date} onChange={e => setDate(e.target.value || todayStr())} className="rounded-lg border border-line bg-white px-3 py-2 text-xs" />
-        </label>
-        <AttendanceReconciliationPanel key={`${user.id}-${date}`} date={date} user={user} userId={user.id} />
-
         {/* Trạng thái hôm nay */}
         <section className="mt-4 rounded-xl2 bg-white p-4 shadow-card lg:p-6">
           <p className="text-xs text-muted">Hôm nay · {new Date().toLocaleDateString("vi-VN")}</p>
@@ -537,8 +531,6 @@ export default function AttendancePage() {
           )}
         </div>
       </section>
-
-      <AttendanceReconciliationPanel key={`team-${date}`} date={date} user={user} />
 
       {/* Tổng hợp tháng — TỔNG QUAN cho Ban Giám đốc */}
       <section className="mt-5">
