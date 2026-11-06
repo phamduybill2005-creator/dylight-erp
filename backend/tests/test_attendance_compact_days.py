@@ -169,6 +169,19 @@ class CompactAttendanceDaysTests(unittest.TestCase):
         for row in rows.values():
             self.assert_zero_work(row)
 
+    def test_monthly_summary_hides_director_even_with_punches_or_when_viewing_as_director(self):
+        director = self.user(4, UserRole.DIRECTOR)
+        self.db.commit()
+        self.assertNotIn(director.id, self.summary())
+        self.punch("08:00", "17:00", user=director)
+        for viewer in (self.admin, director):
+            self.current = viewer
+            rows = self.summary()
+            self.assertNotIn(director.id, rows)
+            self.assertIn(self.staff.id, rows)
+            self.assertIn(self.admin.id, rows)
+        self.assertEqual(self.db.query(Attendance).filter_by(user_id=director.id).count(), 1)
+
     def test_leave_only_employee_has_summary_card_but_no_actual_work_credit(self):
         self.leave("FULL")
         rows = self.summary()

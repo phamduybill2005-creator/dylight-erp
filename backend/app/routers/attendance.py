@@ -308,7 +308,8 @@ def attendance_summary(
     _apply_late_exemption(db, current.company_id, records)   # đơn đi muộn duyệt -> không tính vào late_days
     # Lọc đúng tháng (so khớp tiền tố "YYYY-MM") rồi gom theo người.
     by_user: dict[int, AttendanceSummary] = {}
-    users = {u.id: u for u in db.query(User).filter(User.company_id == current.company_id).all()}
+    users = {u.id: u for u in db.query(User).filter(
+        User.company_id == current.company_id, User.role != UserRole.DIRECTOR).all()}
     evidenced = {record.user_id for record in records}
     evidenced.update(uid for (uid,) in db.query(LeaveRequest.user_id).filter(
         LeaveRequest.company_id == current.company_id, LeaveRequest.status == LeaveStatus.APPROVED,
