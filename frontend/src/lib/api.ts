@@ -3,7 +3,7 @@
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 import type { NotificationSendResult } from "./notification-send-result";
 import { leaveLoginPath } from "./leave-links";
-import type { AttendanceReconciliation, AttendanceReconciliationRow, AttendancePermissionPayload, AttendanceDataConfirmation, AttendanceSession } from "./types";
+import type { AttendanceReconciliation, AttendanceReconciliationRow, AttendancePermissionPayload, AttendanceDayPermissionPayload, AttendanceDataConfirmation, AttendanceSession } from "./types";
 
 import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, EvaluationMonthReview, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 import type { ProjectGroupHours } from "./bando-hours";
@@ -366,6 +366,8 @@ export const api = {
   },
   setAttendancePermission: (payload: AttendancePermissionPayload) =>
     request<AttendanceReconciliationRow>("/attendance/reconciliation/override", { method: "PUT", body: JSON.stringify(payload) }),
+  setAttendanceDayPermission: (payload: AttendanceDayPermissionPayload) =>
+    request<AttendanceReconciliationRow>("/attendance/reconciliation/override-day", { method: "PUT", body: JSON.stringify(payload) }),
   confirmAttendanceData: (payload: { work_date: string; session: AttendanceSession; reason: string }) =>
     request<AttendanceDataConfirmation>("/attendance/reconciliation/confirm-data", { method: "POST", body: JSON.stringify(payload) }),
   attendanceMe: (fromDate?: string, toDate?: string) => {

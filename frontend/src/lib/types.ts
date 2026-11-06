@@ -240,6 +240,7 @@ export interface AttendanceReconciliationRow {
   morning: AttendanceSessionResult;
   afternoon: AttendanceSessionResult;
   needs_attention: boolean;
+  can_edit_permission?: boolean;
 }
 export interface AttendanceDataConfirmation {
   work_date: string;
@@ -260,6 +261,9 @@ export interface AttendancePermissionPayload {
   decision: AttendancePermissionDecision | null;
   reason: string;
   approved_by: string;
+}
+export interface AttendanceDayPermissionPayload extends Omit<AttendancePermissionPayload, "session"> {
+  sessions: AttendanceSession[];
 }
 
 export interface Attendance {

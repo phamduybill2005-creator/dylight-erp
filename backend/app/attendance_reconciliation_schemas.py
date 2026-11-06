@@ -13,10 +13,9 @@ SessionStatus = Literal[
 ]
 
 
-class AttendancePermissionWrite(BaseModel):
+class AttendancePermissionFields(BaseModel):
     user_id: int = Field(gt=0)
     work_date: date
-    session: SessionName
     decision: PermissionDecision | None
     reason: str = Field(min_length=1, max_length=2000)
     approved_by: str = Field(default="", max_length=255)
@@ -31,6 +30,21 @@ class AttendancePermissionWrite(BaseModel):
         if not self.reason or (self.decision is not None and not self.approved_by):
             raise ValueError("Phải nhập lý do và người đã đồng ý cho phép.")
         return self
+
+
+class AttendancePermissionWrite(AttendancePermissionFields):
+    session: SessionName
+
+
+class AttendanceDayPermissionWrite(AttendancePermissionFields):
+    sessions: list[SessionName] = Field(min_length=1, max_length=2)
+
+    @field_validator("sessions")
+    @classmethod
+    def unique_sessions(cls, value):
+        if len(set(value)) != len(value):
+            raise ValueError("Không chọn trùng buổi.")
+        return sorted(value)
 
 
 class AttendanceCoverageWrite(BaseModel):
@@ -84,6 +98,7 @@ class AttendanceReconciliationDay(BaseModel):
     morning: AttendanceSessionOut
     afternoon: AttendanceSessionOut
     needs_attention: bool
+    can_edit_permission: bool = True
 
 
 class AttendanceReconciliationOut(BaseModel):

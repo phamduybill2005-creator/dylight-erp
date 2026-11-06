@@ -6,9 +6,10 @@ Router Chấm công (Attendance).
 - Máy chấm công gọi /attendance/punch (xác thực bằng X-API-Key, KHÔNG dùng JWT).
 """
 import hmac
+from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.audit import date_vi, log_activity
@@ -16,7 +17,7 @@ from app.events import publish
 from app.config import settings
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
-from app.models import Attendance, AttendanceSource, PaymentDirection, User, UserRole, LeaveRequest, LeaveStatus
+from app.models import Attendance, AttendanceSource, AttendanceSessionOverride, PaymentDirection, User, UserRole, LeaveRequest, LeaveStatus
 from app.schemas import (
     AttendanceOut, AttendanceUpdate, AttendanceSummary, MachinePunch,
     AttendanceImportRequest, AttendanceImportResult,
@@ -280,7 +281,7 @@ def update_attendance(
 
 @router.get("/summary", response_model=list[AttendanceSummary])
 def attendance_summary(
-    period: str | None = None,
+    period: str | None = Query(default=None, pattern=r"^\d{4}-(?:0[1-9]|1[0-2])$"),
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
@@ -289,11 +290,16 @@ def attendance_summary(
     - Quản trị hệ thống, Giám đốc, Quản lý cấp cao: xem được toàn bộ nhân sự.
     - Các tài khoản còn lại: CHỈ xem được của chính mình.
     """
-    period = period or date.today().strftime("%Y-%m")
+    period = period or vn_now().strftime("%Y-%m")
+    year, month = map(int, period.split("-"))
+    if year < 1:
+        raise HTTPException(400, "Tháng chấm công không hợp lệ.")
+    first = date(year, month, 1)
+    last = date(year, month, monthrange(year, month)[1])
     q = (
         db.query(Attendance)
         .filter(Attendance.company_id == current.company_id)
-        .filter(Attendance.work_date >= date.fromisoformat(period + "-01"))
+        .filter(Attendance.work_date >= first, Attendance.work_date <= last)
     )
     if not _is_senior_manager_up(current):
         q = q.filter(Attendance.user_id == current.id)
@@ -303,6 +309,18 @@ def attendance_summary(
     # Lọc đúng tháng (so khớp tiền tố "YYYY-MM") rồi gom theo người.
     by_user: dict[int, AttendanceSummary] = {}
     users = {u.id: u for u in db.query(User).filter(User.company_id == current.company_id).all()}
+    evidenced = {record.user_id for record in records}
+    evidenced.update(uid for (uid,) in db.query(LeaveRequest.user_id).filter(
+        LeaveRequest.company_id == current.company_id, LeaveRequest.status == LeaveStatus.APPROVED,
+        LeaveRequest.from_date <= last, LeaveRequest.to_date >= first))
+    evidenced.update(uid for (uid,) in db.query(AttendanceSessionOverride.user_id).filter(
+        AttendanceSessionOverride.company_id == current.company_id,
+        AttendanceSessionOverride.work_date >= first, AttendanceSessionOverride.work_date <= last))
+    for u in users.values():
+        if not _is_senior_manager_up(current) and u.id != current.id:
+            continue
+        if u.id in evidenced or (u.is_active and u.is_approved and (not u.created_at or u.created_at.date() <= last)):
+            by_user[u.id] = AttendanceSummary(user_id=u.id, full_name=u.full_name)
     for rec in records:
         if not rec.work_date.strftime("%Y-%m") == period:
             continue

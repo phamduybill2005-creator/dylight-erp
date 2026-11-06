@@ -18,10 +18,10 @@ import {
 } from "@heroicons/react/24/outline";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/app-shell";
-import AttendanceTimeEditor from "@/components/attendance-time-editor";
+import CompactAttendanceDays from "@/components/compact-attendance-days";
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
-import { roleTier, isSeniorManagerUp } from "@/lib/roles";
+import { isSeniorManagerUp } from "@/lib/roles";
 import { useNicknames } from "@/lib/nicknames";
 import { todayLocal, monthLocal } from "@/lib/format";
 import { loadAttendanceExportRows } from "@/lib/attendance-export";
@@ -127,10 +127,6 @@ export default function AttendancePage() {
   const [filters, setFilters] = useStickyState<Filters>("attendance.filters", NO_FILTERS);   // lọc tổng hợp theo phòng ban
   // Chi tiết từng ngày của 1 người (mở khi bấm vào người trong bảng tổng hợp).
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
-  const [detailRecs, setDetailRecs] = useState<Attendance[]>([]);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
-  const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
 
   // Nhập chấm công từ file CSV
   const [showImport, setShowImport] = useState(false);
@@ -274,49 +270,8 @@ export default function AttendancePage() {
   }, [user]);
 
   // Bấm vào 1 người trong bảng tổng hợp -> mở/đóng chi tiết từng ngày trong tháng.
-  /** Khoảng ngày của tháng "YYYY-MM" — ngày cuối TÍNH THEO THÁNG THẬT.
-   *  Trước đây chỗ xem chi tiết cắm cứng "-31" nên tháng 30 ngày (hoặc tháng 2)
-   *  gửi lên ngày không tồn tại -> backend từ chối -> danh sách rỗng. */
-  function monthRange(period: string) {
-    const [y, m] = period.split("-").map(Number);
-    const lastDay = new Date(y, m, 0).getDate();
-    return {
-      from: `${period}-01`,
-      to: `${period}-${String(lastDay).padStart(2, "0")}`,
-    };
-  }
-
-  async function toggleDetail(userId: number) {
-    if (expandedUser === userId) { setExpandedUser(null); return; }
-    setExpandedUser(userId);
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
-      const { from, to } = monthRange(summaryPeriod);
-      const recs = await api.attendanceList({ user_id: userId, from_date: from, to_date: to });
-      setDetailRecs(recs);
-      const initialNotes: Record<number, string> = {};
-      recs.forEach((r) => { if (r.note) initialNotes[r.id] = r.note; });
-      setEditingNotes(initialNotes);
-    } catch (err) {
-      // Trước đây nuốt lỗi rồi hiện "không có ngày công" -> gọi API hỏng mà
-      // trông y như tháng không có dữ liệu. Nay tách bạch hai trường hợp.
-      setDetailRecs([]);
-      setDetailError(err instanceof Error ? err.message : "Không tải được chi tiết, thử lại giúp mình.");
-    } finally {
-      setDetailLoading(false);
-    }
-  }
-
-  // Quản lý cấp cao / Giám đốc / Quản trị hệ thống: Lưu ghi chú/lý do cho ngày công
-  async function handleSaveNote(rId: number) {
-    const note = editingNotes[rId] ?? "";
-    try {
-      const updated = await api.updateAttendance(rId, { note });
-      setDetailRecs((prev) => prev.map((item) => (item.id === rId ? updated : item)));
-    } catch (err) {
-      console.error(err);
-    }
+  function toggleDetail(userId: number) {
+    setExpandedUser(current => current === userId ? null : userId);
   }
 
   if (loading || !user) {
@@ -606,57 +561,10 @@ export default function AttendancePage() {
                     <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
                       Chi tiết từng ngày · tháng {summaryPeriod}
                     </p>
-                    {detailLoading ? (
-                      <p className="py-3 text-center text-xs text-muted">Đang tải…</p>
-                    ) : detailError ? (
-                      <p className="py-3 text-center text-xs font-semibold text-bad">{detailError}</p>
-                    ) : detailRecs.length === 0 ? (
-                      <p className="py-3 text-center text-xs text-muted">Không có ngày công nào trong tháng này.</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {[...detailRecs]
-                          .sort((a, b) => a.work_date.localeCompare(b.work_date))
-                          .map((r) => (
-                            <div key={r.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 rounded-lg bg-paper px-2.5 py-1.5 text-xs sm:flex sm:flex-wrap sm:justify-between sm:gap-2">
-                              <div className="contents sm:flex sm:min-w-0 sm:flex-1 sm:items-center sm:gap-2">
-                                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-nowrap">
-                                <span className="font-medium text-ink shrink-0">
-                                  {new Date(r.work_date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
-                                </span>
-
-                                {user.role === "ADMIN" && (r.check_in || r.check_out) && (
-                                  <AttendanceTimeEditor record={r} formTargetId={`attendance-time-editor-${r.id}`} onSaved={(updated) => {
-                                    setDetailRecs((prev) => prev.map((item) => item.id === updated.id ? updated : item));
-                                    setDayList((prev) => prev.map((item) => item.id === updated.id ? updated : item));
-                                    api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
-                                  }} />
-                                )}
-
-                                {r.is_late && <span className="rounded border border-rose-200 bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">Đi trễ</span>}
-                                </div>
-
-                                {/* Thanh ghi chú lý do */}
-                                <input
-                                  type="text"
-                                  value={editingNotes[r.id] ?? r.note ?? ""}
-                                  onChange={(e) => setEditingNotes((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                                  onBlur={() => handleSaveNote(r.id)}
-                                  onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())}
-                                  placeholder="Ghi chú lý do..."
-                                  className="col-span-2 row-start-2 w-full min-w-0 rounded border border-line/70 bg-white px-2 py-1 text-[11px] text-ink outline-none focus:border-steel placeholder:text-slate-300 shadow-sm sm:w-auto sm:min-w-[140px] sm:max-w-[260px] sm:flex-1"
-                                />
-                              </div>
-                              <div className="col-start-2 row-start-1 flex shrink-0 items-center gap-2 whitespace-nowrap tnum sm:gap-3">
-                                <span className="text-ink">{fmtTime(r.check_in)} - {fmtTime(r.check_out)}</span>
-                                <span className="font-bold text-steel">{fmtHours(r.worked_minutes)}</span>
-                              </div>
-                              {user.role === "ADMIN" && (r.check_in || r.check_out) && (
-                                <div id={`attendance-time-editor-${r.id}`} className="col-span-2 w-full empty:hidden" />
-                              )}
-                            </div>
-                          ))}
-                      </div>
-                    )}
+                    <CompactAttendanceDays key={`${s.user_id}-${summaryPeriod}`} userId={s.user_id} period={summaryPeriod} user={user} onSaved={updated => {
+                      if (updated) setDayList(prev => prev.map(item => item.id === updated.id ? updated : item));
+                      api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
+                    }} />
                   </div>
                 )}
               </div>

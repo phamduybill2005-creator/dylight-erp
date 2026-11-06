@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.attendance_reconciliation_schemas import (
-    AttendanceCoverageOut, AttendanceCoverageWrite, AttendancePermissionWrite,
+    AttendanceCoverageOut, AttendanceCoverageWrite, AttendancePermissionWrite, AttendanceDayPermissionWrite,
     AttendanceReconciliationDay, AttendanceReconciliationOut,
 )
 from app.database import get_db
@@ -39,9 +39,7 @@ def get_reconciliation(from_date: date, to_date: date, user_id: int | None = Non
     return service.reconcile(db, current.company_id, from_date, to_date, user_id=user_id)
 
 
-@router.put("/override", response_model=AttendanceReconciliationDay)
-def set_permission(payload: AttendancePermissionWrite, db: Session = Depends(get_db),
-                   current: User = Depends(get_current_user)):
+def _set_permissions(payload, sessions, db, current):
     _admin(current)
     now = service.vn_now()
     if payload.work_date > now.date():
@@ -50,30 +48,36 @@ def set_permission(payload: AttendancePermissionWrite, db: Session = Depends(get
                                     User.is_active.is_(True), User.is_approved.is_(True)).first()
     if employee is None:
         raise HTTPException(404, "Không tìm thấy nhân viên trong công ty.")
-    record = db.query(AttendanceSessionOverride).filter(
+    records = db.query(AttendanceSessionOverride).filter(
         AttendanceSessionOverride.company_id == current.company_id,
         AttendanceSessionOverride.user_id == employee.id,
         AttendanceSessionOverride.work_date == payload.work_date,
-        AttendanceSessionOverride.session == payload.session).with_for_update().first()
-    before = {k: getattr(record, k) for k in ("decision", "reason", "approved_by")} if record else None
+        AttendanceSessionOverride.session.in_(sessions)).order_by(AttendanceSessionOverride.session).with_for_update().all()
+    by_session = {record.session: record for record in records}
     try:
-        if record is None:
-            record = AttendanceSessionOverride(company_id=current.company_id, user_id=employee.id,
-                work_date=payload.work_date, session=payload.session, created_at=now)
-            db.add(record)
-        record.decision = payload.decision
-        record.reason = payload.reason
-        record.approved_by = payload.approved_by
-        record.recorded_by_id = current.id
-        record.recorded_by_name = current.full_name
-        record.updated_at = now
+        changes = []
+        for session in sorted(sessions):
+            record = by_session.get(session)
+            before = {k: getattr(record, k) for k in ("decision", "reason", "approved_by")} if record else None
+            if record is None:
+                record = AttendanceSessionOverride(company_id=current.company_id, user_id=employee.id,
+                    work_date=payload.work_date, session=session, created_at=now)
+                db.add(record)
+            record.decision = payload.decision
+            record.reason = payload.reason
+            record.approved_by = payload.approved_by
+            record.recorded_by_id = current.id
+            record.recorded_by_name = current.full_name
+            record.updated_at = now
+            changes.append((record, before))
         db.flush()
-        after = {k: getattr(record, k) for k in ("decision", "reason", "approved_by")}
-        db.add(ActivityLog(company_id=current.company_id, user_id=current.id,
-            action="attendance.permission", entity_type="attendance_session_override", entity_id=record.id,
-            detail=f"{employee.full_name} · {payload.work_date:%d/%m/%Y} · {payload.session}: "
-                   + json.dumps(before, ensure_ascii=False) + " → " + json.dumps(after, ensure_ascii=False)
-                   + f" · Người ghi nhận: {current.full_name} (#{current.id})"))
+        for record, before in changes:
+            after = {k: getattr(record, k) for k in ("decision", "reason", "approved_by")}
+            db.add(ActivityLog(company_id=current.company_id, user_id=current.id,
+                action="attendance.permission", entity_type="attendance_session_override", entity_id=record.id,
+                detail=f"{employee.full_name} · {payload.work_date:%d/%m/%Y} · {record.session}: "
+                       + json.dumps(before, ensure_ascii=False) + " → " + json.dumps(after, ensure_ascii=False)
+                       + f" · Người ghi nhận: {current.full_name} (#{current.id})"))
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -84,6 +88,18 @@ def set_permission(payload: AttendancePermissionWrite, db: Session = Depends(get
     publish(current.company_id, "attendance")
     publish(current.company_id, "audit")
     return service.reconcile(db, current.company_id, payload.work_date, payload.work_date, employee.id, now)["rows"][0]
+
+
+@router.put("/override", response_model=AttendanceReconciliationDay)
+def set_permission(payload: AttendancePermissionWrite, db: Session = Depends(get_db),
+                   current: User = Depends(get_current_user)):
+    return _set_permissions(payload, [payload.session], db, current)
+
+
+@router.put("/override-day", response_model=AttendanceReconciliationDay)
+def set_day_permission(payload: AttendanceDayPermissionWrite, db: Session = Depends(get_db),
+                       current: User = Depends(get_current_user)):
+    return _set_permissions(payload, payload.sessions, db, current)
 
 
 @router.post("/confirm-data", response_model=AttendanceCoverageOut)

@@ -54,3 +54,15 @@ test("rejected coverage is surfaced and never produces a successful mutation eve
   await assert.rejects(api.confirmAttendanceData({ work_date: "2026-11-06", session: "PM", reason: "Kiểm tra" }), /Chưa hết ca/);
   assert.deepEqual(events, []);
 });
+
+test("a full-day permission is a single authenticated atomic request with no punch or coverage write", async () => {
+  const { api, requests, events } = client();
+  const payload = { user_id: 7, work_date: "2026-11-02", sessions: ["AM", "PM"], decision: "EXCUSED_ABSENCE", reason: "Có phép qua Zalo", approved_by: "Giám đốc" };
+  await api.setAttendanceDayPermission(payload);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].method, "PUT");
+  assert.equal(new URL(requests[0].url).pathname, "/api/v1/attendance/reconciliation/override-day");
+  assert.equal(requests[0].headers.get("Authorization"), "Bearer test-token");
+  assert.deepEqual(JSON.parse(requests[0].body), payload);
+  assert.equal(events.length, 1);
+});

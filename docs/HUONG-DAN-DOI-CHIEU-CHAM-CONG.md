@@ -2,11 +2,12 @@
 
 ## Cách sử dụng
 
-1. Vào **Chấm công**, chọn ngày ở phần **Theo ngày**. Khung **Đối chiếu nghỉ phép và chấm công** hiển thị từng nhân sự, mốc chấm thực tế và kết quả sáng/chiều. Nhân viên chỉ xem được của mình; cấp quản lý có quyền xem đội theo phân quyền hiện có.
-2. Lọc phòng ban, trạng thái hoặc bật **Cần xử lý** để tìm nghỉ/muộn không phép, đơn chờ duyệt và dữ liệu cần kiểm tra. Dùng **Xem đơn** để mở đúng hồ sơ liên quan.
+1. Vào **Chấm công → Tổng hợp chấm công**, chọn tháng rồi bấm tên nhân viên. Chi tiết hiển thị tất cả ngày trong tháng, kể cả ngày không có lượt quẹt. Nhân viên chỉ xem được của mình; cấp quản lý xem theo phân quyền hiện có.
+2. Mỗi dòng có ngày, trạng thái ngắn và giờ chấm thực tế. Khi sáng/chiều khác nhau, trạng thái ghi rõ từng buổi. Đơn nghỉ đã duyệt tự hiện **Nghỉ có phép** dù ngày đó không có lượt quẹt. Ngày tương lai ghi rõ **Chưa đến ngày**; mở bút chì để xem căn cứ và liên kết **Xem đơn** nếu có.
 3. Khi lập đơn đi muộn mới, nhập **Giờ được phép đến**. Đơn chỉ được tính có phép khi được duyệt đúng buổi; giờ vào muộn hơn mọi giờ đã được duyệt vẫn bị ghi nhận chưa có phép. Đơn cũ không có giờ đến vẫn có hiệu lực theo buổi đã duyệt.
-4. Với xin phép qua điện thoại/Zalo, ADMIN bấm **Xác nhận phép**, chọn đúng buổi và loại phép, nhập người đồng ý cùng lý do. **Đặt lại tự động** gỡ xác nhận riêng của Admin; đơn đã duyệt vẫn được áp dụng. Giờ quẹt không thay đổi. Mỗi lần lưu/đặt lại được ghi lịch sử cùng danh tính người thực hiện.
-5. Với trường hợp vắng chưa có đơn, kiểm tra máy đã Online, dữ liệu trên Yunatt và việc ghép nhân viên. Sau khi toàn bộ ca kết thúc, ADMIN ghi cách đã kiểm tra và bấm xác nhận đủ dữ liệu nguồn của đúng buổi. Các trường hợp vắng không có phép khi đó mới được chốt **Nghỉ không phép**. Lần đồng bộ thành công không tự thay thế bước kiểm tra này.
+4. Với xin phép qua điện thoại/Zalo, ADMIN bấm **bút chì cạnh ngày**, chọn **Sáng / Chiều / Cả ngày**, chọn **Nghỉ có phép / Muộn có phép**, nhập người cho phép cùng lý do rồi **Lưu xác nhận**. Có thể làm ngay cả khi không có lượt quẹt. **Đặt lại tự động** chỉ gỡ xác nhận riêng của Admin; đơn đã duyệt vẫn áp dụng. Mỗi lần lưu/đặt lại có lịch sử người thực hiện; chọn cả ngày lưu hai buổi cùng một giao dịch.
+5. Giờ quẹt và xác nhận phép được lưu riêng. Nếu cần sửa giờ thực tế, ADMIN mở bút chì rồi dùng phần **Giờ chấm công thực tế**; phần này chỉ xuất hiện khi đã có mốc chấm. Nhân sự không còn hoạt động vẫn xem được đơn và giờ lịch sử, nhưng không tạo xác nhận phép mới.
+6. Vắng chưa có đơn và chưa xác minh đủ dữ liệu nguồn được giữ ở **Chờ dữ liệu**, không tự coi là nghỉ có phép hoặc không phép. Lần đồng bộ thành công không chứng minh máy đã gửi đủ lượt quẹt. Giao diện gọn này không tự xác nhận dữ liệu nguồn cho toàn công ty.
 
 ## Quy tắc và phạm vi
 
@@ -16,7 +17,7 @@
 - Lượt quẹt đơn lẻ chưa rõ vào/ra, thiếu giờ ra, mốc giờ tương lai hoặc ngày trước khi tạo tài khoản chưa có căn cứ được giữ ở **Cần kiểm tra**. Khi có thêm mốc máy hoặc chỉnh giờ hợp lệ, kết quả tự đối chiếu lại.
 - Các ngày có dữ liệu lịch sử/đơn đã duyệt vẫn được đối chiếu ngay cả khi trước ngày tạo tài khoản. Ngày tạo tài khoản không được coi là ngày bắt đầu đi làm.
 - Xác nhận mới theo buổi không bị mất khi đồng bộ lại. Đường sửa cờ đi muộn cũ trên API đã được ngừng dùng; dùng xác nhận theo buổi để có lý do và lịch sử đầy đủ.
-- Kết quả trong khung đối chiếu là phân loại mới theo buổi. Tổng hợp tháng/Đánh giá và thông báo nhóm chưa được chuyển sang cơ chế mới trong bước 1–4 này.
+- Trạng thái trong chi tiết là phân loại theo buổi. Tổng ngày công/giờ trên thẻ vẫn dựa vào chấm công thực tế; ngày nghỉ có phép không tự cộng giờ làm. Đánh giá và thông báo nhóm chưa được chuyển sang cơ chế mới.
 
 ## Triển khai
 

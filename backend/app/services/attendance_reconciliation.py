@@ -192,6 +192,8 @@ def assess_day(user, work_date, attendance, leaves, overrides, confirmations, no
             return finish("NEEDS_REVIEW", "Có giờ vào sáng nhưng thiếu giờ ra; chưa đủ căn cứ xác định nghỉ chiều.")
         if before_account:
             return finish("NEEDS_REVIEW", "Chưa có căn cứ lịch làm cho ngày trước khi tạo tài khoản; cần xác minh.")
+        if not user.is_active or not user.is_approved:
+            return finish("NEEDS_REVIEW", "Cần kiểm tra lịch làm lịch sử của nhân sự không còn hoạt động.")
         if session not in complete:
             return finish("WAITING_DATA", "Chưa xác nhận dữ liệu máy đã đủ cho buổi này.")
         return finish("UNEXCUSED_ABSENCE", "Buổi đã kết thúc, dữ liệu đã được xác nhận đủ và chưa có phép hợp lệ.")
@@ -202,14 +204,17 @@ def assess_day(user, work_date, attendance, leaves, overrides, confirmations, no
         "work_date": work_date, "attendance_id": attendance.id if attendance else None,
         "check_in": ci, "check_out": co, "morning": morning, "afternoon": afternoon,
         "needs_attention": any(s["status"] in ATTENTION_STATUSES for s in (morning, afternoon)),
+        "can_edit_permission": bool(user.is_active and user.is_approved),
     }
 
 
 def reconcile(db: Session, company_id: int, from_date: date, to_date: date, user_id=None, now=None):
     now = now or vn_now()
-    users_query = db.query(User).filter(User.company_id == company_id, User.is_active.is_(True), User.is_approved.is_(True))
+    users_query = db.query(User).filter(User.company_id == company_id)
     if user_id is not None:
         users_query = users_query.filter(User.id == user_id)
+    else:
+        users_query = users_query.filter(User.is_active.is_(True), User.is_approved.is_(True))
     users = users_query.order_by(User.full_name, User.id).all()
     ids = [u.id for u in users]
     records = db.query(Attendance).filter(Attendance.company_id == company_id, Attendance.user_id.in_(ids),
