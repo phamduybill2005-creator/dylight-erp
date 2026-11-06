@@ -636,6 +636,14 @@ export default function AttendancePage() {
                                   {new Date(r.work_date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
                                 </span>
 
+                                {user.role === "ADMIN" && (r.check_in || r.check_out) && (
+                                  <AttendanceTimeEditor record={r} formTargetId={`attendance-time-editor-${r.id}`} onSaved={(updated) => {
+                                    setDetailRecs((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+                                    setDayList((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+                                    api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
+                                  }} />
+                                )}
+
                                 {/* Nút sửa/xóa mác đi trễ */}
                                 <button
                                   type="button"
@@ -667,13 +675,7 @@ export default function AttendancePage() {
                                 <span className="font-bold text-steel">{fmtHours(r.worked_minutes)}</span>
                               </div>
                               {user.role === "ADMIN" && (r.check_in || r.check_out) && (
-                                <div className="col-span-2 sm:w-full">
-                                  <AttendanceTimeEditor record={r} onSaved={(updated) => {
-                                    setDetailRecs((prev) => prev.map((item) => item.id === updated.id ? updated : item));
-                                    setDayList((prev) => prev.map((item) => item.id === updated.id ? updated : item));
-                                    api.attendanceSummary(summaryPeriod).then(setSummary).catch(() => {});
-                                  }} />
-                                </div>
+                                <div id={`attendance-time-editor-${r.id}`} className="col-span-2 w-full empty:hidden" />
                               )}
                             </div>
                           ))}

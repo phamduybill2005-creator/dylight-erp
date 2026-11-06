@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { PencilSquareIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import type { Attendance } from "@/lib/types";
 
-export default function AttendanceTimeEditor({ record, onSaved }: {
+export default function AttendanceTimeEditor({ record, onSaved, formTargetId }: {
   record: Attendance;
   onSaved: (updated: Attendance) => void;
+  formTargetId?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [checkIn, setCheckIn] = useState("");
@@ -38,7 +40,7 @@ export default function AttendanceTimeEditor({ record, onSaved }: {
   }
 
   if (!editing) return (
-    <button type="button" title="Sửa giờ vào/ra" aria-label="Sửa giờ vào/ra" className="rounded p-1 text-steel hover:bg-white"
+    <button type="button" title="Sửa giờ vào/ra" aria-label="Sửa giờ vào/ra" className="shrink-0 rounded p-1 text-steel hover:bg-white"
       onClick={() => {
         setCheckIn(record.check_in?.slice(11, 16) || "");
         setCheckOut(record.check_out?.slice(11, 16) || "");
@@ -49,7 +51,7 @@ export default function AttendanceTimeEditor({ record, onSaved }: {
     </button>
   );
 
-  return (
+  const editor = (
     <div className="flex max-w-full flex-wrap items-end gap-2 whitespace-normal">
       <label className="text-[10px] text-muted">Giờ vào
         <input type="time" value={checkIn} disabled={saving} onChange={(e) => setCheckIn(e.target.value)}
@@ -64,4 +66,6 @@ export default function AttendanceTimeEditor({ record, onSaved }: {
       {error && <p role="alert" className="w-full text-xs text-bad">{error}</p>}
     </div>
   );
+  const target = formTargetId ? document.getElementById(formTargetId) : null;
+  return target ? createPortal(editor, target) : editor;
 }

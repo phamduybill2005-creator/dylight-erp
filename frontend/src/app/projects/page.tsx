@@ -1125,7 +1125,7 @@ export default function ProjectsPage() {
               <col className="w-[50px]" />   {/* Time in */}
               <col className="w-[50px]" />   {/* Time out */}
               <col className="w-[50px]" />   {/* Time due */}
-              <col className="w-[66px]" />   {/* Manual time */}
+              <col className="w-[96px]" />   {/* Manual time */}
               <col className="w-[60px]" />   {/* Real time */}
               <col className="w-[88px]" />   {/* Trạng thái — đủ chứa "Hoàn thành" 1 dòng */}
               {showRevenue && <col className="w-[104px]" />}  {/* Doanh thu */}
@@ -1147,7 +1147,7 @@ export default function ProjectsPage() {
               <col className="w-[64px]" />   {/* Time in */}
               <col className="w-[64px]" />   {/* Time out */}
               <col className="w-[64px]" />   {/* Time due */}
-              <col className="w-[84px]" />   {/* Manual time */}
+              <col className="w-[96px]" />   {/* Manual time */}
               <col className="w-[74px]" />   {/* Real time */}
               {/* Trạng thái: nhãn "Hoàn thành" đo được 74px + padding 12 = 86px
                   -> lấy 92px, trước để 82px nên bị xuống dòng. */}

@@ -28,7 +28,7 @@ import { getProjectDept, isBanDoView } from "@/lib/groups";
 import { parseBanDoDetails, analysisNumber, isBanDoTicked, tickInputClass } from "@/lib/bando-details";
 import { BANDO_HOUR_COLUMNS, hoursByColumn, formatGroupHours, type ProjectGroupHours } from "@/lib/bando-hours";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { formatVND, todayLocal } from "@/lib/format";
+import { formatVND, formatDate, todayLocal } from "@/lib/format";
 import { pickJpyRate, computeRevenueVnd, parseJpyInput } from "@/lib/revenue";
 import type { Project, User, Timesheet } from "@/lib/types";
 import { revenueMobileFacts } from "@/lib/mobile-view-models";
@@ -278,7 +278,7 @@ export default function RevenuePage() {
 
   // Bố cục Phòng Bản đồ (cùng điều kiện với bảng Dự án): thêm Vùng + 9 cột giờ chỉ xem sau Tên dự án.
   const isBanDoMode = isBanDoView(filterDept, me);
-  const colCount = isBanDoMode ? 10 + BANDO_HOUR_COLUMNS.length : 9;
+  const colCount = isBanDoMode ? 11 + BANDO_HOUR_COLUMNS.length : 10;
   // Bề rộng từng cột giờ: tên dài (HoverMaps, Grid_XML, トレース) cần rộng hơn để không bị cắt chữ.
   const BANDO_COL_W: Record<string, string> = { hovermaps: "w-[76px]", grid: "w-[66px]", trace: "w-[60px]", ground: "w-[58px]" };
 
@@ -579,6 +579,7 @@ export default function RevenuePage() {
                 <p className="mt-0.5 text-xl font-extrabold text-emerald-800 tnum">{facts.revenue > 0 ? formatVND(facts.revenue) : "—"}</p>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="col-span-2 rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">TIME DUE</p><p className="mt-0.5 font-bold text-ink tnum">{formatDate(project.internal_deadline)}</p></div>
                 <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Time ({monthLabel})</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(monthHoursByProject[project.id] || 0)}h</p></div>
                 <div className="rounded-lg bg-paper px-2.5 py-2" onClick={(event) => event.stopPropagation()}>
                   <p className="text-[10px] text-muted">TIME KHÁCH HÀNG ({monthLabel})</p>
@@ -596,7 +597,7 @@ export default function RevenuePage() {
 
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
       <div className="mt-3 hidden max-h-[calc(100vh-200px)] overflow-auto rounded-xl2 border border-line bg-white shadow-card lg:block">
-        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1600px]" : "min-w-[1080px]"}`}>
+        <table className={`w-full table-fixed border-collapse text-[11px] ${isBanDoMode ? "min-w-[1690px]" : "min-w-[1170px]"}`}>
           <colgroup>
             <col className="w-[40px]" />{/* STT */}
             <col className="w-[26px]" />{/* Ghim ★ */}
@@ -611,6 +612,7 @@ export default function RevenuePage() {
                 {BANDO_HOUR_COLUMNS.map((c) => <col key={c.key} className={BANDO_COL_W[c.key] ?? "w-[52px]"} />)}
               </>
             )}
+            <col className="w-[90px]" />{/* Time due */}
             <col className="w-[84px]" />{/* Time (Month) */}
             <col className="w-[140px]" />{/* TIME KHÁCH HÀNG (Month) */}
             <col className="w-[84px]" />{/* Time (All) */}
@@ -637,6 +639,9 @@ export default function RevenuePage() {
                   ))}
                 </>
               )}
+              <th className={`${TH} text-center`} title="Hạn nội bộ — lấy từ cột TIME DUE bên Dự án">
+                TIME DUE
+              </th>
               <th className={`${TH} text-center`} title={`Thời gian làm thực tế người làm đã nhập trong tháng ${monthLabel}`}>
                 Time <span className="block text-[9px] font-normal normal-case text-slate-500">({monthLabel})</span>
               </th>
@@ -777,6 +782,10 @@ export default function RevenuePage() {
                       </>
                     );
                   })()}
+
+                  <td className={`${TD} whitespace-nowrap text-center tnum`} title={p.internal_deadline || ""}>
+                    {formatDate(p.internal_deadline)}
+                  </td>
 
                   {/* TIME (MONTH) — giờ realtime người làm nhập trong tháng đang xem */}
                   <td className={`${TD} whitespace-nowrap text-center`}>
