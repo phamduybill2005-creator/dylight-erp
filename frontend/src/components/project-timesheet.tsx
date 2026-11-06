@@ -487,7 +487,8 @@ export default function ProjectTimesheet({
         </div>
       )}
 
-      <div className="mt-3 overflow-x-auto">
+      {/* Máy tính cuộn theo trang; điện thoại cuộn trong bảng để giữ cả tiêu đề ngày và cột tên. */}
+      <div className="mt-3 max-h-[calc(100dvh-8rem)] overflow-auto lg:max-h-none lg:overflow-visible">
         <table className="w-full min-w-[850px] table-fixed border-collapse text-xs">
           <colgroup>
             <col className="w-[45px]" />
@@ -499,7 +500,8 @@ export default function ProjectTimesheet({
             ))}
             <col className="w-[60px]" />
           </colgroup>
-          <thead>
+          {/* Thanh menu cao 56px và viền 1px; tiêu đề luôn nằm ngay dưới menu khi cuộn trang. */}
+          <thead className="sticky top-0 z-20 bg-slate-800 shadow-sm lg:top-[57px]">
             <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-[10px] uppercase tracking-wide text-white">
               <th className="px-2 py-2 text-center font-semibold border-r border-slate-600">STT</th>
               {/* Ô dính phải có NỀN ĐỤC riêng (hàng dùng gradient nên không kế thừa được), nếu không
