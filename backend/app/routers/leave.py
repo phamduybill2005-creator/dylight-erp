@@ -9,6 +9,7 @@ from sqlalchemy import func, update
 from sqlalchemy.orm import Session
 
 from app.audit import log_activity
+from app.config import settings
 from app.events import publish
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
@@ -100,6 +101,14 @@ def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: U
                  zalo: LeaveZaloService = Depends(get_leave_zalo_service)):
     if payload.to_date < payload.from_date:
         raise HTTPException(400, "Ngày kết thúc phải sau ngày bắt đầu.")
+    if payload.allowed_arrival_time:
+        kind = (payload.leave_type or "FULL").upper()
+        minute = int(payload.allowed_arrival_time[:2]) * 60 + int(payload.allowed_arrival_time[3:])
+        if kind not in ("LATE", "LATE_MORNING", "LATE_AFTERNOON"):
+            raise HTTPException(400, "Chỉ đơn đi muộn mới có giờ được phép đến.")
+        if ((kind in ("LATE", "LATE_MORNING") and minute > settings.MORNING_END_MIN)
+                or (kind == "LATE_AFTERNOON" and minute <= settings.MORNING_END_MIN)):
+            raise HTTPException(400, "Giờ được phép đến phải thuộc buổi xin đi muộn.")
 
     # QUY TẮC 19H (mọi loại nghỉ + đi muộn): đơn nghỉ bắt đầu ngày N phải gửi
     # TRƯỚC 19:00 ngày N-1. Gửi sau mốc đó (kể cả xin cho chính hôm nay hay

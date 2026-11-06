@@ -220,13 +220,17 @@ class ActivityLogTests(unittest.TestCase):
 
     def test_late_override_logged_but_note_only_is_not(self):
         self.current = self.director
-        self.client.put(f"/attendance/{self.att_id}", json={"note": "tắc đường"})
+        resp = self.client.put(f"/attendance/{self.att_id}", json={"note": "tắc đường"})
+        self.assertEqual(resp.status_code, 200, resp.text)
         self.assertEqual(self._logs(), [])
 
         resp = self.client.put(f"/attendance/{self.att_id}", json={"is_late_override": False})
-        self.assertEqual(resp.status_code, 200, resp.text)
-        [log] = self._logs("attendance.late_override")
-        self.assertEqual(log.detail, "N.V.HOA · 14/09/2026: tính đi muộn → không tính đi muộn")
+        self.assertEqual(resp.status_code, 403, resp.text)
+        self.assertEqual(self._logs(), [])
+        with self.sessions() as db:
+            rec = db.get(Attendance, self.att_id)
+            self.assertIsNone(rec.is_late_override)
+            self.assertEqual(rec.note, "tắc đường")
 
     # --------- Trang nhật ký: nhãn tiếng Việt ---------
 

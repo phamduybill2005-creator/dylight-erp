@@ -877,6 +877,7 @@ class LeaveCreate(BaseModel):
     from_date: date
     to_date: date
     leave_type: str | None = "FULL"
+    allowed_arrival_time: str | None = Field(default=None, pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
     reason: str | None = None
 
 
@@ -892,6 +893,7 @@ class LeaveOut(BaseModel):
     from_date: date
     to_date: date
     leave_type: str | None = "FULL"
+    allowed_arrival_time: str | None = None
     reason: str | None = None
     status: LeaveStatus
     source: str | None = "LEAVE"

@@ -20,6 +20,7 @@ import { api } from "@/lib/api";
 import { canDecideLinkedLeave, leaveLoginPath, linkedLeaveId } from "@/lib/leave-links";
 import { isManagerUp, isDirector } from "@/lib/roles";
 import { formatDate, todayLocal } from "@/lib/format";
+import { lateArrivalLabel, validateArrivalTime } from "@/lib/attendance-reconciliation";
 import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
 
 // Danh sách LÝ DO nghỉ phép cố định — người xin nghỉ chỉ được chọn 1 trong các mục này.
@@ -122,6 +123,7 @@ function LeaveContent() {
   const [leaveType, setLeaveType] = useState("FULL");
   const [leaveCategory, setLeaveCategory] = useState<"LEAVE" | "LATE">("LEAVE");
   const [lateSlot, setLateSlot] = useState<"MORNING" | "AFTERNOON">("MORNING");
+  const [allowedArrivalTime, setAllowedArrivalTime] = useState("");
   const [reason, setReason] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);   // lỗi backend trả về (VD quá hạn 19h)
   const [saving, setSaving] = useState(false);
@@ -221,6 +223,10 @@ function LeaveContent() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!fromDate || !toDate || !reason) return;   // bắt buộc chọn 1 lý do
+    if (!validateArrivalTime(leaveCategory, allowedArrivalTime)) {
+      setSubmitError("Vui lòng nhập giờ được phép đến muộn (HH:MM).");
+      return;
+    }
     setSaving(true);
     setSubmitError(null);
     setSubmitResult(null);
@@ -228,7 +234,7 @@ function LeaveContent() {
       const finalType = leaveCategory === "LATE"
         ? (lateSlot === "AFTERNOON" ? "LATE_AFTERNOON" : "LATE_MORNING")
         : leaveType;
-      const saved = await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: finalType, reason: reason || null });
+      const saved = await api.createLeave({ from_date: fromDate, to_date: toDate, leave_type: finalType, reason: reason || null, allowed_arrival_time: leaveCategory === "LATE" ? allowedArrivalTime : null });
       setSubmitResult(saved.zalo?.status === "sent"
         ? "Đã lưu đơn trên ERP và gửi thông báo vào nhóm Zalo."
         : saved.zalo?.status === "failed"
@@ -237,6 +243,7 @@ function LeaveContent() {
             ? "Đã lưu đơn trên ERP. Thông báo Zalo chưa được bật hoặc chưa đủ cấu hình."
             : "Đã lưu đơn trên ERP.");
       setFromDate(""); setToDate(""); setLeaveType("FULL"); setLeaveCategory("LEAVE"); setLateSlot("MORNING"); setReason("");
+      setAllowedArrivalTime("");
       setRequestFormOpen(false);
       setMine((old) => [saved, ...old]);
       // A refresh failure after a successful save must not invite resubmission.
@@ -348,10 +355,10 @@ function LeaveContent() {
 
   const formatDaysDisplay = (l: LeaveRequest) => {
     if (l.leave_type === "LATE_MORNING" || l.leave_type === "LATE") {
-      return <span className="inline-flex items-center rounded-md bg-[#0284c7]/15 px-2 py-0.5 text-[11px] font-semibold text-[#0284c7] border border-[#0284c7]/30">Đi muộn sáng</span>;
+      return <span className="inline-flex flex-col rounded-md bg-[#0284c7]/15 px-2 py-0.5 text-[11px] font-semibold text-[#0284c7] border border-[#0284c7]/30"><span>Đi muộn sáng</span><span className="text-[10px]">{lateArrivalLabel(l)}</span></span>;
     }
     if (l.leave_type === "LATE_AFTERNOON") {
-      return <span className="inline-flex items-center rounded-md bg-[#0d9488]/15 px-2 py-0.5 text-[11px] font-semibold text-[#0d9488] border border-[#0d9488]/30">Đi muộn chiều</span>;
+      return <span className="inline-flex flex-col rounded-md bg-[#0d9488]/15 px-2 py-0.5 text-[11px] font-semibold text-[#0d9488] border border-[#0d9488]/30"><span>Đi muộn chiều</span><span className="text-[10px]">{lateArrivalLabel(l)}</span></span>;
     }
     if (l.leave_type === "MORNING") return `${l.days} (Sáng)`;
     if (l.leave_type === "AFTERNOON") return `${l.days} (Chiều)`;
@@ -390,6 +397,7 @@ function LeaveContent() {
                 <div><dt className="text-slate-500">Đến ngày</dt><dd>{formatDate(linkedLeave.to_date)}</dd></div>
                 <div><dt className="text-slate-500">{linkedLeave.leave_type?.startsWith("LATE") ? "Buổi đi muộn" : "Thời gian nghỉ"}</dt><dd>{LEAVE_TIME_LABEL[linkedLeave.leave_type || "FULL"] || linkedLeave.leave_type}</dd></div>
                 <div><dt className="text-slate-500">Nghỉ phép</dt><dd>{linkedLeave.leave_type?.startsWith("LATE") ? "Đi muộn" : "Nghỉ"}</dd></div>
+                {linkedLeave.leave_type?.startsWith("LATE") && <div><dt className="text-slate-500">Giờ được phép đến muộn</dt><dd>{lateArrivalLabel(linkedLeave)}</dd></div>}
                 <div><dt className="text-slate-500">Lý do</dt><dd className="whitespace-pre-wrap break-words">{linkedLeave.reason || "—"}</dd></div>
                 {linkedLeave.decided_by_name && <div><dt className="text-slate-500">Người xử lý</dt><dd>{linkedLeave.decided_by_name}</dd></div>}
               </dl>
@@ -469,6 +477,10 @@ function LeaveContent() {
             </select>
           </div>
         </div>
+        {leaveCategory === "LATE" && <label className="mt-3 block text-[11px] font-semibold text-muted">Giờ được phép đến muộn *
+          <input type="time" required value={allowedArrivalTime} onChange={e => setAllowedArrivalTime(e.target.value)} className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel sm:max-w-xs" />
+          <span className="mt-1 block font-normal">Ghi giờ dự kiến đến để người duyệt xác nhận; đến quá giờ này vẫn được đối chiếu là muộn không phép.</span>
+        </label>}
         {submitError && (
           <p className="mt-3 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[11px] font-semibold text-bad">
             {submitError}
@@ -479,7 +491,7 @@ function LeaveContent() {
             ⏰ Đơn phải gửi <b className="text-ink">trước 19h ngày hôm trước</b> ngày nghỉ — gửi sau
             sẽ không được xét duyệt.
           </p>
-          <button type="submit" disabled={saving || !fromDate || !toDate || !reason}
+          <button type="submit" disabled={saving || !fromDate || !toDate || !reason || !validateArrivalTime(leaveCategory, allowedArrivalTime)}
             className="flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
             <PaperAirplaneIcon className="h-4 w-4" /> {saving ? "Đang gửi…" : "Gửi đơn"}
           </button>

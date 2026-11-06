@@ -3,6 +3,7 @@
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 import type { NotificationSendResult } from "./notification-send-result";
 import { leaveLoginPath } from "./leave-links";
+import type { AttendanceReconciliation, AttendanceReconciliationRow, AttendancePermissionPayload, AttendanceDataConfirmation, AttendanceSession } from "./types";
 
 import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, EvaluationMonthReview, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 import type { ProjectGroupHours } from "./bando-hours";
@@ -114,6 +115,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
     throw new Error(detail?.detail || `Lỗi máy chủ (${res.status}).`);
+  }
+  // Refresh mounted reconciliation after local punch/leave changes as well as SSE/polling.
+  if (init.method && !["GET", "HEAD"].includes(init.method.toUpperCase()) && /^\/(attendance|leave)(\/|$)/.test(path)
+    && typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(new Event("attendance-reconciliation-changed"));
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -353,6 +359,15 @@ export const api = {
     ),
 
   // --- Attendance (Chấm công) ---
+  attendanceReconciliation: (fromDate: string, toDate: string, userId?: number) => {
+    const qs = new URLSearchParams({ from_date: fromDate, to_date: toDate });
+    if (userId !== undefined) qs.set("user_id", String(userId));
+    return request<AttendanceReconciliation>(`/attendance/reconciliation?${qs}`);
+  },
+  setAttendancePermission: (payload: AttendancePermissionPayload) =>
+    request<AttendanceReconciliationRow>("/attendance/reconciliation/override", { method: "PUT", body: JSON.stringify(payload) }),
+  confirmAttendanceData: (payload: { work_date: string; session: AttendanceSession; reason: string }) =>
+    request<AttendanceDataConfirmation>("/attendance/reconciliation/confirm-data", { method: "POST", body: JSON.stringify(payload) }),
   attendanceMe: (fromDate?: string, toDate?: string) => {
     const qs = new URLSearchParams();
     if (fromDate) qs.set("from_date", fromDate);
@@ -455,7 +470,7 @@ export const api = {
   auditLogs: (limit = 200) => request<ActivityLog[]>(`/audit?limit=${limit}`),
 
   // --- Nghỉ phép ---
-  createLeave: (payload: { from_date: string; to_date: string; leave_type?: string | null; reason?: string | null }) =>
+  createLeave: (payload: { from_date: string; to_date: string; leave_type?: string | null; reason?: string | null; allowed_arrival_time?: string | null }) =>
     request<LeaveRequest & { zalo?: { status: "sent" | "failed" | "skipped"; reason?: string } }>("/leave", { method: "POST", body: JSON.stringify(payload) }),
   leave: (id: number) => request<LeaveRequest>(`/leave/${id}`),
   myLeaves: () => request<LeaveRequest[]>("/leave/me"),

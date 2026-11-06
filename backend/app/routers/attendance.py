@@ -23,8 +23,10 @@ from app.schemas import (
     YunattSyncResult, YunattPerson, YunattSyncStatus,
 )
 from app.services import yunatt_service
+from app.routers.attendance_reconciliation import router as reconciliation_router
 
 router = APIRouter(prefix="/attendance", tags=["Chấm công"])
+router.include_router(reconciliation_router)
 
 # Vai trò được xem chấm công toàn công ty (ADMIN tự được phép trong require_roles).
 _MANAGER_ROLES = (UserRole.MANAGER, UserRole.DIRECTOR)
@@ -118,11 +120,13 @@ def _apply_late_exemption(db: Session, company_id: int, records: list[Attendance
     Đơn đi muộn chỉ tạo được khi gửi trước 19h hôm trước (đã chặn ở create_leave),
     nên "được duyệt" đồng nghĩa hợp lệ giờ giấc -> ngày đó không tính đi trễ.
     Chỉ ÁP KHI is_late_override đang None (tức đang tự tính là trễ) — nếu cấp cao
-    đã đè tay (True/False) thì tôn trọng, không ghi đè. Set IN-MEMORY, KHÔNG commit,
-    nên chỉ đổi kết quả trả về của các GET, không sửa dữ liệu gốc.
+    đã đè tay (True/False) thì tôn trọng, không ghi đè. Chỉ đặt thuộc tính Python
+    tạm thời, không sửa cột ORM nên kể cả autoflush cũng không ghi nhầm quyền phép.
     """
     if not records:
         return
+    for record in records:
+        record._leave_late_exempt = False
     uids = {r.user_id for r in records}
     dmin = min(r.work_date for r in records)
     dmax = max(r.work_date for r in records)
@@ -140,16 +144,19 @@ def _apply_late_exemption(db: Session, company_id: int, records: list[Attendance
     )
     if not leaves:
         return
-    # Tập (user_id, ngày) được miễn — đơn đi muộn có thể trải nhiều ngày.
-    exempt: set[tuple[int, date]] = set()
-    for lv in leaves:
-        d = lv.from_date
-        while d <= lv.to_date:
-            exempt.add((lv.user_id, d))
-            d += timedelta(days=1)
     for r in records:
-        if r.is_late_override is None and (r.user_id, r.work_date) in exempt:
-            r.is_late_override = False
+        if r.is_late_override is not None or not r.check_in:
+            continue
+        arrival = r.check_in.hour * 60 + r.check_in.minute
+        kinds = ("LATE_AFTERNOON",) if arrival > settings.MORNING_END_MIN else ("LATE", "LATE_MORNING")
+        for lv in leaves:
+            if lv.user_id != r.user_id or not lv.from_date <= r.work_date <= lv.to_date or lv.leave_type not in kinds:
+                continue
+            allowed = lv.allowed_arrival_time
+            if allowed and arrival > int(allowed[:2]) * 60 + int(allowed[3:]):
+                continue
+            r._leave_late_exempt = True
+            break
 
 
 @router.get("/me", response_model=list[AttendanceOut])
@@ -215,6 +222,11 @@ def update_attendance(
     if not rec or rec.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy bản ghi chấm công.")
 
+    if "is_late_override" in payload.model_fields_set:
+        if current.role != UserRole.ADMIN:
+            raise HTTPException(403, "Chỉ Quản trị hệ thống được xác nhận có phép.")
+        raise HTTPException(400, "Dùng Xác nhận phép theo buổi để lưu người cho phép, lý do và lịch sử.")
+
     time_fields = payload.model_fields_set & {"check_in", "check_out"}
     changes = []
     if time_fields:
@@ -244,8 +256,6 @@ def update_attendance(
                 setattr(rec, f"{field}_corrected", True)
 
     was_late = rec.is_late          # trạng thái đang hiển thị (tự tính hoặc đã đè)
-    if payload.is_late_override is not None:
-        rec.is_late_override = payload.is_late_override
     if payload.note is not None:
         rec.note = payload.note
     db.commit()

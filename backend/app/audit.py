@@ -55,6 +55,8 @@ ACTION_LABELS: dict[str, str] = {
     "timesheet.clear_other": "Xóa sạch giờ công của người khác",
     "attendance.late_override": "Sửa mác đi muộn",
     "attendance.time_edit": "Sửa giờ vào/ra chấm công",
+    "attendance.permission": "Xác nhận có phép theo buổi",
+    "attendance.data_confirmation": "Xác nhận dữ liệu chấm công đã đủ",
 }
 
 ENTITY_LABELS: dict[str, str] = {
@@ -66,6 +68,8 @@ ENTITY_LABELS: dict[str, str] = {
     "project_item": "Hạng mục",
     "timesheet": "Giờ công",
     "attendance": "Chấm công",
+    "attendance_session_override": "Xác nhận có phép",
+    "attendance_data_confirmation": "Dữ liệu chấm công",
 }
 
 ROLE_LABELS: dict[str, str] = {

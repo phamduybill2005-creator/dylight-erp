@@ -327,6 +327,8 @@ def _ensure_schema() -> None:
                     conn.execute(text("ALTER TABLE leave_requests ADD COLUMN leave_type VARCHAR(50) DEFAULT 'FULL'"))
                 if "source" not in cols_leave:
                     conn.execute(text("ALTER TABLE leave_requests ADD COLUMN source VARCHAR(30) DEFAULT 'LEAVE'"))
+                if "allowed_arrival_time" not in cols_leave:
+                    conn.execute(text("ALTER TABLE leave_requests ADD COLUMN allowed_arrival_time VARCHAR(5)"))
                 # Cap nhat tat ca don dang ky lich sinh vien da tao thanh source = 'SCHEDULE' de khong bi hien o Don cua toi
                 conn.execute(text("UPDATE leave_requests SET source = 'SCHEDULE' WHERE reason LIKE 'Đi học%' AND from_date = to_date"))
                 # Ly do "HỌC HÀNH" da doi ten thanh "ĐI HỌC" tren form -> dua don CU

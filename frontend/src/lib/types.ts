@@ -209,6 +209,59 @@ export interface Progress {
 // Chấm công (attendance) — 1 bản ghi / người / ngày.
 export type AttendanceSource = "MANUAL" | "MACHINE" | "API";
 
+export type AttendanceSession = "AM" | "PM";
+export type ReconciliationStatus = "PRESENT" | "EXCUSED_ABSENCE" | "UNEXCUSED_ABSENCE" | "EXCUSED_LATE" | "UNEXCUSED_LATE" | "PENDING_APPROVAL" | "NEEDS_REVIEW" | "WAITING_DATA" | "NOT_SCHEDULED" | "NOT_FINISHED";
+export type AttendancePermissionDecision = "EXCUSED_LATE" | "EXCUSED_ABSENCE";
+export interface AttendancePermissionOverride {
+  decision: AttendancePermissionDecision;
+  reason: string;
+  approved_by: string;
+  recorded_by: string;
+  updated_at: string;
+}
+export interface AttendanceSessionResult {
+  session: AttendanceSession;
+  status: ReconciliationStatus;
+  late_minutes: number;
+  explanation: string;
+  leave_id: number | null;
+  permission_source: "LEAVE" | "ADMIN" | null;
+  override: AttendancePermissionOverride | null;
+  data_confirmed: boolean;
+}
+export interface AttendanceReconciliationRow {
+  user_id: number;
+  full_name: string;
+  department: string | null;
+  work_date: string;
+  attendance_id: number | null;
+  check_in: string | null;
+  check_out: string | null;
+  morning: AttendanceSessionResult;
+  afternoon: AttendanceSessionResult;
+  needs_attention: boolean;
+}
+export interface AttendanceDataConfirmation {
+  work_date: string;
+  session: AttendanceSession;
+  confirmed_by: string;
+  confirmed_at: string;
+  reason: string;
+}
+export interface AttendanceReconciliation {
+  rows: AttendanceReconciliationRow[];
+  confirmations: AttendanceDataConfirmation[];
+  confirmation_available: Record<AttendanceSession, boolean>;
+}
+export interface AttendancePermissionPayload {
+  user_id: number;
+  work_date: string;
+  session: AttendanceSession;
+  decision: AttendancePermissionDecision | null;
+  reason: string;
+  approved_by: string;
+}
+
 export interface Attendance {
   id: number;
   company_id: number;
@@ -402,6 +455,7 @@ export type LeaveType = "FULL" | "MORNING" | "AFTERNOON" | "LATE" | "LATE_MORNIN
 export interface LeaveRequest {
   id: number; company_id: number; user_id: number;
   from_date: string; to_date: string; leave_type?: string | null; reason?: string | null;
+  allowed_arrival_time?: string | null;
   status: LeaveStatus; source?: string | null;
   decided_by_id?: number | null; decided_by_name?: string | null; decided_at?: string | null;
   created_at: string; user_name?: string | null; days: number;

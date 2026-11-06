@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     # Đơn vị: PHÚT trong ngày. Ca sáng 08:00–11:45, ca chiều 13:30–17:00.
     MORNING_END_MIN: int = 11 * 60 + 45       # 11:45 — hết ca sáng
     AFTERNOON_START_MIN: int = 13 * 60 + 30    # 13:30 — vào ca chiều
+    AFTERNOON_END_MIN: int = 17 * 60
+    ATTENDANCE_HOLIDAYS: str = ""  # YYYY-MM-DD, cách nhau dấu phẩy; không tính nghỉ KP.
 
     # --- Máy chấm công ĐẨY TRỰC TIẾP qua giao thức ZKTeco PUSH/ADMS (/iclock) ---
     # Trỏ "địa chỉ máy chủ" trên máy về domain ERP; máy tự gọi /iclock/cdata.

@@ -621,6 +621,8 @@ class Attendance(Base):
         """
         if self.is_late_override is not None:
             return self.is_late_override
+        if getattr(self, "_leave_late_exempt", False):
+            return False
         if not self.check_in:
             return False
         if self.work_date.weekday() == 6:  # 6 = Chủ Nhật
@@ -664,6 +666,42 @@ class Attendance(Base):
             worked_afternoon = ci >= settings.AFTERNOON_START_MIN
         credit = Decimal("0.5") * (worked_morning + worked_afternoon)
         return credit if credit > 0 else Decimal("0.5")
+
+
+class AttendanceSessionOverride(Base):
+    """Permission is separate from real punches and survives subsequent imports."""
+    __tablename__ = "attendance_session_overrides"
+    __table_args__ = (UniqueConstraint("company_id", "user_id", "work_date", "session", name="uq_attendance_session_override"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    work_date: Mapped[date] = mapped_column(Date, index=True)
+    session: Mapped[str] = mapped_column(String(2))
+    decision: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    reason: Mapped[str] = mapped_column(Text)
+    approved_by: Mapped[str] = mapped_column(String(255), default="")
+    recorded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    recorded_by_name: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now, onupdate=vn_now)
+    recorded_by: Mapped["User | None"] = relationship("User", foreign_keys=[recorded_by_id])
+
+
+class AttendanceDataConfirmation(Base):
+    """An administrator verified that a closed session's source data is complete."""
+    __tablename__ = "attendance_data_confirmations"
+    __table_args__ = (UniqueConstraint("company_id", "work_date", "session", name="uq_attendance_data_confirmation"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    work_date: Mapped[date] = mapped_column(Date, index=True)
+    session: Mapped[str] = mapped_column(String(2))
+    reason: Mapped[str] = mapped_column(Text)
+    confirmed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    confirmed_by_name: Mapped[str | None] = mapped_column(String(255))
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now)
+    confirmed_by: Mapped["User | None"] = relationship("User", foreign_keys=[confirmed_by_id])
 
 
 class YunattSyncLog(Base):
@@ -864,6 +902,7 @@ class LeaveRequest(Base):
     from_date: Mapped[date] = mapped_column(Date)
     to_date: Mapped[date] = mapped_column(Date)
     leave_type: Mapped[str | None] = mapped_column(String(50), default="FULL")
+    allowed_arrival_time: Mapped[str | None] = mapped_column(String(5))
     reason: Mapped[str | None] = mapped_column(Text)
     status: Mapped[LeaveStatus] = mapped_column(SAEnum(LeaveStatus), default=LeaveStatus.PENDING)
     source: Mapped[str | None] = mapped_column(String(30), default="LEAVE")  # "LEAVE" (đơn tạo từ mục nghỉ phép) | "SCHEDULE" (đăng ký từ lịch làm việc)
