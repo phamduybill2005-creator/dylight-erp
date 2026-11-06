@@ -8,6 +8,7 @@
 4. Với xin phép qua điện thoại/Zalo, ADMIN bấm **bút chì cạnh ngày**, chọn **Sáng / Chiều / Cả ngày**, chọn **Nghỉ có phép / Muộn có phép**, nhập người cho phép cùng lý do rồi **Lưu xác nhận**. Có thể làm ngay cả khi không có lượt quẹt. **Đặt lại tự động** chỉ gỡ xác nhận riêng của Admin; đơn đã duyệt vẫn áp dụng. Mỗi lần lưu/đặt lại có lịch sử người thực hiện; chọn cả ngày lưu hai buổi cùng một giao dịch.
 5. Giờ quẹt và xác nhận phép được lưu riêng. Nếu cần sửa giờ thực tế, ADMIN mở bút chì rồi dùng phần **Giờ chấm công thực tế**; phần này chỉ xuất hiện khi đã có mốc chấm. Nhân sự không còn hoạt động vẫn xem được đơn và giờ lịch sử, nhưng không tạo xác nhận phép mới.
 6. Vắng chưa có đơn và chưa xác minh đủ dữ liệu nguồn được giữ ở **Chờ dữ liệu**, không tự coi là nghỉ có phép hoặc không phép. Lần đồng bộ thành công không chứng minh máy đã gửi đủ lượt quẹt. Giao diện gọn này không tự xác nhận dữ liệu nguồn cho toàn công ty.
+7. Vào **Đánh giá**, chọn cùng tháng: **Muộn CP/KP** tự tổng hợp theo lần; **Nghỉ CP/KP** theo ngày (mỗi buổi 0,5 ngày). Admin sửa phép, duyệt đơn hoặc đồng bộ chấm công thì số liệu được tính lại khi tải và tự làm mới trên trang. Dấu **buổi chờ đối soát** cho biết còn dữ liệu chưa đủ kết luận; các buổi này chưa tính vi phạm. Muốn điều chỉnh phép, sửa tại ngày chấm công; ba điểm Ý thức, Chất lượng công việc và Tập thể vẫn do Giám đốc nhập.
 
 ## Quy tắc và phạm vi
 
@@ -17,7 +18,7 @@
 - Lượt quẹt đơn lẻ chưa rõ vào/ra, thiếu giờ ra, mốc giờ tương lai hoặc ngày trước khi tạo tài khoản chưa có căn cứ được giữ ở **Cần kiểm tra**. Khi có thêm mốc máy hoặc chỉnh giờ hợp lệ, kết quả tự đối chiếu lại.
 - Các ngày có dữ liệu lịch sử/đơn đã duyệt vẫn được đối chiếu ngay cả khi trước ngày tạo tài khoản. Ngày tạo tài khoản không được coi là ngày bắt đầu đi làm.
 - Xác nhận mới theo buổi không bị mất khi đồng bộ lại. Đường sửa cờ đi muộn cũ trên API đã được ngừng dùng; dùng xác nhận theo buổi để có lý do và lịch sử đầy đủ.
-- Trạng thái trong chi tiết là phân loại theo buổi. Tổng ngày công/giờ trên thẻ vẫn dựa vào chấm công thực tế; ngày nghỉ có phép không tự cộng giờ làm. Đánh giá và thông báo nhóm chưa được chuyển sang cơ chế mới.
+- Trạng thái trong chi tiết là phân loại theo buổi. Tổng ngày công/giờ trên thẻ vẫn dựa vào chấm công thực tế; ngày nghỉ có phép không tự cộng giờ làm. Tab Đánh giá và Excel dùng cùng số tự tổng hợp; không cộng trùng đơn nghỉ, không tính ngày tương lai. Số chấm công nhập tay cũ vẫn giữ trong cơ sở dữ liệu nhưng không thay thế kết quả đối chiếu. Chưa tự trừ điểm đánh giá hoặc gửi thông báo nhóm.
 
 ## Triển khai
 

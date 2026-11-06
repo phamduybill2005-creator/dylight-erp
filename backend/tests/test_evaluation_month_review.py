@@ -1,14 +1,14 @@
-"""Bảng đánh giá tháng NHẬP TAY (Muộn CP/KP, Nghỉ CP/KP, Ý thức / Chất lượng CV / Tập thể).
+"""Điểm đánh giá nhập tay và số chấm công được đối chiếu tự động theo tháng.
 
 - PUT /evaluations/month-reviews/{user_id}/{YYYY-MM}: chỉ Giám đốc; gửi trường nào sửa trường đó.
-- GET /evaluations/month-reviews: dòng theo (người, tháng) kèm leave_cp_auto tính từ đơn nghỉ
-  đã duyệt (bỏ lịch sinh viên source="SCHEDULE", bỏ đơn đi muộn, bỏ Chủ nhật).
+- GET /evaluations/month-reviews: dòng theo (người, tháng); số chấm công không bị ghi đè.
 
 Chạy từ thư mục backend: python -m unittest tests.test_evaluation_month_review -v
 """
 import os
 import unittest
-from datetime import date
+from datetime import date, datetime
+from unittest.mock import patch
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["DEBUG"] = "true"
@@ -27,6 +27,9 @@ from app.routers.evaluations import router
 
 class EvaluationMonthReviewTests(unittest.TestCase):
     def setUp(self):
+        clock = patch("app.services.attendance_reconciliation.vn_now", return_value=datetime(2026, 12, 31, 18))
+        clock.start()
+        self.addCleanup(clock.stop)
         self.engine = create_engine(
             "sqlite+pysqlite:///:memory:",
             connect_args={"check_same_thread": False},
@@ -85,14 +88,14 @@ class EvaluationMonthReviewTests(unittest.TestCase):
         return {(r["user_id"], r["month"]): r for r in res.json()}
 
     def test_director_partial_updates_keep_other_fields(self):
-        res = self._put(self.staff.id, "2026-11", {"late_cp": 1, "score_quality": 40})
+        res = self._put(self.staff.id, "2026-11", {"score_attitude": 10, "score_quality": 40})
         self.assertEqual(res.status_code, 200, res.text)
-        self.assertEqual((res.json()["late_cp"], res.json()["score_quality"], res.json()["score_attitude"]), (1.0, 40.0, None))
+        self.assertEqual((res.json()["late_cp"], res.json()["score_quality"], res.json()["score_attitude"]), (0.0, 40.0, 10.0))
         res = self._put(self.staff.id, "2026-11", {"score_attitude": 20, "score_team": 22.5})
         row = res.json()
-        self.assertEqual((row["late_cp"], row["score_quality"], row["score_attitude"], row["score_team"]), (1.0, 40.0, 20.0, 22.5))
+        self.assertEqual((row["late_cp"], row["score_quality"], row["score_attitude"], row["score_team"]), (0.0, 40.0, 20.0, 22.5))
         # Xoá trắng 1 ô
-        self.assertIsNone(self._put(self.staff.id, "2026-11", {"late_cp": None}).json()["late_cp"])
+        self.assertIsNone(self._put(self.staff.id, "2026-11", {"score_team": None}).json()["score_team"])
 
     def test_score_limits_and_month_format(self):
         self.assertEqual(self._put(self.staff.id, "2026-11", {"score_attitude": 26}).status_code, 422)
@@ -105,7 +108,9 @@ class EvaluationMonthReviewTests(unittest.TestCase):
     def test_only_director_writes_admin_can_read(self):
         self.current = self.admin
         self.assertEqual(self._put(self.staff.id, "2026-11", {"late_kp": 2}).status_code, 403)
-        self.assertEqual(self._get("2026-11", "2026-11"), {})
+        rows = self._get("2026-11", "2026-11")
+        self.assertEqual({uid for uid, month in rows}, {self.director.id, self.admin.id, self.staff.id})
+        self.assertTrue(all(row["leave_kp"] == 0 for row in rows.values()))
         self.current = self.staff
         self.assertEqual(self.client.get("/evaluations/month-reviews",
                                          params={"from_month": "2026-11", "to_month": "2026-11"}).status_code, 403)
@@ -118,20 +123,21 @@ class EvaluationMonthReviewTests(unittest.TestCase):
         self._leave(self.staff, "2026-11-10", "2026-11-10", leave_type="LATE_MORNING")      # đi muộn: không tính
         self._leave(self.staff, "2026-11-11", "2026-11-11", source="SCHEDULE")                # lịch sinh viên: không tính
         self._leave(self.staff, "2026-11-12", "2026-11-12", status=LeaveStatus.PENDING)       # chưa duyệt: không tính
-        self._leave(self.staff, "2026-10-30", "2026-11-02")                                   # vắt tháng: 30,31/10 -> T10; 2/11 trùng ngày đã nghỉ -> cộng dồn
+        self._leave(self.staff, "2026-10-30", "2026-11-02")                                   # vắt tháng: trùng 2/11 không được cộng hai lần
         rows = self._get("2026-10", "2026-11")
-        self.assertEqual(rows[(self.staff.id, "2026-11")]["leave_cp_auto"], 5.5)
+        self.assertEqual(rows[(self.staff.id, "2026-11")]["leave_cp_auto"], 4.5)
         self.assertEqual(rows[(self.staff.id, "2026-10")]["leave_cp_auto"], 2.0)
-        self.assertIsNone(rows[(self.staff.id, "2026-11")]["leave_cp"])
-        # Giám đốc ghi đè -> leave_cp có giá trị, số tự tính vẫn trả kèm
-        row = self._put(self.staff.id, "2026-11", {"leave_cp": 4}).json()
-        self.assertEqual((row["leave_cp"], row["leave_cp_auto"]), (4.0, 5.5))
+        self.assertEqual(rows[(self.staff.id, "2026-11")]["leave_cp"], 4.5)
+        # Điều chỉnh phép tại ngày chấm công; không ghi đè số tổng hợp nữa.
+        self.assertEqual(self._put(self.staff.id, "2026-11", {"leave_cp": 4}).status_code, 400)
 
     def test_quarter_range_returns_each_month(self):
         self._put(self.staff.id, "2026-10", {"score_quality": 30})
         self._put(self.staff.id, "2026-12", {"score_quality": 45})
         rows = self._get("2026-10", "2026-12")
-        self.assertEqual(set(rows), {(self.staff.id, "2026-10"), (self.staff.id, "2026-12")})
+        self.assertEqual(set(rows), {(user.id, month) for user in (self.staff, self.director, self.admin)
+                                    for month in ("2026-10", "2026-11", "2026-12")})
+        self.assertEqual(rows[(self.staff.id, "2026-12")]["score_quality"], 45)
         self.assertEqual(self.client.get("/evaluations/month-reviews",
                                          params={"from_month": "2026-12", "to_month": "2026-10"}).status_code, 400)
 

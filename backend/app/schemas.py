@@ -619,12 +619,12 @@ class EvaluationOverviewRow(BaseModel):
     department: str | None = None
     office_hours: float = 0        # giờ có mặt theo chấm công (đã trừ nghỉ trưa)
     project_hours: float = 0       # tổng giờ khai ở bảng tiến độ dự án (timesheets)
-    late_days: int = 0             # số ngày đi muộn (đã miễn ngày có đơn đi muộn được duyệt)
+    late_days: int = 0             # số ngày UNEXCUSED_LATE từ đối chiếu chấm công theo buổi
     my_rating: int | None = None   # sao NGƯỜI XEM đã chấm người này trong khoảng ngày; None = chưa chấm
 
 
 class EvaluationMonthReviewIn(BaseModel):
-    """Giám đốc nhập/sửa ô của bảng đánh giá tháng: chỉ gửi trường cần đổi; None = xoá trắng."""
+    """Giám đốc sửa điểm; trường chấm công cũ được nhận diện để trả lỗi hướng dẫn."""
     late_cp: Decimal | None = Field(default=None, ge=0, le=100)
     late_kp: Decimal | None = Field(default=None, ge=0, le=100)
     leave_cp: Decimal | None = Field(default=None, ge=0, le=100)
@@ -637,14 +637,15 @@ class EvaluationMonthReviewIn(BaseModel):
 class EvaluationMonthReviewOut(BaseModel):
     user_id: int
     month: str                           # "YYYY-MM"
-    late_cp: float | None = None
-    late_kp: float | None = None
-    leave_cp: float | None = None        # None = chưa ghi đè -> giao diện dùng leave_cp_auto
-    leave_kp: float | None = None
+    late_cp: float = 0                   # số lần muộn có phép từ đối chiếu chấm công
+    late_kp: float = 0
+    leave_cp: float = 0                  # số ngày nghỉ; mỗi buổi = 0,5 ngày
+    leave_kp: float = 0
+    attendance_pending_sessions: int = 0 # chưa tính vi phạm: thiếu căn cứ hoặc đơn chờ duyệt
     score_attitude: float | None = None  # % tối đa 25
     score_quality: float | None = None   # % tối đa 50
     score_team: float | None = None      # % tối đa 25
-    leave_cp_auto: float = 0             # ngày nghỉ CÓ PHÉP tự tính từ đơn nghỉ đã duyệt trong tháng
+    leave_cp_auto: float = 0             # alias leave_cp cho các client cũ
 
 
 # --------- Đánh giá theo DỰ ÁN (chấm chéo 360° giữa các thành viên) ---------

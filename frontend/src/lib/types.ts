@@ -630,18 +630,19 @@ export interface EvaluationOverviewRow {
   my_rating?: number | null;    // sao mình đã chấm trong tháng; null = chưa chấm
 }
 
-// Bảng đánh giá tháng NHẬP TAY (chỉ Giám đốc nhập): 1 dòng = (người, tháng "YYYY-MM").
+// Đánh giá theo người/tháng: chấm công từ đối soát, điểm do Giám đốc nhập.
 export interface EvaluationMonthReview {
   user_id: number;
   month: string;
-  late_cp?: number | null;         // ngày đi muộn có phép
-  late_kp?: number | null;         // ngày đi muộn không phép
-  leave_cp?: number | null;        // ngày nghỉ có phép; null = chưa ghi đè -> dùng leave_cp_auto
-  leave_kp?: number | null;        // ngày nghỉ không phép
+  late_cp: number;                 // lần đi muộn có phép
+  late_kp: number;                 // lần đi muộn không phép
+  leave_cp: number;                // ngày nghỉ có phép (0,5 ngày/buổi)
+  leave_kp: number;                // ngày nghỉ không phép (0,5 ngày/buổi)
+  attendance_pending_sessions: number; // buổi chưa đủ kết luận, không tính vi phạm
   score_attitude?: number | null;  // Ý thức (%), tối đa 25
   score_quality?: number | null;   // Chất lượng công việc (%), tối đa 50
   score_team?: number | null;      // Tập thể (%), tối đa 25
-  leave_cp_auto: number;           // ngày nghỉ có phép TỰ TÍNH từ đơn nghỉ đã duyệt
+  leave_cp_auto: number;           // alias tương thích của leave_cp
 }
 
 

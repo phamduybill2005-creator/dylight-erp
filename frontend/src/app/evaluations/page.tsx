@@ -8,7 +8,7 @@
 //    time / Đi muộn) + bấm sao chấm mọi người (TRỪ Giám đốc — không ai chấm Giám đốc) + xuất Excel.
 //  Mỗi người (trừ Giám đốc) có mục RIÊNG TƯ "Đánh giá tôi nhận được" theo tháng: ai chấm mình bao nhiêu sao.
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, ChevronRightIcon, FunnelIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
@@ -242,10 +242,16 @@ export default function EvaluationsPage() {
   const [selMonth, setSelMonth] = useStickyState("evaluations.month", monthLocal());   // tháng đang chọn (bảng GĐ / form Nhân viên); nhớ qua F5
   const [overview, setOverview] = useState<EvaluationOverviewRow[]>([]);   // bảng đánh giá tháng
   const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewError, setOverviewError] = useState("");
+  const [overviewKey, setOverviewKey] = useState("");
+  const overviewRequest = useRef(0);
+  const tableVisit = useRef(0);
+  const scoreRevision = useRef(0);
+  const savedScores = useRef<Record<string, { revision: number; rowKey: string; field: ScoreField; value: number | null | undefined }>>({});
   const [rateMsg, setRateMsg] = useState("");
   // Lọc theo QUÝ (1–4) của năm đang chọn; "" = xem theo tháng. Quý chỉ XEM cộng dồn; nhập theo tháng.
   const [selQuarter, setSelQuarter] = useStickyState("evaluations.quarter", "");
-  // Bảng đánh giá tháng NHẬP TAY (Giám đốc nhập): {`${user_id}:${month}`: dòng} + nháp ô đang gõ.
+  // Điểm Giám đốc nhập và số liệu chấm công đã đối soát theo người/tháng.
   const [reviews, setReviews] = useState<Record<string, EvaluationMonthReview>>({});
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -274,28 +280,59 @@ export default function EvaluationsPage() {
   const periodTo = monthRange(periodMonths[periodMonths.length - 1])[1];
   const periodLabel = isQuarter ? `quý ${selQuarter}/${selMonth.slice(0, 4)}` : `tháng ${fmtMonth(selMonth)}`;
 
-  // Bảng đánh giá: Office time / Project time cộng cả kỳ (cùng khoảng ngày với Excel ở Tổng hợp
-  // chấm công) + các ô nhập tay theo từng tháng trong kỳ.
-  useEffect(() => {
-    if (!user || !MONTH_TABLE_ROLES.includes(user.role)) return;
-    let alive = true;
+  const tableKey = `${user?.id}:${user?.role}:${periodFrom}:${periodTo}`;
+  const currentTableKey = useRef(tableKey);
+  currentTableKey.current = tableKey;
+  // Cả hai nguồn cùng một kỳ; bỏ qua phản hồi cũ khi đổi kỳ/người hoặc tải lại.
+  const reloadOverview = useCallback(async () => {
+    if (!usesMonthTable) return;
+    const request = ++overviewRequest.current;
+    const startedScoreRevision = scoreRevision.current;
+    const isCurrent = () => currentTableKey.current === tableKey && overviewRequest.current === request;
     setOverviewLoading(true);
-    setRateMsg("");
-    Promise.all([
-      api.evaluationsOverview(periodFrom, periodTo),
-      api.evaluationMonthReviews(periodMonths[0], periodMonths[periodMonths.length - 1]),
-    ])
-      .then(([rows, revs]) => {
-        if (!alive) return;
-        setOverview(rows);
-        const map: Record<string, EvaluationMonthReview> = {};
-        for (const r of revs) map[`${r.user_id}:${r.month}`] = r;
-        setReviews(map);
-      })
-      .catch(() => { if (alive) { setOverview([]); setReviews({}); } })
-      .finally(() => { if (alive) setOverviewLoading(false); });
-    return () => { alive = false; };
-  }, [user, periodFrom, periodTo, periodMonths]);
+    setOverviewError("");
+    try {
+      const [rows, revs] = await Promise.all([
+        api.evaluationsOverview(periodFrom, periodTo),
+        api.evaluationMonthReviews(periodFrom.slice(0, 7), periodTo.slice(0, 7)),
+      ]);
+      if (!isCurrent()) return;
+      setOverview(rows);
+      const map: Record<string, EvaluationMonthReview> = {};
+      for (const r of revs) map[`${r.user_id}:${r.month}`] = r;
+      // Keep score saves acknowledged after this GET started, including newly created rows.
+      setReviews((previous) => {
+        const merged = { ...map };
+        for (const saved of Object.values(savedScores.current)) {
+          if (saved.revision <= startedScoreRevision) continue;
+          const base = merged[saved.rowKey] ?? previous[saved.rowKey];
+          if (base) merged[saved.rowKey] = { ...base, [saved.field]: saved.value };
+        }
+        return merged;
+      });
+      setOverviewKey(tableKey);
+    } catch (err) {
+      if (isCurrent()) setOverviewError(err instanceof Error ? err.message : "Không tải được dữ liệu đánh giá và chấm công.");
+    } finally {
+      if (isCurrent()) setOverviewLoading(false);
+    }
+  }, [usesMonthTable, tableKey, periodFrom, periodTo]);
+
+  useEffect(() => {
+    setEdits({});
+    setSavingKey(null);
+    savedScores.current = {};
+    void reloadOverview();
+    return () => { overviewRequest.current += 1; tableVisit.current += 1; };
+  }, [reloadOverview]);
+
+  useAutoRefresh(reloadOverview, { enabled: usesMonthTable, topics: ["attendance", "leave", "schedule", "timesheet"], intervalMs: 20_000 });
+  useEffect(() => {
+    if (!usesMonthTable) return;
+    const refresh = () => { void reloadOverview(); };
+    window.addEventListener("attendance-reconciliation-changed", refresh);
+    return () => window.removeEventListener("attendance-reconciliation-changed", refresh);
+  }, [usesMonthTable, reloadOverview]);
 
   // Đổi kỳ -> đóng dòng chi tiết đang mở (số của kỳ cũ không còn đúng).
   useEffect(() => { setOpenUid(null); }, [periodFrom, periodTo]);
@@ -323,31 +360,28 @@ export default function EvaluationsPage() {
     }
   }
 
-  // ===== BẢNG ĐÁNH GIÁ THÁNG NHẬP TAY (Giám đốc nhập; người khác chỉ xem) =====
-  type ReviewField = "late_cp" | "late_kp" | "leave_cp" | "leave_kp" | "score_attitude" | "score_quality" | "score_team";
+  // Chỉ các điểm tổng hợp được nhập; số chấm công luôn lấy từ đối soát.
   type CountField = "late_cp" | "late_kp" | "leave_cp" | "leave_kp";
   type ScoreField = "score_attitude" | "score_quality" | "score_team";
-  const REVIEW_MAX: Record<ReviewField, number> = {
-    late_cp: 100, late_kp: 100, leave_cp: 100, leave_kp: 100, score_attitude: 25, score_quality: 50, score_team: 25,
+  const REVIEW_MAX: Record<ScoreField, number> = {
+    score_attitude: 25, score_quality: 50, score_team: 25,
   };
   // Chỉ Giám đốc nhập, và chỉ khi xem theo THÁNG (quý là cộng dồn chỉ xem).
   const canEditReview = user?.role === "DIRECTOR" && !isQuarter;
   const reviewOf = (uid: number, month: string): EvaluationMonthReview | undefined => reviews[`${uid}:${month}`];
-  /** Giá trị hiệu lực 1 ô trong 1 tháng: Nghỉ CP chưa ghi đè -> số tự tính từ đơn nghỉ đã duyệt. */
-  const fieldValue = (uid: number, month: string, f: ReviewField): number | null => {
+  const fieldValue = (uid: number, month: string, f: CountField | ScoreField): number | null => {
     const r = reviewOf(uid, month);
     const v = r?.[f];
     if (v != null) return Number(v);
-    if (f === "leave_cp") return r?.leave_cp_auto ?? 0;
     return null;
   };
-  type PeriodStats = Record<CountField, number> & Record<ScoreField, number | null> & { result: number | null; scoredMonths: number };
+  type PeriodStats = Record<CountField, number> & Record<ScoreField, number | null> & { result: number | null; scoredMonths: number; pendingSessions: number };
   /** Cộng dồn cả kỳ: số ngày cộng các tháng; % & Kết quả theo quý = trung bình các tháng đã chấm.
    *  Kết quả (%) = Ý thức (tối đa 25%) + Chất lượng CV (tối đa 50%) + Tập thể (tối đa 25%). */
   const statsOf = (uid: number): PeriodStats => {
     const s: PeriodStats = {
       late_cp: 0, late_kp: 0, leave_cp: 0, leave_kp: 0,
-      score_attitude: null, score_quality: null, score_team: null, result: null, scoredMonths: 0,
+      score_attitude: null, score_quality: null, score_team: null, result: null, scoredMonths: 0, pendingSessions: 0,
     };
     let sumA = 0, sumQ = 0, sumT = 0, scored = 0;
     for (const m of periodMonths) {
@@ -355,6 +389,7 @@ export default function EvaluationsPage() {
       s.late_kp += fieldValue(uid, m, "late_kp") ?? 0;
       s.leave_cp += fieldValue(uid, m, "leave_cp") ?? 0;
       s.leave_kp += fieldValue(uid, m, "leave_kp") ?? 0;
+      s.pendingSessions += reviewOf(uid, m)?.attendance_pending_sessions ?? 0;
       const a = fieldValue(uid, m, "score_attitude");
       const q = fieldValue(uid, m, "score_quality");
       const tt = fieldValue(uid, m, "score_team");
@@ -373,7 +408,10 @@ export default function EvaluationsPage() {
   };
   const fmtNum = (n: number) => (Math.round(n * 10) / 10).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 
-  async function saveReview(uid: number, f: ReviewField) {
+  async function saveReview(uid: number, f: ScoreField) {
+    if (!canEditReview || uid === user?.id) return;
+    const visit = tableVisit.current;
+    const isCurrent = () => currentTableKey.current === tableKey && tableVisit.current === visit;
     const k = `${uid}:${f}`;
     const draft = edits[k];
     if (draft === undefined) return;
@@ -381,7 +419,7 @@ export default function EvaluationsPage() {
     const txt = draft.replace(/,/g, ".").trim();
     const next = txt === "" ? null : Number(txt);
     if (next !== null && (!Number.isFinite(next) || next < 0 || next > REVIEW_MAX[f])) {
-      setRateMsg(`Giá trị không hợp lệ: ${f.startsWith("score") ? "phần trăm" : "số ngày"} từ 0 đến ${REVIEW_MAX[f]}${f.startsWith("score") ? "%" : ""}.`);
+      setRateMsg(`Giá trị không hợp lệ: phần trăm từ 0 đến ${REVIEW_MAX[f]}%.`);
       clear();
       return;
     }
@@ -392,16 +430,22 @@ export default function EvaluationsPage() {
     setRateMsg("");
     try {
       const res = await api.setEvaluationMonthReview(uid, selMonth, { [f]: next });
-      setReviews((m) => ({ ...m, [`${uid}:${selMonth}`]: res }));
+      if (!isCurrent()) return;
+      const rowKey = `${uid}:${selMonth}`;
+      savedScores.current[`${rowKey}:${f}`] = { revision: ++scoreRevision.current, rowKey, field: f, value: res[f] };
+      // A score response may predate an attendance refresh; change only the saved score.
+      setReviews((m) => {
+        const key = `${uid}:${selMonth}`;
+        return { ...m, [key]: { ...(m[key] ?? res), [f]: res[f] } };
+      });
     } catch (err) {
-      setRateMsg(err instanceof Error ? err.message : "Không lưu được ô vừa nhập.");
+      if (isCurrent()) setRateMsg(err instanceof Error ? err.message : "Không lưu được ô vừa nhập.");
     } finally {
-      setSavingKey(null);
-      clear();
+      if (isCurrent()) { setSavingKey(null); clear(); }
     }
   }
 
-  const reviewInput = (uid: number, f: ReviewField, opts?: { placeholder?: string; title?: string }) => {
+  const reviewInput = (uid: number, f: ScoreField, opts?: { placeholder?: string; title?: string }) => {
     const k = `${uid}:${f}`;
     const stored = reviewOf(uid, selMonth)?.[f];
     const shown = edits[k] ?? (stored == null ? "" : String(Number(stored)));
@@ -420,23 +464,17 @@ export default function EvaluationsPage() {
       />
     );
   };
-  /** Ô số ngày (Muộn CP/KP, Nghỉ CP/KP): Giám đốc xem tháng -> ô nhập; còn lại hiện số. */
-  const countCell = (uid: number, f: CountField, st: PeriodStats, self: boolean) => {
-    if (canEditReview && !self) {
-      if (f === "leave_cp") {
-        const auto = reviewOf(uid, selMonth)?.leave_cp_auto ?? 0;
-        return reviewInput(uid, f, {
-          placeholder: fmtNum(auto),
-          title: `Tự tính từ đơn nghỉ đã duyệt: ${fmtNum(auto)} ngày — gõ số để ghi đè, xoá trắng để dùng lại số tự tính`,
-        });
-      }
-      return reviewInput(uid, f, { title: "Số ngày (Giám đốc nhập)" });
-    }
+  /** Muộn: số lần; nghỉ: số ngày (mỗi buổi 0,5 ngày). Sửa tại ngày chấm công. */
+  const countCell = (f: CountField, st: PeriodStats) => {
     const v = st[f];
     const kp = f.endsWith("_kp");
     return v > 0
       ? <span className={`font-bold tnum ${kp ? "text-bad" : "text-ink"}`}>{fmtNum(v)}</span>
       : <span className="text-muted">0</span>;
+  };
+  const pendingHint = (uid: number) => {
+    const pending = statsOf(uid).pendingSessions;
+    return pending > 0 ? <span className="ml-1 text-[10px] font-medium text-amber-deep" title="Buổi đang chờ dữ liệu, duyệt phép hoặc đối soát; chưa tính là vi phạm">{pending} buổi chờ đối soát</span> : null;
   };
   /** Ô % Tổng hợp (Ý thức / Chất lượng CV / Tập thể). */
   const scoreCell = (uid: number, f: ScoreField, st: PeriodStats, self: boolean) => {
@@ -463,8 +501,8 @@ export default function EvaluationsPage() {
       const r1 = (h: number) => Math.round(h * 10) / 10;
       const headers = [
         "STT", "Họ và tên", "Chức vụ", "Phòng ban",
-        "Office time (giờ)", "P time (giờ)", "Muộn CP (ngày)", "Muộn KP (ngày)", "Nghỉ CP (ngày)", "Nghỉ KP (ngày)",
-        "Ý thức (%)", "Chất lượng CV (%)", "Tập thể (%)", "Kết quả (%)",
+        "Office time (giờ)", "P time (giờ)", "Muộn CP (lần)", "Muộn KP (lần)", "Nghỉ CP (ngày)", "Nghỉ KP (ngày)",
+        "Ý thức (%)", "Chất lượng CV (%)", "Tập thể (%)", "Kết quả (%)", "Chờ đối soát (buổi)",
       ];
       const data = rows.map((r, i) => {
         const st = statsOf(r.user_id);
@@ -476,14 +514,14 @@ export default function EvaluationsPage() {
           r1(r.office_hours),
           r1(r.project_hours),
           st.late_cp, st.late_kp, st.leave_cp, st.leave_kp,
-          st.score_attitude ?? "", st.score_quality ?? "", st.score_team ?? "", st.result ?? "",
+          st.score_attitude ?? "", st.score_quality ?? "", st.score_team ?? "", st.result ?? "", st.pendingSessions,
         ];
       });
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
       ws["!cols"] = [
         { wch: 6 }, { wch: 22 }, { wch: 18 }, { wch: 30 },
         { wch: 16 }, { wch: 13 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
-        { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 14 },
+        { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 22 },
       ];
       const tag = isQuarter ? `Q${selQuarter}-${selMonth.slice(0, 4)}` : selMonth;
       const wb = XLSX.utils.book_new();
@@ -746,7 +784,7 @@ export default function EvaluationsPage() {
     // Bảng tháng gồm chính mình (kể cả Giám đốc); xếp theo cấp bậc rồi tên để hàng
     // không nhảy khi bấm sao. Xuất Excel dùng chính danh sách đang xem.
     // Người thuộc nhiều phòng ("Phòng Bản đồ, Phòng AI") được tính ở TỪNG phòng, giống bộ lọc các trang khác.
-    const rows = overview
+    const rows = (overviewKey === tableKey ? overview : [])
       .filter((r) => r.role !== "DIRECTOR" || r.user_id === user.id)
       .filter((r) => !selDept || splitDepts(r.department).map(normalizeDept).includes(selDept))
       .sort((x, y) => userRankWeight(x) - userRankWeight(y) || x.full_name.localeCompare(y.full_name, "vi"));
@@ -767,10 +805,11 @@ export default function EvaluationsPage() {
                 Đánh giá nhân sự {periodLabel}{selDept ? ` · ${selDept}` : ""} ({rows.length})
               </h2>
               <p className="mt-0.5 text-[11px] text-muted">
-                Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP, Nghỉ CP/KP</b> = số ngày do Giám đốc nhập (Nghỉ CP tự điền từ đơn nghỉ đã duyệt, sửa được) · <b className="text-steel">Tổng hợp</b> nhập theo phần trăm: Ý thức (tối đa 25%) + Chất lượng CV (tối đa 50%) + Tập thể (tối đa 25%) → <b className="text-steel">Kết quả</b> (%).
+                Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP</b> = số lần, <b className="text-steel">Nghỉ CP/KP</b> = số ngày (0,5 ngày/buổi), tự tính từ đối soát chấm công; sửa phép tại ngày chấm công · <b className="text-steel">Tổng hợp</b> nhập theo phần trăm: Ý thức (tối đa 25%) + Chất lượng CV (tối đa 50%) + Tập thể (tối đa 25%) → <b className="text-steel">Kết quả</b> (%).
                 {isQuarter ? " Xem theo quý là cộng dồn 3 tháng (% lấy trung bình các tháng đã chấm); muốn nhập thì chọn tháng." : canEditReview ? " Gõ số vào ô rồi Enter hoặc bấm ra ngoài để lưu; xoá trắng để bỏ." : ""}
               </p>
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
+              {overviewError && <p role="alert" className="mt-1 text-[11px] font-semibold text-bad">Không tải được dữ liệu đánh giá: {overviewError}{overviewKey === tableKey ? " · Đang hiển thị dữ liệu lần tải trước." : ""}</p>}
             </div>
             {/* min-w-0 (không shrink-0): trên điện thoại hàng công cụ tự xuống dòng thay vì tràn ngang */}
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -790,7 +829,7 @@ export default function EvaluationsPage() {
               </label>
               <button
                 onClick={() => exportExcel(rows)}
-                disabled={exporting || overviewLoading || rows.length === 0}
+                disabled={exporting || overviewLoading || !!overviewError || rows.length === 0}
                 className="flex items-center gap-1.5 rounded-xl2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer disabled:cursor-default disabled:opacity-60"
                 title={`Xuất file Excel tháng ${fmtMonth(selMonth)}`}
               >
@@ -826,7 +865,7 @@ export default function EvaluationsPage() {
           </div>
           {rows.length === 0 ? (
             <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">
-              {overviewLoading ? "Đang tải…" : selDept ? `Không có ai thuộc ${selDept}.` : "Chưa có nhân sự nào."}
+              {overviewError ? "Chưa tải được dữ liệu; vui lòng thử lại." : overviewLoading || overviewKey !== tableKey ? "Đang tải…" : selDept ? `Không có ai thuộc ${selDept}.` : "Chưa có nhân sự nào."}
             </p>
           ) : (
             <>
@@ -836,7 +875,7 @@ export default function EvaluationsPage() {
                   <button type="button" onClick={() => toggleProjects(r.user_id)} className="flex min-h-16 w-full items-center gap-2 px-3 py-2.5 text-left" aria-expanded={openUid === r.user_id}>
                     <span className="w-5 shrink-0 text-right font-mono text-xs font-bold text-slate-400">{i + 1}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-ink">{r.full_name}</span>
+                      <span className="block text-sm font-bold text-ink">{r.full_name}{pendingHint(r.user_id)}</span>
                       <span className="block truncate text-[10px] text-muted">{ROLE_LABEL[r.role] || "Nhân viên"}{r.department ? ` · ${r.department}` : ""}</span>
                     </span>
                     <ChevronRightIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${openUid === r.user_id ? "rotate-90" : ""}`} />
@@ -855,10 +894,10 @@ export default function EvaluationsPage() {
                           {box("Kết quả", resultCell(st))}
                         </div>
                         <div className="grid grid-cols-4 border-b border-line text-center text-xs">
-                          {box("Muộn CP", countCell(r.user_id, "late_cp", st, self))}
-                          {box("Muộn KP", countCell(r.user_id, "late_kp", st, self), "border-l border-line")}
-                          {box("Nghỉ CP", countCell(r.user_id, "leave_cp", st, self), "border-l border-line")}
-                          {box("Nghỉ KP", countCell(r.user_id, "leave_kp", st, self), "border-l border-line")}
+                          {box("Muộn CP (lần)", countCell("late_cp", st))}
+                          {box("Muộn KP (lần)", countCell("late_kp", st), "border-l border-line")}
+                          {box("Nghỉ CP (ngày)", countCell("leave_cp", st), "border-l border-line")}
+                          {box("Nghỉ KP (ngày)", countCell("leave_kp", st), "border-l border-line")}
                         </div>
                         <div className="grid grid-cols-3 text-center text-xs">
                           {box("Ý thức 25%", scoreCell(r.user_id, "score_attitude", st, self))}
@@ -879,10 +918,10 @@ export default function EvaluationsPage() {
                     <th rowSpan={2} className="border-b border-line px-3 py-2 align-bottom font-semibold">Người</th>
                     <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold">Office time</th>
                     <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Project time — giờ khai ở bảng tiến độ dự án">P time</th>
-                    <th rowSpan={2} className="border-b border-l border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày đi muộn CÓ PHÉP (Giám đốc nhập)">Muộn CP</th>
-                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày đi muộn KHÔNG PHÉP (Giám đốc nhập)">Muộn KP</th>
-                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày nghỉ CÓ PHÉP: tự điền từ đơn nghỉ đã duyệt, Giám đốc sửa được">Nghỉ CP</th>
-                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày nghỉ KHÔNG PHÉP (Giám đốc nhập)">Nghỉ KP</th>
+                    <th rowSpan={2} className="border-b border-l border-line px-2 py-2 text-center align-bottom font-semibold" title="Số lần đi muộn CÓ PHÉP từ đối soát chấm công">Muộn CP (lần)</th>
+                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số lần đi muộn KHÔNG PHÉP từ đối soát chấm công">Muộn KP (lần)</th>
+                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày nghỉ CÓ PHÉP từ đối soát; mỗi buổi 0,5 ngày">Nghỉ CP (ngày)</th>
+                    <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold" title="Số ngày nghỉ KHÔNG PHÉP từ đối soát; mỗi buổi 0,5 ngày">Nghỉ KP (ngày)</th>
                     <th colSpan={3} className="border-b border-l border-line bg-paper/60 px-2 py-1.5 text-center font-semibold">Tổng hợp</th>
                     <th rowSpan={2} className="border-b border-l border-line px-2 py-2 text-center align-bottom font-semibold" title="Kết quả (%) = Ý thức + Chất lượng CV + Tập thể">Kết quả</th>
                   </tr>
@@ -908,6 +947,7 @@ export default function EvaluationsPage() {
                               className="group flex max-w-full items-center gap-1 text-left"
                             >
                               <span className="truncate font-semibold text-ink group-hover:text-steel group-hover:underline">{r.full_name}</span>
+                              {pendingHint(r.user_id)}
                               <ChevronRightIcon className={`h-3 w-3 shrink-0 text-muted transition-transform ${openUid === r.user_id ? "rotate-90" : ""}`} />
                             </button>
                             <p className="truncate text-[10px] text-muted">
@@ -923,10 +963,10 @@ export default function EvaluationsPage() {
                         const self = r.user_id === user.id;
                         return (
                           <>
-                            <td className="border-l border-line px-2 py-2 text-center tnum">{countCell(r.user_id, "late_cp", st, self)}</td>
-                            <td className="px-2 py-2 text-center tnum">{countCell(r.user_id, "late_kp", st, self)}</td>
-                            <td className="px-2 py-2 text-center tnum">{countCell(r.user_id, "leave_cp", st, self)}</td>
-                            <td className="px-2 py-2 text-center tnum">{countCell(r.user_id, "leave_kp", st, self)}</td>
+                            <td className="border-l border-line px-2 py-2 text-center tnum">{countCell("late_cp", st)}</td>
+                            <td className="px-2 py-2 text-center tnum">{countCell("late_kp", st)}</td>
+                            <td className="px-2 py-2 text-center tnum">{countCell("leave_cp", st)}</td>
+                            <td className="px-2 py-2 text-center tnum">{countCell("leave_kp", st)}</td>
                             <td className="border-l border-line px-2 py-2 text-center tnum">{scoreCell(r.user_id, "score_attitude", st, self)}</td>
                             <td className="px-2 py-2 text-center tnum">{scoreCell(r.user_id, "score_quality", st, self)}</td>
                             <td className="px-2 py-2 text-center tnum">{scoreCell(r.user_id, "score_team", st, self)}</td>

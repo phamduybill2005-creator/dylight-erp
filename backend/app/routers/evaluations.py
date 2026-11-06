@@ -22,12 +22,10 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import (
-    Attendance, Evaluation, EvaluationDirection, EvaluationMonthReview, LeaveRequest, LeaveStatus,
+    Attendance, Evaluation, EvaluationDirection, EvaluationMonthReview,
     Project, ProjectEvaluation, ProjectItem, Timesheet, User, UserRole,
 )
-# Dùng CHUNG luật miễn trễ (đơn đi muộn được duyệt) với trang Chấm công để số
-# "Đi muộn" ở bảng Đánh giá khớp đúng số ở Tổng hợp.
-from app.routers.attendance import _apply_late_exemption
+from app.services.evaluation_attendance import attendance_totals, attendance_user_ids, COUNT_FIELDS
 from app.schemas import (
     EvaluationCreate, EvaluationMonthReviewIn, EvaluationMonthReviewOut, EvaluationOut,
     EvaluationOverviewRow, EvaluationSummary, StarOverviewRow,
@@ -265,16 +263,17 @@ def evaluation_overview(
     db: Session = Depends(get_db),
     current: User = Depends(require_roles(*_TABLE_ROLES)),
 ):
-    """Bảng đánh giá tháng (GĐ / Quản trị / QL cấp cao / QL cấp trung): mỗi người đang làm
-    trong khoảng ngày, bao gồm chính mình; chỉ hiện Giám đốc khi đó là người đang xem.
+    """Bảng đánh giá tháng: người đang làm và người có dữ liệu lịch sử trong kỳ,
+    bao gồm chính mình; chỉ hiện Giám đốc khi đó là người đang xem.
     Dòng của chính mình chỉ để xem số liệu, không được tự chấm sao.
       - office_hours : giờ có mặt theo chấm công, đã trừ nghỉ trưa (như "tổng giờ" ở Tổng hợp).
       - project_hours: tổng giờ khai ở bảng tiến độ dự án (timesheets).
-      - late_days    : số ngày đi muộn, đã miễn ngày có đơn đi muộn được duyệt.
+      - late_days    : số ngày muộn không phép từ đối chiếu chấm công theo buổi.
       - my_rating    : sao CHÍNH MÌNH đã chấm người đó trong khoảng ngày (phiếu chung,
                        không gắn dự án); nhiều phiếu thì lấy phiếu mới nhất."""
     if to_date < from_date:
         raise HTTPException(400, "Ngày kết thúc phải sau ngày bắt đầu.")
+    _months_between(from_date.strftime("%Y-%m"), to_date.strftime("%Y-%m"))
     cid = current.company_id
 
     users = (
@@ -282,7 +281,7 @@ def evaluation_overview(
         .filter(
             User.company_id == cid,
             or_(User.role != UserRole.DIRECTOR, User.id == current.id),
-            User.is_active.is_(True), User.is_approved.is_(True),
+            User.id.in_(attendance_user_ids(db, cid, from_date, to_date)),
         )
         .all()
     )
@@ -295,14 +294,14 @@ def evaluation_overview(
         )
         .all()
     )
-    _apply_late_exemption(db, cid, records)
     office: dict[int, float] = {}
-    late: dict[int, int] = {}
     for rec in records:
         # Làm tròn TỪNG NGÀY như attendance_summary để tổng khớp đúng Tổng hợp.
         office[rec.user_id] = office.get(rec.user_id, 0) + round(rec.worked_minutes / 60, 2)
-        if rec.is_late:
-            late[rec.user_id] = late.get(rec.user_id, 0) + 1
+    totals = attendance_totals(db, cid, from_date, to_date, user_ids=[u.id for u in users])
+    late: dict[int, int] = {}
+    for (uid, month), counts in totals.items():
+        late[uid] = late.get(uid, 0) + counts["late_kp"]
 
     project = {
         uid: float(h or 0)
@@ -341,73 +340,40 @@ def evaluation_overview(
     ]
 
 
-# ---------------------------------------------------------------------------
-# BẢNG ĐÁNH GIÁ THÁNG NHẬP TAY: Muộn CP/KP, Nghỉ CP/KP, Ý thức / Chất lượng CV / Tập thể
-# ---------------------------------------------------------------------------
+# Attendance counts are derived; only the three evaluation scores are entered manually.
 _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
-# Đơn nghỉ phép đã duyệt -> số ngày nghỉ CÓ PHÉP: cả ngày = 1, nửa ngày = 0,5; đơn đi muộn
-# (LATE_*) không phải nghỉ nên không tính.
-_LEAVE_DAY_VALUE = {"FULL": 1.0, "MORNING": 0.5, "AFTERNOON": 0.5}
 
 
 def _month_bounds(month: str) -> tuple[date, date]:
+    if not _MONTH_RE.fullmatch(month or "") or int(month[:4]) < 1:
+        raise HTTPException(400, "Tháng không hợp lệ, cần dạng YYYY-MM.")
     y, m = int(month[:4]), int(month[5:7])
     return date(y, m, 1), date(y, m, monthrange(y, m)[1])
 
 
 def _months_between(from_month: str, to_month: str) -> list[str]:
-    out: list[str] = []
-    y, m = int(from_month[:4]), int(from_month[5:7])
-    while f"{y:04d}-{m:02d}" <= to_month and len(out) < 24:
-        out.append(f"{y:04d}-{m:02d}")
-        m += 1
-        if m > 12:
-            m, y = 1, y + 1
-    return out
+    _month_bounds(from_month)
+    _month_bounds(to_month)
+    start = int(from_month[:4]) * 12 + int(from_month[5:7]) - 1
+    end = int(to_month[:4]) * 12 + int(to_month[5:7]) - 1
+    if end < start or end - start >= 24:
+        raise HTTPException(400, "Chọn khoảng tháng theo thứ tự và tối đa 24 tháng.")
+    return [f"{i // 12:04d}-{i % 12 + 1:02d}" for i in range(start, end + 1)]
 
 
-def _auto_leave_cp(db: Session, cid: int, months: list[str]) -> dict[tuple[int, str], float]:
-    """Ngày nghỉ CÓ PHÉP tự tính theo (người, tháng) từ đơn nghỉ phép ĐÃ DUYỆT.
-    Lịch sinh viên đăng ký (source "SCHEDULE") là lịch làm việc riêng, KHÔNG phải nghỉ phép
-    nên không tính. Bỏ Chủ nhật. Giám đốc vẫn ghi đè được số này ở ô Nghỉ CP."""
-    first, _ = _month_bounds(months[0])
-    _, last = _month_bounds(months[-1])
-    reqs = (
-        db.query(LeaveRequest)
-        .filter(
-            LeaveRequest.company_id == cid,
-            LeaveRequest.status == LeaveStatus.APPROVED,
-            or_(LeaveRequest.source.is_(None), LeaveRequest.source != "SCHEDULE"),
-            LeaveRequest.from_date <= last, LeaveRequest.to_date >= first,
-        )
-        .all()
-    )
-    out: dict[tuple[int, str], float] = {}
-    for r in reqs:
-        val = _LEAVE_DAY_VALUE.get((r.leave_type or "FULL").upper())
-        if not val:
-            continue
-        d, end = max(r.from_date, first), min(r.to_date, last)
-        while d <= end:
-            if d.weekday() != 6:
-                key = (r.user_id, d.strftime("%Y-%m"))
-                out[key] = out.get(key, 0.0) + val
-            d += timedelta(days=1)
-    return out
-
-
-def _review_out(rec: EvaluationMonthReview | None, user_id: int, month: str, auto: float) -> EvaluationMonthReviewOut:
+def _review_out(rec: EvaluationMonthReview | None, user_id: int, month: str, auto: dict) -> EvaluationMonthReviewOut:
     f = lambda v: float(v) if v is not None else None  # noqa: E731
     return EvaluationMonthReviewOut(
         user_id=user_id, month=month,
-        late_cp=f(rec.late_cp) if rec else None,
-        late_kp=f(rec.late_kp) if rec else None,
-        leave_cp=f(rec.leave_cp) if rec else None,
-        leave_kp=f(rec.leave_kp) if rec else None,
+        late_cp=auto.get("late_cp", 0),
+        late_kp=auto.get("late_kp", 0),
+        leave_cp=auto.get("leave_cp", 0),
+        leave_kp=auto.get("leave_kp", 0),
+        attendance_pending_sessions=auto.get("attendance_pending_sessions", 0),
         score_attitude=f(rec.score_attitude) if rec else None,
         score_quality=f(rec.score_quality) if rec else None,
         score_team=f(rec.score_team) if rec else None,
-        leave_cp_auto=round(auto, 1),
+        leave_cp_auto=auto.get("leave_cp", 0),
     )
 
 
@@ -418,9 +384,8 @@ def month_reviews(
     db: Session = Depends(get_db),
     current: User = Depends(require_roles(*_TABLE_ROLES)),
 ):
-    """Dòng đánh giá tháng nhập tay của mọi người trong công ty, các tháng từ from_month
-    đến to_month (tối đa 24 tháng; xem theo quý = 3 tháng). Chỉ trả (người, tháng) đã có
-    dữ liệu nhập hoặc có ngày nghỉ có phép tự tính; thiếu = chưa nhập gì."""
+    """Điểm nhập tay và số chấm công tự đối chiếu theo người/tháng (tối đa 24 tháng).
+    Số chấm công được tính lại mỗi lần đọc; buổi chưa đủ căn cứ được trả riêng."""
     if not (_MONTH_RE.match(from_month or "") and _MONTH_RE.match(to_month or "")):
         raise HTTPException(400, "Tháng không hợp lệ, cần dạng YYYY-MM.")
     if to_month < from_month:
@@ -432,10 +397,10 @@ def month_reviews(
         .filter(EvaluationMonthReview.company_id == cid, EvaluationMonthReview.month.in_(months))
         .all()
     )
-    auto = _auto_leave_cp(db, cid, months)
+    auto = attendance_totals(db, cid, _month_bounds(months[0])[0], _month_bounds(months[-1])[1])
     by = {(r.user_id, r.month): r for r in recs}
     keys = set(by) | set(auto)
-    return [_review_out(by.get(k), k[0], k[1], auto.get(k, 0.0)) for k in sorted(keys)]
+    return [_review_out(by.get(k), k[0], k[1], auto.get(k, {})) for k in sorted(keys)]
 
 
 @router.put("/month-reviews/{user_id}/{month}", response_model=EvaluationMonthReviewOut)
@@ -446,22 +411,24 @@ def set_month_review(
     db: Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    """Giám đốc nhập/sửa bảng đánh giá tháng của 1 người: gửi đúng trường cần đổi
-    (None = xoá trắng; Nghỉ CP xoá trắng = quay về số tự tính)."""
+    """Giám đốc sửa điểm tháng: gửi trường điểm cần đổi, None = xoá trắng.
+    Số nghỉ/đi muộn được điều chỉnh tại ngày chấm công, không ghi đè tại đây."""
     if current.role != UserRole.DIRECTOR:
         raise HTTPException(403, "Chỉ Giám đốc mới được nhập bảng đánh giá tháng.")
-    if not _MONTH_RE.match(month or ""):
-        raise HTTPException(400, "Tháng không hợp lệ, cần dạng YYYY-MM.")
+    _month_bounds(month)
     target = db.get(User, user_id)
     if not target or target.company_id != current.company_id:
         raise HTTPException(404, "Không tìm thấy nhân sự.")
     data = payload.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(400, "Chưa có trường nào để lưu.")
+    if set(data) & set(COUNT_FIELDS):
+        raise HTTPException(400, "Số nghỉ/đi muộn tự lấy từ chấm công. Hãy sửa phép tại ngày chấm công tương ứng.")
 
     rec = (
         db.query(EvaluationMonthReview)
-        .filter(EvaluationMonthReview.user_id == user_id, EvaluationMonthReview.month == month)
+        .filter(EvaluationMonthReview.company_id == current.company_id,
+                EvaluationMonthReview.user_id == user_id, EvaluationMonthReview.month == month)
         .first()
     )
     if rec is None:
@@ -472,5 +439,6 @@ def set_month_review(
     rec.updated_by_id = current.id
     db.commit()
     db.refresh(rec)
-    auto = _auto_leave_cp(db, current.company_id, [month]).get((user_id, month), 0.0)
+    first, last = _month_bounds(month)
+    auto = attendance_totals(db, current.company_id, first, last, user_ids=[user_id]).get((user_id, month), {})
     return _review_out(rec, user_id, month, auto)

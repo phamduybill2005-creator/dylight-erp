@@ -208,11 +208,13 @@ def assess_day(user, work_date, attendance, leaves, overrides, confirmations, no
     }
 
 
-def reconcile(db: Session, company_id: int, from_date: date, to_date: date, user_id=None, now=None):
+def reconcile(db: Session, company_id: int, from_date: date, to_date: date, user_id=None, now=None, *, user_ids=None):
     now = now or vn_now()
     users_query = db.query(User).filter(User.company_id == company_id)
     if user_id is not None:
         users_query = users_query.filter(User.id == user_id)
+    elif user_ids is not None:
+        users_query = users_query.filter(User.id.in_(user_ids))
     else:
         users_query = users_query.filter(User.is_active.is_(True), User.is_approved.is_(True))
     users = users_query.order_by(User.full_name, User.id).all()
