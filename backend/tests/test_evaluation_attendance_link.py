@@ -18,6 +18,8 @@ class EvaluationAttendanceLinkTests(unittest.TestCase):
     def setUp(self):
         fixtures.ReconciliationTests.setUp(self)
         self.client.app.include_router(router)
+        # These regressions concern an established employee, including leave-only days.
+        self.punch("08:00", "17:00", day=date(2026, 1, 2))
 
     def reviews(self, first="2026-11", last="2026-11"):
         response = self.client.get("/evaluations/month-reviews", params={"from_month": first, "to_month": last})
@@ -34,7 +36,7 @@ class EvaluationAttendanceLinkTests(unittest.TestCase):
         self.assertEqual(self.counts(), (0, 0, 1, 0))
         row = self.reviews()[(self.staff.id, "2026-11")]
         self.assertEqual(row["leave_cp_auto"], 1)
-        self.assertEqual(self.db.query(Attendance).count(), 0)
+        self.assertEqual(self.db.query(Attendance).filter_by(work_date=date(2026, 11, 5)).count(), 0)
 
     def test_admin_external_permission_and_reset_recompute_without_saved_review(self):
         self.assertEqual(self.override(decision="EXCUSED_ABSENCE").status_code, 200)

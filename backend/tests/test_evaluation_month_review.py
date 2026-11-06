@@ -21,7 +21,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.deps import get_current_user
-from app.models import Company, LeaveRequest, LeaveStatus, User, UserRole
+from app.models import Attendance, Company, LeaveRequest, LeaveStatus, User, UserRole
 from app.routers.evaluations import router
 
 
@@ -49,6 +49,10 @@ class EvaluationMonthReviewTests(unittest.TestCase):
             self.staff = User(company_id=company.id, email="nv@example.com", full_name="Nhan vien",
                               role=UserRole.FIELD_STAFF, hashed_password="unused")
             db.add_all([self.director, self.admin, self.staff])
+            db.flush()
+            db.add(Attendance(company_id=company.id, user_id=self.staff.id,
+                              work_date=date(2026, 1, 2), check_in=datetime(2026, 1, 2, 8),
+                              check_out=datetime(2026, 1, 2, 17)))
             db.commit()
 
         self.app = FastAPI()

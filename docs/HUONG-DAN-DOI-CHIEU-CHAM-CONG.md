@@ -9,6 +9,7 @@
 5. Giờ quẹt và xác nhận phép được lưu riêng. Nếu cần sửa giờ thực tế, ADMIN mở bút chì rồi dùng phần **Giờ chấm công thực tế**; phần này chỉ xuất hiện khi đã có mốc chấm. Nhân sự không còn hoạt động vẫn xem được đơn và giờ lịch sử, nhưng không tạo xác nhận phép mới.
 6. Vắng chưa có đơn và chưa xác minh đủ dữ liệu nguồn được giữ ở **Chờ dữ liệu**, không tự coi là nghỉ có phép hoặc không phép. Lần đồng bộ thành công không chứng minh máy đã gửi đủ lượt quẹt. Giao diện gọn này không tự xác nhận dữ liệu nguồn cho toàn công ty.
 7. Vào **Đánh giá**, chọn cùng tháng: **Muộn CP/KP** tự tổng hợp theo lần; **Nghỉ CP/KP** theo ngày (mỗi buổi 0,5 ngày). Admin sửa phép, duyệt đơn hoặc đồng bộ chấm công thì số liệu được tính lại khi tải và tự làm mới trên trang. Dấu **buổi chờ đối soát** cho biết còn dữ liệu chưa đủ kết luận; các buổi này chưa tính vi phạm. Muốn điều chỉnh phép, sửa tại ngày chấm công; ba điểm Ý thức, Chất lượng công việc và Tập thể vẫn do Giám đốc nhập.
+8. **Mốc bắt đầu tính Đánh giá là ngày có lượt chấm công đầu tiên trong toàn bộ lịch sử của nhân viên**, không phải ngày tạo tài khoản hoặc đầu tháng đang xem. Các ngày trước mốc không cộng số nghỉ/muộn hoặc buổi chờ đối soát; chưa từng chấm công thì các số này bằng 0. Bản ghi trống/chỉ có ghi chú và giờ chấm tương lai không tạo mốc. Đồng bộ thêm lịch sử sẽ tự tính lại mốc. Thông tin chấm công và đơn phép đã lưu vẫn được giữ nguyên; chỉ phạm vi tổng hợp Đánh giá được giới hạn theo mốc này.
 
 ## Quy tắc và phạm vi
 

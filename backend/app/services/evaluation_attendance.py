@@ -2,7 +2,7 @@
 from collections import defaultdict
 from datetime import date
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models import Attendance, AttendanceSessionOverride, EvaluationMonthReview, LeaveRequest, LeaveStatus, User
@@ -43,10 +43,20 @@ def attendance_totals(db: Session, company_id: int, first: date, last: date, *, 
         return {}
     if user_ids is None:
         user_ids = attendance_user_ids(db, company_id, first, last)
+    # Employment begins at the first actual punch in the user's entire history.
+    # Empty/note-only rows and future clock values must not start assessment.
+    starts = dict(db.query(Attendance.user_id, func.min(Attendance.work_date)).filter(
+        Attendance.company_id == company_id, Attendance.user_id.in_(user_ids),
+        Attendance.work_date <= now.date(),
+        or_(Attendance.check_in <= now, Attendance.check_out <= now),
+    ).group_by(Attendance.user_id).all())
     result = reconciliation.reconcile(db, company_id, first, last, now=now, user_ids=user_ids)
     totals = defaultdict(lambda: dict.fromkeys((*COUNT_FIELDS, "attendance_pending_sessions"), 0))
     for row in result["rows"]:
         counts = totals[(row["user_id"], row["work_date"].strftime("%Y-%m"))]
+        start = starts.get(row["user_id"])
+        if start is None or row["work_date"] < start:
+            continue
         statuses = [row[session]["status"] for session in ("morning", "afternoon")]
         # A late day contributes once, even if an upstream rule later adds another session.
         counts["late_cp"] += int("EXCUSED_LATE" in statuses)
