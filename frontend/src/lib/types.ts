@@ -652,6 +652,27 @@ export interface EvaluationOverviewRow {
 }
 
 // Đánh giá theo người/tháng: chấm công/Ý thức từ đối soát, CL/HN do Giám đốc nhập.
+// Đánh giá ĐỒNG NGHIỆP theo tháng (tab "Đánh giá" — mọi người trừ Giám đốc):
+// QUALITY = "Chất lượng công việc", TEAM = "Hòa đồng, tập thể"; scores = 3 tiêu chí, mỗi tiêu chí 1–5.
+export type PeerReviewKind = "QUALITY" | "TEAM";
+export interface PeerReview {
+  id: number;
+  evaluatee_id: number;
+  evaluatee_name?: string | null;
+  month: string;              // "YYYY-MM"
+  kind: PeerReviewKind;
+  scores: number[];
+  updated_at?: string | null;
+}
+// Tổng hợp cho Giám đốc / Quản trị: TB 1–5 + số phiếu 1 người nhận theo tháng & loại.
+export interface PeerReviewSummaryRow {
+  user_id: number;
+  month: string;
+  kind: PeerReviewKind;
+  avg: number;
+  count: number;
+}
+
 export interface EvaluationMonthReview {
   user_id: number;
   month: string;

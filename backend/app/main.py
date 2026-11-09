@@ -20,7 +20,7 @@ from app.routers import (
     auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
     project_items, attendance, evaluations, project_evaluations, partners, payroll,
     leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-    chat, iclock, departments, timesheets, archive, org_chart, events, zalo,
+    chat, iclock, departments, timesheets, archive, org_chart, events, zalo, peer_reviews,
 )
 from app.zalo_models import ZALO_TABLE_NAMES
 from app.zalo_reminder_models import ZALO_REMINDER_TABLE_NAMES
@@ -590,7 +590,7 @@ P = settings.API_V1_PREFIX
 for r in (auth, companies, bids, projects, contracts, invoices, payments, progress, dashboard,
           project_items, attendance, evaluations, project_evaluations, partners, payroll,
           leave, equipment, finance, audit, design_docs, notifications, assignments, colleagues,
-          chat, departments, timesheets, archive, org_chart, events):
+          chat, departments, timesheets, archive, org_chart, events, peer_reviews):
     app.include_router(r.router, prefix=P)
 
 # Máy chấm công đẩy trực tiếp (ZKTeco PUSH/ADMS) gọi đúng /iclock/... -> KHÔNG thêm tiền tố /api/v1.

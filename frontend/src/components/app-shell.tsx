@@ -19,6 +19,7 @@ import {
   UsersIcon,
   UserGroupIcon,
   StarIcon,
+  ClipboardDocumentCheckIcon,
   CalendarDaysIcon,
   CalendarIcon,
   TableCellsIcon,
@@ -60,7 +61,7 @@ function deskNav(user: User | null): NavLink[] {
       { href: "/work-schedule", label: "Lịch làm việc", icon: CalendarIcon },
       { href: "/attendance", label: "Chấm công", icon: ClockIcon },
       { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
-      { href: "/evaluations", label: "Đánh giá", icon: StarIcon },
+      { href: "/peer-review", label: "Đánh giá", icon: StarIcon },
       { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
       { href: "/profile", label: "Cá nhân", icon: UserCircleIcon },
     );
@@ -80,7 +81,16 @@ function deskNav(user: User | null): NavLink[] {
     { href: "/attendance", label: "Chấm công", icon: ClockIcon },
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
-    { href: "/evaluations", label: "Đánh giá", icon: StarIcon },
+  );
+  // "Đánh giá" = phiếu chấm đồng nghiệp: mọi người TRỪ Giám đốc.
+  // "Tổng hợp đánh giá" = bảng tháng (Office/P time, muộn, nghỉ, %): CHỈ Giám đốc + Quản trị.
+  if (user?.role !== "DIRECTOR") {
+    items.push({ href: "/peer-review", label: "Đánh giá", icon: StarIcon });
+  }
+  if (tier === "DIRECTOR") {
+    items.push({ href: "/evaluations", label: "Tổng hợp đánh giá", icon: ClipboardDocumentCheckIcon });
+  }
+  items.push(
     { href: "/employees", label: "Nhân sự", icon: UsersIcon },
     { href: "/colleagues", label: "Đồng nghiệp", icon: UserGroupIcon },
   );

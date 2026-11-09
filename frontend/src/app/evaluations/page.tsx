@@ -1,5 +1,8 @@
 "use client";
 
+// Tab "TỔNG HỢP ĐÁNH GIÁ" — CHỈ Giám đốc + Quản trị (các vai trò khác được chuyển sang
+// /peer-review = tab "Đánh giá" chấm đồng nghiệp). Các nhánh Nhân viên / Kế toán bên dưới
+// giữ lại cho tới khi dọn, nhưng không còn tới được qua menu.
 // Trang Đánh giá 2 chiều (Nhân viên <-> Quản lý trực tiếp) — chấm THEO TỪNG NGÀY
 // & TỪNG DỰ ÁN (dự án tùy chọn), TỔNG HỢP THEO TUẦN.
 //  - STAFF   : chấm quản lý trực tiếp THEO THÁNG (mỗi tháng 1 phiếu) + xem điểm mình nhận.
@@ -538,13 +541,15 @@ export default function EvaluationsPage() {
   useEffect(() => {
     api.me()
       .then((u) => {
-        setUser(u);
         const t = roleTier(u.role);
+        // Tổng hợp đánh giá chỉ dành cho Giám đốc + Quản trị; người khác về tab Đánh giá.
+        if (t !== "DIRECTOR") { router.replace("/peer-review"); return; }
+        setUser(u);
         api.evaluationsReceived().then(setReceived).catch(() => {});
         api.evaluationsGiven().then(setGiven).catch(() => {});
         api.projects().then(setProjects).catch(() => {});
         api.colleagues().then(setColleagues).catch(() => {});
-        if (t !== "STAFF") api.users().then(setUsers).catch(() => {});
+        api.users().then(setUsers).catch(() => {});
         setLoading(false);
       })
       .catch(() => router.push("/login"));
@@ -795,7 +800,7 @@ export default function EvaluationsPage() {
       <AppShell>
         <header className="flex items-center gap-2 rounded-xl2 bg-ink p-4 text-white shadow-card lg:p-6">
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
-          <h1 className="text-base font-bold lg:text-xl">Đánh giá nhân sự</h1>
+          <h1 className="text-base font-bold lg:text-xl">Tổng hợp đánh giá</h1>
         </header>
 
         {/* BẢNG ĐÁNH GIÁ THÁNG: Office time / Project time / Đi muộn + bấm sao để chấm */}
@@ -803,7 +808,7 @@ export default function EvaluationsPage() {
           <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-ink">
-                Đánh giá nhân sự {periodLabel}{selDept ? ` · ${selDept}` : ""} ({rows.length})
+                Tổng hợp đánh giá {periodLabel}{selDept ? ` · ${selDept}` : ""} ({rows.length})
               </h2>
               <p className="mt-0.5 text-[11px] text-muted">
                 Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP</b> = số lần, <b className="text-steel">Nghỉ CP/KP</b> = số ngày (0,5 ngày/buổi), tự tính từ đối soát chấm công; sửa phép tại ngày chấm công · <b className="text-steel">Ý thức</b> tự tính /5 (25%); Chất lượng CV (50%) và Tập thể (25%) do Giám đốc nhập → <b className="text-steel">Kết quả</b> (%).

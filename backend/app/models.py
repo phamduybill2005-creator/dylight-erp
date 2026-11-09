@@ -814,6 +814,37 @@ class EvaluationMonthReview(Base):
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
 
 
+class PeerReview(Base):
+    """ĐÁNH GIÁ ĐỒNG NGHIỆP theo tháng — tab "Đánh giá" (mọi người trừ Giám đốc).
+    1 phiếu = (người chấm, người được chấm, tháng "YYYY-MM", loại); gửi lại trong tháng là ghi đè.
+      kind QUALITY "Chất lượng công việc": score_1 sản phẩm đúng, ít lỗi / score_2 nộp bài đúng hẹn
+                                           / score_3 phối hợp với mọi người.
+      kind TEAM    "Hòa đồng, tập thể"   : score_1 hòa đồng, thân thiện / score_2 tham gia hoạt động
+                                           tập thể / score_3 tiếp thu góp ý.
+    Điểm 1–5. Tách khỏi evaluations (sao theo tuần/dự án) và evaluation_month_reviews (Giám đốc nhập %)."""
+    __tablename__ = "peer_reviews"
+    __table_args__ = (UniqueConstraint("evaluator_id", "evaluatee_id", "month", "kind", name="uq_peer_review"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    evaluator_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)  # người chấm
+    evaluatee_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)  # người được chấm
+    month: Mapped[str] = mapped_column(String(7), index=True)      # "YYYY-MM"
+    kind: Mapped[str] = mapped_column(String(10), index=True)      # QUALITY | TEAM
+    score_1: Mapped[int] = mapped_column(Integer, default=0)
+    score_2: Mapped[int] = mapped_column(Integer, default=0)
+    score_3: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now, onupdate=vn_now)
+
+    evaluator: Mapped["User"] = relationship("User", foreign_keys=[evaluator_id])
+    evaluatee: Mapped["User"] = relationship("User", foreign_keys=[evaluatee_id])
+
+    @property
+    def evaluatee_name(self) -> str | None:
+        return self.evaluatee.full_name if self.evaluatee else None
+
+
 # --------------------------------------------------------------------------
 # 11b. PROJECT_EVALUATIONS — đánh giá CHÉO 360° trong MỘT DỰ ÁN.
 #     Mọi thành viên (gồm chủ trì) chấm lẫn nhau: 1 phiếu/người/dự án (ghi đè

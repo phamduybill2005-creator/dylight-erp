@@ -8,7 +8,9 @@ Quy ước:
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, EmailStr, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
 
 from app.models import (
     UserRole, BidStatus, ProjectStatus, ContractStatus,
@@ -650,6 +652,43 @@ class EvaluationMonthReviewOut(BaseModel):
 
 
 # --------- Đánh giá theo DỰ ÁN (chấm chéo 360° giữa các thành viên) ---------
+PeerReviewKind = Literal["QUALITY", "TEAM"]
+
+
+class PeerReviewIn(BaseModel):
+    """1 phiếu đánh giá đồng nghiệp: 3 tiêu chí, mỗi tiêu chí 1–5 (thứ tự như trên giao diện)."""
+    evaluatee_id: int
+    month: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    kind: PeerReviewKind
+    scores: list[int]
+
+    @field_validator("scores")
+    @classmethod
+    def _three_scores(cls, v: list[int]) -> list[int]:
+        if len(v) != 3 or any(not isinstance(s, int) or s < 1 or s > 5 for s in v):
+            raise ValueError("Cần đúng 3 điểm, mỗi điểm từ 1 đến 5.")
+        return v
+
+
+class PeerReviewOut(BaseModel):
+    id: int
+    evaluatee_id: int
+    evaluatee_name: str | None = None
+    month: str
+    kind: PeerReviewKind
+    scores: list[int]
+    updated_at: datetime | None = None
+
+
+class PeerReviewSummaryRow(BaseModel):
+    """Tổng hợp cho Giám đốc / Quản trị: TB 1–5 và số phiếu 1 người NHẬN theo tháng & loại."""
+    user_id: int
+    month: str
+    kind: PeerReviewKind
+    avg: float
+    count: int
+
+
 class ProjectEvaluationCreate(BaseModel):
     project_id: int
     evaluatee_id: int

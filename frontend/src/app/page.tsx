@@ -104,7 +104,8 @@ const MODULES: ModuleDef[] = [
   { href: "/work-schedule", label: "Lịch làm việc", icon: CalendarDaysIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/projects", label: "Dự án", icon: FolderOpenIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/attendance", label: "Chấm công", icon: ClockIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
-  { href: "/evaluations", label: "Đánh giá nhân sự", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR", "MANAGER"] },
+  { href: "/peer-review", label: "Đánh giá", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["MANAGER"] },
+  { href: "/evaluations", label: "Tổng hợp đánh giá", icon: StarIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
   { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon, tint: "bg-steel/10 text-steel", tiers: ["DIRECTOR", "MANAGER"] },
   { href: "/audit", label: "Nhật ký hoạt động", icon: ShieldCheckIcon, tint: "bg-amber/15 text-amber-deep", tiers: ["DIRECTOR"] },
 ];
@@ -300,10 +301,10 @@ export default function DashboardPage() {
 
         <PersonalProjectsCard user={user} projects={projects} loaded={projectsLoaded} error={projectsError} onRefresh={() => refreshProjects.current()} />
 
-        {/* Đánh giá quản lý */}
+        {/* Đánh giá đồng nghiệp */}
         <section className="mt-5">
           <Link
-            href="/evaluations"
+            href="/peer-review"
             className="flex items-center justify-between rounded-xl2 bg-white p-4 shadow-card border-l-4 border-amber card-hover"
           >
             <div className="flex items-center gap-3">
@@ -311,8 +312,8 @@ export default function DashboardPage() {
                 <StarIcon className="h-5 w-5" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-ink">Đánh giá quản lý</p>
-                <p className="text-[11px] text-muted">Chấm điểm & nhận xét quản lý trực tiếp</p>
+                <p className="text-sm font-semibold text-ink">Đánh giá đồng nghiệp</p>
+                <p className="text-[11px] text-muted">Chấm chất lượng công việc & hòa đồng, tập thể theo tháng</p>
               </div>
             </div>
             <span className="text-steel transition-transform duration-200 hover:translate-x-1">→</span>
