@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import vn_now
 from app.models import (
-    Attendance, AttendanceSource, AttendanceDataConfirmation, AttendanceSessionOverride,
+    Attendance, AttendanceSource, AttendanceDataConfirmation, AttendanceSessionOverride, AttendanceForgotPunch,
     LeaveRequest, LeaveStatus, User,
 )
 
@@ -82,7 +82,16 @@ def confirmation_out(record):
     }
 
 
-def assess_day(user, work_date, attendance, leaves, overrides, confirmations, now):
+def forgot_punch_out(record):
+    return {
+        "punch": record.punch, "decision": record.decision, "reported_at": record.reported_at,
+        "reason": record.reason, "approved_by": record.approved_by,
+        "recorded_by": record.recorded_by_name or (record.recorded_by.full_name if record.recorded_by else "—"),
+        "updated_at": record.updated_at,
+    }
+
+
+def assess_day(user, work_date, attendance, leaves, overrides, confirmations, now, forgot_punches=()):
     """Derive a day from matching user/day inputs; no mutation or database writes."""
     relevant = sorted((l for l in leaves if l.user_id == user.id
                        and l.company_id == user.company_id and l.from_date <= work_date <= l.to_date),
@@ -112,11 +121,15 @@ def assess_day(user, work_date, attendance, leaves, overrides, confirmations, no
     personal_end = _minutes(user.work_end)
     unpaired_machine = bool(attendance and attendance.source == AttendanceSource.MACHINE and ci and not co
                             and not attendance.check_in_corrected)
+    active_forgotten = [f for f in forgot_punches if f.company_id == user.company_id and f.user_id == user.id
+                       and f.work_date == work_date and f.decision == "FORGOT"]
+    unresolved_forgotten = bool(active_forgotten and (not ci or not co or invalid or co <= ci))
 
     def session_result(session):
         override = permission_out(decisions.get(session))
         result = {
             "session": session, "status": "PRESENT", "late_minutes": 0,
+            "early_status": None, "early_minutes": 0,
             "explanation": "", "leave_id": None, "permission_source": None,
             "override": override, "data_confirmed": session in complete,
         }
@@ -162,7 +175,7 @@ def assess_day(user, work_date, attendance, leaves, overrides, confirmations, no
             result["late_minutes"] = late
             if late == 0:
                 return finish("PRESENT", "Có chấm công; không đi muộn buổi này.")
-            if override and override["decision"] == "EXCUSED_LATE":
+            if override and override["decision"] in {"EXCUSED_LATE", "EXCUSED_LATE_EARLY"}:
                 return finish("EXCUSED_LATE", f"Admin xác nhận: {override['reason']}", source="ADMIN")
             late_leaves = [l for l in applications if _covers(l.leave_type, session, late=True)]
             for late_leave in late_leaves:
@@ -186,6 +199,8 @@ def assess_day(user, work_date, attendance, leaves, overrides, confirmations, no
                               or _covers(l.leave_type, session, late=True)), None)
         if pending_leave:
             return finish("PENDING_APPROVAL", "Có đơn đang chờ duyệt; chưa chốt nghỉ không phép.", pending_leave)
+        if unresolved_forgotten:
+            return finish("NEEDS_REVIEW", "Đã xác nhận quên chấm công; cần bổ sung giờ thực tế trước khi xác định vắng mặt.")
         if now < shift_end(work_date, session, user):
             return finish("NOT_FINISHED", "Buổi làm việc chưa kết thúc; chưa chốt vắng mặt.")
         if session == "PM" and morning_present and not co:
@@ -199,11 +214,34 @@ def assess_day(user, work_date, attendance, leaves, overrides, confirmations, no
         return finish("UNEXCUSED_ABSENCE", "Buổi đã kết thúc, dữ liệu đã được xác nhận đủ và chưa có phép hợp lệ.")
 
     morning, afternoon = session_result("AM"), session_result("PM")
+    # A checkout can describe only the last session it actually overlaps. A paired
+    # morning interval cannot imply an early PM checkout, nor a lunch-return rule.
+    if ci and co and co > ci and not invalid:
+        afternoon_start = (personal_start if personal_start is not None and personal_start > morning_boundary
+                           else settings.AFTERNOON_START_MIN)
+        session = "PM" if _clock(co) >= afternoon_start else "AM"
+        result = afternoon if session == "PM" else morning
+        start_minute = (personal_start if personal_start is not None and
+                        (session == "AM" or personal_start > morning_boundary)
+                        else settings.WORK_START_HOUR * 60 if session == "AM"
+                        else settings.AFTERNOON_START_MIN)
+        start = datetime.combine(work_date, time.min) + timedelta(minutes=start_minute)
+        end = shift_end(work_date, session, user)
+        pending_session = any(_covers(l.leave_type, session) or _covers(l.leave_type, session, late=True)
+                              for l in pending)
+        if (result["status"] in {"PRESENT", "EXCUSED_LATE", "UNEXCUSED_LATE"}
+                and not pending_session and now >= end and co > start and ci < end and co < end):
+            result["early_minutes"] = max(0, _clock(end) - _clock(co))
+            if result["early_minutes"]:
+                result["early_status"] = ("EXCUSED_EARLY" if result["override"] and
+                    result["override"]["decision"] in {"EXCUSED_EARLY", "EXCUSED_LATE_EARLY"} else "UNEXCUSED_EARLY")
     return {
         "user_id": user.id, "full_name": user.full_name, "department": user.department,
         "work_date": work_date, "attendance_id": attendance.id if attendance else None,
         "check_in": ci, "check_out": co, "morning": morning, "afternoon": afternoon,
-        "needs_attention": any(s["status"] in ATTENTION_STATUSES for s in (morning, afternoon)),
+        "forgot_punches": [forgot_punch_out(f) for f in sorted(active_forgotten, key=lambda f: f.punch)],
+        "needs_attention": any(s["status"] in ATTENTION_STATUSES or s["early_status"] == "UNEXCUSED_EARLY"
+                               for s in (morning, afternoon)),
         "can_edit_permission": bool(user.is_active and user.is_approved),
     }
 
@@ -229,8 +267,14 @@ def reconcile(db: Session, company_id: int, from_date: date, to_date: date, user
         AttendanceSessionOverride.work_date <= to_date).all() if ids else []
     confirmations = db.query(AttendanceDataConfirmation).filter(AttendanceDataConfirmation.company_id == company_id,
         AttendanceDataConfirmation.work_date >= from_date, AttendanceDataConfirmation.work_date <= to_date).all()
+    forgotten = db.query(AttendanceForgotPunch).filter(AttendanceForgotPunch.company_id == company_id,
+        AttendanceForgotPunch.user_id.in_(ids), AttendanceForgotPunch.work_date >= from_date,
+        AttendanceForgotPunch.work_date <= to_date, AttendanceForgotPunch.decision == "FORGOT").all() if ids else []
     by_record = {(r.user_id, r.work_date): r for r in records}
     by_leave, by_override, by_confirmation = defaultdict(list), defaultdict(list), defaultdict(list)
+    by_forgotten = defaultdict(list)
+    for record in forgotten:
+        by_forgotten[(record.user_id, record.work_date)].append(record)
     for leave in leaves:
         by_leave[leave.user_id].append(leave)
     for override in overrides:
@@ -241,7 +285,7 @@ def reconcile(db: Session, company_id: int, from_date: date, to_date: date, user
     while day <= to_date:
         for user in users:
             rows.append(assess_day(user, day, by_record.get((user.id, day)), by_leave[user.id],
-                                   by_override[user.id], by_confirmation[day], now))
+                                   by_override[user.id], by_confirmation[day], now, by_forgotten[(user.id, day)]))
         day += timedelta(days=1)
     return {
         "rows": rows,

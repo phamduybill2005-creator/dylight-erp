@@ -1,8 +1,21 @@
-import type { Attendance, AttendanceDayPermissionPayload, AttendancePermissionDecision, AttendanceReconciliationRow, AttendanceSessionResult, ReconciliationStatus } from "./types";
+import type { Attendance, AttendanceDayPermissionPayload, AttendanceForgotPunchPayload, AttendancePermissionDecision, AttendanceReconciliationRow, AttendanceSessionResult, ReconciliationStatus } from "./types";
 
 export type CompactDayBadge = { label: string; title: string; tone: "good" | "bad" | "waiting" | "muted" };
 export type CompactAttendanceDay = { work_date: string; record: Attendance | null; result: AttendanceReconciliationRow | null; future: boolean; badges: CompactDayBadge[] };
 export type CompactPermissionDraft = { scope: "AM" | "PM" | "ALL"; decision: AttendancePermissionDecision | ""; reason: string; approved_by: string };
+export type CompactForgotPunchDraft = { punch: "IN" | "OUT"; decision: "FORGOT" | ""; reported_at: string; reason: string; approved_by: string };
+
+export function initialCompactForgotPunch(day: CompactAttendanceDay, punch?: "IN" | "OUT"): CompactForgotPunchDraft {
+  const selectedPunch = punch ?? day.result?.forgot_punches?.[0]?.punch ?? "IN";
+  const saved = day.result?.forgot_punches?.find(item => item.punch === selectedPunch);
+  return { punch: selectedPunch, decision: saved?.decision ?? "", reported_at: saved?.reported_at?.slice(0, 16) ?? "", reason: saved?.reason ?? "", approved_by: saved?.approved_by ?? "" };
+}
+
+export function compactForgotPunchPayload(userId: number, workDate: string, draft: CompactForgotPunchDraft): AttendanceForgotPunchPayload {
+  if (!draft.reason.trim()) throw new Error("Vui lòng nhập lý do.");
+  if (!draft.approved_by.trim()) throw new Error("Vui lòng nhập người xác nhận quên chấm công.");
+  return { user_id: userId, work_date: workDate, punch: draft.punch, decision: draft.decision || null, reported_at: draft.decision && draft.reported_at ? `${draft.reported_at}:00+07:00` : null, reason: draft.reason.trim(), approved_by: draft.approved_by.trim() };
+}
 
 export function compactMonthRange(period: string) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error("Tháng không hợp lệ.");
@@ -67,18 +80,22 @@ export function initialCompactPermission(day: CompactAttendanceDay): CompactPerm
   const matchingOverride = amOverride && pmOverride && amOverride.decision === pmOverride.decision && amOverride.reason === pmOverride.reason && amOverride.approved_by === pmOverride.approved_by;
   const current = amOverride || pmOverride;
   const isLate = (result?: AttendanceSessionResult) => !!result && (result.status === "EXCUSED_LATE" || result.status === "UNEXCUSED_LATE" || result.late_minutes > 0);
+  const isEarly = (result?: AttendanceSessionResult) => !!result && (!!result.early_status || (result.early_minutes ?? 0) > 0);
   let scope: CompactPermissionDraft["scope"] = "ALL";
   if (!matchingOverride && current) scope = amOverride ? "AM" : "PM";
   else if (!current && isLate(morning) !== isLate(afternoon)) scope = isLate(morning) ? "AM" : "PM";
+  else if (!current && !isLate(morning) && !isLate(afternoon) && isEarly(morning) !== isEarly(afternoon)) scope = isEarly(morning) ? "AM" : "PM";
   else if (!current && morning && afternoon && morning.status !== afternoon.status) {
     scope = ["PRESENT", "NOT_SCHEDULED"].includes(morning.status) ? "PM" : "AM";
   }
   const selectedResults = scope === "AM" ? [morning] : scope === "PM" ? [afternoon] : [morning, afternoon];
   const selectedStatuses = selectedResults.map(result => result?.status);
   const late = selectedResults.some(isLate);
+  const early = !late && selectedResults.some(isEarly);
+  const lateAndEarly = selectedResults.some(result => isLate(result) && isEarly(result));
   const absence = !late && (!day.record?.check_in && !day.record?.check_out
     || selectedStatuses.some(status => status === "EXCUSED_ABSENCE" || status === "UNEXCUSED_ABSENCE"));
-  return { scope, decision: current?.decision || (absence ? "EXCUSED_ABSENCE" : "EXCUSED_LATE"), reason: current?.reason || "", approved_by: current?.approved_by || "" };
+  return { scope, decision: current?.decision || (lateAndEarly ? "EXCUSED_LATE_EARLY" : early ? "EXCUSED_EARLY" : absence ? "EXCUSED_ABSENCE" : "EXCUSED_LATE"), reason: current?.reason || "", approved_by: current?.approved_by || "" };
 }
 
 export function compactPermissionPayload(userId: number, workDate: string, draft: CompactPermissionDraft): AttendanceDayPermissionPayload {

@@ -642,7 +642,8 @@ class EvaluationMonthReviewOut(BaseModel):
     leave_cp: float = 0                  # số ngày nghỉ; mỗi buổi = 0,5 ngày
     leave_kp: float = 0
     attendance_pending_sessions: int = 0 # chưa tính vi phạm: thiếu căn cứ hoặc đơn chờ duyệt
-    score_attitude: float | None = None  # % tối đa 25
+    attitude_points: float | None = None # điểm Ý thức tự tính 0..5; None = chưa bắt đầu làm
+    score_attitude: float | None = None  # đóng góp Ý thức: attitude_points / 5 * 25
     score_quality: float | None = None   # % tối đa 50
     score_team: float | None = None      # % tối đa 25
     leave_cp_auto: float = 0             # alias leave_cp cho các client cũ

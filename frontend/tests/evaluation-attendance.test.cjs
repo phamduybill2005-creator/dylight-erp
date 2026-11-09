@@ -52,7 +52,7 @@ function mount(overrides = {}, role = "DIRECTOR") {
 }
 const person = { user_id: 7, full_name: "Nguyễn An", role: "STAFF", department: "Phòng AI", office_hours: 120, project_hours: 100, late_days: 3, my_rating: null };
 const month = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" }).slice(0, 7);
-const review = { user_id: 7, month, late_cp: 2, late_kp: 3, leave_cp: 0.5, leave_kp: 1.5, leave_cp_auto: 99, attendance_pending_sessions: 4, score_attitude: 20, score_quality: 40, score_team: 15 };
+const review = { user_id: 7, month, late_cp: 2, late_kp: 3, leave_cp: 0.5, leave_kp: 1.5, leave_cp_auto: 99, attendance_pending_sessions: 4, attitude_points: 4, score_attitude: 20, score_quality: 40, score_team: 15 };
 const nodes = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
 const textOf = tree => tree == null || typeof tree === "boolean" ? "" : Array.isArray(tree) ? tree.map(textOf).join("") : typeof tree === "object" ? textOf(tree.props?.children) : String(tree);
 const find = (tree, predicate) => nodes(tree).find(predicate);
@@ -60,20 +60,22 @@ const button = (tree, label) => find(tree, node => node.type === "button" && tex
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function ready(app) { app.render(); await flush(); app.render(); await flush(); return app.render(); }
 
-test("director sees derived attendance without count inputs while score inputs and self guard stay intact", async () => {
+test("director sees read-only attitude points including self while quality and self guard stay intact", async () => {
   const writes = [];
   const self = { ...person, user_id: 1, full_name: "Giám đốc", role: "DIRECTOR" };
-  const app = mount({ evaluationsOverview: async () => [self, person], evaluationMonthReviews: async () => [review, { ...review, user_id: 1 }], setEvaluationMonthReview: async (...args) => { writes.push(args); return { ...review, score_attitude: 22 }; } });
+  const app = mount({ evaluationsOverview: async () => [self, person], evaluationMonthReviews: async () => [review, { ...review, user_id: 1 }], setEvaluationMonthReview: async (...args) => { writes.push(args); return { ...review, score_quality: 42 }; } });
   let tree = await ready(app);
   assert.equal(nodes(tree).filter(node => node.type === "input" && ["late_cp", "late_kp", "leave_cp", "leave_kp"].includes(node.props["aria-label"])).length, 0);
   const cards = nodes(tree).filter(node => node.type === "article");
   assert.ok(textOf(cards.find(card => textOf(card).includes("Nguyễn An"))).includes("4 buổi chờ đối soát"));
   assert.ok(!textOf(tree).includes("99"));
   assert.equal(nodes(cards.find(card => textOf(card).includes("Giám đốc"))).filter(node => node.type === "input").length, 0);
-  const input = find(tree, node => node.props?.["aria-label"] === "score_attitude");
-  input.props.onChange({ target: { value: "22" } }); tree = app.render();
-  await find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onBlur();
-  assert.deepEqual(JSON.parse(JSON.stringify(writes)), [[7, month, { score_attitude: 22 }]]);
+  assert.equal(nodes(tree).filter(node => node.type === "input" && node.props?.["aria-label"] === "score_attitude").length, 0);
+  assert.ok(cards.every(card => textOf(card).includes("4/5")));
+  const input = find(tree, node => node.props?.["aria-label"] === "score_quality");
+  input.props.onChange({ target: { value: "42" } }); tree = app.render();
+  await find(tree, node => node.props?.["aria-label"] === "score_quality").props.onBlur();
+  assert.deepEqual(JSON.parse(JSON.stringify(writes)), [[7, month, { score_quality: 42 }]]);
   app.unmount();
 });
 
@@ -86,7 +88,7 @@ test("quarter totals and Excel preserve half days, lateness units, pending sessi
   await button(tree, "Xuất Excel").props.onClick();
   assert.ok(app.exports[0][0].includes("Muộn CP (lần)"));
   assert.ok(app.exports[0][0].includes("Chờ đối soát (buổi)"));
-  assert.deepEqual(Array.from(app.exports[0][1]).slice(6), [3, 6, 1.5, 0.5, 20, 40, 15, 75, 3]);
+  assert.deepEqual(Array.from(app.exports[0][1]).slice(6), [3, 6, 1.5, 0.5, 4, 20, 40, 15, 75, 3]);
   app.unmount();
 });
 
@@ -105,6 +107,35 @@ test("attendance refresh reloads both sources and the latest period request wins
   assert.ok(textOf(tree).includes("8 buổi chờ đối soát")); assert.ok(!textOf(tree).includes("99 buổi"));
   assert.ok(app.listeners.has("attendance-reconciliation-changed"));
   app.listeners.get("attendance-reconciliation-changed")(); await flush(); assert.equal(calls, 4);
+  app.unmount();
+});
+
+test("quarter independently averages eligible attitude and manual components with full precision", async () => {
+  const year = month.slice(0, 4);
+  const app = mount({ evaluationMonthReviews: async () => [
+    { ...review, month: `${year}-01`, attitude_points: null, score_attitude: null, score_quality: 41.25, score_team: null },
+    { ...review, month: `${year}-02`, attitude_points: 4.65, score_attitude: 23.25, score_quality: null, score_team: 18.25 },
+    { ...review, month: `${year}-03`, attitude_points: 4.9, score_attitude: 24.5, score_quality: null, score_team: null },
+  ] });
+  let tree = await ready(app); button(tree, "Quý 1").props.onClick(); app.render(); await flush(); tree = app.render();
+  assert.ok(textOf(tree).includes("4,78/5"));
+  assert.ok(textOf(tree).includes("83,38%"));
+  await button(tree, "Xuất Excel").props.onClick();
+  const [headers, row] = app.exports[0];
+  assert.equal(row[headers.indexOf("Ý thức (/5)")], 4.775);
+  assert.equal(row[headers.indexOf("Ý thức (%)")], 23.875);
+  assert.equal(row[headers.indexOf("Kết quả (%)")], 83.375);
+  app.unmount();
+});
+
+test("an incomplete manual score never becomes zero or produces a result", async () => {
+  const app = mount({ evaluationMonthReviews: async () => [{ ...review, attitude_points: 4.65, score_attitude: 23.25, score_team: null }] });
+  const tree = await ready(app);
+  assert.ok(textOf(tree).includes("4,65/5"));
+  await button(tree, "Xuất Excel").props.onClick();
+  const [headers, row] = app.exports[0];
+  assert.equal(row[headers.indexOf("Tập thể (%)")], "");
+  assert.equal(row[headers.indexOf("Kết quả (%)")], "");
   app.unmount();
 });
 
@@ -137,15 +168,17 @@ test("an older score save response cannot undo attendance refreshed while the sa
   let finishSave;
   const app = mount({ setEvaluationMonthReview: () => new Promise(resolve => { finishSave = resolve; }) });
   let tree = await ready(app);
-  find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onChange({ target: { value: "22" } });
-  tree = app.render(); const saving = find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onBlur();
-  app.api.evaluationMonthReviews = async () => [{ ...review, late_cp: 6, attendance_pending_sessions: 8, score_attitude: 22 }];
+  find(tree, node => node.props?.["aria-label"] === "score_quality").props.onChange({ target: { value: "22" } });
+  tree = app.render(); const saving = find(tree, node => node.props?.["aria-label"] === "score_quality").props.onBlur();
+  app.api.evaluationMonthReviews = async () => [{ ...review, late_cp: 6, attendance_pending_sessions: 8, attitude_points: 3.65, score_attitude: 18.25, score_quality: 22 }];
   app.refresh(); await flush(); app.render();
-  finishSave({ ...review, score_attitude: 22 }); await saving; tree = app.render();
+  finishSave({ ...review, score_quality: 22 }); await saving; tree = app.render();
   assert.ok(textOf(tree).includes("8 buổi chờ đối soát"));
   await button(tree, "Xuất Excel").props.onClick();
   assert.equal(app.exports[0][1][6], 6);
-  assert.equal(app.exports[0][1][10], 22);
+  assert.equal(app.exports[0][1][10], 3.65);
+  assert.equal(app.exports[0][1][11], 18.25);
+  assert.equal(app.exports[0][1][12], 22);
   app.unmount();
 });
 
@@ -153,38 +186,39 @@ test("a score save from a previous visit cannot overwrite a newly selected perio
   let finishSave;
   const app = mount({ setEvaluationMonthReview: () => new Promise(resolve => { finishSave = resolve; }) });
   let tree = await ready(app);
-  find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onChange({ target: { value: "22" } });
-  tree = app.render(); const saving = find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onBlur();
+  find(tree, node => node.props?.["aria-label"] === "score_quality").props.onChange({ target: { value: "22" } });
+  tree = app.render(); const saving = find(tree, node => node.props?.["aria-label"] === "score_quality").props.onBlur();
   find(tree, node => node.type === "input" && node.props.type === "month").props.onChange({ target: { value: "2025-01" } });
   app.render(); await flush(); tree = app.render();
-  app.api.evaluationMonthReviews = async () => [{ ...review, score_attitude: 24 }];
+  app.api.evaluationMonthReviews = async () => [{ ...review, score_quality: 24 }];
   find(tree, node => node.type === "input" && node.props.type === "month").props.onChange({ target: { value: month } });
   app.render(); await flush(); app.render();
-  finishSave({ ...review, score_attitude: 22 }); await saving; tree = app.render();
-  assert.equal(find(tree, node => node.props?.["aria-label"] === "score_attitude").props.value, "24");
+  finishSave({ ...review, score_quality: 22 }); await saving; tree = app.render();
+  assert.equal(find(tree, node => node.props?.["aria-label"] === "score_quality").props.value, "24");
   app.unmount();
 });
 
 test("a GET started before a successful score save keeps that score and still refreshes attendance", async () => {
   for (const score of [22, null]) {
     let finishRead;
-    const app = mount({ setEvaluationMonthReview: async () => ({ ...review, score_attitude: score }) });
+    const app = mount({ setEvaluationMonthReview: async () => ({ ...review, score_quality: score }) });
     let tree = await ready(app);
     app.api.evaluationMonthReviews = () => new Promise(resolve => { finishRead = resolve; });
     app.refresh(); await flush(); tree = app.render();
-    find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onChange({ target: { value: score === null ? "" : String(score) } });
-    tree = app.render(); await find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onBlur();
+    find(tree, node => node.props?.["aria-label"] === "score_quality").props.onChange({ target: { value: score === null ? "" : String(score) } });
+    tree = app.render(); await find(tree, node => node.props?.["aria-label"] === "score_quality").props.onBlur();
     finishRead([{ ...review, late_cp: 6, attendance_pending_sessions: 8 }]); await flush(); tree = app.render();
-    assert.equal(find(tree, node => node.props?.["aria-label"] === "score_attitude").props.value, score === null ? "" : "22");
+    assert.equal(find(tree, node => node.props?.["aria-label"] === "score_quality").props.value, score === null ? "" : "22");
     assert.ok(textOf(tree).includes("8 buổi chờ đối soát"));
     assert.equal(button(tree, "Xuất Excel").props.disabled, false);
     await button(tree, "Xuất Excel").props.onClick();
     assert.equal(app.exports[0][1][6], 6);
-    assert.equal(app.exports[0][1][10], score ?? 0); // Existing aggregation treats a cleared component as zero when other scores remain.
+    assert.equal(app.exports[0][1][12], score ?? "");
+    assert.equal(app.exports[0][1][14], score == null ? "" : 57);
     // A later request may reflect another director's subsequent edit.
-    app.api.evaluationMonthReviews = async () => [{ ...review, score_attitude: 24 }];
+    app.api.evaluationMonthReviews = async () => [{ ...review, score_quality: 24 }];
     app.refresh(); await flush(); tree = app.render();
-    assert.equal(find(tree, node => node.props?.["aria-label"] === "score_attitude").props.value, "24");
+    assert.equal(find(tree, node => node.props?.["aria-label"] === "score_quality").props.value, "24");
     app.unmount();
   }
 });
@@ -192,19 +226,20 @@ test("a GET started before a successful score save keeps that score and still re
 test("an old empty GET cannot erase a newly created future-month score row", async () => {
   const futureMonth = "2099-01";
   let finishRead;
-  const created = { ...review, month: futureMonth, late_cp: 0, late_kp: 0, leave_cp: 0, leave_kp: 0, leave_cp_auto: 0, attendance_pending_sessions: 0, score_attitude: 22, score_quality: null, score_team: null };
+  const created = { ...review, month: futureMonth, late_cp: 0, late_kp: 0, leave_cp: 0, leave_kp: 0, leave_cp_auto: 0, attendance_pending_sessions: 0, attitude_points: null, score_attitude: null, score_quality: 22, score_team: null };
   const app = mount({ evaluationMonthReviews: async () => [], setEvaluationMonthReview: async () => created });
   let tree = await ready(app);
   find(tree, node => node.type === "input" && node.props.type === "month").props.onChange({ target: { value: futureMonth } });
   app.render(); await flush(); tree = app.render();
   app.api.evaluationMonthReviews = () => new Promise(resolve => { finishRead = resolve; });
   app.refresh(); await flush(); tree = app.render();
-  find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onChange({ target: { value: "22" } });
-  tree = app.render(); await find(tree, node => node.props?.["aria-label"] === "score_attitude").props.onBlur();
+  find(tree, node => node.props?.["aria-label"] === "score_quality").props.onChange({ target: { value: "22" } });
+  tree = app.render(); await find(tree, node => node.props?.["aria-label"] === "score_quality").props.onBlur();
   finishRead([]); await flush(); tree = app.render();
-  assert.equal(find(tree, node => node.props?.["aria-label"] === "score_attitude").props.value, "22");
+  assert.equal(find(tree, node => node.props?.["aria-label"] === "score_quality").props.value, "22");
   await button(tree, "Xuất Excel").props.onClick();
-  assert.equal(app.exports[0][1][10], 22);
-  assert.equal(app.exports[0][1][13], 22);
+  assert.equal(app.exports[0][1][10], "");
+  assert.equal(app.exports[0][1][12], 22);
+  assert.equal(app.exports[0][1][14], "");
   app.unmount();
 });

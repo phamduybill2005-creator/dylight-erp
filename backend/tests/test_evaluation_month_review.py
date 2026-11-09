@@ -92,12 +92,12 @@ class EvaluationMonthReviewTests(unittest.TestCase):
         return {(r["user_id"], r["month"]): r for r in res.json()}
 
     def test_director_partial_updates_keep_other_fields(self):
-        res = self._put(self.staff.id, "2026-11", {"score_attitude": 10, "score_quality": 40})
+        res = self._put(self.staff.id, "2026-11", {"score_team": 10, "score_quality": 40})
         self.assertEqual(res.status_code, 200, res.text)
-        self.assertEqual((res.json()["late_cp"], res.json()["score_quality"], res.json()["score_attitude"]), (0.0, 40.0, 10.0))
-        res = self._put(self.staff.id, "2026-11", {"score_attitude": 20, "score_team": 22.5})
+        self.assertEqual((res.json()["late_cp"], res.json()["score_quality"], res.json()["score_attitude"]), (0.0, 40.0, 25.0))
+        res = self._put(self.staff.id, "2026-11", {"score_team": 22.5})
         row = res.json()
-        self.assertEqual((row["late_cp"], row["score_quality"], row["score_attitude"], row["score_team"]), (0.0, 40.0, 20.0, 22.5))
+        self.assertEqual((row["late_cp"], row["score_quality"], row["score_attitude"], row["score_team"]), (0.0, 40.0, 25.0, 22.5))
         # Xoá trắng 1 ô
         self.assertIsNone(self._put(self.staff.id, "2026-11", {"score_team": None}).json()["score_team"])
 

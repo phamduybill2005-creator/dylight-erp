@@ -360,53 +360,52 @@ export default function EvaluationsPage() {
     }
   }
 
-  // Chỉ các điểm tổng hợp được nhập; số chấm công luôn lấy từ đối soát.
+  // Chỉ Chất lượng/Tập thể được nhập; Ý thức và chấm công lấy từ đối soát.
   type CountField = "late_cp" | "late_kp" | "leave_cp" | "leave_kp";
-  type ScoreField = "score_attitude" | "score_quality" | "score_team";
+  type ScoreField = "score_quality" | "score_team";
   const REVIEW_MAX: Record<ScoreField, number> = {
-    score_attitude: 25, score_quality: 50, score_team: 25,
+    score_quality: 50, score_team: 25,
   };
   // Chỉ Giám đốc nhập, và chỉ khi xem theo THÁNG (quý là cộng dồn chỉ xem).
   const canEditReview = user?.role === "DIRECTOR" && !isQuarter;
   const reviewOf = (uid: number, month: string): EvaluationMonthReview | undefined => reviews[`${uid}:${month}`];
-  const fieldValue = (uid: number, month: string, f: CountField | ScoreField): number | null => {
+  const fieldValue = (uid: number, month: string, f: CountField | ScoreField | "score_attitude" | "attitude_points"): number | null => {
     const r = reviewOf(uid, month);
     const v = r?.[f];
     if (v != null) return Number(v);
     return null;
   };
-  type PeriodStats = Record<CountField, number> & Record<ScoreField, number | null> & { result: number | null; scoredMonths: number; pendingSessions: number };
-  /** Cộng dồn cả kỳ: số ngày cộng các tháng; % & Kết quả theo quý = trung bình các tháng đã chấm.
+  type PeriodStats = Record<CountField, number> & Record<ScoreField | "score_attitude" | "attitude_points", number | null> & { result: number | null; scoredMonths: number; pendingSessions: number };
+  /** Cộng dồn cả kỳ: số ngày cộng các tháng; mỗi điểm lấy trung bình riêng các tháng có dữ liệu.
    *  Kết quả (%) = Ý thức (tối đa 25%) + Chất lượng CV (tối đa 50%) + Tập thể (tối đa 25%). */
   const statsOf = (uid: number): PeriodStats => {
     const s: PeriodStats = {
       late_cp: 0, late_kp: 0, leave_cp: 0, leave_kp: 0,
-      score_attitude: null, score_quality: null, score_team: null, result: null, scoredMonths: 0, pendingSessions: 0,
+      attitude_points: null, score_attitude: null, score_quality: null, score_team: null, result: null, scoredMonths: 0, pendingSessions: 0,
     };
-    let sumA = 0, sumQ = 0, sumT = 0, scored = 0;
+    const values: Record<"attitude_points" | "score_attitude" | ScoreField, number[]> = { attitude_points: [], score_attitude: [], score_quality: [], score_team: [] };
     for (const m of periodMonths) {
       s.late_cp += fieldValue(uid, m, "late_cp") ?? 0;
       s.late_kp += fieldValue(uid, m, "late_kp") ?? 0;
       s.leave_cp += fieldValue(uid, m, "leave_cp") ?? 0;
       s.leave_kp += fieldValue(uid, m, "leave_kp") ?? 0;
       s.pendingSessions += reviewOf(uid, m)?.attendance_pending_sessions ?? 0;
-      const a = fieldValue(uid, m, "score_attitude");
-      const q = fieldValue(uid, m, "score_quality");
-      const tt = fieldValue(uid, m, "score_team");
-      if (a != null || q != null || tt != null) {
-        scored += 1;
-        sumA += a ?? 0; sumQ += q ?? 0; sumT += tt ?? 0;
+      for (const field of Object.keys(values) as (keyof typeof values)[]) {
+        const value = fieldValue(uid, m, field);
+        if (value != null) values[field].push(value);
       }
     }
-    if (scored > 0) {
-      const r1 = (n: number) => Math.round((n / scored) * 10) / 10;
-      s.score_attitude = r1(sumA); s.score_quality = r1(sumQ); s.score_team = r1(sumT);
-      s.result = r1(sumA + sumQ + sumT);
-      s.scoredMonths = scored;
+    for (const field of Object.keys(values) as (keyof typeof values)[]) {
+      const items = values[field];
+      s[field] = items.length ? items.reduce((sum, value) => sum + value, 0) / items.length : null;
+    }
+    if (s.score_attitude != null && s.score_quality != null && s.score_team != null) {
+      s.result = s.score_attitude + s.score_quality + s.score_team;
+      s.scoredMonths = values.score_attitude.length;
     }
     return s;
   };
-  const fmtNum = (n: number) => (Math.round(n * 10) / 10).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+  const fmtNum = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 2 });
 
   async function saveReview(uid: number, f: ScoreField) {
     if (!canEditReview || uid === user?.id) return;
@@ -477,7 +476,10 @@ export default function EvaluationsPage() {
     return pending > 0 ? <span className="ml-1 text-[10px] font-medium text-amber-deep" title="Buổi đang chờ dữ liệu, duyệt phép hoặc đối soát; chưa tính là vi phạm">{pending} buổi chờ đối soát</span> : null;
   };
   /** Ô % Tổng hợp (Ý thức / Chất lượng CV / Tập thể). */
-  const scoreCell = (uid: number, f: ScoreField, st: PeriodStats, self: boolean) => {
+  const scoreCell = (uid: number, f: ScoreField | "score_attitude", st: PeriodStats, self: boolean) => {
+    if (f === "score_attitude") return st.attitude_points != null
+      ? <span className="font-semibold text-ink tnum">{fmtNum(st.attitude_points)}/5</span>
+      : <span className="text-muted">—</span>;
     if (canEditReview && !self) return reviewInput(uid, f, { title: `Nhập phần trăm, tối đa ${REVIEW_MAX[f]}%` });
     const v = st[f];
     return v != null ? <span className="font-semibold text-ink tnum">{fmtNum(v)}%</span> : <span className="text-muted">—</span>;
@@ -488,7 +490,6 @@ export default function EvaluationsPage() {
       : (
         <span className="inline-flex items-baseline gap-1">
           <span className="text-sm font-extrabold text-steel tnum">{fmtNum(st.result)}%</span>
-          {isQuarter && <span className="text-[10px] text-muted">{st.scoredMonths}/3 th</span>}
         </span>
       );
 
@@ -502,7 +503,7 @@ export default function EvaluationsPage() {
       const headers = [
         "STT", "Họ và tên", "Chức vụ", "Phòng ban",
         "Office time (giờ)", "P time (giờ)", "Muộn CP (lần)", "Muộn KP (lần)", "Nghỉ CP (ngày)", "Nghỉ KP (ngày)",
-        "Ý thức (%)", "Chất lượng CV (%)", "Tập thể (%)", "Kết quả (%)", "Chờ đối soát (buổi)",
+        "Ý thức (/5)", "Ý thức (%)", "Chất lượng CV (%)", "Tập thể (%)", "Kết quả (%)", "Chờ đối soát (buổi)",
       ];
       const data = rows.map((r, i) => {
         const st = statsOf(r.user_id);
@@ -514,14 +515,14 @@ export default function EvaluationsPage() {
           r1(r.office_hours),
           r1(r.project_hours),
           st.late_cp, st.late_kp, st.leave_cp, st.leave_kp,
-          st.score_attitude ?? "", st.score_quality ?? "", st.score_team ?? "", st.result ?? "", st.pendingSessions,
+          st.attitude_points ?? "", st.score_attitude ?? "", st.score_quality ?? "", st.score_team ?? "", st.result ?? "", st.pendingSessions,
         ];
       });
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
       ws["!cols"] = [
         { wch: 6 }, { wch: 22 }, { wch: 18 }, { wch: 30 },
         { wch: 16 }, { wch: 13 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
-        { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 22 },
+        { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 22 },
       ];
       const tag = isQuarter ? `Q${selQuarter}-${selMonth.slice(0, 4)}` : selMonth;
       const wb = XLSX.utils.book_new();
@@ -805,7 +806,7 @@ export default function EvaluationsPage() {
                 Đánh giá nhân sự {periodLabel}{selDept ? ` · ${selDept}` : ""} ({rows.length})
               </h2>
               <p className="mt-0.5 text-[11px] text-muted">
-                Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP</b> = số lần, <b className="text-steel">Nghỉ CP/KP</b> = số ngày (0,5 ngày/buổi), tự tính từ đối soát chấm công; sửa phép tại ngày chấm công · <b className="text-steel">Tổng hợp</b> nhập theo phần trăm: Ý thức (tối đa 25%) + Chất lượng CV (tối đa 50%) + Tập thể (tối đa 25%) → <b className="text-steel">Kết quả</b> (%).
+                Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP</b> = số lần, <b className="text-steel">Nghỉ CP/KP</b> = số ngày (0,5 ngày/buổi), tự tính từ đối soát chấm công; sửa phép tại ngày chấm công · <b className="text-steel">Ý thức</b> tự tính /5 (25%); Chất lượng CV (50%) và Tập thể (25%) do Giám đốc nhập → <b className="text-steel">Kết quả</b> (%).
                 {isQuarter ? " Xem theo quý là cộng dồn 3 tháng (% lấy trung bình các tháng đã chấm); muốn nhập thì chọn tháng." : canEditReview ? " Gõ số vào ô rồi Enter hoặc bấm ra ngoài để lưu; xoá trắng để bỏ." : ""}
               </p>
               {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}

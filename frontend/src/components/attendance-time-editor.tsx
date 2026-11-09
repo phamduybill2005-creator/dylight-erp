@@ -1,26 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PencilSquareIcon } from "@heroicons/react/24/outline";
 import { api } from "@/lib/api";
 import type { Attendance } from "@/lib/types";
 
-export default function AttendanceTimeEditor({ record, onSaved, formTargetId }: {
+export default function AttendanceTimeEditor({ record, onSaved, formTargetId, disabled = false, onSavingChange }: {
   record: Attendance;
   onSaved: (updated: Attendance) => void;
   formTargetId?: string;
+  disabled?: boolean;
+  onSavingChange?: (saving: boolean) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const pending = useRef(false);
+  const blocked = useRef(disabled);
+  blocked.current = disabled;
 
   async function save() {
+    if (blocked.current || pending.current) return;
     if (!checkIn && !checkOut) { setError("Phải giữ ít nhất một mốc giờ."); return; }
     if (checkIn && checkOut && checkOut < checkIn) { setError("Giờ ra không được sớm hơn giờ vào."); return; }
+    pending.current = true;
     setSaving(true);
+    onSavingChange?.(true);
     setError("");
     try {
       const payload: { check_in?: string | null; check_out?: string | null } = {};
@@ -36,12 +44,13 @@ export default function AttendanceTimeEditor({ record, onSaved, formTargetId }: 
       setEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không lưu được giờ chấm công.");
-    } finally { setSaving(false); }
+    } finally { pending.current = false; setSaving(false); onSavingChange?.(false); }
   }
 
   if (!editing) return (
-    <button type="button" title="Sửa giờ vào/ra" aria-label="Sửa giờ vào/ra" className="shrink-0 rounded p-1 text-steel hover:bg-white"
+    <button type="button" title="Sửa giờ vào/ra" aria-label="Sửa giờ vào/ra" disabled={disabled} className="shrink-0 rounded p-1 text-steel hover:bg-white"
       onClick={() => {
+        if (blocked.current) return;
         setCheckIn(record.check_in?.slice(11, 16) || "");
         setCheckOut(record.check_out?.slice(11, 16) || "");
         setError("");
@@ -54,14 +63,14 @@ export default function AttendanceTimeEditor({ record, onSaved, formTargetId }: 
   const editor = (
     <div className="flex max-w-full flex-wrap items-end gap-2 whitespace-normal">
       <label className="text-[10px] text-muted">Giờ vào
-        <input type="time" value={checkIn} disabled={saving} onChange={(e) => setCheckIn(e.target.value)}
+        <input type="time" value={checkIn} disabled={saving || disabled} onChange={(e) => setCheckIn(e.target.value)}
           className="block rounded border border-line bg-white px-2 py-1 text-xs text-ink" />
       </label>
       <label className="text-[10px] text-muted">Giờ ra
-        <input type="time" value={checkOut} disabled={saving} onChange={(e) => setCheckOut(e.target.value)}
+        <input type="time" value={checkOut} disabled={saving || disabled} onChange={(e) => setCheckOut(e.target.value)}
           className="block rounded border border-line bg-white px-2 py-1 text-xs text-ink" />
       </label>
-      <button type="button" disabled={saving} onClick={save} className="rounded bg-steel px-2 py-1 text-xs text-white disabled:opacity-50">{saving ? "Đang lưu…" : "Lưu"}</button>
+      <button type="button" disabled={saving || disabled} onClick={save} className="rounded bg-steel px-2 py-1 text-xs text-white disabled:opacity-50">{saving ? "Đang lưu…" : "Lưu"}</button>
       <button type="button" disabled={saving} onClick={() => setEditing(false)} className="rounded border border-line px-2 py-1 text-xs text-muted">Hủy</button>
       {error && <p role="alert" className="w-full text-xs text-bad">{error}</p>}
     </div>

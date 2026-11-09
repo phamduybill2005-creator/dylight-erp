@@ -9,11 +9,12 @@ from sqlalchemy.orm import Session
 from app.attendance_reconciliation_schemas import (
     AttendanceCoverageOut, AttendanceCoverageWrite, AttendancePermissionWrite, AttendanceDayPermissionWrite,
     AttendanceReconciliationDay, AttendanceReconciliationOut,
+    AttendanceForgotPunchWrite,
 )
 from app.database import get_db
 from app.deps import get_current_user
 from app.events import publish
-from app.models import ActivityLog, AttendanceDataConfirmation, AttendanceSessionOverride, User, UserRole
+from app.models import ActivityLog, AttendanceDataConfirmation, AttendanceSessionOverride, AttendanceForgotPunch, User, UserRole
 from app.services import attendance_reconciliation as service
 
 router = APIRouter(prefix="/reconciliation")
@@ -140,3 +141,53 @@ def confirm_data(payload: AttendanceCoverageWrite, db: Session = Depends(get_db)
     publish(current.company_id, "attendance")
     publish(current.company_id, "audit")
     return service.confirmation_out(record)
+
+
+@router.put("/forgot-punch", response_model=AttendanceReconciliationDay)
+def set_forgot_punch(payload: AttendanceForgotPunchWrite, db: Session = Depends(get_db),
+                     current: User = Depends(get_current_user)):
+    _admin(current)
+    now = service.vn_now()
+    if payload.work_date > now.date():
+        raise HTTPException(400, "Chỉ xác nhận ngày hôm nay hoặc ngày đã qua.")
+    if payload.reported_at and payload.reported_at > now:
+        raise HTTPException(400, "Thời điểm báo không được ở tương lai.")
+    employee = db.query(User).filter(User.id == payload.user_id, User.company_id == current.company_id,
+                                    User.is_active.is_(True), User.is_approved.is_(True)).first()
+    if employee is None:
+        raise HTTPException(404, "Không tìm thấy nhân viên trong công ty.")
+    record = db.query(AttendanceForgotPunch).filter(
+        AttendanceForgotPunch.company_id == current.company_id,
+        AttendanceForgotPunch.user_id == employee.id,
+        AttendanceForgotPunch.work_date == payload.work_date,
+        AttendanceForgotPunch.punch == payload.punch).with_for_update().first()
+    fields = ("decision", "reported_at", "reason", "approved_by", "recorded_by_id", "recorded_by_name")
+    before = {key: getattr(record, key) for key in fields} if record else None
+    try:
+        if record is None:
+            record = AttendanceForgotPunch(company_id=current.company_id, user_id=employee.id,
+                work_date=payload.work_date, punch=payload.punch, created_at=now)
+            db.add(record)
+        for key in ("decision", "reported_at", "reason", "approved_by"):
+            setattr(record, key, getattr(payload, key))
+        record.recorded_by_id = current.id
+        record.recorded_by_name = current.full_name
+        record.updated_at = now
+        db.flush()
+        after = {key: getattr(record, key) for key in fields}
+        db.add(ActivityLog(company_id=current.company_id, user_id=current.id,
+            action="attendance.forgot_punch", entity_type="attendance_forgot_punch", entity_id=record.id,
+            detail=f"{employee.full_name} · {payload.work_date:%d/%m/%Y} · {payload.punch}: "
+                   + json.dumps(before, ensure_ascii=False, default=lambda value: value.isoformat()) + " → "
+                   + json.dumps(after, ensure_ascii=False, default=lambda value: value.isoformat())
+                   + f" · Người ghi nhận: {current.full_name} (#{current.id})"))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Xác nhận vừa được cập nhật ở phiên khác. Tải lại để kiểm tra.")
+    except Exception:
+        db.rollback()
+        raise
+    publish(current.company_id, "attendance")
+    publish(current.company_id, "audit")
+    return service.reconcile(db, current.company_id, payload.work_date, payload.work_date, employee.id, now)["rows"][0]

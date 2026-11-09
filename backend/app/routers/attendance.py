@@ -17,7 +17,7 @@ from app.events import publish
 from app.config import settings
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
-from app.models import Attendance, AttendanceSource, AttendanceSessionOverride, PaymentDirection, User, UserRole, LeaveRequest, LeaveStatus
+from app.models import Attendance, AttendanceSource, AttendanceSessionOverride, AttendanceForgotPunch, PaymentDirection, User, UserRole, LeaveRequest, LeaveStatus
 from app.schemas import (
     AttendanceOut, AttendanceUpdate, AttendanceSummary, MachinePunch,
     AttendanceImportRequest, AttendanceImportResult,
@@ -317,6 +317,9 @@ def attendance_summary(
     evidenced.update(uid for (uid,) in db.query(AttendanceSessionOverride.user_id).filter(
         AttendanceSessionOverride.company_id == current.company_id,
         AttendanceSessionOverride.work_date >= first, AttendanceSessionOverride.work_date <= last))
+    evidenced.update(uid for (uid,) in db.query(AttendanceForgotPunch.user_id).filter(
+        AttendanceForgotPunch.company_id == current.company_id,
+        AttendanceForgotPunch.work_date >= first, AttendanceForgotPunch.work_date <= last))
     for u in users.values():
         if not _is_senior_manager_up(current) and u.id != current.id:
             continue

@@ -153,3 +153,97 @@ test("a permission editor becoming read-only cannot submit its earlier handler, 
   assert.equal(writes, 0);
   app.unmount();
 });
+
+test("forgotten punch initializes saved confirmation, keeps a failed draft and resets without changing clocks", async () => {
+  const writes = []; let fail = true, reads = 0;
+  const session = { session: "AM", status: "PRESENT", override: null, leave_id: null };
+  const confirmation = { punch: "OUT", decision: "FORGOT", reported_at: "2026-11-02T17:30:00", reason: "Quên bấm ra", approved_by: "Chị Hà" };
+  const app = mount({ attendanceList: async () => [realRecord], attendanceReconciliation: async () => { reads++; return { rows: [{ user_id: 7, work_date: realRecord.work_date, morning: session, afternoon: { ...session, session: "PM" }, forgot_punches: [confirmation] }] }; }, setAttendanceForgotPunch: async payload => { writes.push(payload); if (fail) throw new Error("Không lưu được"); } });
+  app.render(); await flush(); let tree = edit(app);
+  assert.ok(find(tree, node => node.type === "option" && node.props.value === "EXCUSED_EARLY"));
+  assert.ok(find(tree, node => node.type === "option" && node.props.value === "EXCUSED_LATE_EARLY"));
+  assert.equal(find(tree, node => node.props?.["aria-label"] === "Mốc quên chấm công").props.value, "OUT");
+  assert.equal(find(tree, node => node.props?.["aria-label"] === "Thời điểm nhân viên báo").props.value, "2026-11-02T17:30");
+  assert.equal(find(tree, node => node.props?.["aria-label"] === "Lý do quên chấm công").props.value, confirmation.reason);
+  fill(tree, "Xác nhận quên chấm công", ""); fill(tree, "Lý do quên chấm công", "Đặt lại sau kiểm tra");
+  tree = app.render(); await find(tree, node => node.type === "form" && node.props["aria-label"] === "Quên chấm công").props.onSubmit({ preventDefault() {} });
+  tree = app.render();
+  assert.equal(find(tree, node => node.props?.["aria-label"] === "Lý do quên chấm công").props.value, "Đặt lại sau kiểm tra");
+  assert.ok(find(tree, node => node.props?.role === "alert"));
+  fail = false; await find(tree, node => node.type === "form" && node.props["aria-label"] === "Quên chấm công").props.onSubmit({ preventDefault() {} });
+  assert.deepEqual(JSON.parse(JSON.stringify(writes[1])), { user_id: 7, work_date: realRecord.work_date, punch: "OUT", decision: null, reported_at: null, reason: "Đặt lại sau kiểm tra", approved_by: "Chị Hà" });
+  assert.equal(reads, 2);
+  assert.equal(find(app.render(), node => node.props?.role === "dialog"), undefined);
+  app.unmount();
+});
+
+test("forgotten punch is explicit, validates authorizer, reloads selection and serializes writes", async () => {
+  let finish, writes = 0, permissionWrites = 0, savedPayload;
+  const app = mount({ setAttendanceForgotPunch: payload => { writes++; savedPayload = payload; return new Promise(resolve => { finish = resolve; }); }, setAttendanceDayPermission: async () => permissionWrites++ });
+  app.render(); await flush(); let tree = edit(app);
+  assert.equal(find(tree, node => node.props?.["aria-label"] === "Xác nhận quên chấm công").props.value, "");
+  fill(tree, "Mốc quên chấm công", "OUT"); fill(tree, "Xác nhận quên chấm công", "FORGOT"); fill(tree, "Lý do quên chấm công", "Quên bấm");
+  tree = app.render(); await find(tree, node => node.type === "form" && node.props["aria-label"] === "Quên chấm công").props.onSubmit({ preventDefault() {} });
+  assert.equal(writes, 0);
+  tree = app.render(); fill(tree, "Người xác nhận quên chấm công", "Giám đốc");
+  fill(tree, "Người cho phép", "Giám đốc"); fill(tree, "Lý do xác nhận", "Có phép");
+  tree = app.render();
+  const submit = find(tree, node => node.type === "form" && node.props["aria-label"] === "Quên chấm công").props.onSubmit;
+  const permissionSubmit = find(tree, node => node.type === "form" && !node.props["aria-label"]).props.onSubmit;
+  const saving = submit({ preventDefault() {} });
+  await submit({ preventDefault() {} }); await permissionSubmit({ preventDefault() {} });
+  assert.equal(writes, 1); assert.equal(permissionWrites, 0);
+  assert.equal(savedPayload.punch, "OUT");
+  assert.equal(savedPayload.decision, "FORGOT");
+  assert.equal(savedPayload.reported_at, null);
+  finish(); await saving; app.unmount();
+});
+
+test("employee report timestamp comes from the entered report time rather than Admin entry time", async () => {
+  let payload;
+  const app = mount({ setAttendanceForgotPunch: async value => { payload = value; } });
+  app.render(); await flush(); let tree = edit(app);
+  fill(tree, "Xác nhận quên chấm công", "FORGOT"); fill(tree, "Người xác nhận quên chấm công", "Chị Hà"); fill(tree, "Lý do quên chấm công", "Nhân viên đã báo"); fill(tree, "Thời điểm nhân viên báo", "2026-11-02T08:40");
+  tree = app.render(); await find(tree, node => node.type === "form" && node.props["aria-label"] === "Quên chấm công").props.onSubmit({ preventDefault() {} });
+  assert.equal(payload.reported_at, "2026-11-02T08:40:00+07:00");
+  app.unmount();
+});
+
+test("real Admin, nonfuture and live editability guard forgotten punch writes including earlier handlers", async () => {
+  const session = { session: "AM", status: "PRESENT", override: null, leave_id: null };
+  let editable = true, writes = 0;
+  const app = mount({ attendanceReconciliation: async () => ({ rows: [{ user_id: 7, work_date: realRecord.work_date, can_edit_permission: editable, morning: session, afternoon: { ...session, session: "PM" } }] }), attendanceList: async () => [realRecord], setAttendanceForgotPunch: async () => writes++ });
+  app.render(); await flush(); let tree = edit(app);
+  fill(tree, "Xác nhận quên chấm công", "FORGOT"); fill(tree, "Người xác nhận quên chấm công", "Chị Hà"); fill(tree, "Lý do quên chấm công", "Đã xác nhận");
+  tree = app.render(); const submit = find(tree, node => node.type === "form" && node.props["aria-label"] === "Quên chấm công").props.onSubmit;
+  editable = false; await app.refresh(); tree = app.render();
+  assert.equal(find(tree, node => node.props?.["aria-label"] === "Quên chấm công"), undefined);
+  await submit({ preventDefault() {} }); assert.equal(writes, 0);
+  app.unmount();
+  const preview = mount({ realUser: () => ({ role: "DIRECTOR" }) });
+  preview.render(); await flush(); edit(preview);
+  assert.equal(find(preview.render(), node => node.props?.role === "dialog"), undefined);
+  preview.unmount();
+  const future = mount({}); future.props.period = "2099-01";
+  future.render(); await flush(); edit(future, "2099-01-02");
+  assert.equal(find(future.render(), node => node.props?.role === "dialog"), undefined);
+  future.unmount();
+});
+
+test("actual clock save blocks permission and forgotten writes until the request finishes", async () => {
+  let writes = 0;
+  const app = mount({ attendanceList: async () => [realRecord], setAttendanceForgotPunch: async () => writes++, setAttendanceDayPermission: async () => writes++ });
+  app.render(); await flush(); let tree = edit(app);
+  fill(tree, "Xác nhận quên chấm công", "FORGOT"); fill(tree, "Người xác nhận quên chấm công", "Chị Hà"); fill(tree, "Lý do quên chấm công", "Đã xác nhận");
+  fill(tree, "Người cho phép", "Chị Hà"); fill(tree, "Lý do xác nhận", "Đã xác nhận");
+  tree = app.render();
+  const time = find(tree, node => node.type === app.TimeEditor);
+  assert.equal(typeof time.props.onSavingChange, "function");
+  time.props.onSavingChange(true);
+  for (const form of nodes(tree).filter(node => node.type === "form")) await form.props.onSubmit({ preventDefault() {} });
+  assert.equal(writes, 0);
+  time.props.onSavingChange(false);
+  await find(app.render(), node => node.type === "form").props.onSubmit({ preventDefault() {} });
+  assert.equal(writes, 1);
+  app.unmount();
+});

@@ -211,7 +211,7 @@ export type AttendanceSource = "MANUAL" | "MACHINE" | "API";
 
 export type AttendanceSession = "AM" | "PM";
 export type ReconciliationStatus = "PRESENT" | "EXCUSED_ABSENCE" | "UNEXCUSED_ABSENCE" | "EXCUSED_LATE" | "UNEXCUSED_LATE" | "PENDING_APPROVAL" | "NEEDS_REVIEW" | "WAITING_DATA" | "NOT_SCHEDULED" | "NOT_FINISHED";
-export type AttendancePermissionDecision = "EXCUSED_LATE" | "EXCUSED_ABSENCE";
+export type AttendancePermissionDecision = "EXCUSED_LATE" | "EXCUSED_ABSENCE" | "EXCUSED_EARLY" | "EXCUSED_LATE_EARLY";
 export interface AttendancePermissionOverride {
   decision: AttendancePermissionDecision;
   reason: string;
@@ -223,6 +223,8 @@ export interface AttendanceSessionResult {
   session: AttendanceSession;
   status: ReconciliationStatus;
   late_minutes: number;
+  early_status?: "EXCUSED_EARLY" | "UNEXCUSED_EARLY" | null;
+  early_minutes?: number;
   explanation: string;
   leave_id: number | null;
   permission_source: "LEAVE" | "ADMIN" | null;
@@ -241,6 +243,25 @@ export interface AttendanceReconciliationRow {
   afternoon: AttendanceSessionResult;
   needs_attention: boolean;
   can_edit_permission?: boolean;
+  forgot_punches?: AttendanceForgotPunch[];
+}
+export interface AttendanceForgotPunch {
+  punch: "IN" | "OUT";
+  decision: "FORGOT";
+  reported_at: string | null;
+  reason: string;
+  approved_by: string;
+  recorded_by: string;
+  updated_at: string;
+}
+export interface AttendanceForgotPunchPayload {
+  user_id: number;
+  work_date: string;
+  punch: "IN" | "OUT";
+  decision: "FORGOT" | null;
+  reported_at: string | null;
+  reason: string;
+  approved_by: string;
 }
 export interface AttendanceDataConfirmation {
   work_date: string;
@@ -630,7 +651,7 @@ export interface EvaluationOverviewRow {
   my_rating?: number | null;    // sao mình đã chấm trong tháng; null = chưa chấm
 }
 
-// Đánh giá theo người/tháng: chấm công từ đối soát, điểm do Giám đốc nhập.
+// Đánh giá theo người/tháng: chấm công/Ý thức từ đối soát, CL/HN do Giám đốc nhập.
 export interface EvaluationMonthReview {
   user_id: number;
   month: string;
@@ -639,7 +660,8 @@ export interface EvaluationMonthReview {
   leave_cp: number;                // ngày nghỉ có phép (0,5 ngày/buổi)
   leave_kp: number;                // ngày nghỉ không phép (0,5 ngày/buổi)
   attendance_pending_sessions: number; // buổi chưa đủ kết luận, không tính vi phạm
-  score_attitude?: number | null;  // Ý thức (%), tối đa 25
+  attitude_points?: number | null; // Ý thức tự tính, tối đa 5
+  score_attitude?: number | null;  // Ý thức tự tính quy đổi (%), tối đa 25
   score_quality?: number | null;   // Chất lượng công việc (%), tối đa 50
   score_team?: number | null;      // Tập thể (%), tối đa 25
   leave_cp_auto: number;           // alias tương thích của leave_cp

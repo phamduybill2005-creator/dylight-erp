@@ -1,11 +1,12 @@
 """Read-time evaluation counts from the same per-session attendance decisions."""
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.models import Attendance, AttendanceSessionOverride, EvaluationMonthReview, LeaveRequest, LeaveStatus, User
+from app.models import Attendance, AttendanceForgotPunch, AttendanceSessionOverride, EvaluationMonthReview, LeaveRequest, LeaveStatus, User
 from app.services import attendance_reconciliation as reconciliation
 
 COUNT_FIELDS = ("late_cp", "late_kp", "leave_cp", "leave_kp")
@@ -23,6 +24,9 @@ def attendance_user_ids(db: Session, company_id: int, first: date, last: date):
     evidenced.update(uid for (uid,) in db.query(AttendanceSessionOverride.user_id).filter(
         AttendanceSessionOverride.company_id == company_id,
         AttendanceSessionOverride.work_date >= first, AttendanceSessionOverride.work_date <= last))
+    evidenced.update(uid for (uid,) in db.query(AttendanceForgotPunch.user_id).filter(
+        AttendanceForgotPunch.company_id == company_id,
+        AttendanceForgotPunch.work_date >= first, AttendanceForgotPunch.work_date <= last))
     evidenced.update(uid for (uid,) in db.query(EvaluationMonthReview.user_id).filter(
         EvaluationMonthReview.company_id == company_id,
         EvaluationMonthReview.month >= first.strftime("%Y-%m"),
@@ -51,12 +55,19 @@ def attendance_totals(db: Session, company_id: int, first: date, last: date, *, 
         or_(Attendance.check_in <= now, Attendance.check_out <= now),
     ).group_by(Attendance.user_id).all())
     result = reconciliation.reconcile(db, company_id, first, last, now=now, user_ids=user_ids)
-    totals = defaultdict(lambda: dict.fromkeys((*COUNT_FIELDS, "attendance_pending_sessions"), 0))
+    totals = defaultdict(lambda: {
+        **dict.fromkeys((*COUNT_FIELDS, "attendance_pending_sessions"), 0),
+        "attitude_points": None, "score_attitude": None,
+    })
+    conduct_events = defaultdict(list)
+    forgot_deductions = defaultdict(lambda: Decimal("0"))
     for row in result["rows"]:
-        counts = totals[(row["user_id"], row["work_date"].strftime("%Y-%m"))]
+        key = (row["user_id"], row["work_date"].strftime("%Y-%m"))
+        counts = totals[key]
         start = starts.get(row["user_id"])
         if start is None or row["work_date"] < start:
             continue
+        counts["attitude_points"] = 5
         statuses = [row[session]["status"] for session in ("morning", "afternoon")]
         # A late day contributes once, even if an upstream rule later adds another session.
         counts["late_cp"] += int("EXCUSED_LATE" in statuses)
@@ -64,4 +75,34 @@ def attendance_totals(db: Session, company_id: int, first: date, last: date, *, 
         counts["leave_cp"] += 0.5 * statuses.count("EXCUSED_ABSENCE")
         counts["leave_kp"] += 0.5 * statuses.count("UNEXCUSED_ABSENCE")
         counts["attendance_pending_sessions"] += sum(status in PENDING_STATUSES for status in statuses)
+        for session in ("morning", "afternoon"):
+            result_session = row[session]
+            for field, clock_field, cp, kp, order in (
+                ("status", "check_in", "EXCUSED_LATE", "UNEXCUSED_LATE", 0),
+                ("early_status", "check_out", "EXCUSED_EARLY", "UNEXCUSED_EARLY", 1),
+            ):
+                status = result_session.get(field)
+                if status in (cp, kp):
+                    occurred = row.get(clock_field) or datetime.combine(row["work_date"], time.min)
+                    conduct_events[key].append((occurred, order, session, status == kp))
+        for forgotten in row.get("forgot_punches", []):
+            if all(status in {"NOT_SCHEDULED", "EXCUSED_ABSENCE"} for status in statuses):
+                continue  # No clock was expected during an entirely off/approved-leave day.
+            if forgotten.get("decision") != "FORGOT":
+                continue
+            reported = forgotten.get("reported_at")
+            if reported is not None and reported.date() == row["work_date"]:
+                continue
+            if row["work_date"] < now.date():
+                forgot_deductions[key] += Decimal("0.1")
+    for key, counts in totals.items():
+        if counts["attitude_points"] is None:
+            continue
+        deduction = Decimal(str(counts["leave_kp"])) + forgot_deductions[key]
+        # Both deductions begin at the third event, sharing the same monthly grace.
+        for event in sorted(conduct_events[key])[2:]:
+            deduction += Decimal("0.75") if event[3] else Decimal("0.25")
+        points = max(Decimal("0"), Decimal("5") - deduction)
+        counts["attitude_points"] = float(points)
+        counts["score_attitude"] = float(points * 5)
     return dict(totals)

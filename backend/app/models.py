@@ -688,6 +688,27 @@ class AttendanceSessionOverride(Base):
     recorded_by: Mapped["User | None"] = relationship("User", foreign_keys=[recorded_by_id])
 
 
+class AttendanceForgotPunch(Base):
+    """Explicit forgotten-punch confirmations, independent from corrected clocks."""
+    __tablename__ = "attendance_forgot_punches"
+    __table_args__ = (UniqueConstraint("company_id", "user_id", "work_date", "punch", name="uq_attendance_forgot_punch"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    work_date: Mapped[date] = mapped_column(Date, index=True)
+    punch: Mapped[str] = mapped_column(String(3))
+    decision: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    reported_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reason: Mapped[str] = mapped_column(Text)
+    approved_by: Mapped[str] = mapped_column(String(255))
+    recorded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    recorded_by_name: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=vn_now, onupdate=vn_now)
+    recorded_by: Mapped["User | None"] = relationship("User", foreign_keys=[recorded_by_id])
+
+
 class AttendanceDataConfirmation(Base):
     """An administrator verified that a closed session's source data is complete."""
     __tablename__ = "attendance_data_confirmations"
@@ -767,11 +788,11 @@ class Evaluation(Base):
 
 
 class EvaluationMonthReview(Base):
-    """ĐÁNH GIÁ THÁNG NHẬP TAY (bảng Đánh giá; chỉ Giám đốc nhập): 1 dòng = (người, tháng "YYYY-MM").
-    - Muộn CP / Muộn KP / Nghỉ CP / Nghỉ KP: số ngày, nhập tay. Nghỉ CP để NULL = dùng số TỰ TÍNH
-      từ đơn nghỉ phép đã duyệt (router trả kèm leave_cp_auto); nhập số là ghi đè.
-    - Tổng hợp: Ý thức (tối đa 25%), Chất lượng công việc (tối đa 50%), Tập thể (tối đa 25%);
-      Kết quả (%) = tổng 3 mục, giao diện tự cộng.
+    """ĐÁNH GIÁ THÁNG: 1 dòng = (người, tháng "YYYY-MM").
+    - Muộn CP / Muộn KP / Nghỉ CP / Nghỉ KP và Ý thức được tính từ dữ liệu chấm công.
+      Các cột lưu cũ được giữ để bảo toàn lịch sử, không dùng ghi đè kết quả tự tính.
+    - Giám đốc nhập Chất lượng công việc (tối đa 50%) và Tập thể (tối đa 25%).
+      Ý thức tối đa 25%; Kết quả (%) = tổng 3 mục, giao diện tự cộng.
     Tách khỏi bảng evaluations (sao theo tuần / dự án) để không đụng luồng chấm sao cũ."""
     __tablename__ = "evaluation_month_reviews"
     __table_args__ = (UniqueConstraint("user_id", "month", name="uq_evaluation_month_review"),)
@@ -780,11 +801,11 @@ class EvaluationMonthReview(Base):
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     month: Mapped[str] = mapped_column(String(7), index=True)                    # "YYYY-MM"
-    late_cp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # ngày đi muộn có phép
-    late_kp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # ngày đi muộn không phép
-    leave_cp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True) # ngày nghỉ có phép (ghi đè số tự tính)
-    leave_kp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True) # ngày nghỉ không phép
-    score_attitude: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # Ý thức, tối đa 25%
+    late_cp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # lịch sử; API tự tính muộn CP
+    late_kp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # lịch sử; API tự tính muộn KP
+    leave_cp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True) # lịch sử; API tự tính nghỉ CP
+    leave_kp: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True) # lịch sử; API tự tính nghỉ KP
+    score_attitude: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)  # lịch sử; API tự tính Ý thức
     score_quality: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)   # Chất lượng CV, tối đa 50%
     score_team: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)      # Tập thể, tối đa 25%
     updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)

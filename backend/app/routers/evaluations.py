@@ -370,7 +370,8 @@ def _review_out(rec: EvaluationMonthReview | None, user_id: int, month: str, aut
         leave_cp=auto.get("leave_cp", 0),
         leave_kp=auto.get("leave_kp", 0),
         attendance_pending_sessions=auto.get("attendance_pending_sessions", 0),
-        score_attitude=f(rec.score_attitude) if rec else None,
+        attitude_points=auto.get("attitude_points"),
+        score_attitude=auto.get("score_attitude"),
         score_quality=f(rec.score_quality) if rec else None,
         score_team=f(rec.score_team) if rec else None,
         leave_cp_auto=auto.get("leave_cp", 0),
@@ -422,8 +423,8 @@ def set_month_review(
     data = payload.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(400, "Chưa có trường nào để lưu.")
-    if set(data) & set(COUNT_FIELDS):
-        raise HTTPException(400, "Số nghỉ/đi muộn tự lấy từ chấm công. Hãy sửa phép tại ngày chấm công tương ứng.")
+    if set(data) & {*COUNT_FIELDS, "score_attitude"}:
+        raise HTTPException(400, "Số nghỉ/đi muộn và điểm Ý thức tự tính từ chấm công. Hãy sửa dữ liệu tại ngày chấm công tương ứng.")
 
     rec = (
         db.query(EvaluationMonthReview)

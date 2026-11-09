@@ -5,6 +5,34 @@ const model = () => loadTypeScript("src/lib/compact-attendance-days.ts");
 const session = (status, session = "AM", extra = {}) => ({ status, session, explanation: "Căn cứ đã kiểm tra", late_minutes: 0, leave_id: null, permission_source: null, override: null, data_confirmed: false, ...extra });
 const result = (date, am, pm = am) => ({ user_id: 7, work_date: date, morning: session(am), afternoon: session(pm, "PM") });
 
+test("early-only checkout opens the correct session and permission while actual lateness keeps priority", () => {
+  const { buildCompactAttendanceDays, initialCompactPermission } = model();
+  const record = { user_id: 7, work_date: "2026-11-02", check_in: "2026-11-02T08:00:00", check_out: "2026-11-02T16:00:00" };
+  const dayFor = row => buildCompactAttendanceDays("2026-11", 7, [record], [row], "2026-11-06")[1];
+  for (const target of ["AM", "PM"]) {
+    const row = result(record.work_date, "PRESENT");
+    Object.assign(target === "AM" ? row.morning : row.afternoon, { early_status: "UNEXCUSED_EARLY", early_minutes: 60 });
+    assert.deepEqual(initialCompactPermission(dayFor(row)), { scope: target, decision: "EXCUSED_EARLY", reason: "", approved_by: "" });
+    row.morning.status = "UNEXCUSED_LATE";
+    assert.equal(initialCompactPermission(dayFor(row)).decision, target === "AM" ? "EXCUSED_LATE_EARLY" : "EXCUSED_LATE");
+    assert.equal(initialCompactPermission(dayFor(row)).scope, "AM");
+    row.afternoon.override = { decision: "EXCUSED_EARLY", reason: "Đã xác nhận", approved_by: "Chị Hà" };
+    assert.deepEqual(initialCompactPermission(dayFor(row)), { scope: "PM", decision: "EXCUSED_EARLY", reason: "Đã xác nhận", approved_by: "Chị Hà" });
+  }
+});
+
+test("combined permission preserves the existing override when both arrival and departure were excused", () => {
+  const { buildCompactAttendanceDays, initialCompactPermission, compactPermissionPayload } = model();
+  const row = result("2026-11-02", "EXCUSED_LATE");
+  row.morning.override = { decision: "EXCUSED_LATE_EARLY", reason: "Có việc gia đình", approved_by: "Chị Hà" };
+  row.morning.early_status = "EXCUSED_EARLY";
+  const day = buildCompactAttendanceDays("2026-11", 7, [], [row], "2026-11-06")[1];
+  const draft = initialCompactPermission(day);
+  assert.equal(draft.decision, "EXCUSED_LATE_EARLY");
+  assert.equal(draft.scope, "AM");
+  assert.equal(compactPermissionPayload(7, row.work_date, draft).decision, "EXCUSED_LATE_EARLY");
+});
+
 test("calendar includes every real month date without manufacturing attendance records", () => {
   const { compactMonthRange, buildCompactAttendanceDays } = model();
   assert.deepEqual(compactMonthRange("2024-02"), { from: "2024-02-01", to: "2024-02-29" });

@@ -66,3 +66,19 @@ test("a full-day permission is a single authenticated atomic request with no pun
   assert.deepEqual(JSON.parse(requests[0].body), payload);
   assert.equal(events.length, 1);
 });
+
+test("forgotten punch PUT preserves report time and reset, emitting refresh only on success", async () => {
+  const { api, requests, events } = client();
+  const payload = { user_id: 7, work_date: "2026-11-02", punch: "OUT", decision: "FORGOT", reported_at: "2026-11-02T17:40:00", reason: "Quên bấm", approved_by: "Giám đốc" };
+  assert.equal(typeof api.setAttendanceForgotPunch, "function");
+  await api.setAttendanceForgotPunch(payload);
+  await api.setAttendanceForgotPunch({ ...payload, decision: null, reported_at: null });
+  assert.equal(requests[0].method, "PUT");
+  assert.equal(new URL(requests[0].url).pathname, "/api/v1/attendance/reconciliation/forgot-punch");
+  assert.deepEqual(JSON.parse(requests[0].body), payload);
+  assert.equal(JSON.parse(requests[1].body).decision, null);
+  assert.equal(events.length, 2);
+  const rejected = client(400);
+  await assert.rejects(rejected.api.setAttendanceForgotPunch(payload), /Chưa hết ca/);
+  assert.deepEqual(rejected.events, []);
+});

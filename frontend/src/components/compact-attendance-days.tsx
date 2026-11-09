@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "@/lib/api";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { buildCompactAttendanceDays, compactMonthRange, compactPermissionPayload, compactSessionBasis, initialCompactPermission, type CompactAttendanceDay, type CompactPermissionDraft } from "@/lib/compact-attendance-days";
+import { buildCompactAttendanceDays, compactMonthRange, compactPermissionPayload, compactForgotPunchPayload, compactSessionBasis, initialCompactPermission, initialCompactForgotPunch, type CompactAttendanceDay, type CompactPermissionDraft, type CompactForgotPunchDraft } from "@/lib/compact-attendance-days";
 import { RECONCILIATION_LABELS, reconciliationLeavePath } from "@/lib/attendance-reconciliation";
 import type { Attendance, AttendanceReconciliationRow, User } from "@/lib/types";
 import AttendanceTimeEditor from "./attendance-time-editor";
@@ -28,7 +28,11 @@ export default function CompactAttendanceDays({ userId, period, user, onSaved }:
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [draft, setDraft] = useState<CompactPermissionDraft>({ scope: "ALL", decision: "EXCUSED_ABSENCE", reason: "", approved_by: "" });
   const [saving, setSaving] = useState(false);
+  const [timeSaving, setTimeSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [forgotDraft, setForgotDraft] = useState<CompactForgotPunchDraft>({ punch: "IN", decision: "", reported_at: "", reason: "", approved_by: "" });
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const mutationBusy = useRef(false);
   const latestPermissionAccess = useRef(false);
 
   const reload = useCallback(async () => {
@@ -66,22 +70,26 @@ export default function CompactAttendanceDays({ userId, period, user, onSaved }:
   const days = data ? buildCompactAttendanceDays(period, userId, data.records, data.results) : [];
   const editingDay = days.find(day => day.work_date === editingDate);
   const canEditPermission = editingDay?.result?.can_edit_permission !== false;
-  latestPermissionAccess.current = isAdmin && !!editingDay && !editingDay.future && canEditPermission;
+  const busy = saving || timeSaving;
+  latestPermissionAccess.current = isAdmin && !!editingDay && !editingDay.future && canEditPermission && !error;
 
   function openEditor(day: CompactAttendanceDay) {
-    if (!isAdmin || day.future) return;
+    if (!isAdmin || day.future || error || mutationBusy.current) return;
     if (day.result?.can_edit_permission === false && !day.record?.check_in && !day.record?.check_out) return;
     setEditingDate(day.work_date);
     setDraft(initialCompactPermission(day));
+    setForgotDraft(initialCompactForgotPunch(day));
+    setForgotError(null);
     setSaveError(null);
   }
 
   async function savePermission(event: React.FormEvent) {
     event.preventDefault();
-    if (!isAdmin || !editingDay || editingDay.future || !latestPermissionAccess.current || saving) return;
+    if (!isAdmin || !editingDay || editingDay.future || !latestPermissionAccess.current || mutationBusy.current) return;
     let payload;
     try { payload = compactPermissionPayload(userId, editingDay.work_date, draft); }
     catch (err) { setSaveError((err as Error).message); return; }
+    mutationBusy.current = true;
     setSaving(true); setSaveError(null);
     try {
       await api.setAttendanceDayPermission(payload);
@@ -91,7 +99,26 @@ export default function CompactAttendanceDays({ userId, period, user, onSaved }:
       await reload();
     } catch (err) {
       if (mounted.current) setSaveError(err instanceof Error ? err.message : "Không lưu được xác nhận phép. Dữ liệu nhập vẫn được giữ lại.");
-    } finally { if (mounted.current) setSaving(false); }
+    } finally { mutationBusy.current = false; if (mounted.current) setSaving(false); }
+  }
+
+  async function saveForgotPunch(event: React.FormEvent) {
+    event.preventDefault();
+    if (!isAdmin || !editingDay || editingDay.future || !latestPermissionAccess.current || mutationBusy.current) return;
+    let payload;
+    try { payload = compactForgotPunchPayload(userId, editingDay.work_date, forgotDraft); }
+    catch (err) { setForgotError((err as Error).message); return; }
+    mutationBusy.current = true;
+    setSaving(true); setForgotError(null);
+    try {
+      await api.setAttendanceForgotPunch(payload);
+      if (!mounted.current) return;
+      setEditingDate(null);
+      onSaved?.();
+      await reload();
+    } catch (err) {
+      if (mounted.current) setForgotError(err instanceof Error ? err.message : "Không lưu được xác nhận quên chấm công. Dữ liệu nhập vẫn được giữ lại.");
+    } finally { mutationBusy.current = false; if (mounted.current) setSaving(false); }
   }
 
   async function saveNote(day: CompactAttendanceDay) {
@@ -130,23 +157,37 @@ export default function CompactAttendanceDays({ userId, period, user, onSaved }:
       onNoteChange={(id, value) => setNotes(prev => ({ ...prev, [id]: value }))} onNoteSave={day => void saveNote(day)} />}
     {editingDay && createPortal(<div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/50 p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="compact-attendance-title" className="my-auto w-full max-w-md rounded-xl2 bg-white p-4 shadow-2xl">
-        <div className="mb-3 flex items-center justify-between gap-2"><h3 id="compact-attendance-title" className="text-sm font-bold text-ink">Chấm công · {editingDay.work_date.split("-").reverse().join("/")}</h3><button type="button" aria-label="Đóng chỉnh sửa" disabled={saving} onClick={() => setEditingDate(null)} className="rounded px-2 py-1 text-sm text-muted">✕</button></div>
+        <div className="mb-3 flex items-center justify-between gap-2"><h3 id="compact-attendance-title" className="text-sm font-bold text-ink">Chấm công · {editingDay.work_date.split("-").reverse().join("/")}</h3><button type="button" aria-label="Đóng chỉnh sửa" disabled={busy} onClick={() => setEditingDate(null)} className="rounded px-2 py-1 text-sm text-muted">✕</button></div>
         {editingDay.result && <div className="mb-3 space-y-1 text-[11px] text-muted">{[editingDay.result.morning, editingDay.result.afternoon].map(result => <div key={result.session}>
           <b>{result.session === "AM" ? "Sáng" : "Chiều"}: {RECONCILIATION_LABELS[result.status]}</b><span className="block break-words">{compactSessionBasis(result)}</span>
           {result.leave_id !== null && <a href={reconciliationLeavePath(result.leave_id)} className="font-medium text-steel underline">Xem đơn #{result.leave_id}</a>}
         </div>)}</div>}
         {canEditPermission ? <form onSubmit={savePermission} className="space-y-3">
-          <fieldset disabled={saving} className="space-y-3">
+          <fieldset disabled={busy} className="space-y-3">
             <div className="grid grid-cols-2 gap-3"><label className="text-xs text-muted">Buổi<select aria-label="Buổi áp dụng" value={draft.scope} onChange={e => setDraft(prev => ({ ...prev, scope: e.target.value as CompactPermissionDraft["scope"] }))} className={fieldClass}><option value="AM">Sáng</option><option value="PM">Chiều</option><option value="ALL">Cả ngày</option></select></label>
-              <label className="text-xs text-muted">Xác nhận<select aria-label="Xác nhận phép" value={draft.decision} onChange={e => setDraft(prev => ({ ...prev, decision: e.target.value as CompactPermissionDraft["decision"] }))} className={fieldClass}><option value="EXCUSED_ABSENCE">Nghỉ có phép</option><option value="EXCUSED_LATE">Muộn có phép</option><option value="">Đặt lại tự động</option></select></label></div>
+              <label className="text-xs text-muted">Xác nhận<select aria-label="Xác nhận phép" value={draft.decision} onChange={e => setDraft(prev => ({ ...prev, decision: e.target.value as CompactPermissionDraft["decision"] }))} className={fieldClass}><option value="EXCUSED_ABSENCE">Nghỉ có phép</option><option value="EXCUSED_LATE">Muộn có phép</option><option value="EXCUSED_EARLY">Về sớm có phép</option><option value="EXCUSED_LATE_EARLY">Muộn và về sớm có phép</option><option value="">Đặt lại tự động</option></select></label></div>
             {draft.decision === "" && <p className="text-[11px] text-muted">Chỉ gỡ xác nhận của Admin; đơn đã duyệt vẫn áp dụng.</p>}
             <label className="block text-xs text-muted">Người cho phép / xác nhận đặt lại *<input aria-label="Người cho phép" autoFocus required maxLength={255} value={draft.approved_by} onChange={e => setDraft(prev => ({ ...prev, approved_by: e.target.value }))} className={fieldClass} /></label>
             <label className="block text-xs text-muted">Lý do *<textarea aria-label="Lý do xác nhận" required maxLength={2000} rows={2} value={draft.reason} onChange={e => setDraft(prev => ({ ...prev, reason: e.target.value }))} className={fieldClass} /></label>
           </fieldset>
           {saveError && <p role="alert" className="text-xs text-bad">{saveError}</p>}
-          <div className="flex justify-end gap-2"><button type="button" disabled={saving} onClick={() => setEditingDate(null)} className="rounded-lg border border-line px-3 py-2 text-xs text-muted">Hủy</button><button type="submit" disabled={saving} className="rounded-lg bg-steel px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Đang lưu…" : "Lưu xác nhận"}</button></div>
+          <div className="flex justify-end gap-2"><button type="button" disabled={busy} onClick={() => setEditingDate(null)} className="rounded-lg border border-line px-3 py-2 text-xs text-muted">Hủy</button><button type="submit" disabled={busy} className="rounded-lg bg-steel px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Đang lưu…" : "Lưu xác nhận"}</button></div>
         </form> : <p className="text-xs text-muted">Xác nhận phép chỉ đọc cho nhân sự này.</p>}
-        {editingDay.record && (editingDay.record.check_in || editingDay.record.check_out) && <fieldset disabled={saving} className="mt-3 border-t border-line pt-3"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-ink">Giờ chấm công thực tế</span><AttendanceTimeEditor record={editingDay.record} onSaved={timeSaved} /></div></fieldset>}
+        {canEditPermission && <form aria-label="Quên chấm công" onSubmit={saveForgotPunch} className="mt-3 space-y-2 border-t border-line pt-3">
+          <fieldset disabled={busy} className="space-y-2">
+            <legend className="text-xs font-semibold text-ink">Quên chấm công</legend>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs text-muted">Mốc<select aria-label="Mốc quên chấm công" value={forgotDraft.punch} onChange={e => setForgotDraft(initialCompactForgotPunch(editingDay, e.target.value as "IN" | "OUT"))} className={fieldClass}><option value="IN">Giờ vào</option><option value="OUT">Giờ ra</option></select></label>
+              <label className="text-xs text-muted">Xác nhận<select aria-label="Xác nhận quên chấm công" value={forgotDraft.decision} onChange={e => setForgotDraft(prev => ({ ...prev, decision: e.target.value as CompactForgotPunchDraft["decision"] }))} className={fieldClass}><option value="">Đặt lại</option><option value="FORGOT">Quên chấm công</option></select></label>
+            </div>
+            <label className="block text-xs text-muted">Thời điểm nhân viên báo (nếu có)<input aria-label="Thời điểm nhân viên báo" type="datetime-local" disabled={!forgotDraft.decision} value={forgotDraft.reported_at} onChange={e => setForgotDraft(prev => ({ ...prev, reported_at: e.target.value }))} className={fieldClass} /></label>
+            <label className="block text-xs text-muted">Người xác nhận *<input aria-label="Người xác nhận quên chấm công" required maxLength={255} value={forgotDraft.approved_by} onChange={e => setForgotDraft(prev => ({ ...prev, approved_by: e.target.value }))} className={fieldClass} /></label>
+            <label className="block text-xs text-muted">Lý do *<textarea aria-label="Lý do quên chấm công" required maxLength={2000} rows={2} value={forgotDraft.reason} onChange={e => setForgotDraft(prev => ({ ...prev, reason: e.target.value }))} className={fieldClass} /></label>
+          </fieldset>
+          {forgotError && <p role="alert" className="text-xs text-bad">{forgotError}</p>}
+          <div className="flex justify-end"><button type="submit" disabled={busy} className="rounded-lg bg-steel px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Đang lưu…" : "Lưu quên chấm công"}</button></div>
+        </form>}
+        {editingDay.record && (editingDay.record.check_in || editingDay.record.check_out) && <fieldset disabled={saving} className="mt-3 border-t border-line pt-3"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-ink">Giờ chấm công thực tế</span><AttendanceTimeEditor record={editingDay.record} onSaved={timeSaved} disabled={saving} onSavingChange={pending => { mutationBusy.current = pending; setTimeSaving(pending); }} /></div></fieldset>}
       </div>
     </div>, document.body)}
   </div>;

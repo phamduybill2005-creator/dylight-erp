@@ -3,7 +3,7 @@
 // cookie httpOnly + NextAuth để an toàn hơn trước tấn công XSS.
 import type { NotificationSendResult } from "./notification-send-result";
 import { leaveLoginPath } from "./leave-links";
-import type { AttendanceReconciliation, AttendanceReconciliationRow, AttendancePermissionPayload, AttendanceDayPermissionPayload, AttendanceDataConfirmation, AttendanceSession } from "./types";
+import type { AttendanceReconciliation, AttendanceReconciliationRow, AttendancePermissionPayload, AttendanceDayPermissionPayload, AttendanceForgotPunchPayload, AttendanceDataConfirmation, AttendanceSession } from "./types";
 
 import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, EvaluationMonthReview, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 import type { ProjectGroupHours } from "./bando-hours";
@@ -368,6 +368,8 @@ export const api = {
     request<AttendanceReconciliationRow>("/attendance/reconciliation/override", { method: "PUT", body: JSON.stringify(payload) }),
   setAttendanceDayPermission: (payload: AttendanceDayPermissionPayload) =>
     request<AttendanceReconciliationRow>("/attendance/reconciliation/override-day", { method: "PUT", body: JSON.stringify(payload) }),
+  setAttendanceForgotPunch: (payload: AttendanceForgotPunchPayload) =>
+    request<AttendanceReconciliationRow>("/attendance/reconciliation/forgot-punch", { method: "PUT", body: JSON.stringify(payload) }),
   confirmAttendanceData: (payload: { work_date: string; session: AttendanceSession; reason: string }) =>
     request<AttendanceDataConfirmation>("/attendance/reconciliation/confirm-data", { method: "POST", body: JSON.stringify(payload) }),
   attendanceMe: (fromDate?: string, toDate?: string) => {
@@ -417,14 +419,14 @@ export const api = {
     request<EvaluationSummary[]>(`/evaluations/summary?period=${period}`),
   evaluationsOverview: (fromDate: string, toDate: string) =>
     request<EvaluationOverviewRow[]>(`/evaluations/overview?from_date=${fromDate}&to_date=${toDate}`),
-  // Bảng đánh giá tháng NHẬP TAY (Muộn CP/KP, Nghỉ CP/KP, 3 mục Tổng hợp) theo khoảng tháng "YYYY-MM".
+  // Bảng đánh giá tháng: số đối soát và Ý thức tự tính, CL/HN do Giám đốc nhập.
   evaluationMonthReviews: (fromMonth: string, toMonth: string) =>
     request<EvaluationMonthReview[]>(`/evaluations/month-reviews?from_month=${fromMonth}&to_month=${toMonth}`),
   // Giám đốc nhập/sửa 1 ô: gửi đúng trường cần đổi (null = xoá trắng).
   setEvaluationMonthReview: (
     userId: number,
     month: string,
-    patch: Partial<Omit<EvaluationMonthReview, "user_id" | "month" | "leave_cp_auto">>,
+    patch: Partial<Pick<EvaluationMonthReview, "score_quality" | "score_team">>,
   ) =>
     request<EvaluationMonthReview>(`/evaluations/month-reviews/${userId}/${month}`, {
       method: "PUT",
