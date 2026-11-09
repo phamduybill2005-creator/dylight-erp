@@ -116,9 +116,12 @@ function ScorePicker({ value, onChange, disabled, label }: { value: number; onCh
 }
 
 /** Một phiếu (Chất lượng công việc / Hòa đồng, tập thể) — tự quản lý Tháng · Phòng ban · Đồng nghiệp của nó. */
-function ReviewForm({ def, colleagues }: { def: FormDef; colleagues: Colleague[] }) {
+/** Một phiếu. `ownDepts` (phiếu Chất lượng công việc) = phòng của NGƯỜI CHẤM: phòng ban khóa theo
+ *  phòng mình, chỉ chấm đồng nghiệp cùng phòng; không truyền (phiếu Hòa đồng) thì chọn mọi phòng. */
+function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: Colleague[]; ownDepts?: string[] }) {
+  const lockedDepts = ownDepts && ownDepts.length > 0 ? ownDepts : null;
   const [month, setMonth] = useStickyState(`peer-review.${def.kind}.month`, monthLocal());
-  const [dept, setDept] = useStickyState(`peer-review.${def.kind}.dept`, "");
+  const [dept, setDept] = useStickyState(`peer-review.${def.kind}.dept`, lockedDepts?.[0] ?? "");
   const [personId, setPersonId] = useStickyState(`peer-review.${def.kind}.person`, "");
   const [scores, setScores] = useState<number[]>([0, 0, 0]);
   const [mine, setMine] = useState<PeerReview[]>([]);
@@ -129,10 +132,15 @@ function ReviewForm({ def, colleagues }: { def: FormDef; colleagues: Colleague[]
   const candidates = useMemo(() => colleagues.filter((c) => c.role !== "DIRECTOR"), [colleagues]);
   // Phòng ban: 4 phòng chuẩn + phòng khác (nếu có) đang gán cho đồng nghiệp.
   const deptOptions = useMemo(() => {
+    if (lockedDepts) return lockedDepts;
     const extra = new Set<string>();
     for (const c of candidates) for (const d of deptsOf(c)) if (d && !PRESET_DEPARTMENTS.includes(d)) extra.add(d);
     return [...PRESET_DEPARTMENTS, ...[...extra].sort((a, b) => a.localeCompare(b, "vi"))];
-  }, [candidates]);
+  }, [candidates, lockedDepts]);
+  // Phòng khóa: luôn là một trong các phòng của mình (kể cả khi sessionStorage còn giá trị cũ).
+  useEffect(() => {
+    if (lockedDepts && !lockedDepts.includes(dept)) setDept(lockedDepts[0]);
+  }, [lockedDepts, dept, setDept]);
   const people = useMemo(
     () => candidates
       .filter((c) => !dept || deptsOf(c).includes(dept))
@@ -217,15 +225,21 @@ function ReviewForm({ def, colleagues }: { def: FormDef; colleagues: Colleague[]
         </label>
         <label className="block">
           <span className="mb-1 block text-[10px] font-semibold text-muted">Phòng ban</span>
-          <select value={dept} onChange={(e) => setDept(e.target.value)} className={sel}>
-            <option value="">Tất cả phòng ban</option>
+          <select
+            value={dept}
+            onChange={(e) => setDept(e.target.value)}
+            disabled={!!lockedDepts && lockedDepts.length === 1}
+            title={lockedDepts ? "Phiếu này chấm đồng nghiệp cùng phòng với bạn" : undefined}
+            className={`${sel} disabled:cursor-default disabled:bg-paper disabled:text-ink`}
+          >
+            {!lockedDepts && <option value="">Tất cả phòng ban</option>}
             {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </label>
         <label className="block">
           <span className="mb-1 block text-[10px] font-semibold text-muted">Đồng nghiệp</span>
           <select value={personId} onChange={(e) => pickPerson(e.target.value)} className={sel}>
-            <option value="">— Chọn đồng nghiệp —</option>
+            <option value="">{people.length === 0 && lockedDepts ? "— Chưa có đồng nghiệp cùng phòng —" : "— Chọn đồng nghiệp —"}</option>
             {people.map((c) => {
               const done = rated.some((r) => r.evaluatee_id === c.id);
               return <option key={c.id} value={c.id}>{done ? "✓ " : ""}{c.full_name}{c.department ? ` · ${c.department}` : ""}</option>;
@@ -318,6 +332,9 @@ export default function PeerReviewPage() {
       .catch(() => router.push("/login"));
   }, [router]);
 
+  // Phòng của người chấm (có thể nhiều phòng, cách nhau dấu phẩy) — phiếu Chất lượng công việc khóa theo đây.
+  const myDepts = useMemo(() => splitDepts(user?.department).map(normalizeDept).filter(Boolean), [user?.department]);
+
   if (!user) {
     return (
       <AppShell><div className="flex min-h-[70vh] items-center justify-center">
@@ -333,7 +350,7 @@ export default function PeerReviewPage() {
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
           <div>
             <h1 className="text-base font-bold lg:text-xl">Đánh giá</h1>
-            <p className="text-[11px] text-white/70">Chấm đồng nghiệp theo tháng · thang 1–5 · chỉ bạn thấy phiếu mình chấm</p>
+            <p className="text-[11px] text-white/70">Chấm đồng nghiệp theo tháng · thang 1–5 · chỉ bạn thấy phiếu mình chấm · Chất lượng công việc chấm người cùng phòng, Hòa đồng chấm mọi phòng</p>
           </div>
         </div>
       </header>
@@ -342,7 +359,7 @@ export default function PeerReviewPage() {
       <div className="mt-4 space-y-4">
         {FORMS.map((f) => (
           <div key={f.kind} className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-            <ReviewForm def={f} colleagues={colleagues} />
+            <ReviewForm def={f} colleagues={colleagues} ownDepts={f.kind === "QUALITY" ? myDepts : undefined} />
             <RubricCard def={f} />
           </div>
         ))}
