@@ -683,9 +683,13 @@ export interface EvaluationMonthReview {
   attendance_pending_sessions: number; // buổi chưa đủ kết luận, không tính vi phạm
   attitude_points?: number | null; // Ý thức tự tính, tối đa 5
   score_attitude?: number | null;  // Ý thức tự tính quy đổi (%), tối đa 25
-  score_quality?: number | null;   // Chất lượng công việc (%), tối đa 50
-  score_team?: number | null;      // Tập thể (%), tối đa 25
+  score_quality?: number | null;   // lịch sử: Giám đốc nhập tay (%); giao diện không dùng nữa
+  score_team?: number | null;      // lịch sử: Giám đốc nhập tay (%); giao diện không dùng nữa
   leave_cp_auto: number;           // alias tương thích của leave_cp
+  peer_quality?: number | null;    // Chất lượng công việc: TB /5 đồng nghiệp chấm; null = chưa ai chấm
+  peer_quality_count: number;      // số phiếu Chất lượng công việc
+  peer_team?: number | null;       // Hòa đồng, tập thể: TB /5 đồng nghiệp chấm
+  peer_team_count: number;         // số phiếu Hòa đồng, tập thể
 }
 
 

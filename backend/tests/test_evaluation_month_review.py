@@ -21,7 +21,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.deps import get_current_user
-from app.models import Attendance, Company, LeaveRequest, LeaveStatus, User, UserRole
+from app.models import Attendance, Company, LeaveRequest, LeaveStatus, PeerReview, User, UserRole
 from app.routers.evaluations import router
 
 
@@ -144,6 +144,29 @@ class EvaluationMonthReviewTests(unittest.TestCase):
         self.assertEqual(rows[(self.staff.id, "2026-12")]["score_quality"], 45)
         self.assertEqual(self.client.get("/evaluations/month-reviews",
                                          params={"from_month": "2026-12", "to_month": "2026-10"}).status_code, 400)
+
+    def test_peer_review_averages_in_month_reviews(self):
+        # 2 người chấm Chất lượng cho staff: (5,4,3) và (4,4,4) -> TB 4.0 của 6 số; Tập thể 1 phiếu (5,5,4) -> 4.67
+        with self.sessions() as db:
+            db.add_all([
+                PeerReview(company_id=self.company_id, evaluator_id=self.admin.id, evaluatee_id=self.staff.id,
+                           month="2026-11", kind="QUALITY", score_1=5, score_2=4, score_3=3),
+                PeerReview(company_id=self.company_id, evaluator_id=self.director.id, evaluatee_id=self.staff.id,
+                           month="2026-11", kind="QUALITY", score_1=4, score_2=4, score_3=4),
+                PeerReview(company_id=self.company_id, evaluator_id=self.admin.id, evaluatee_id=self.staff.id,
+                           month="2026-11", kind="TEAM", score_1=5, score_2=5, score_3=4),
+                PeerReview(company_id=self.company_id, evaluator_id=self.admin.id, evaluatee_id=self.staff.id,
+                           month="2026-10", kind="TEAM", score_1=3, score_2=3, score_3=3),
+            ])
+            db.commit()
+        rows = self._get("2026-11", "2026-11")
+        row = rows[(self.staff.id, "2026-11")]
+        self.assertEqual((row["peer_quality"], row["peer_quality_count"]), (4.0, 2))
+        self.assertEqual((row["peer_team"], row["peer_team_count"]), (4.67, 1))
+        self.assertEqual((rows[(self.admin.id, "2026-11")]["peer_quality"], rows[(self.admin.id, "2026-11")]["peer_quality_count"]), (None, 0))
+        # Tháng khác không lẫn sang; PUT trả kèm điểm đồng nghiệp của đúng tháng đó.
+        self.assertEqual(self._get("2026-10", "2026-10")[(self.staff.id, "2026-10")]["peer_team"], 3.0)
+        self.assertEqual(self._put(self.staff.id, "2026-11", {"score_quality": 10}).json()["peer_quality"], 4.0)
 
 
 if __name__ == "__main__":

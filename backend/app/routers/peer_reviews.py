@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
+from app.events import publish
 from app.models import PeerReview, User, UserRole
 from app.schemas import PeerReviewIn, PeerReviewOut, PeerReviewSummaryRow
 
@@ -96,6 +97,7 @@ def save_peer_review(
     rec.updated_at = vn_now()
     db.commit()
     db.refresh(rec)
+    publish(current.company_id, "evaluation")   # bảng Tổng hợp đánh giá đang mở tự tải lại
     return _out(rec)
 
 
@@ -111,6 +113,7 @@ def delete_my_peer_review(
         raise HTTPException(404, "Không tìm thấy phiếu.")
     db.delete(rec)
     db.commit()
+    publish(current.company_id, "evaluation")
 
 
 @router.get("/summary", response_model=list[PeerReviewSummaryRow])

@@ -646,9 +646,14 @@ class EvaluationMonthReviewOut(BaseModel):
     attendance_pending_sessions: int = 0 # chưa tính vi phạm: thiếu căn cứ hoặc đơn chờ duyệt
     attitude_points: float | None = None # điểm Ý thức tự tính 0..5; None = chưa bắt đầu làm
     score_attitude: float | None = None  # đóng góp Ý thức: attitude_points / 5 * 25
-    score_quality: float | None = None   # % tối đa 50
-    score_team: float | None = None      # % tối đa 25
+    score_quality: float | None = None   # lịch sử: Giám đốc nhập tay (%); giao diện không dùng nữa
+    score_team: float | None = None      # lịch sử: Giám đốc nhập tay (%); giao diện không dùng nữa
     leave_cp_auto: float = 0             # alias leave_cp cho các client cũ
+    # Điểm ĐỒNG NGHIỆP chấm (bảng peer_reviews): TB 1–5 của mọi tiêu chí, mọi người chấm trong tháng.
+    peer_quality: float | None = None    # Chất lượng công việc /5; None = chưa ai chấm
+    peer_quality_count: int = 0          # số phiếu Chất lượng công việc
+    peer_team: float | None = None       # Hòa đồng, tập thể /5
+    peer_team_count: int = 0             # số phiếu Hòa đồng, tập thể
 
 
 # --------- Đánh giá theo DỰ ÁN (chấm chéo 360° giữa các thành viên) ---------

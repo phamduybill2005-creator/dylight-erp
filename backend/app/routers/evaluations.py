@@ -23,7 +23,7 @@ from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import (
     Attendance, Evaluation, EvaluationDirection, EvaluationMonthReview,
-    Project, ProjectEvaluation, ProjectItem, Timesheet, User, UserRole,
+    PeerReview, Project, ProjectEvaluation, ProjectItem, Timesheet, User, UserRole,
 )
 from app.services.evaluation_attendance import attendance_totals, attendance_user_ids, COUNT_FIELDS
 from app.schemas import (
@@ -361,8 +361,28 @@ def _months_between(from_month: str, to_month: str) -> list[str]:
     return [f"{i // 12:04d}-{i % 12 + 1:02d}" for i in range(start, end + 1)]
 
 
-def _review_out(rec: EvaluationMonthReview | None, user_id: int, month: str, auto: dict) -> EvaluationMonthReviewOut:
+def _peer_averages(db: Session, company_id: int, months: list[str], user_ids: list[int] | None = None) -> dict:
+    """Điểm đồng nghiệp chấm theo (người được chấm, tháng): TB 1–5 của cả 3 tiêu chí trên mọi phiếu
+    + số phiếu, tách QUALITY (Chất lượng công việc) / TEAM (Hòa đồng, tập thể)."""
+    avg_expr = func.avg((PeerReview.score_1 + PeerReview.score_2 + PeerReview.score_3) / 3.0)
+    q = (
+        db.query(PeerReview.evaluatee_id, PeerReview.month, PeerReview.kind, avg_expr, func.count(PeerReview.id))
+        .filter(PeerReview.company_id == company_id, PeerReview.month.in_(months))
+    )
+    if user_ids is not None:
+        q = q.filter(PeerReview.evaluatee_id.in_(user_ids))
+    out: dict = {}
+    for uid, month, kind, avg, count in q.group_by(PeerReview.evaluatee_id, PeerReview.month, PeerReview.kind).all():
+        slot = out.setdefault((uid, month), {})
+        key = "peer_quality" if kind == "QUALITY" else "peer_team"
+        slot[key] = round(float(avg), 2)
+        slot[f"{key}_count"] = int(count)
+    return out
+
+
+def _review_out(rec: EvaluationMonthReview | None, user_id: int, month: str, auto: dict, peer: dict | None = None) -> EvaluationMonthReviewOut:
     f = lambda v: float(v) if v is not None else None  # noqa: E731
+    peer = peer or {}
     return EvaluationMonthReviewOut(
         user_id=user_id, month=month,
         late_cp=auto.get("late_cp", 0),
@@ -375,6 +395,10 @@ def _review_out(rec: EvaluationMonthReview | None, user_id: int, month: str, aut
         score_quality=f(rec.score_quality) if rec else None,
         score_team=f(rec.score_team) if rec else None,
         leave_cp_auto=auto.get("leave_cp", 0),
+        peer_quality=peer.get("peer_quality"),
+        peer_quality_count=peer.get("peer_quality_count", 0),
+        peer_team=peer.get("peer_team"),
+        peer_team_count=peer.get("peer_team_count", 0),
     )
 
 
@@ -399,9 +423,10 @@ def month_reviews(
         .all()
     )
     auto = attendance_totals(db, cid, _month_bounds(months[0])[0], _month_bounds(months[-1])[1])
+    peer = _peer_averages(db, cid, months)
     by = {(r.user_id, r.month): r for r in recs}
-    keys = set(by) | set(auto)
-    return [_review_out(by.get(k), k[0], k[1], auto.get(k, {})) for k in sorted(keys)]
+    keys = set(by) | set(auto) | set(peer)
+    return [_review_out(by.get(k), k[0], k[1], auto.get(k, {}), peer.get(k)) for k in sorted(keys)]
 
 
 @router.put("/month-reviews/{user_id}/{month}", response_model=EvaluationMonthReviewOut)
@@ -442,4 +467,5 @@ def set_month_review(
     db.refresh(rec)
     first, last = _month_bounds(month)
     auto = attendance_totals(db, current.company_id, first, last, user_ids=[user_id]).get((user_id, month), {})
-    return _review_out(rec, user_id, month, auto)
+    peer = _peer_averages(db, current.company_id, [month], user_ids=[user_id]).get((user_id, month))
+    return _review_out(rec, user_id, month, auto, peer)
