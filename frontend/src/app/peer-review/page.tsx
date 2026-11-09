@@ -22,12 +22,60 @@ import { normalizeDept } from "@/lib/groups";
 import { splitDepts } from "@/components/filter-bar";
 import type { Colleague, PeerReview, PeerReviewKind, User } from "@/lib/types";
 
-type FormDef = { kind: PeerReviewKind; title: string; criteria: string[] };
+// Mỗi tiêu chí kèm mô tả mức 1 điểm / 5 điểm (bảng tiêu chí của công ty — Phụ lục 2 và 2a).
+type Criterion = { label: string; low: string; high: string };
+type FormDef = { kind: PeerReviewKind; code: string; title: string; note: string; criteria: Criterion[] };
 // Thứ tự tiêu chí = thứ tự scores[0..2] gửi lên backend — đừng đảo.
 const FORMS: FormDef[] = [
-  { kind: "QUALITY", title: "Chất lượng công việc", criteria: ["Sản phẩm đúng, ít lỗi", "Nộp bài đúng hẹn", "Phối hợp với mọi người"] },
-  { kind: "TEAM", title: "Hòa đồng, tập thể", criteria: ["Hòa đồng, thân thiện", "Tham gia hoạt động tập thể", "Tiếp thu góp ý"] },
+  {
+    kind: "QUALITY", code: "CL", title: "Chất lượng công việc",
+    note: "Quản lý và đồng nghiệp cùng dự án chấm hằng tháng, thang 1–5 (3 = Đạt). Tự chấm không tính.",
+    criteria: [
+      { label: "Sản phẩm đúng, ít lỗi", low: "Thường sai, phải làm lại", high: "Hầu như không lỗi, tự kiểm kỹ" },
+      { label: "Nộp bài đúng hẹn", low: "Thường trễ, cả nhóm phải chờ", high: "Luôn đúng hẹn, trễ thì báo sớm" },
+      { label: "Phối hợp với mọi người", low: "Khó liên lạc, không hợp tác", high: "Trao đổi rõ, sẵn sàng hỗ trợ" },
+    ],
+  },
+  {
+    kind: "TEAM", code: "HN", title: "Hòa đồng, tập thể",
+    note: "Toàn thể đồng nghiệp chấm, thang 1–5 (3 = Đạt). Tự chấm không tính, không công bố ai chấm ai.",
+    criteria: [
+      { label: "Hòa đồng, thân thiện", low: "Khép kín, gắt gỏng", high: "Dễ gần, gắn kết mọi người" },
+      { label: "Tham gia hoạt động tập thể", low: "Hầu như không tham gia", high: "Tham gia đầy đủ, góp sức tổ chức" },
+      { label: "Tiếp thu góp ý", low: "Phản ứng gay gắt, để bụng", high: "Bình tĩnh trao đổi, tiếp thu và sửa" },
+    ],
+  },
 ];
+
+/** Bảng tiêu chí đặt cạnh phiếu: mô tả mức 1 điểm và 5 điểm để mọi người chấm cùng một thước. */
+function RubricCard({ def }: { def: FormDef }) {
+  return (
+    <aside className="rounded-xl2 border border-line bg-paper/60 p-4 lg:p-5">
+      <p className="text-center text-[11px] font-bold uppercase tracking-wide text-ink">
+        Điểm {def.title.toLowerCase()} ({def.code})
+      </p>
+      <p className="mt-1 text-center text-[11px] italic text-muted">{def.note}</p>
+      <table className="mt-3 w-full border-collapse text-[11px]">
+        <thead>
+          <tr className="text-ink">
+            <th className="border border-line bg-white px-2 py-1.5 text-left font-bold">Tiêu chí</th>
+            <th className="w-[34%] border border-line bg-white px-2 py-1.5 text-left font-bold">1 điểm</th>
+            <th className="w-[36%] border border-line bg-white px-2 py-1.5 text-left font-bold">5 điểm</th>
+          </tr>
+        </thead>
+        <tbody>
+          {def.criteria.map((c, i) => (
+            <tr key={c.label}>
+              <td className="border border-line bg-white px-2 py-1.5 font-semibold text-ink">{i + 1}. {c.label}</td>
+              <td className="border border-line bg-white px-2 py-1.5 text-bad/90">{c.low}</td>
+              <td className="border border-line bg-white px-2 py-1.5 text-ok">{c.high}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </aside>
+  );
+}
 const SCORE_LABEL: Record<number, string> = { 1: "Kém", 2: "Yếu", 3: "Trung bình", 4: "Tốt", 5: "Xuất sắc" };
 const fmtMonth = (m: string) => `${m.slice(5, 7)}/${m.slice(0, 4)}`;
 const deptsOf = (c: Colleague) => splitDepts(c.department).map(normalizeDept);
@@ -188,8 +236,8 @@ function ReviewForm({ def, colleagues }: { def: FormDef; colleagues: Colleague[]
 
       {/* 3 tiêu chí, thang 1–5 */}
       <div className="mt-4 divide-y divide-line/60">
-        {def.criteria.map((label, i) => (
-          <div key={label} className="flex flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+        {def.criteria.map(({ label, low, high }, i) => (
+          <div key={label} className="flex flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:justify-between" title={`1 điểm: ${low} · 5 điểm: ${high}`}>
             <span className={`text-xs font-semibold ${person ? "text-ink" : "text-muted"}`}>{i + 1}. {label}</span>
             <ScorePicker
               label={label}
@@ -290,8 +338,14 @@ export default function PeerReviewPage() {
         </div>
       </header>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {FORMS.map((f) => <ReviewForm key={f.kind} def={f} colleagues={colleagues} />)}
+      {/* Mỗi hàng: phiếu bên TRÁI, bảng tiêu chí 1 điểm / 5 điểm bên PHẢI. Chất lượng công việc trên, Hòa đồng tập thể dưới. */}
+      <div className="mt-4 space-y-4">
+        {FORMS.map((f) => (
+          <div key={f.kind} className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+            <ReviewForm def={f} colleagues={colleagues} />
+            <RubricCard def={f} />
+          </div>
+        ))}
       </div>
     </AppShell>
   );
