@@ -69,6 +69,9 @@ export default function ProjectDetailPage() {
   const [progressLogs, setProgressLogs] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"items" | "progress" | "team">("items");
+  // Chỗ đặt 2 nút của tab Hạng mục (Sao chép từ dự án mẫu / Thêm hạng mục) ngay trong khung
+  // thông tin dự án — hạng mục dồn lên, không còn hàng tiêu đề + nút riêng phía dưới.
+  const [itemsToolbarHost, setItemsToolbarHost] = useState<HTMLDivElement | null>(null);
   /** Đổi tab + ghi vào URL (?tab=...) để F5 hay gửi link vẫn mở đúng tab (không tải lại trang). */
   const switchTab = (tab: "items" | "progress" | "team") => {
     setActiveTab(tab);
@@ -580,7 +583,7 @@ export default function ProjectDetailPage() {
             </h3>
           </div>
           
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
             {(() => {
               // Hiện CẢ chủ trì để số đếm "(N)" khớp với danh sách bên dưới —
               // trước đây lọc bỏ chủ trì nên thấy "(1)" mà lại báo "Chưa phân công".
@@ -629,6 +632,8 @@ export default function ProjectDetailPage() {
               });
             })()}
           </div>
+          {/* Nút của tab Hạng mục được gắn vào đây (portal) khi tab đó đang mở. */}
+          <div ref={setItemsToolbarHost} className="ml-auto flex shrink-0 flex-wrap items-center gap-1.5" />
         </div>
       </div>
 
@@ -657,6 +662,7 @@ export default function ProjectDetailPage() {
             // thường -> bật màn "Đang tải chi tiết dự án" thay cả trang -> tab hạng mục bị gỡ
             // rồi gắn lại, mất vị trí đang cuộn, trông như bị F5 mỗi lần chọn Người làm.
             onMemberAdded={() => loadData(true)}
+            toolbarHost={itemsToolbarHost}
           />
         )}
 

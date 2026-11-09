@@ -28,7 +28,7 @@ import { getProjectDept, isBanDoView } from "@/lib/groups";
 import { parseBanDoDetails, analysisNumber, isBanDoTicked, tickInputClass } from "@/lib/bando-details";
 import { BANDO_HOUR_COLUMNS, hoursByColumn, formatGroupHours, type ProjectGroupHours } from "@/lib/bando-hours";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { formatVND, formatDate, todayLocal } from "@/lib/format";
+import { formatVND, todayLocal } from "@/lib/format";
 import { pickJpyRate, computeRevenueVnd, parseJpyInput } from "@/lib/revenue";
 import type { Project, User, Timesheet } from "@/lib/types";
 import { revenueMobileFacts } from "@/lib/mobile-view-models";
@@ -393,6 +393,18 @@ export default function RevenuePage() {
 
   /** Số giờ -> "12,5" gọn cho ô hiển thị. */
   const fmtH = (h: number) => h.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+  /** Ô Manual time: "X ngày" + "(Yh)" từ manual_hours nhập ở bảng Dự án; chưa nhập -> gạch. */
+  const manualCell = (p: Project) => {
+    const h = Number(p.manual_hours || 0);
+    return h > 0 ? (
+      <span className="inline-flex flex-col items-center leading-tight">
+        <span className="text-[11px] font-bold text-ink">{hoursToDays(h)} ngày</span>
+        <span className="text-[10px] font-mono text-muted">({fmtH(h)}h)</span>
+      </span>
+    ) : (
+      <span className="text-muted">—</span>
+    );
+  };
 
   const TH = "border border-line font-semibold whitespace-nowrap sticky top-0 bg-paper z-10 px-2 py-2";
   const TD = "border border-line align-middle px-2 py-2";
@@ -579,7 +591,7 @@ export default function RevenuePage() {
                 <p className="mt-0.5 text-xl font-extrabold text-emerald-800 tnum">{facts.revenue > 0 ? formatVND(facts.revenue) : "—"}</p>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                <div className="col-span-2 rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">TIME DUE</p><p className="mt-0.5 font-bold text-ink tnum">{formatDate(project.internal_deadline)}</p></div>
+                <div className="col-span-2 rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Manual time</p><p className="mt-0.5 font-bold text-ink tnum">{manualCell(project)}</p></div>
                 <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Time ({monthLabel})</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(monthHoursByProject[project.id] || 0)}h</p></div>
                 <div className="rounded-lg bg-paper px-2.5 py-2" onClick={(event) => event.stopPropagation()}>
                   <p className="text-[10px] text-muted">TIME KHÁCH HÀNG ({monthLabel})</p>
@@ -612,7 +624,7 @@ export default function RevenuePage() {
                 {BANDO_HOUR_COLUMNS.map((c) => <col key={c.key} className={BANDO_COL_W[c.key] ?? "w-[52px]"} />)}
               </>
             )}
-            <col className="w-[90px]" />{/* Time due */}
+            <col className="w-[90px]" />{/* Manual time */}
             <col className="w-[84px]" />{/* Time (Month) */}
             <col className="w-[140px]" />{/* TIME KHÁCH HÀNG (Month) */}
             <col className="w-[84px]" />{/* Time (All) */}
@@ -639,8 +651,8 @@ export default function RevenuePage() {
                   ))}
                 </>
               )}
-              <th className={`${TH} text-center`} title="Hạn nội bộ — lấy từ cột TIME DUE bên Dự án">
-                TIME DUE
+              <th className={`${TH} text-center`} title="Giờ nhập tay — lấy từ cột Manual time bên Dự án (8 giờ = 1 ngày)">
+                Manual time
               </th>
               <th className={`${TH} text-center`} title={`Thời gian làm thực tế người làm đã nhập trong tháng ${monthLabel}`}>
                 Time <span className="block text-[9px] font-normal normal-case text-slate-500">({monthLabel})</span>
@@ -783,8 +795,9 @@ export default function RevenuePage() {
                     );
                   })()}
 
-                  <td className={`${TD} whitespace-nowrap text-center tnum`} title={p.internal_deadline || ""}>
-                    {formatDate(p.internal_deadline)}
+                  {/* MANUAL TIME — giờ nhập tay ở cột Manual time bên Dự án (chỉ xem ở đây) */}
+                  <td className={`${TD} whitespace-nowrap text-center tnum`} title={`Manual time nhập ở bảng Dự án: ${Number(p.manual_hours || 0) > 0 ? `${fmtH(Number(p.manual_hours))}h` : "chưa nhập"}`}>
+                    {manualCell(p)}
                   </td>
 
                   {/* TIME (MONTH) — giờ realtime người làm nhập trong tháng đang xem */}

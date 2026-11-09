@@ -6,6 +6,7 @@
 // tiểu tổng mỗi nhóm + tổng dự toán, và xuất ra Excel/CSV.
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
@@ -247,6 +248,7 @@ export default function ProjectItemsTab({
   canManage = false,
   currentUserId = null,
   onMemberAdded,
+  toolbarHost = null,
 }: {
   projectId: number;
   /** Nhân viên (STAFF) = false: ẩn cột Khối lượng/Đơn giá/Thành tiền, tiểu tổng, tổng, xuất Excel. */
@@ -256,6 +258,9 @@ export default function ProjectItemsTab({
   canManage?: boolean;
   currentUserId?: number | null;
   onMemberAdded?: () => void;
+  /** Chỗ đặt 2 nút "Sao chép từ dự án mẫu" / "Thêm hạng mục" (khung thông tin dự án ở trang
+   *  chi tiết) để hạng mục dồn lên trên; không truyền thì nút nằm ngay trên bảng. */
+  toolbarHost?: HTMLElement | null;
 }) {
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -546,8 +551,35 @@ export default function ProjectItemsTab({
     return <p className="py-12 text-center text-xs text-muted">Đang tải bảng dự toán...</p>;
   }
 
+  // 2 nút thao tác chính — đặt lên khung thông tin dự án (portal) cho gọn, hoặc ngay trên bảng.
+  const toolbar = canManage ? (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setShowCopyModal(true)}
+        disabled={busy}
+        className="inline-flex min-h-9 items-center gap-1 rounded-xl2 border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
+        title="Sao chép hạng mục từ dự án mẫu"
+      >
+        <TableCellsIcon className="h-4 w-4 text-slate-500" />
+        Sao chép từ dự án mẫu
+      </button>
+      <button
+        type="button"
+        onClick={() => { setShowForm((s) => !s); setFormMsg(""); if (fGroupId === "" && groups.length > 0) setFGroupId(String(groups[0].id)); }}
+        disabled={busy}
+        className="inline-flex min-h-9 items-center gap-1 rounded-xl2 bg-amber px-2.5 py-1.5 text-[11px] font-semibold text-ink hover:bg-amber-deep hover:text-white transition-colors disabled:opacity-50"
+        title="Thêm hạng mục vào bảng"
+      >
+        <PlusIcon className="h-4 w-4" />
+        Thêm hạng mục
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-3 lg:space-y-4">
+      {toolbar && (toolbarHost ? createPortal(toolbar, toolbarHost) : toolbar)}
       {canSeeMoney && (
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-muted lg:text-xs">Tổng dự toán: <span className="font-bold text-ink tnum">{formatVND(grandTotal)}</span></p>
