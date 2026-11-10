@@ -29,8 +29,7 @@ import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
 // là đơn người dùng gửi sẽ biến mất khỏi danh sách.
 const LEAVE_REASONS = [
   "GIỖ TẾT", "HIẾU SỰ", "HỶ SỰ", "ỐM ĐAU", "NGỦ QUÊN", "TẮC ĐƯỜNG",
-  "HỎNG XE", "SINH NHẬT", "THIÊN TAI", "BIA RƯỢU", "ĐI HỌC", "YÊU ĐƯƠNG",
-  "GIA ĐÌNH",
+  "HỎNG XE", "VỢ ĐẺ", "THIÊN TAI", "BIA RƯỢU", "ĐI HỌC", "YÊU ĐƯƠNG",
 ];
 
 const STATUS_LABEL: Record<LeaveStatus, string> = {
