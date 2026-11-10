@@ -5,7 +5,7 @@ import type { NotificationSendResult } from "./notification-send-result";
 import { leaveLoginPath } from "./leave-links";
 import type { AttendanceReconciliation, AttendanceReconciliationRow, AttendancePermissionPayload, AttendanceDayPermissionPayload, AttendanceForgotPunchPayload, AttendanceDataConfirmation, AttendanceSession } from "./types";
 
-import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, EvaluationMonthReview, PeerReview, PeerReviewKind, PeerReviewSummaryRow, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
+import type { Role, Company, Invoice, KpiSummary, Project, ProjectProfit, User, Bid, Contract, Payment, Progress, ProjectItem, ProjectItemRating, Attendance, AttendanceSummary, Evaluation, Partner, SalaryConfig, Payroll, LeaveRequest, StudentWeekSchedulePayload, Equipment, EquipmentLog, ActivityLog, FinanceSummary, DebtRow, DesignDocument, Notification, Assignment, Colleague, EvaluationSummary, EvaluationOverviewRow, EvaluationMonthReview, PeerReview, PeerReviewKind, PeerReviewSummaryRow, PeerReviewDetails, YunattSyncResult, YunattPerson, YunattSyncStatus, Conversation, ChatMessage, ProgressHistory, ProjectEvaluation, ProjectEvaluationView, Department, Timesheet, DeletedProject, DeletedItem, OrgChartData, OrgChartOut } from "./types";
 import type { ProjectGroupHours } from "./bando-hours";
 
 export const API_BASE =
@@ -438,6 +438,8 @@ export const api = {
   savePeerReview: (payload: { evaluatee_id: number; month: string; kind: PeerReviewKind; scores: number[] }) =>
     request<PeerReview>("/peer-reviews", { method: "PUT", body: JSON.stringify(payload) }),
   deletePeerReview: (id: number) => request<void>(`/peer-reviews/${id}`, { method: "DELETE" }),
+  peerReviewDetails: (evaluateeId: number, kind: PeerReviewKind, fromMonth: string, toMonth: string) =>
+    request<PeerReviewDetails>(`/peer-reviews/details?evaluatee_id=${evaluateeId}&kind=${kind}&from_month=${fromMonth}&to_month=${toMonth}`),
   peerReviewSummary: (fromMonth: string, toMonth: string) =>
     request<PeerReviewSummaryRow[]>(`/peer-reviews/summary?from_month=${fromMonth}&to_month=${toMonth}`),
 

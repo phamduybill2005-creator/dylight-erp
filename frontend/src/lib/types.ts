@@ -673,6 +673,23 @@ export interface PeerReviewSummaryRow {
   count: number;
 }
 
+// Chi tiết chỉ dành cho Giám đốc / Quản trị, tải khi mở số phiếu trong bảng tổng hợp.
+export interface PeerReviewDetails {
+  evaluatee_id: number;
+  evaluatee_name: string;
+  kind: PeerReviewKind;
+  from_month: string;
+  to_month: string;
+  count: number;
+  evaluators: {
+    evaluator_id: number;
+    evaluator_name: string;
+    avg: number;
+    count: number;
+    reviews: { id: number; month: string; scores: [number, number, number]; avg: number; updated_at: string | null }[];
+  }[];
+}
+
 export interface EvaluationMonthReview {
   user_id: number;
   month: string;

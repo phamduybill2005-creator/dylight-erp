@@ -7,7 +7,7 @@
 // Mỗi phiếu có Tháng · Phòng ban · Đồng nghiệp riêng; chọn người thì phòng ban tự theo người,
 // chọn phòng ban thì danh sách người chỉ còn phòng đó (giống tab Tiến độ).
 // 1 phiếu / người / tháng / loại — gửi lại trong tháng là sửa phiếu đó.
-// RIÊNG TƯ: chỉ thấy phiếu MÌNH đã chấm; Giám đốc / Quản trị chỉ xem tổng hợp (không biết ai chấm).
+// Phiếu không công khai với đồng nghiệp; Giám đốc / Quản trị được xem tên người chấm và điểm chi tiết.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,32 +20,9 @@ import { useStickyState } from "@/lib/use-sticky-state";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { normalizeDept } from "@/lib/groups";
 import { splitDepts } from "@/components/filter-bar";
-import type { Colleague, PeerReview, PeerReviewKind, User } from "@/lib/types";
+import type { Colleague, PeerReview, User } from "@/lib/types";
 
-// Mỗi tiêu chí kèm mô tả mức 1 điểm / 5 điểm (bảng tiêu chí của công ty — Phụ lục 2 và 2a).
-type Criterion = { label: string; low: string; high: string };
-type FormDef = { kind: PeerReviewKind; code: string; title: string; note: string; criteria: Criterion[] };
-// Thứ tự tiêu chí = thứ tự scores[0..2] gửi lên backend — đừng đảo.
-const FORMS: FormDef[] = [
-  {
-    kind: "QUALITY", code: "CL", title: "Chất lượng công việc",
-    note: "Quản lý và đồng nghiệp cùng dự án chấm hằng tháng, thang 1–5 (3 = Đạt). Tự chấm không tính.",
-    criteria: [
-      { label: "Sản phẩm đúng, ít lỗi", low: "Thường sai, phải làm lại", high: "Hầu như không lỗi, tự kiểm kỹ" },
-      { label: "Nộp bài đúng hẹn", low: "Thường trễ, cả nhóm phải chờ", high: "Luôn đúng hẹn, trễ thì báo sớm" },
-      { label: "Phối hợp với mọi người", low: "Khó liên lạc, không hợp tác", high: "Trao đổi rõ, sẵn sàng hỗ trợ" },
-    ],
-  },
-  {
-    kind: "TEAM", code: "HN", title: "Hòa đồng, tập thể",
-    note: "Toàn thể đồng nghiệp chấm, thang 1–5 (3 = Đạt). Tự chấm không tính, không công bố ai chấm ai.",
-    criteria: [
-      { label: "Hòa đồng, thân thiện", low: "Khép kín, gắt gỏng", high: "Dễ gần, gắn kết mọi người" },
-      { label: "Tham gia hoạt động tập thể", low: "Hầu như không tham gia", high: "Tham gia đầy đủ, góp sức tổ chức" },
-      { label: "Tiếp thu góp ý", low: "Phản ứng gay gắt, để bụng", high: "Bình tĩnh trao đổi, tiếp thu và sửa" },
-    ],
-  },
-];
+import { FORMS, type FormDef } from "@/lib/peer-review-forms";
 
 /** Bảng tiêu chí đặt cạnh phiếu: mô tả mức 1 điểm và 5 điểm để mọi người chấm cùng một thước. */
 function RubricCard({ def }: { def: FormDef }) {
@@ -350,7 +327,7 @@ export default function PeerReviewPage() {
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
           <div>
             <h1 className="text-base font-bold lg:text-xl">Đánh giá</h1>
-            <p className="text-[11px] text-white/70">Chấm đồng nghiệp theo tháng · thang 1–5 · chỉ bạn thấy phiếu mình chấm · Chất lượng công việc chấm người cùng phòng, Hòa đồng chấm mọi phòng</p>
+            <p className="text-[11px] text-white/70">Chấm đồng nghiệp theo tháng · thang 1–5 · phiếu không công khai với đồng nghiệp; Giám đốc / Quản trị có thể xem chi tiết · Chất lượng công việc chấm người cùng phòng, Hòa đồng chấm mọi phòng</p>
           </div>
         </div>
       </header>

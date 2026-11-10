@@ -694,6 +694,33 @@ class PeerReviewSummaryRow(BaseModel):
     count: int
 
 
+class PeerReviewBallotDetail(BaseModel):
+    id: int
+    month: str
+    scores: list[int]
+    avg: float
+    updated_at: datetime | None = None
+
+
+class PeerReviewEvaluatorDetail(BaseModel):
+    evaluator_id: int
+    evaluator_name: str
+    avg: float
+    count: int
+    reviews: list[PeerReviewBallotDetail]
+
+
+class PeerReviewDetails(BaseModel):
+    """Named ballot details for the director/admin summary, never ordinary staff."""
+    evaluatee_id: int
+    evaluatee_name: str
+    kind: PeerReviewKind
+    from_month: str
+    to_month: str
+    count: int
+    evaluators: list[PeerReviewEvaluatorDetail]
+
+
 class ProjectEvaluationCreate(BaseModel):
     project_id: int
     evaluatee_id: int

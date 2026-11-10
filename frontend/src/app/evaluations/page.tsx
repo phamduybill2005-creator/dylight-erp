@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, ChevronRightIcon, FunnelIcon, LockClosedIcon, UserCircleIcon, FolderIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
+import PeerReviewDetailsDialog from "@/components/peer-review-details-dialog";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { roleTier, ROLE_LABEL, userRankWeight } from "@/lib/roles";
@@ -24,7 +25,7 @@ import { useStickyState } from "@/lib/use-sticky-state";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { normalizeDept } from "@/lib/groups";
 import { splitDepts } from "@/components/filter-bar";
-import type { Evaluation, EvaluationOverviewRow, EvaluationMonthReview, User, Project, Colleague } from "@/lib/types";
+import type { Evaluation, EvaluationOverviewRow, EvaluationMonthReview, User, Project, Colleague, PeerReviewKind } from "@/lib/types";
 
 const RATING_LABELS: Record<number, string> = {
   1: "Cần xem xét lại",
@@ -260,6 +261,7 @@ export default function EvaluationsPage() {
   const [exporting, setExporting] = useState(false);
   // Lọc bảng tháng theo PHÒNG BAN (4 phòng chuẩn như các trang khác); nhớ qua F5.
   const [selDept, setSelDept] = useStickyState("evaluations.dept", "");
+  const [peerDetail, setPeerDetail] = useState<{ uid: number; name: string; kind: PeerReviewKind; scope: string } | null>(null);
 
   const period = weekSaturday();
   const tier = user ? roleTier(user.role) : "STAFF";
@@ -280,6 +282,8 @@ export default function EvaluationsPage() {
   const periodLabel = isQuarter ? `quý ${selQuarter}/${selMonth.slice(0, 4)}` : `tháng ${fmtMonth(selMonth)}`;
 
   const tableKey = `${user?.id}:${user?.role}:${periodFrom}:${periodTo}`;
+  const canViewPeerDetails = user?.role === "DIRECTOR" || user?.role === "ADMIN";
+  useEffect(() => { setPeerDetail(null); }, [tableKey]);
   const currentTableKey = useRef(tableKey);
   currentTableKey.current = tableKey;
   // Cả hai nguồn cùng một kỳ; bỏ qua phản hồi cũ khi đổi kỳ/người hoặc tải lại.
@@ -407,7 +411,7 @@ export default function EvaluationsPage() {
     return pending > 0 ? <span className="ml-1 text-[10px] font-medium text-amber-deep" title="Buổi đang chờ dữ liệu, duyệt phép hoặc đối soát; chưa tính là vi phạm">{pending} buổi chờ đối soát</span> : null;
   };
   /** Ô điểm /5 Tổng hợp (Ý thức / Chất lượng CV / Tập thể). Điểm đồng nghiệp kèm số phiếu. */
-  const scoreCell = (f: ScoreField, st: PeriodStats) => {
+  const scoreCell = (f: ScoreField, st: PeriodStats, person?: EvaluationOverviewRow) => {
     const v = st[f];
     if (v == null) {
       return <span className="text-muted" title={f === "attitude_points" ? "Chưa bắt đầu làm" : "Chưa đồng nghiệp nào chấm"}>—</span>;
@@ -416,7 +420,13 @@ export default function EvaluationsPage() {
     return (
       <span className="inline-flex flex-col items-center leading-tight" title={count ? `Trung bình ${count} phiếu đồng nghiệp chấm` : undefined}>
         <span className="font-semibold text-ink tnum">{fmtNum(v)}/5</span>
-        {count > 0 && <span className="text-[9px] font-medium text-muted">{count} phiếu</span>}
+        {count > 0 && (canViewPeerDetails && person && f !== "attitude_points" ? (
+          <button type="button" aria-haspopup="dialog"
+            aria-label={`Xem ${count} phiếu ${f === "peer_quality" ? "Chất lượng công việc" : "Tập thể"} của ${person.full_name}`}
+            onClick={() => setPeerDetail({ uid: person.user_id, name: person.full_name, kind: f === "peer_quality" ? "QUALITY" : "TEAM", scope: tableKey })}
+            className="rounded px-1 py-1 text-[10px] font-semibold text-steel underline underline-offset-2 hover:bg-steel/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-steel"
+          >{count} phiếu</button>
+        ) : <span className="text-[9px] font-medium text-muted">{count} phiếu</span>)}
       </span>
     );
   };
@@ -841,8 +851,8 @@ export default function EvaluationsPage() {
                         </div>
                         <div className="grid grid-cols-3 text-center text-xs">
                           {box("Ý thức 25%", scoreCell("attitude_points", st))}
-                          {box("Chất lượng CV 50%", scoreCell("peer_quality", st), "border-x border-line")}
-                          {box("Tập thể 25%", scoreCell("peer_team", st))}
+                          {box("Chất lượng CV 50%", scoreCell("peer_quality", st, r), "border-x border-line")}
+                          {box("Tập thể 25%", scoreCell("peer_team", st, r))}
                         </div>
                       </>
                     );
@@ -907,8 +917,8 @@ export default function EvaluationsPage() {
                             <td className="px-2 py-2 text-center tnum">{countCell("leave_cp", st)}</td>
                             <td className="px-2 py-2 text-center tnum">{countCell("leave_kp", st)}</td>
                             <td className="border-l border-line px-2 py-2 text-center tnum">{scoreCell("attitude_points", st)}</td>
-                            <td className="px-2 py-2 text-center tnum">{scoreCell("peer_quality", st)}</td>
-                            <td className="px-2 py-2 text-center tnum">{scoreCell("peer_team", st)}</td>
+                            <td className="px-2 py-2 text-center tnum">{scoreCell("peer_quality", st, r)}</td>
+                            <td className="px-2 py-2 text-center tnum">{scoreCell("peer_team", st, r)}</td>
                             <td className="border-l border-line px-2 py-2 text-center tnum">{resultCell(st)}</td>
                           </>
                         );
@@ -929,6 +939,13 @@ export default function EvaluationsPage() {
             </>
           )}
         </section>
+
+        {canViewPeerDetails && peerDetail?.scope === tableKey && (
+          <PeerReviewDetailsDialog key={`${tableKey}:${peerDetail.uid}:${peerDetail.kind}`}
+            evaluateeId={peerDetail.uid} evaluateeName={peerDetail.name} kind={peerDetail.kind}
+            fromMonth={periodMonths[0]} toMonth={periodMonths[periodMonths.length - 1]}
+            onClose={() => setPeerDetail(null)} />
+        )}
 
         {/* Mục RIÊNG TƯ: ai đã chấm mình bao nhiêu sao (Giám đốc không nhận đánh giá -> ẩn) */}
         {user.role !== "DIRECTOR" && <ReceivedSection items={received} month={selMonth} />}

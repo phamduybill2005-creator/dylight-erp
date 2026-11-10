@@ -6,20 +6,20 @@ Mỗi tháng, một người chấm đồng nghiệp bằng 2 phiếu, mỗi phi
   - TEAM    "Hòa đồng, tập thể"   : hòa đồng, thân thiện / tham gia hoạt động tập thể / tiếp thu góp ý.
 1 phiếu = (người chấm, người được chấm, tháng, loại); gửi lại trong tháng là sửa phiếu đó.
 RIÊNG TƯ: mỗi người chỉ xem được phiếu MÌNH đã chấm (/mine). Giám đốc / Quản trị xem
-TỔNG HỢP (điểm trung bình, số phiếu) theo người/tháng ở /summary — không xem ai chấm ai.
+tổng hợp (/summary) và chi tiết người chấm, điểm từng tiêu chí (/details) theo yêu cầu quản lý.
 Không ai chấm Giám đốc; Giám đốc không chấm (tab này không hiện với Giám đốc).
 """
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.database import get_db, vn_now
 from app.deps import get_current_user, require_roles
 from app.events import publish
 from app.models import PeerReview, User, UserRole
-from app.schemas import PeerReviewIn, PeerReviewOut, PeerReviewSummaryRow
+from app.schemas import PeerReviewDetails, PeerReviewKind, PeerReviewIn, PeerReviewOut, PeerReviewSummaryRow
 
 router = APIRouter(prefix="/peer-reviews", tags=["Đánh giá đồng nghiệp"])
 
@@ -27,7 +27,7 @@ _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
 def _check_month(month: str) -> str:
-    if not _MONTH_RE.match(month or ""):
+    if not _MONTH_RE.fullmatch(month or "") or int(month[:4]) < 1:
         raise HTTPException(400, "Tháng không hợp lệ, cần dạng YYYY-MM.")
     return month
 
@@ -144,3 +144,48 @@ def peer_review_summary(
         PeerReviewSummaryRow(user_id=uid, month=m, kind=k, avg=round(float(a or 0), 2), count=int(c))
         for uid, m, k, a, c in rows
     ]
+
+
+@router.get("/details", response_model=PeerReviewDetails)
+def peer_review_details(
+    evaluatee_id: int,
+    kind: PeerReviewKind,
+    from_month: str,
+    to_month: str,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(UserRole.DIRECTOR)),
+):
+    """Leadership inspects named raters and their three criterion scores in one selected period."""
+    _check_month(from_month)
+    _check_month(to_month)
+    distance = ((int(to_month[:4]) - int(from_month[:4])) * 12
+                + int(to_month[5:7]) - int(from_month[5:7]))
+    if not 0 <= distance < 24:
+        raise HTTPException(400, "Chọn khoảng tháng theo thứ tự và tối đa 24 tháng.")
+    target = db.query(User).filter(User.id == evaluatee_id, User.company_id == current.company_id).first()
+    if target is None:
+        raise HTTPException(404, "Không tìm thấy nhân sự trong công ty.")
+    evaluator = aliased(User)
+    rows = (
+        db.query(PeerReview, evaluator.id, evaluator.full_name)
+        .join(evaluator, evaluator.id == PeerReview.evaluator_id)
+        .filter(PeerReview.company_id == current.company_id, PeerReview.evaluatee_id == target.id,
+                PeerReview.kind == kind, PeerReview.month >= from_month, PeerReview.month <= to_month,
+                evaluator.company_id == current.company_id)
+        .order_by(evaluator.full_name, evaluator.id, PeerReview.month, PeerReview.id)
+        .all()
+    )
+    by_evaluator = {}
+    for ballot, evaluator_id, evaluator_name in rows:
+        group = by_evaluator.setdefault(evaluator_id, {
+            "evaluator_id": evaluator_id, "evaluator_name": evaluator_name, "reviews": [],
+        })
+        scores = [ballot.score_1, ballot.score_2, ballot.score_3]
+        group["reviews"].append({"id": ballot.id, "month": ballot.month, "scores": scores,
+                                 "avg": sum(scores) / 3, "updated_at": ballot.updated_at})
+    for group in by_evaluator.values():
+        group["count"] = len(group["reviews"])
+        group["avg"] = sum(sum(ballot["scores"]) for ballot in group["reviews"]) / (3 * group["count"])
+    return {"evaluatee_id": target.id, "evaluatee_name": target.full_name, "kind": kind,
+            "from_month": from_month, "to_month": to_month, "count": len(rows),
+            "evaluators": list(by_evaluator.values())}
