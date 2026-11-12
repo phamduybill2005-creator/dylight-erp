@@ -2,14 +2,7 @@
 from sqlalchemy.orm import Session
 
 from app.models import PeerReview, User, UserRole
-
-_DEPARTMENTS = {"測量解析": "Phòng Bản đồ", "3次元設計": "Phòng BIM",
-                "土木設計": "Phòng Thiết kế đường 2D", "AI開発": "Phòng AI"}
-
-
-def _departments(value: str | None) -> set[str]:
-    # Match splitDepts/normalizeDept in the existing voting forms.
-    return {_DEPARTMENTS.get(part.strip(), part.strip()) for part in (value or "").split(",") if part.strip()}
+from app.services.peer_review_policy import normalized_departments
 
 
 def pending_evaluators(db: Session, company_id: int, month: str) -> list[User]:
@@ -21,7 +14,7 @@ def pending_evaluators(db: Session, company_id: int, month: str) -> list[User]:
     cast = {}
     for ballot in ballots:
         cast.setdefault(ballot.evaluator_id, set()).add((ballot.evaluatee_id, ballot.kind))
-    departments = {person.id: _departments(person.department) for person in people}
+    departments = {person.id: normalized_departments(person.department) for person in people}
     pending = []
     for voter in people:
         required = set()

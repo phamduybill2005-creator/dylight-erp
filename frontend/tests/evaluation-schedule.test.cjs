@@ -121,6 +121,7 @@ function mountForm(search = "", options = {}) {
       return [slots[i].value, slots[i].set];
     },
     useMemo: fn => fn(),
+    useRef(initial) { const i = cursor++; if (!(i in slots)) slots[i] = { current: initial }; return slots[i]; },
     useEffect(fn, deps) {
       const i = cursor++, prior = slots[i];
       if (!prior || deps.some((dep, j) => !Object.is(dep, prior.deps[j]))) {
@@ -133,34 +134,36 @@ function mountForm(search = "", options = {}) {
   const source = ts.transpileModule(fs.readFileSync("src/app/peer-review/page.tsx", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020 },
   }).outputText;
-  vm.runInNewContext(source, { module, exports: module.exports, Date: Clock, URLSearchParams, window: browser,
+  vm.runInNewContext(source, { module, exports: module.exports, Date: Clock, Error, URLSearchParams, window: browser,
     document: { addEventListener() {}, removeEventListener() {} },
     require: name => {
       if (name === "react") return react;
       if (name === "next/navigation") return { useRouter: () => ({}), useSearchParams: () => new URLSearchParams(location.search) };
       if (name === "@/components/app-shell") return { __esModule: true, default: "main" };
       if (name === "@/lib/api") return { api: {
-        peerReviewsMine: async month => { calls.push(month); return options.ballots || []; },
-        savePeerReview: async payload => { writes.push(["save", payload]); return { ...payload, id: 12 }; },
-        deletePeerReview: async id => { writes.push(["delete", id]); },
+        me: async () => ({ id: 7, role: "FIELD_STAFF", department: "" }),
+        colleagues: async () => options.colleagues || [],
+        peerReviewsMine: async month => { calls.push(month); return options.load ? options.load(month) : options.ballots || []; },
+        savePeerReview: async payload => { writes.push(["save", payload]); return options.save ? options.save(payload) : { ...payload, id: 12 }; },
+        deletePeerReview: async id => { writes.push(["delete", id]); if (options.withdraw) return options.withdraw(id); },
       } };
       if (name === "@/lib/format") return { monthLocal: () => "2026-11" };
       if (name === "@/lib/use-sticky-state") return { useStickyState: (_, initial) => react.useState(initial) };
       if (name === "@/lib/departments") return { PRESET_DEPARTMENTS: [] };
       if (name === "@/lib/groups") return { normalizeDept: value => value };
-      if (name === "@/components/filter-bar") return { splitDepts: () => [] };
+      if (name === "@/components/filter-bar") return { splitDepts: value => (value || "").split(",").map(dept => dept.trim()).filter(Boolean) };
       if (name === "@/lib/peer-review-forms") return loadTypeScript("src/lib/peer-review-forms.ts");
       if (name === "@/lib/evaluation-schedule") return calendarWithClock(Clock);
       return require(name);
     },
   });
   const tree = module.exports.default();
-  const form = nodes(tree).find(node => typeof node.type === "function" && node.type.name === "ReviewForm");
-  page = false; slots.length = 0; effects.length = 0;
+  const form = nodes(tree).find(node => typeof node.type === "function" && node.type.name === "ReviewForm" && (!options.kind || node.props.def.kind === options.kind));
+  if (!options.page) { page = false; slots.length = 0; effects.length = 0; }
   return { calls, writes, timers, navigate: search => { location.search = search; }, advance: iso => { instant = iso; },
     fireTimers() { const pending = [...timers.values()]; timers.clear(); pending.forEach(timer => timer.fn()); },
-    render() { cursor = 0; const tree = form.type({ ...form.props, ownDepts: undefined,
-      colleagues: [{ id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "" }] }); effects.splice(0).forEach(fn => fn()); return tree; } };
+    render() { cursor = 0; const tree = options.page ? module.exports.default() : form.type({ ...form.props, ownDepts: options.ownDepts,
+      colleagues: options.colleagues || [{ id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "" }] }); effects.splice(0).forEach(fn => fn()); return tree; } };
 }
 
 test("actual ballot defaults to previous month, honors reminder link and retains manual selection", () => {
@@ -208,4 +211,200 @@ test("open form locks automatically at Vietnam midnight; stale save/withdraw han
   for (const node of nodes(tree).filter(node => typeof node.type === "function" && node.type.name === "ScorePicker")) assert.equal(node.props.disabled, true);
   assert.equal(nodes(tree).find(node => node.type === "button" && textOf(node) === "Lưu sửa").props.disabled, true);
   assert.equal(nodes(tree).find(node => node.type === "button" && textOf(node) === "Rút lại").props.disabled, true);
+});
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+const ballot = (month, id = 12, evaluatee_id = 8, scores = [5, 4, 3]) =>
+  ({ id, evaluatee_id, evaluatee_name: evaluatee_id === 8 ? "Peer" : "Other", month, kind: "QUALITY", scores });
+const monthField = tree => nodes(tree).find(node => node.props?.type === "month");
+const personField = tree => nodes(tree).find(node => node.type === "select" && nodes(node).some(child => child.type === "option" && child.props.value === 8));
+const button = (tree, label) => nodes(tree).find(node => node.type === "button" && textOf(node) === label);
+const pickers = tree => nodes(tree).filter(node => typeof node.type === "function" && node.type.name === "ScorePicker");
+const renderForm = app => { app.render(); app.render(); return app.render(); };
+async function settleForm(app) { await new Promise(resolve => setImmediate(resolve)); return renderForm(app); }
+function choosePeer(app, id = "8") { personField(renderForm(app)).props.onChange({ target: { value: id } }); return renderForm(app); }
+function setScores(app, values) { pickers(renderForm(app)).forEach((picker, i) => picker.props.onChange(values[i])); return renderForm(app); }
+
+test("month change hides old ballots and blocks edits until its read succeeds", async () => {
+  const october = deferred();
+  const app = mountForm("?month=2026-09", { load: month => month === "2026-09" ? [ballot("2026-09")] : october.promise });
+  renderForm(app); await settleForm(app); choosePeer(app);
+  monthField(renderForm(app)).props.onChange({ target: { value: "2026-10" } });
+  let tree = renderForm(app);
+  assert.ok(!textOf(tree).includes("Đã chấm Peer tháng 10/2026"));
+  assert.ok(!button(tree, "Rút lại"));
+  assert.ok(pickers(tree).every(picker => picker.props.disabled));
+  october.resolve([ballot("2026-10", 13, 8, [2, 2, 2])]);
+  tree = await settleForm(app);
+  assert.deepEqual(pickers(tree).map(picker => picker.props.value), [2, 2, 2]);
+  assert.ok(pickers(tree).every(picker => !picker.props.disabled));
+});
+
+test("failed ballot read stays blocked and retry restores authoritative saved scores", async () => {
+  let attempts = 0;
+  const app = mountForm("", { load: () => ++attempts === 1 ? Promise.reject(new Error("offline")) : [ballot("2026-10")] });
+  renderForm(app); choosePeer(app);
+  let tree = await settleForm(app);
+  assert.ok(nodes(tree).some(node => node.props?.role === "alert" && textOf(node).includes("offline")));
+  assert.ok(pickers(tree).every(picker => picker.props.disabled));
+  const retry = button(tree, "Thử lại"); assert.ok(retry);
+  retry.props.onClick(); renderForm(app);
+  tree = await settleForm(app);
+  assert.deepEqual(pickers(tree).map(picker => picker.props.value), [5, 4, 3]);
+  assert.equal(button(tree, "Lưu sửa").props.disabled, false);
+});
+
+test("pending initial read cannot accept a save that its later snapshot would erase", async () => {
+  const read = deferred();
+  const app = mountForm("", { load: () => read.promise });
+  renderForm(app); choosePeer(app); setScores(app, [1, 2, 3]);
+  const tree = renderForm(app);
+  assert.ok(pickers(tree).every(picker => picker.props.disabled));
+  await nodes(tree).find(node => node.type === "button" && textOf(node).startsWith("Gửi đánh giá")).props.onClick();
+  assert.equal(app.writes.length, 0);
+  read.resolve([]); await settleForm(app);
+});
+
+test("one save blocks synchronous duplicate handlers and all selection controls", async () => {
+  const saved = deferred();
+  const app = mountForm("", { ballots: [ballot("2026-10")], save: () => saved.promise });
+  renderForm(app); await settleForm(app); const tree = choosePeer(app);
+  const save = button(tree, "Lưu sửa").props.onClick;
+  const first = save(); const duplicate = save();
+  assert.equal(app.writes.length, 1);
+  const pendingTree = renderForm(app);
+  assert.ok(nodes(pendingTree).filter(node => node.type === "select" || node.props?.type === "month").every(node => node.props.disabled));
+  assert.ok(nodes(pendingTree).filter(node => node.type === "button" && textOf(node).includes("Peer")).every(node => node.props.disabled));
+  saved.resolve(ballot("2026-10")); await Promise.all([first, duplicate]);
+});
+
+test("old selection handlers cannot mutate the newly selected ballot", async () => {
+  const app = mountForm("", { ballots: [ballot("2026-10"), ballot("2026-10", 13, 9)], colleagues: [
+    { id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "" },
+    { id: 9, full_name: "Other", role: "FIELD_STAFF", department: "" },
+  ] });
+  renderForm(app); await settleForm(app); const tree = choosePeer(app);
+  const staleSave = button(tree, "Lưu sửa").props.onClick;
+  const staleWithdraw = button(tree, "Rút lại").props.onClick;
+  choosePeer(app, "9");
+  await staleSave(); await staleWithdraw();
+  assert.equal(app.writes.length, 0);
+});
+
+for (const action of ["save", "withdraw"]) {
+  test(`late ${action} after reminder navigation cannot alter another month's scores or status`, async () => {
+    const mutation = deferred();
+    const app = mountForm("?month=2026-10", { load: month => [ballot(month, month === "2026-10" ? 12 : 13, 8, month === "2026-10" ? [5, 4, 3] : [2, 2, 2])],
+      save: () => mutation.promise, withdraw: () => mutation.promise });
+    renderForm(app); await settleForm(app); const tree = choosePeer(app);
+    const pending = button(tree, action === "save" ? "Lưu sửa" : "Rút lại").props.onClick();
+    app.navigate("?month=2026-09"); renderForm(app); await settleForm(app);
+    mutation.resolve(action === "save" ? ballot("2026-10") : undefined); await pending;
+    const finalTree = renderForm(app);
+    assert.deepEqual(pickers(finalTree).map(picker => picker.props.value), [2, 2, 2]);
+    assert.ok(textOf(finalTree).includes("Đã chấm Peer tháng 09/2026"));
+    assert.ok(!textOf(finalTree).includes(action === "save" ? "Đã lưu" : "Đã rút"));
+    assert.ok(!textOf(finalTree).includes("4.0"));
+  });
+}
+
+test("same-id save response refreshes displayed scores", async () => {
+  const app = mountForm("", { ballots: [ballot("2026-10")], save: () => ballot("2026-10", 12, 8, [3, 3, 3]) });
+  renderForm(app); await settleForm(app); choosePeer(app);
+  await button(setScores(app, [1, 1, 1]), "Lưu sửa").props.onClick();
+  assert.deepEqual(pickers(renderForm(app)).map(picker => picker.props.value), [3, 3, 3]);
+});
+
+test("historical quality chips cannot escape current department eligibility", async () => {
+  const app = mountForm("", { ownDepts: ["BIM"], ballots: [ballot("2026-10")], colleagues: [
+    { id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "AI" },
+  ] });
+  renderForm(app); let tree = await settleForm(app);
+  const chip = nodes(tree).find(node => node.type === "button" && textOf(node).includes("Peer"));
+  assert.equal(chip.props.disabled, true);
+  chip.props.onClick(); tree = renderForm(app);
+  assert.equal(nodes(tree).find(node => node.type === "select").props.value, "BIM");
+  assert.ok(pickers(tree).every(picker => picker.props.disabled));
+});
+
+test("page heading advances with the ballot cycle at Vietnam midnight", () => {
+  const app = mountForm("", { page: true, instant: "2026-11-30T16:59:59Z" });
+  assert.ok(textOf(renderForm(app)).includes("Đánh giá định kì tháng 10/2026"));
+  assert.equal([...app.timers.values()][0]?.delay, 1000);
+  app.advance("2026-11-30T17:00:00Z"); app.fireTimers();
+  const tree = renderForm(app);
+  assert.ok(textOf(tree).includes("Đánh giá định kì tháng 11/2026"));
+  assert.ok(textOf(tree).includes("Thời hạn: 01/12/2026 – 05/12/2026"));
+});
+
+test("returning to a month during its pending save reloads after the mutation settles", async () => {
+  const saved = deferred(); let persisted = false;
+  const app = mountForm("?month=2026-10", { load: month => month === "2026-10" ? [ballot(month, 12, 8, persisted ? [1, 1, 1] : [5, 4, 3])] : [],
+    save: async () => { await saved.promise; persisted = true; return ballot("2026-10", 12, 8, [1, 1, 1]); } });
+  renderForm(app); await settleForm(app); choosePeer(app);
+  const pending = button(setScores(app, [1, 1, 1]), "Lưu sửa").props.onClick();
+  app.navigate("?month=2026-09"); renderForm(app); await settleForm(app);
+  app.navigate("?month=2026-10"); renderForm(app); await settleForm(app);
+  saved.resolve(); await pending; renderForm(app);
+  assert.deepEqual(pickers(await settleForm(app)).map(picker => picker.props.value), [1, 1, 1]);
+});
+
+test("quality without a department and team preserve unrestricted colleague eligibility", async () => {
+  for (const kind of ["QUALITY", "TEAM"]) {
+    const app = mountForm("", { kind, ownDepts: kind === "QUALITY" ? [] : undefined, colleagues: [
+      { id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "AI" },
+    ] });
+    renderForm(app); const tree = await settleForm(app);
+    assert.equal(nodes(tree).some(node => node.type === "option" && node.props.value === 8), true);
+  }
+});
+
+test("quality history navigation selects a shared department instead of a foreign first department", async () => {
+  const app = mountForm("", { ownDepts: ["BIM", "AI"], ballots: [ballot("2026-10")], colleagues: [
+    { id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "Map, AI" },
+  ] });
+  renderForm(app); let tree = await settleForm(app);
+  const chip = nodes(tree).find(node => node.type === "button" && textOf(node).includes("Peer"));
+  assert.equal(chip.props.disabled, false);
+  chip.props.onClick(); tree = renderForm(app);
+  assert.equal(nodes(tree).find(node => node.type === "select").props.value, "AI");
+  assert.equal(personField(tree).props.value, "8");
+});
+
+for (const action of ["save", "withdraw"]) {
+  test(`late ${action} error belongs to the original month after reminder navigation`, async () => {
+    const mutation = deferred();
+    const app = mountForm("?month=2026-10", { load: month => [ballot(month)], save: () => mutation.promise, withdraw: () => mutation.promise });
+    renderForm(app); await settleForm(app); const tree = choosePeer(app);
+    const pending = button(tree, action === "save" ? "Lưu sửa" : "Rút lại").props.onClick();
+    app.navigate("?month=2026-09"); renderForm(app); await settleForm(app);
+    mutation.reject(new Error("Original request failed")); await pending;
+    assert.ok(!textOf(renderForm(app)).includes("Original request failed"));
+  });
+}
+
+test("new-cycle midnight discards a late previous-cycle save result", async () => {
+  const mutation = deferred();
+  const app = mountForm("", { load: month => [ballot(month, month === "2026-10" ? 12 : 13, 8, month === "2026-10" ? [5, 4, 3] : [2, 2, 2])], save: () => mutation.promise });
+  renderForm(app); await settleForm(app);
+  const pending = button(choosePeer(app), "Lưu sửa").props.onClick();
+  app.advance("2026-11-30T17:00:00Z"); app.fireTimers(); renderForm(app); await settleForm(app);
+  mutation.resolve(ballot("2026-10")); await pending;
+  const tree = renderForm(app);
+  assert.equal(monthField(tree).props.value, "2026-11");
+  assert.deepEqual(pickers(tree).map(picker => picker.props.value), [2, 2, 2]);
+  assert.ok(!textOf(tree).includes("Đã lưu"));
+});
+
+test("clicking the already-selected history chip keeps the current save handler usable", async () => {
+  const app = mountForm("", { ballots: [ballot("2026-10")] });
+  renderForm(app); await settleForm(app); const tree = choosePeer(app);
+  nodes(tree).find(node => node.type === "button" && textOf(node).includes("Peer")).props.onClick();
+  // Selecting the same person produces no React state update or render.
+  await button(tree, "Lưu sửa").props.onClick();
+  assert.equal(app.writes.length, 1);
 });

@@ -13,6 +13,7 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
 from app.database import get_db, vn_now
@@ -21,6 +22,7 @@ from app.events import publish
 from app.models import PeerReview, User, UserRole
 from app.schemas import PeerReviewDetails, PeerReviewKind, PeerReviewIn, PeerReviewOut, PeerReviewSummaryRow
 from app.services.evaluation_calendar import evaluation_voting_open
+from app.services.peer_review_policy import can_review_quality
 
 router = APIRouter(prefix="/peer-reviews", tags=["Đánh giá đồng nghiệp"])
 
@@ -56,7 +58,8 @@ def my_peer_reviews(
     _check_month(month)
     rows = (
         db.query(PeerReview)
-        .filter(PeerReview.evaluator_id == current.id, PeerReview.month == month)
+        .filter(PeerReview.company_id == current.company_id,
+                PeerReview.evaluator_id == current.id, PeerReview.month == month)
         .order_by(PeerReview.updated_at.desc())
         .all()
     )
@@ -77,23 +80,28 @@ def save_peer_review(
         raise HTTPException(400, "Chưa thể đánh giá cho tháng tương lai.")
     _require_voting_open(month)
     evaluatee = db.get(User, payload.evaluatee_id)
-    if not evaluatee or evaluatee.company_id != current.company_id or not evaluatee.is_active:
+    if (not evaluatee or evaluatee.company_id != current.company_id
+            or not evaluatee.is_active or not evaluatee.is_approved):
         raise HTTPException(404, "Không tìm thấy đồng nghiệp trong công ty.")
     if evaluatee.id == current.id:
         raise HTTPException(400, "Không thể tự đánh giá chính mình.")
     if evaluatee.role == UserRole.DIRECTOR:
         raise HTTPException(403, "Không ai được đánh giá Giám đốc.")
+    if payload.kind == "QUALITY" and not can_review_quality(current.department, evaluatee.department):
+        raise HTTPException(403, "Chỉ được chấm Chất lượng công việc cho đồng nghiệp cùng phòng.")
 
-    rec = (
+    ballot_query = (
         db.query(PeerReview)
         .filter(
+            PeerReview.company_id == current.company_id,
             PeerReview.evaluator_id == current.id,
             PeerReview.evaluatee_id == evaluatee.id,
             PeerReview.month == month,
             PeerReview.kind == payload.kind,
         )
-        .first()
     )
+    rec = ballot_query.first()
+    creating = rec is None
     if rec is None:
         rec = PeerReview(
             company_id=current.company_id, evaluator_id=current.id,
@@ -102,7 +110,21 @@ def save_peer_review(
         db.add(rec)
     rec.score_1, rec.score_2, rec.score_3 = payload.scores
     rec.updated_at = vn_now()
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if not creating:
+            raise
+        # Another tab may have inserted the same unique key after our read.
+        # Recover only that exact ballot; unrelated constraint failures still surface.
+        rec = ballot_query.first()
+        if rec is None:
+            raise
+        _require_voting_open(month)
+        rec.score_1, rec.score_2, rec.score_3 = payload.scores
+        rec.updated_at = vn_now()
+        db.commit()
     db.refresh(rec)
     publish(current.company_id, "evaluation")   # bảng Tổng hợp đánh giá đang mở tự tải lại
     return _out(rec)
@@ -116,7 +138,7 @@ def delete_my_peer_review(
 ):
     """Rút lại 1 phiếu MÌNH đã chấm."""
     rec = db.get(PeerReview, review_id)
-    if not rec or rec.evaluator_id != current.id:
+    if not rec or rec.company_id != current.company_id or rec.evaluator_id != current.id:
         raise HTTPException(404, "Không tìm thấy phiếu.")
     _require_voting_open(rec.month)
     db.delete(rec)
