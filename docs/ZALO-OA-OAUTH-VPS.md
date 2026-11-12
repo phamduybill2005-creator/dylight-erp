@@ -232,7 +232,8 @@ Luồng ngày 2–5 dùng bảng riêng `zalo_evaluation_daily_reminders`, khóa
 
 Người nhận: Tất cả mọi người
 Tiêu đề: Đánh giá định kì tháng <tháng trước: mm/yyyy>
-Nội dung: Từ ngày 01 đến hết ngày 05/<tháng gửi: mm/yyyy>, mọi người vào mục Đánh giá để chấm đánh giá tháng <tháng trước: mm/yyyy>.
+Nội dung: Mọi người vào mục Đánh giá để chấm đánh giá tháng <tháng trước: mm/yyyy>.
+Thời hạn: 01/<tháng gửi: mm/yyyy> – 05/<tháng gửi: mm/yyyy>.
 Người gửi: Hệ thống
 
 Mở đánh giá: https://erp.dosco.vn/peer-review?month=<tháng trước: YYYY-MM>

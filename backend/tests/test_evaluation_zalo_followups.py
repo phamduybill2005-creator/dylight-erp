@@ -50,7 +50,7 @@ class EvaluationZaloFollowupTests(unittest.TestCase):
         self.assertIn("1. Bình", self.message())
         self.assertNotIn("1. An", self.message())
         self.assertNotIn("Director", self.message())
-        self.assertIn("05/11/2026", self.message())
+        self.assertIn("\nThời hạn: 01/11/2026 – 05/11/2026.", self.message())
         self.assertIn("/peer-review?month=2026-10", self.message())
         self.assertNotIn("score", self.message())
         self.assertEqual(self.service.run_due(datetime(2026, 11, 2, 8, 5))["reason"], "already_claimed")
@@ -121,7 +121,7 @@ class EvaluationZaloFollowupTests(unittest.TestCase):
         self.assertEqual(self.service.run_due(datetime(2026, 11, 5, 8, 59))["status"], "sent")
         self.assertEqual(self.service.run_due(datetime(2027, 1, 2, 8))["status"], "sent")
         self.assertIn("tháng 12/2026", self.message())
-        self.assertIn("05/01/2027", self.message())
+        self.assertIn("\nThời hạn: 01/01/2027 – 05/01/2027.", self.message())
         self.assertEqual({row.period for row in self.db.query(ZaloEvaluationDailyReminder).all()}, {"2026-11-05", "2027-01-02"})
 
     def test_daily_missing_schema_disabled_or_missing_credential_never_sends(self):

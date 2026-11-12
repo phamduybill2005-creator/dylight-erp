@@ -40,7 +40,7 @@ class EvaluationWebReminderTests(unittest.TestCase):
         self.remind(datetime(2026, 11, 1, 8))
         row = self.db.query(Notification).one()
         self.assertEqual(row.title, "Đánh giá định kì tháng 10/2026")
-        self.assertEqual(row.body, "Từ ngày 01 đến hết ngày 05/11/2026, mọi người vào mục Đánh giá để chấm đánh giá tháng 10/2026.")
+        self.assertEqual(row.body, "Mọi người vào mục Đánh giá để chấm đánh giá tháng 10/2026.\nThời hạn: 01/11/2026 – 05/11/2026.")
         self.assertEqual(row.recipient_id, self.user.id)
         self.assertIsNone(row.sender_id)
 
@@ -71,7 +71,7 @@ class EvaluationWebReminderTests(unittest.TestCase):
         self.remind(datetime(2027, 1, 1, 8))
         row = self.db.query(Notification).one()
         self.assertEqual(row.title, "Đánh giá định kì tháng 12/2026")
-        self.assertIn("05/01/2027", row.body)
+        self.assertIn("\nThời hạn: 01/01/2027 – 05/01/2027.", row.body)
 
     def test_old_notification_remains_and_does_not_suppress_new_cycle(self):
         self.db.add(Notification(company_id=self.user.company_id, recipient_id=self.user.id,

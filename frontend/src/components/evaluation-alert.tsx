@@ -39,7 +39,8 @@ export default function EvaluationAlert({ user }: { user: User | null }) {
           <StarIcon className="h-9 w-9 shrink-0 text-yellow-200" />
           <div>
             <p className="text-base font-bold leading-tight">Đánh giá định kì tháng {cycle.monthLabel}</p>
-            <p className="text-[11px] text-white/90">Vui lòng hoàn thành đánh giá tháng {cycle.monthLabel} từ ngày 01 đến hết ngày {cycle.deadline}.</p>
+            <p className="text-[11px] text-white/90">Vui lòng hoàn thành đánh giá tháng {cycle.monthLabel}.</p>
+            <p className="mt-1 text-[11px] font-semibold text-white">Thời hạn: {cycle.startDate} – {cycle.deadline}</p>
           </div>
         </div>
 

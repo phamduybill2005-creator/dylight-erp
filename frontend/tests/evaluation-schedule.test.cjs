@@ -93,7 +93,7 @@ test("popup follows monthly calendar, opens correct ballot and dismissal lasts e
   let app = mountAlert("2026-11-01T01:00:00Z", storage);
   app.render(); const tree = app.render();
   assert.ok(textOf(tree).includes("10/2026"));
-  assert.ok(textOf(tree).includes("05/11/2026"));
+  assert.ok(nodes(tree).some(node => node.type === "p" && textOf(node) === "Thời hạn: 01/11/2026 – 05/11/2026"));
   const link = nodes(tree).find(node => node.props?.href === "/peer-review?month=2026-10");
   assert.ok(link);
   link.props.onClick(); assert.equal(app.render(), null);

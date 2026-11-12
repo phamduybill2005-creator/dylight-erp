@@ -11,6 +11,7 @@ export function evaluationCycle(now = new Date()) {
   const mm = String(month).padStart(2, "0");
   return {
     month: `${reviewedYear}-${mm}`, monthLabel: `${mm}/${reviewedYear}`,
+    startDate: `01/${String(currentMonth).padStart(2, "0")}/${year}`,
     deadline: `05/${String(currentMonth).padStart(2, "0")}/${year}`,
     open: day <= 5 && (day > 1 || hour >= 8),
     votingOpen: day <= 5,

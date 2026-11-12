@@ -81,8 +81,8 @@ class EvaluationZaloReminderTests(unittest.TestCase):
         self.assertEqual(len(self.requests), 1)
         expected = ("[THÔNG BÁO DOSCO]\n\nNgười nhận: Tất cả mọi người\n"
             "Tiêu đề: Đánh giá định kì tháng 10/2026\n"
-            "Nội dung: Từ ngày 01 đến hết ngày 05/11/2026, mọi người vào mục Đánh giá "
-            "để chấm đánh giá tháng 10/2026.\nNgười gửi: Hệ thống\n\n"
+            "Nội dung: Mọi người vào mục Đánh giá "
+            "để chấm đánh giá tháng 10/2026.\nThời hạn: 01/11/2026 – 05/11/2026.\nNgười gửi: Hệ thống\n\n"
             "Mở đánh giá: https://erp.dosco.vn/peer-review?month=2026-10")
         self.assertEqual(json.loads(self.requests[0].content),
             {"recipient": {"group_id": "synthetic-group"}, "message": {"text": expected}})
@@ -130,7 +130,7 @@ class EvaluationZaloReminderTests(unittest.TestCase):
         self.assertEqual(self.service.run_due(datetime(2027, 1, 1, 8)), {"status": "sent"})
         message = json.loads(self.requests[0].content)["message"]["text"]
         self.assertIn("Đánh giá định kì tháng 12/2026", message)
-        self.assertIn("05/01/2027", message)
+        self.assertIn("\nThời hạn: 01/01/2027 – 05/01/2027.", message)
         self.assertIn("/peer-review?month=2026-12", message)
         self.assertEqual(self.db.query(self.model).one().period, "2027-01")
 

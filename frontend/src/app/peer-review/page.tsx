@@ -352,7 +352,8 @@ export default function PeerReviewPage() {
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
           <div>
             <h1 className="text-base font-bold lg:text-xl">Đánh giá</h1>
-            <p className="text-[11px] text-white/90">Đánh giá định kì tháng {evaluationCycle().monthLabel} · Từ ngày 01 đến hết ngày {evaluationCycle().deadline}</p>
+            <p className="text-[11px] text-white/90">Đánh giá định kì tháng {evaluationCycle().monthLabel}</p>
+            <p className="text-[11px] font-semibold text-white/90">Thời hạn: {evaluationCycle().startDate} – {evaluationCycle().deadline}</p>
             <p className="text-[11px] text-white/70">Chấm đồng nghiệp theo tháng · thang 1–5 · phiếu không công khai với đồng nghiệp; Giám đốc / Quản trị có thể xem chi tiết · Chất lượng công việc chấm người cùng phòng, Hòa đồng chấm mọi phòng</p>
           </div>
         </div>

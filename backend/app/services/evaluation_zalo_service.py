@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import inspect
 
 from app.database import vn_now
-from app.services.evaluation_calendar import EVAL_DEADLINE_DAY, EVAL_REMINDER_DAY, EVAL_REMINDER_HOUR, evaluation_reminder
+from app.services.evaluation_calendar import EVAL_DEADLINE_DAY, EVAL_REMINDER_DAY, EVAL_REMINDER_HOUR, evaluation_deadline, evaluation_reminder
 from app.services.evaluation_completion import pending_evaluators
 from app.services.zalo_oa_service import ZaloOAService
 from app.services.zalo_oauth_service import ZaloOAuthService
@@ -66,7 +66,7 @@ class EvaluationZaloService:
                 title = f"Chưa hoàn thành đánh giá tháng {reviewed_month[5:]}/{reviewed_month[:4]}"
                 names = "\n".join(f"{index}. {' '.join(person.full_name.split())}" for index, person in enumerate(pending, 1))
                 body = (f"Danh sách nhân sự chưa chấm đủ các phiếu Chất lượng công việc và Tập thể:\n{names}\n"
-                        f"Vui lòng hoàn thành trước hết ngày 05/{now:%m/%Y}.")
+                        f"{evaluation_deadline(now)}")
             message = ("[THÔNG BÁO DOSCO]\n\nNgười nhận: Tất cả mọi người\n"
                 f"Tiêu đề: {title}\nNội dung: {body}\n"
                 f"Người gửi: Hệ thống\n\nMở đánh giá: {link}")

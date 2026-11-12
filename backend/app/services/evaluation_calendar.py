@@ -19,10 +19,14 @@ def evaluation_window_open(now: datetime) -> bool:
             and (now.day > EVAL_REMINDER_DAY or now.hour >= EVAL_REMINDER_HOUR))
 
 
+def evaluation_deadline(now: datetime) -> str:
+    return f"Thời hạn: 01/{now:%m/%Y} – 05/{now:%m/%Y}."
+
+
 def evaluation_reminder(now: datetime) -> tuple[str, str, str]:
     """Return reviewed month, title and body; claims still key by sending month."""
     reviewed = now.replace(day=1) - timedelta(days=1)
     title = f"Đánh giá định kì tháng {reviewed:%m/%Y}"
-    body = (f"Từ ngày 01 đến hết ngày 05/{now:%m/%Y}, mọi người vào mục Đánh giá "
-            f"để chấm đánh giá tháng {reviewed:%m/%Y}.")
+    body = (f"Mọi người vào mục Đánh giá để chấm đánh giá tháng {reviewed:%m/%Y}.\n"
+            f"{evaluation_deadline(now)}")
     return reviewed.strftime("%Y-%m"), title, body
