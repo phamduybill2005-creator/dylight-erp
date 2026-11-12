@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 
 from app.config import settings
-from app.services.evaluation_calendar import EVAL_REMINDER_DAY, EVAL_REMINDER_HOUR
+from app.services.evaluation_calendar import EVAL_DEADLINE_DAY, EVAL_REMINDER_DAY, EVAL_REMINDER_HOUR
 
 _scheduler = None
 _logger = logging.getLogger(__name__)
@@ -110,6 +110,9 @@ def start_scheduler() -> None:
             sched.add_job(_run_eval_reminder, "cron", day=EVAL_REMINDER_DAY, hour=f"{EVAL_REMINDER_HOUR}-23", minute="*/5", second=0,
                 timezone="Asia/Ho_Chi_Minh", id="zalo_eval_reminder", replace_existing=True,
                 misfire_grace_time=300, coalesce=True, max_instances=1)
+            sched.add_job(_run_eval_reminder, "cron", day=f"2-{EVAL_DEADLINE_DAY}", hour=EVAL_REMINDER_HOUR,
+                minute="*/5", second=0, timezone="Asia/Ho_Chi_Minh", id="zalo_eval_followup", replace_existing=True,
+                misfire_grace_time=300, coalesce=True, max_instances=1)
             # Check the due window after restart without blocking ERP startup.
             sched.add_job(_run_eval_reminder, "date", id="zalo_eval_startup", replace_existing=True,
                 misfire_grace_time=60, coalesce=True, max_instances=1)
@@ -121,6 +124,6 @@ def start_scheduler() -> None:
                 f"{settings.YUNATT_SYNC_MINUTE:02d} ({settings.YUNATT_TIMEZONE})."
             )
         if zalo_enabled:
-            _logger.info("[zalo-eval-reminder] enabled: day 1, from 08:00 Vietnam time")
+            _logger.info("[zalo-eval-reminder] enabled: opening day 1; pending list days 2-5 at 08:00 Vietnam time")
     except Exception:  # noqa: BLE001
         _logger.warning("[scheduler] could not start enabled jobs")

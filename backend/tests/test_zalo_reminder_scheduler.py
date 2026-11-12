@@ -29,7 +29,7 @@ class ZaloReminderSchedulerTests(unittest.TestCase):
             self.assertIsNotNone(scheduler._scheduler)
             start.assert_called_once()
             jobs = {job.id: job for job in scheduler._scheduler.get_jobs()}
-        self.assertEqual(set(jobs), {"zalo_eval_reminder", "zalo_eval_startup"})
+        self.assertEqual(set(jobs), {"zalo_eval_reminder", "zalo_eval_followup", "zalo_eval_startup"})
         trigger = jobs["zalo_eval_reminder"].trigger
         # 07:59:59 VN -> next fire 08:00 VN / 01:00 UTC on the 1st.
         next_fire = trigger.get_next_fire_time(None, datetime(2026, 11, 1, 0, 59, 59, tzinfo=timezone.utc))
@@ -38,6 +38,15 @@ class ZaloReminderSchedulerTests(unittest.TestCase):
         after_window = trigger.get_next_fire_time(None, datetime(2026, 11, 1, 17, tzinfo=timezone.utc))
         self.assertEqual(after_window.astimezone(timezone.utc), datetime(2026, 12, 1, 1, tzinfo=timezone.utc))
         self.assertEqual(jobs["zalo_eval_reminder"].max_instances, 1)
+        followup = jobs["zalo_eval_followup"].trigger
+        self.assertEqual(str(followup.timezone), "Asia/Ho_Chi_Minh")
+        for day in (2, 3, 4, 5):
+            first = followup.get_next_fire_time(None, datetime(2026, 11, day, 0, 59, 59, tzinfo=timezone.utc))
+            self.assertEqual(first.astimezone(timezone.utc), datetime(2026, 11, day, 1, tzinfo=timezone.utc))
+        after_morning = followup.get_next_fire_time(None, datetime(2026, 11, 2, 2, tzinfo=timezone.utc))
+        self.assertEqual(after_morning.astimezone(timezone.utc), datetime(2026, 11, 3, 1, tzinfo=timezone.utc))
+        after_deadline = followup.get_next_fire_time(None, datetime(2026, 11, 5, 2, tzinfo=timezone.utc))
+        self.assertEqual(after_deadline.astimezone(timezone.utc), datetime(2026, 12, 2, 1, tzinfo=timezone.utc))
 
     def test_global_zalo_or_feature_disabled_does_not_start_zalo_job(self):
         for field in ("ZALO_ENABLED", "ZALO_EVAL_REMINDER_ENABLED"):
@@ -59,7 +68,7 @@ class ZaloReminderSchedulerTests(unittest.TestCase):
         self.assertIs(scheduler._scheduler, initial)
         start.assert_called_once()
         jobs = {job.id: job for job in initial.get_jobs()}
-        self.assertEqual(set(jobs), {"yunatt_daily_sync", "zalo_eval_reminder", "zalo_eval_startup"})
+        self.assertEqual(set(jobs), {"yunatt_daily_sync", "zalo_eval_reminder", "zalo_eval_followup", "zalo_eval_startup"})
         next_fire = jobs["yunatt_daily_sync"].trigger.get_next_fire_time(
             None, datetime(2026, 10, 9, 0, tzinfo=timezone.utc))
         self.assertEqual(next_fire.astimezone(timezone.utc), datetime(2026, 10, 9, 13, tzinfo=timezone.utc))

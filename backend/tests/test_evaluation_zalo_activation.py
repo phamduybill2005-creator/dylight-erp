@@ -51,7 +51,7 @@ class EvaluationZaloActivationTests(unittest.TestCase):
             scheduler._run_eval_reminder()
         self.assertEqual(checked, [True])
         self.assertEqual(set(inspect(self.engine).get_table_names()),
-                         {"companies", "alembic_version", "zalo_evaluation_reminders"})
+                         {"companies", "alembic_version", "zalo_evaluation_reminders", "zalo_evaluation_daily_reminders"})
 
     def test_preparation_is_idempotent_and_keeps_prior_claims_and_schema_version(self):
         prepare = self.preparer()
@@ -65,7 +65,18 @@ class EvaluationZaloActivationTests(unittest.TestCase):
             self.assertEqual(connection.scalar(text("SELECT status FROM zalo_evaluation_reminders")), "failed")
             self.assertEqual(connection.scalar(text("SELECT version_num FROM alembic_version")), "production-baseline")
         self.assertEqual(set(inspect(self.engine).get_table_names()),
-                         {"companies", "alembic_version", "zalo_evaluation_reminders"})
+                         {"companies", "alembic_version", "zalo_evaluation_reminders", "zalo_evaluation_daily_reminders"})
+
+    def test_incompatible_daily_schema_prevents_sender_without_mutation(self):
+        with self.engine.begin() as connection:
+            connection.execute(text("CREATE TABLE zalo_evaluation_daily_reminders (id INTEGER PRIMARY KEY)"))
+        with patch.object(scheduler, "settings", self.config), \
+             patch("app.database.SessionLocal", self.sessions), \
+             patch.object(EvaluationZaloService, "run_due") as send, \
+             self.assertLogs("app.services.scheduler", level="WARNING"):
+            scheduler._run_eval_reminder()
+        send.assert_not_called()
+        self.assertEqual([column["name"] for column in inspect(self.engine).get_columns("zalo_evaluation_daily_reminders")], ["id"])
 
     def test_incompatible_schema_prevents_sender_without_mutating_it(self):
         with self.engine.begin() as connection:

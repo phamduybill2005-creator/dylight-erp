@@ -223,6 +223,10 @@ Kiểm thử local dùng SQLite tạm và HTTP MockTransport, gồm gửi đúng
 
 Nếu env cũ trên VPS đang đặt rõ `ZALO_EVAL_REMINDER_ENABLED=false`, đổi thành `true` rồi deploy/recreate backend để kích hoạt. Khi không khai báo biến này, giá trị mặc định mới sẽ bật nhắc cùng tích hợp Zalo. Không cần cấu hình nhóm riêng: dùng chính `ZALO_GMF_GROUP_ID` và `ZALO_COMPANY_ID` của tin xin nghỉ; global `ZALO_ENABLED=false` vẫn tắt toàn bộ Zalo.
 
+Ngày 2–5, cùng OA/nhóm tự gửi **một tin tổng hợp danh sách người chưa hoàn thành** lúc 08:00 Việt Nam. Cron kiểm tra mỗi 5 phút trong giờ 08; khởi động lại trong 08:00–08:59 có thể chạy bù một lần, không gửi bù buổi chiều hoặc cho ngày trước. Mỗi ngày đọc lại dữ liệu: hoàn thành = đủ các phiếu QUALITY cho đồng nghiệp cùng phòng (kể cả tên phòng tiếng Nhật/nhiều phòng; chưa gán phòng thì theo phạm vi không giới hạn của form), và TEAM cho mọi đồng nghiệp khác. Chỉ xét tài khoản đang hoạt động, đã duyệt, cùng công ty và không phải giám đốc; không tự chấm. Các phiếu phải đúng tháng trước và đủ điểm hợp lệ. Không công bố điểm hoặc chi tiết ai chấm ai, chỉ liệt kê tên người còn thiếu. Nếu danh sách rỗng thì không gửi tin.
+
+Luồng ngày 2–5 dùng bảng riêng `zalo_evaluation_daily_reminders`, khóa `(company_id, period)` với `period=YYYY-MM-DD` theo ngày gửi ở Việt Nam. Không đổi hoặc xóa dấu tháng cũ. Kiểm tra buổi sáng đã đầy đủ cũng ghi dấu trạng thái `complete` mà không gọi Zalo, bảo đảm không xuất hiện tin bổ sung trong ngày nếu sau đó ai rút phiếu. Claim commit trước khi gọi API; lỗi/timeout sau claim không tự gửi lại ngày đó. Ngày tiếp theo kiểm tra lại danh sách bình thường. Bảng được worker đã bật/cấu hình tự chuẩn bị, cùng cơ chế kiểm tra schema và PostgreSQL advisory lock; không sửa/stamp `alembic_version`, không tạo bảng OAuth hoặc sửa dữ liệu ERP. Revision riêng `h60c33d8e142` chỉ tạo bảng ngày; helper `zalo_prepare_reminders.py` cũ vẫn chỉ kiểm tra/chuẩn bị bảng tháng. Deploy backend mới là đủ nếu hai cờ Zalo đã là `true`; không cần Bot hoặc biến cấu hình mới. Nhắc web và khóa phiếu sau ngày 5 giữ nguyên.
+
 ```text
 [THÔNG BÁO DOSCO]
 
