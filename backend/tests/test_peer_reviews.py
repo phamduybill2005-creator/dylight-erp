@@ -28,7 +28,7 @@ from app.routers.peer_reviews import router
 
 class PeerReviewTests(unittest.TestCase):
     def setUp(self):
-        clock = patch("app.routers.peer_reviews.vn_now", return_value=datetime(2026, 11, 9, 10))
+        clock = patch("app.routers.peer_reviews.vn_now", return_value=datetime(2026, 12, 2, 10))
         clock.start()
         self.addCleanup(clock.stop)
         self.engine = create_engine(
@@ -97,7 +97,8 @@ class PeerReviewTests(unittest.TestCase):
         res = self._put(self.peer, scores=(2, 2, 2))
         self.assertEqual(res.json()["id"], first_id)            # cùng khóa -> sửa phiếu cũ
         self._put(self.peer, kind="TEAM", scores=(4, 4, 5))     # loại khác -> phiếu riêng
-        self._put(self.peer, month="2026-10")                   # tháng khác -> phiếu riêng
+        with patch("app.routers.peer_reviews.vn_now", return_value=datetime(2026, 11, 2, 10)):
+            self._put(self.peer, month="2026-10")               # phiếu lịch sử được gửi đúng kỳ mở
         mine = self._mine()
         self.assertEqual({(r["kind"], tuple(r["scores"])) for r in mine}, {("QUALITY", (2, 2, 2)), ("TEAM", (4, 4, 5))})
         self.assertEqual(len(self._mine("2026-10")), 1)
@@ -108,7 +109,7 @@ class PeerReviewTests(unittest.TestCase):
         self.assertEqual(self._put(self.peer, scores=(5, 4, 0)).status_code, 422)
         self.assertEqual(self._put(self.peer, kind="OTHER").status_code, 422)
         self.assertEqual(self._put(self.peer, month="2026-13").status_code, 422)
-        self.assertEqual(self._put(self.peer, month="2026-12").status_code, 400)        # tháng tương lai
+        self.assertEqual(self._put(self.peer, month="2027-01").status_code, 400)        # tháng tương lai
         self.assertEqual(self._put(self.staff).status_code, 400)                        # tự chấm
         self.assertEqual(self._put(self.director).status_code, 403)                     # không chấm Giám đốc
         self.assertEqual(self._put(self.outsider).status_code, 404)                     # khác công ty

@@ -1,10 +1,11 @@
-"""One best-effort GMF evaluation reminder per company/month on day 27."""
+"""One best-effort GMF evaluation reminder per company/sending month on day 1."""
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
 from sqlalchemy import inspect
 
 from app.database import vn_now
+from app.services.evaluation_calendar import EVAL_REMINDER_DAY, EVAL_REMINDER_HOUR, evaluation_reminder
 from app.services.zalo_oa_service import ZaloOAService
 from app.services.zalo_oauth_service import ZaloOAuthService
 from app.services.zalo_reminder_repository import ZaloReminderRepository
@@ -26,7 +27,7 @@ class EvaluationZaloService:
         now = now if now is not None else vn_now()
         if now.tzinfo is not None:
             now = now.astimezone(VIETNAM_TIMEZONE).replace(tzinfo=None)
-        if now.day != 27 or now.hour < 8:
+        if now.day != EVAL_REMINDER_DAY or now.hour < EVAL_REMINDER_HOUR:
             return {"status": "skipped", "reason": "not_due"}
         group_id = config.ZALO_GMF_GROUP_ID.strip()
         if not group_id or config.ZALO_COMPANY_ID <= 0:
@@ -49,11 +50,11 @@ class EvaluationZaloService:
                 return {"status": "skipped", "reason": "already_claimed"}
             claimed = True
             callback = urlsplit(config.ZALO_OA_CALLBACK_URL)
-            link = f"{callback.scheme}://{callback.netloc}/evaluations"
+            reviewed_month, title, body = evaluation_reminder(now)
+            link = f"{callback.scheme}://{callback.netloc}/peer-review?month={reviewed_month}"
             message = ("[THÔNG BÁO DOSCO]\n\nNgười nhận: Tất cả mọi người\n"
-                f"Tiêu đề: Đến hạn đánh giá tháng {now:%m/%Y}\n"
-                "Nội dung: Theo quy định, ngày 27 hằng tháng mọi người vào mục Đánh giá "
-                f"để chấm đánh giá tháng {now:%m/%Y}.\nNgười gửi: Hệ thống\n\nMở đánh giá: {link}")
+                f"Tiêu đề: {title}\nNội dung: {body}\n"
+                f"Người gửi: Hệ thống\n\nMở đánh giá: {link}")
             self.oa.send_gmf_message(group_id, message)
             self.repository.finish(company_id, period, "sent")
             return {"status": "sent"}

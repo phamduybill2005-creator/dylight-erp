@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 
 from app.config import settings
+from app.services.evaluation_calendar import EVAL_REMINDER_DAY, EVAL_REMINDER_HOUR
 
 _scheduler = None
 _logger = logging.getLogger(__name__)
@@ -53,10 +54,14 @@ def _run_eval_reminder() -> None:
     from app.database import SessionLocal
     from app.services.evaluation_zalo_service import EvaluationZaloService
     from app.services.zalo_oauth_service import ZaloOAuthService
+    from app.services.zalo_reminder_schema import prepare_reminder_schema
 
     db = None
     try:
         db = SessionLocal()
+        if (settings.ZALO_ENABLED and settings.ZALO_EVAL_REMINDER_ENABLED
+                and settings.ZALO_COMPANY_ID > 0 and settings.ZALO_GMF_GROUP_ID.strip()):
+            prepare_reminder_schema(db.get_bind())
         result = EvaluationZaloService(ZaloOAuthService(db, settings)).run_due()
         if result["status"] == "sent":
             _logger.info("[zalo-eval-reminder] sent")
@@ -102,7 +107,7 @@ def start_scheduler() -> None:
                 coalesce=True,
             )
         if zalo_enabled:
-            sched.add_job(_run_eval_reminder, "cron", day=27, hour="8-23", minute="*/5", second=0,
+            sched.add_job(_run_eval_reminder, "cron", day=EVAL_REMINDER_DAY, hour=f"{EVAL_REMINDER_HOUR}-23", minute="*/5", second=0,
                 timezone="Asia/Ho_Chi_Minh", id="zalo_eval_reminder", replace_existing=True,
                 misfire_grace_time=300, coalesce=True, max_instances=1)
             # Check the due window after restart without blocking ERP startup.
@@ -116,6 +121,6 @@ def start_scheduler() -> None:
                 f"{settings.YUNATT_SYNC_MINUTE:02d} ({settings.YUNATT_TIMEZONE})."
             )
         if zalo_enabled:
-            _logger.info("[zalo-eval-reminder] enabled: day 27, from 08:00 Vietnam time")
+            _logger.info("[zalo-eval-reminder] enabled: day 1, from 08:00 Vietnam time")
     except Exception:  # noqa: BLE001
         _logger.warning("[scheduler] could not start enabled jobs")

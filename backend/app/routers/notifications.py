@@ -2,10 +2,9 @@
 Router Thông báo nội bộ — Giám đốc/Quản lý gửi cho cấp dưới hoặc toàn thể.
 Mỗi người nhận = 1 bản ghi (fan-out) để theo dõi đã đọc/chưa đọc riêng.
 Phạm vi gửi: USER (1 người) | MANAGERS (quản lý) | STAFF (nhân viên) | EVERYONE | DEPARTMENT.
-Kèm nhắc ĐÁNH GIÁ HẰNG THÁNG: từ 8:00 ngày 27 mọi người nhận 1 thông báo từ "Hệ thống".
+Kèm nhắc ĐÁNH GIÁ HẰNG THÁNG: từ 8:00 ngày 1 đến hết ngày 5, đánh giá tháng trước.
 """
 import threading
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -16,41 +15,41 @@ from app.deps import get_current_user
 from app.models import Notification, User, UserRole
 from app.schemas import NotificationCreate, NotificationOut
 from app.services.notification_zalo_service import NotificationZaloService, get_notification_zalo_service
+from app.services.evaluation_calendar import evaluation_reminder, evaluation_window_open
 
 router = APIRouter(prefix="/notifications", tags=["Thông báo"])
 
 _DIRECTORS = (UserRole.ADMIN, UserRole.DIRECTOR)
 _MANAGERS_UP = (UserRole.ADMIN, UserRole.DIRECTOR, UserRole.MANAGER)
 
-# ---- Nhắc ĐÁNH GIÁ HẰNG THÁNG (quy định: ngày 27 hằng tháng mọi người vào mục Đánh giá) ----
+# ---- Nhắc ĐÁNH GIÁ HẰNG THÁNG (ngày 1–5, chấm tháng trước) ----
 # Tạo "lười" khi người đó mở app (chuông gọi /me + /me/unread-count ~20 giây/lần) thay vì
-# chạy lịch nền: không phụ thuộc scheduler (chỉ bật khi YUNATT_ENABLED), backend khởi động
+# chạy lịch nền: không phụ thuộc scheduler, backend khởi động
 # lại cũng không mất. Mỗi người 1 thông báo/tháng — nhận diện bằng tiêu đề có tháng.
-EVAL_REMINDER_DAY = 27
-EVAL_REMINDER_HOUR = 8          # từ 8:00 sáng ngày 27 (tránh bật popup lúc nửa đêm)
 _eval_reminder_lock = threading.Lock()          # chuông gọi 2 API CÙNG LÚC -> chống tạo trùng
 _eval_reminded: set[tuple[int, str]] = set()    # (user_id, "YYYY-MM") đã chắc chắn có thông báo
 
 
 def _ensure_eval_reminder(db: Session, user: User) -> None:
     now = vn_now()
-    if now < datetime(now.year, now.month, EVAL_REMINDER_DAY, EVAL_REMINDER_HOUR):
+    if not evaluation_window_open(now):
         return
     key = (user.id, now.strftime("%Y-%m"))
     if key in _eval_reminded:
         return
-    title = f"Đến hạn đánh giá tháng {now:%m/%Y}"
+    _, title, body = evaluation_reminder(now)
     with _eval_reminder_lock:
         exists = (
             db.query(Notification.id)
-            .filter(Notification.recipient_id == user.id, Notification.title == title)
+            .filter(Notification.company_id == user.company_id,
+                    Notification.recipient_id == user.id, Notification.title == title,
+                    Notification.sender_id.is_(None))
             .first()
         )
         if not exists:
             db.add(Notification(
                 company_id=user.company_id, sender_id=None, recipient_id=user.id, title=title,
-                body=(f"Theo quy định, ngày {EVAL_REMINDER_DAY} hằng tháng mọi người vào mục "
-                      f"Đánh giá để chấm đánh giá tháng {now:%m/%Y}."),
+                body=body,
             ))
             db.commit()
             publish(user.company_id, "notification", [user.id])

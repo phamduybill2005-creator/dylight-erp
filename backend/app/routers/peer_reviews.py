@@ -20,6 +20,7 @@ from app.deps import get_current_user, require_roles
 from app.events import publish
 from app.models import PeerReview, User, UserRole
 from app.schemas import PeerReviewDetails, PeerReviewKind, PeerReviewIn, PeerReviewOut, PeerReviewSummaryRow
+from app.services.evaluation_calendar import evaluation_voting_open
 
 router = APIRouter(prefix="/peer-reviews", tags=["Đánh giá đồng nghiệp"])
 
@@ -30,6 +31,11 @@ def _check_month(month: str) -> str:
     if not _MONTH_RE.fullmatch(month or "") or int(month[:4]) < 1:
         raise HTTPException(400, "Tháng không hợp lệ, cần dạng YYYY-MM.")
     return month
+
+
+def _require_voting_open(month: str) -> None:
+    if not evaluation_voting_open(month, vn_now()):
+        raise HTTPException(403, "Phiếu đã khóa. Chỉ được gửi, sửa hoặc rút đánh giá tháng trước từ ngày 01 đến hết ngày 05 hằng tháng (giờ Việt Nam).")
 
 
 def _out(rec: PeerReview) -> PeerReviewOut:
@@ -69,6 +75,7 @@ def save_peer_review(
     month = _check_month(payload.month)
     if month > vn_now().strftime("%Y-%m"):
         raise HTTPException(400, "Chưa thể đánh giá cho tháng tương lai.")
+    _require_voting_open(month)
     evaluatee = db.get(User, payload.evaluatee_id)
     if not evaluatee or evaluatee.company_id != current.company_id or not evaluatee.is_active:
         raise HTTPException(404, "Không tìm thấy đồng nghiệp trong công ty.")
@@ -111,6 +118,7 @@ def delete_my_peer_review(
     rec = db.get(PeerReview, review_id)
     if not rec or rec.evaluator_id != current.id:
         raise HTTPException(404, "Không tìm thấy phiếu.")
+    _require_voting_open(rec.month)
     db.delete(rec)
     db.commit()
     publish(current.company_id, "evaluation")

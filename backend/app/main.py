@@ -30,7 +30,8 @@ install_callback_log_filter()
 
 # MVP: tự tạo bảng khi khởi động. PRODUCTION nên dùng Alembic migration
 # (đã có sẵn alembic trong requirements) để quản lý phiên bản schema.
-# Zalo tables require an explicit migration; never create them implicitly at ERP startup.
+# OAuth tables require explicit migration. Reminder claims are prepared separately
+# by the enabled, configured background worker, not generic ERP create_all.
 Base.metadata.create_all(bind=engine, tables=[
     table for table in Base.metadata.sorted_tables
     if table.name not in ZALO_TABLE_NAMES | ZALO_REMINDER_TABLE_NAMES

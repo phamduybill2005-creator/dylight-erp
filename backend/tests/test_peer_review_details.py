@@ -1,5 +1,7 @@
 """Named peer ballot details are leadership-only and match their selected category/period."""
 import unittest
+from datetime import datetime
+from unittest.mock import patch
 
 from tests import test_peer_reviews as fixtures
 from app.models import PeerReview, UserRole
@@ -25,7 +27,8 @@ class PeerReviewDetailTests(unittest.TestCase):
     def test_director_and_admin_see_rater_average_and_exact_three_criteria(self):
         self._put(self.peer, scores=(5, 4, 5))
         self._put(self.peer, kind="TEAM", scores=(1, 1, 1))
-        self._put(self.peer, month="2026-10", scores=(2, 2, 2))
+        with patch("app.routers.peer_reviews.vn_now", return_value=datetime(2026, 11, 2, 10)):
+            self._put(self.peer, month="2026-10", scores=(2, 2, 2))
         for viewer in (self.director, self.admin):
             self.current = viewer
             result = self.read()
@@ -39,7 +42,8 @@ class PeerReviewDetailTests(unittest.TestCase):
             self.assertAlmostEqual(ballot["avg"], 14 / 3)
 
     def test_quarter_groups_one_evaluator_across_months_with_individual_ballots(self):
-        self._put(self.peer, month="2026-10", scores=(5, 4, 3))
+        with patch("app.routers.peer_reviews.vn_now", return_value=datetime(2026, 11, 2, 10)):
+            self._put(self.peer, month="2026-10", scores=(5, 4, 3))
         self._put(self.peer, month="2026-11", scores=(2, 2, 2))
         self.current = self.admin
         self._put(self.peer, scores=(4, 4, 5))

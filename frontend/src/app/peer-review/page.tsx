@@ -9,13 +9,14 @@
 // 1 phiếu / người / tháng / loại — gửi lại trong tháng là sửa phiếu đó.
 // Phiếu không công khai với đồng nghiệp; Giám đốc / Quản trị được xem tên người chấm và điểm chi tiết.
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import AppShell from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { monthLocal } from "@/lib/format";
+import { evaluationCanEdit, evaluationCycle, evaluationMonthFromSearch } from "@/lib/evaluation-schedule";
 import { useStickyState } from "@/lib/use-sticky-state";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { normalizeDept } from "@/lib/groups";
@@ -97,13 +98,34 @@ function ScorePicker({ value, onChange, disabled, label }: { value: number; onCh
  *  phòng mình, chỉ chấm đồng nghiệp cùng phòng; không truyền (phiếu Hòa đồng) thì chọn mọi phòng. */
 function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: Colleague[]; ownDepts?: string[] }) {
   const lockedDepts = ownDepts && ownDepts.length > 0 ? ownDepts : null;
-  const [month, setMonth] = useStickyState(`peer-review.${def.kind}.month`, monthLocal());
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const refresh = () => setNow(new Date());
+    const dayMs = 24 * 60 * 60 * 1000;
+    // Refresh at the next Vietnam midnight even if this form stays open.
+    const timer = window.setTimeout(refresh, dayMs - ((now.getTime() + 7 * 60 * 60 * 1000) % dayMs));
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [now]);
+  const cycle = evaluationCycle(now);
+  const requestedMonth = useSearchParams().get("month");
+  const [month, setMonth] = useState(cycle.month);
+  useEffect(() => {
+    setMonth(evaluationMonthFromSearch(requestedMonth === null ? "" : `?month=${encodeURIComponent(requestedMonth)}`));
+  }, [cycle.month, requestedMonth]);
   const [dept, setDept] = useStickyState(`peer-review.${def.kind}.dept`, lockedDepts?.[0] ?? "");
   const [personId, setPersonId] = useStickyState(`peer-review.${def.kind}.person`, "");
   const [scores, setScores] = useState<number[]>([0, 0, 0]);
   const [mine, setMine] = useState<PeerReview[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const canEdit = evaluationCanEdit(month, now);
+  const lockedMessage = `Phiếu tháng ${fmtMonth(month)} đã khóa. Chỉ được gửi, sửa hoặc rút phiếu tháng trước từ ngày 01 đến hết ngày 05 (giờ Việt Nam).`;
 
   // Không ai chấm Giám đốc (backend cũng chặn) -> bỏ khỏi danh sách.
   const candidates = useMemo(() => colleagues.filter((c) => c.role !== "DIRECTOR"), [colleagues]);
@@ -157,6 +179,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
   }
 
   async function save() {
+    if (!evaluationCanEdit(month)) { setNow(new Date()); setMsg({ text: lockedMessage, ok: false }); return; }
     if (!person) { setMsg({ text: "Chọn đồng nghiệp cần đánh giá.", ok: false }); return; }
     if (scores.some((s) => s < 1)) { setMsg({ text: "Chấm đủ 3 tiêu chí rồi mới lưu.", ok: false }); return; }
     setSaving(true);
@@ -173,6 +196,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
   }
 
   async function withdraw() {
+    if (!evaluationCanEdit(month)) { setNow(new Date()); setMsg({ text: lockedMessage, ok: false }); return; }
     if (!existing) return;
     setSaving(true);
     try {
@@ -193,12 +217,13 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
   return (
     <section className="rounded-xl2 bg-white p-4 shadow-card lg:p-6">
       <h2 className="text-center text-sm font-bold uppercase tracking-wide text-ink lg:text-base">{def.title}</h2>
+      {!canEdit && <p role="status" className="mt-3 rounded-lg bg-paper p-3 text-xs text-muted">{lockedMessage}</p>}
 
       {/* Tháng · Phòng ban · Đồng nghiệp */}
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <label className="block">
           <span className="mb-1 block text-[10px] font-semibold text-muted">Tháng</span>
-          <input type="month" value={month} max={monthLocal()} onChange={(e) => setMonth(e.target.value || monthLocal())} className={sel} />
+          <input type="month" value={month} max={monthLocal()} onChange={(e) => setMonth(e.target.value || cycle.month)} className={sel} />
         </label>
         <label className="block">
           <span className="mb-1 block text-[10px] font-semibold text-muted">Phòng ban</span>
@@ -233,7 +258,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
             <ScorePicker
               label={label}
               value={scores[i] ?? 0}
-              disabled={!person || saving}
+              disabled={!canEdit || !person || saving}
               onChange={(n) => setScores((s) => s.map((v, j) => (j === i ? n : v)))}
             />
           </div>
@@ -246,20 +271,20 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
             ? msg.text
             : person
               ? existing
-                ? `Đã chấm ${person.full_name} tháng ${fmtMonth(month)} (TB ${avgOf(existing.scores).toFixed(1)}/5) — sửa điểm rồi lưu lại.`
+                ? `Đã chấm ${person.full_name} tháng ${fmtMonth(month)} (TB ${avgOf(existing.scores).toFixed(1)}/5)${canEdit ? " — sửa điểm rồi lưu lại." : "."}`
                 : `Chưa chấm ${person.full_name} tháng ${fmtMonth(month)}.`
               : "Chọn đồng nghiệp để bắt đầu chấm."}
         </p>
         <div className="flex items-center gap-2">
           {existing && (
-            <button type="button" onClick={withdraw} disabled={saving} className="rounded-xl2 border border-line px-3 py-2 text-xs font-semibold text-muted hover:text-bad disabled:opacity-50">
+            <button type="button" onClick={withdraw} disabled={!canEdit || saving} className="rounded-xl2 border border-line px-3 py-2 text-xs font-semibold text-muted hover:text-bad disabled:opacity-50">
               Rút lại
             </button>
           )}
           <button
             type="button"
             onClick={save}
-            disabled={saving || !person || !complete}
+            disabled={!canEdit || saving || !person || !complete}
             className="rounded-xl2 bg-ink px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
           >
             {saving ? "Đang lưu…" : existing ? "Lưu sửa" : `Gửi đánh giá tháng ${fmtMonth(month)}`}
@@ -327,6 +352,7 @@ export default function PeerReviewPage() {
           <StarIcon className="h-5 w-5 text-amber lg:h-6 lg:w-6" />
           <div>
             <h1 className="text-base font-bold lg:text-xl">Đánh giá</h1>
+            <p className="text-[11px] text-white/90">Đánh giá định kì tháng {evaluationCycle().monthLabel} · Từ ngày 01 đến hết ngày {evaluationCycle().deadline}</p>
             <p className="text-[11px] text-white/70">Chấm đồng nghiệp theo tháng · thang 1–5 · phiếu không công khai với đồng nghiệp; Giám đốc / Quản trị có thể xem chi tiết · Chất lượng công việc chấm người cùng phòng, Hòa đồng chấm mọi phòng</p>
           </div>
         </div>
@@ -336,7 +362,9 @@ export default function PeerReviewPage() {
       <div className="mt-4 space-y-4">
         {FORMS.map((f) => (
           <div key={f.kind} className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-            <ReviewForm def={f} colleagues={colleagues} ownDepts={f.kind === "QUALITY" ? myDepts : undefined} />
+            <Suspense fallback={<p className="p-4 text-xs text-muted">Đang tải phiếu đánh giá…</p>}>
+              <ReviewForm def={f} colleagues={colleagues} ownDepts={f.kind === "QUALITY" ? myDepts : undefined} />
+            </Suspense>
             <RubricCard def={f} />
           </div>
         ))}

@@ -23,7 +23,7 @@ class ZaloReminderSchedulerTests(unittest.TestCase):
         self.scheduler_patch.start()
         self.addCleanup(self.scheduler_patch.stop)
 
-    def test_zalo_job_starts_without_yunatt_with_vietnam_day_27_window(self):
+    def test_zalo_job_starts_without_yunatt_with_vietnam_day_1_window(self):
         with patch.object(BackgroundScheduler, "start") as start:
             scheduler.start_scheduler()
             self.assertIsNotNone(scheduler._scheduler)
@@ -31,12 +31,12 @@ class ZaloReminderSchedulerTests(unittest.TestCase):
             jobs = {job.id: job for job in scheduler._scheduler.get_jobs()}
         self.assertEqual(set(jobs), {"zalo_eval_reminder", "zalo_eval_startup"})
         trigger = jobs["zalo_eval_reminder"].trigger
-        # 07:59:59 VN -> next fire 08:00 VN / 01:00 UTC on the 27th.
-        next_fire = trigger.get_next_fire_time(None, datetime(2026, 10, 27, 0, 59, 59, tzinfo=timezone.utc))
-        self.assertEqual(next_fire.astimezone(timezone.utc), datetime(2026, 10, 27, 1, tzinfo=timezone.utc))
+        # 07:59:59 VN -> next fire 08:00 VN / 01:00 UTC on the 1st.
+        next_fire = trigger.get_next_fire_time(None, datetime(2026, 11, 1, 0, 59, 59, tzinfo=timezone.utc))
+        self.assertEqual(next_fire.astimezone(timezone.utc), datetime(2026, 11, 1, 1, tzinfo=timezone.utc))
         self.assertEqual(str(trigger.timezone), "Asia/Ho_Chi_Minh")
-        after_window = trigger.get_next_fire_time(None, datetime(2026, 10, 27, 17, tzinfo=timezone.utc))
-        self.assertEqual(after_window.astimezone(timezone.utc), datetime(2026, 11, 27, 1, tzinfo=timezone.utc))
+        after_window = trigger.get_next_fire_time(None, datetime(2026, 11, 1, 17, tzinfo=timezone.utc))
+        self.assertEqual(after_window.astimezone(timezone.utc), datetime(2026, 12, 1, 1, tzinfo=timezone.utc))
         self.assertEqual(jobs["zalo_eval_reminder"].max_instances, 1)
 
     def test_global_zalo_or_feature_disabled_does_not_start_zalo_job(self):

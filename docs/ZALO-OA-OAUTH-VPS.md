@@ -20,7 +20,7 @@ Flow OAuth/GMF hiện tại không gọi `getoa` và **không yêu cầu quyền
 | `ZALO_APP_ID` | App ID số của Doscoerp |
 | `ZALO_APP_SECRET` | App Secret của Doscoerp |
 | `ZALO_OA_CALLBACK_URL` | `https://erp.dosco.vn/api/zalo/callback` |
-| `ZALO_EVAL_REMINDER_ENABLED` | `false` mặc định; chỉ bật sau khi chuẩn bị bảng nhắc đánh giá |
+| `ZALO_EVAL_REMINDER_ENABLED` | `true` mặc định; tự nhắc ngày 1 khi Zalo/nhóm đã cấu hình. Giá trị `false` đặt rõ trong env vẫn tắt lịch này |
 | `ZALO_OA_ID` | ID số của OA Công ty DOSCO, lấy từ trang quản trị OA |
 | `ZALO_COMPANY_ID` | ID tenant DOSCO trong bảng `companies`; phải trùng công ty của ADMIN khởi tạo |
 | `ZALO_GMF_GROUP_ID` | Nhóm GMF nhận thông báo nhóm soạn thủ công; mặc định trống để chưa tự gửi |
@@ -143,7 +143,7 @@ Response chỉ chứa OA ID/phân trang và `group_id`, `name`, `status`, `total
 
 ## Thông báo ERP soạn thủ công → GMF (bổ sung local)
 
-`POST /api/v1/notifications` được nối với `NotificationZaloService`. Quyền gửi và tập người nhận trong ERP giữ nguyên. Sau khi commit toàn bộ bản ghi ERP, service thử gửi **một** tin vào `ZALO_GMF_GROUP_ID`, ngoài vòng lặp người nhận. Nghỉ phép dùng service riêng bên dưới; giao việc và nhắc đánh giá chưa nối với Zalo.
+`POST /api/v1/notifications` được nối với `NotificationZaloService`. Quyền gửi và tập người nhận trong ERP giữ nguyên. Sau khi commit toàn bộ bản ghi ERP, service thử gửi **một** tin vào `ZALO_GMF_GROUP_ID`, ngoài vòng lặp người nhận. Nghỉ phép dùng service riêng bên dưới; nhắc đánh giá dùng lịch nền ngày 1. Giao việc chưa nối với Zalo trong luồng này.
 
 | Phạm vi ERP | Người nhận ghi trong tin GMF |
 | --- | --- |
@@ -217,26 +217,32 @@ Response quyết định vẫn là `LeaveOut`, không đổi frontend hoặc th�
 
 Kiểm thử local dùng SQLite tạm và HTTP MockTransport, gồm gửi đúng format/một lần, refresh, lỗi/timeout, quyền xem/xử lý và quyết định lặp. Chưa deploy hoặc thử OA thật cho giai đoạn này.
 
-### Nhắc đánh giá tháng vào GMF (tùy chọn)
+### Nhắc đánh giá tháng vào cùng nhóm GMF xin nghỉ
 
-`ZALO_EVAL_REMINDER_ENABLED=false` là mặc định, độc lập với `YUNATT_ENABLED`. Khi cả cờ này và `ZALO_ENABLED=true`, scheduler chạy kiểm tra lúc 08:00 ngày 27 theo `Asia/Ho_Chi_Minh`, rồi mỗi 5 phút tới hết ngày 27. Backend khởi động lại cũng kiểm tra cửa sổ gửi ngay trong một job nền; không cần ai mở web. Nếu backend tắt cả ngày 27 thì không gửi bù ngày 28. Nhắc web hiện có vẫn giữ nguyên, không dùng polling của từng nhân viên để gửi GMF.
+`ZALO_EVAL_REMINDER_ENABLED=true` là mặc định từ bản kích hoạt 12/11/2026, độc lập với `YUNATT_ENABLED`. Khi Zalo đã bật, scheduler chạy kiểm tra lúc 08:00 ngày 1 theo `Asia/Ho_Chi_Minh`, rồi mỗi 5 phút tới hết ngày 1. Backend khởi động lại cũng kiểm tra cửa sổ gửi ngay trong một job nền; không cần ai mở web. Nếu backend tắt cả ngày 1 thì không gửi bù ngày 2. Nhắc web tạo một thông báo/người trong cửa sổ từ 08:00 ngày 1 đến hết ngày 5; popup cũng theo cửa sổ này, thay cho lịch thứ Bảy cũ. Web và Zalo tự lấy tháng trước làm tháng được đánh giá, kể cả chuyển năm; không dùng polling của từng nhân viên để gửi GMF.
+
+Nếu env cũ trên VPS đang đặt rõ `ZALO_EVAL_REMINDER_ENABLED=false`, đổi thành `true` rồi deploy/recreate backend để kích hoạt. Khi không khai báo biến này, giá trị mặc định mới sẽ bật nhắc cùng tích hợp Zalo. Không cần cấu hình nhóm riêng: dùng chính `ZALO_GMF_GROUP_ID` và `ZALO_COMPANY_ID` của tin xin nghỉ; global `ZALO_ENABLED=false` vẫn tắt toàn bộ Zalo.
 
 ```text
 [THÔNG BÁO DOSCO]
 
 Người nhận: Tất cả mọi người
-Tiêu đề: Đến hạn đánh giá tháng <mm/yyyy>
-Nội dung: Theo quy định, ngày 27 hằng tháng mọi người vào mục Đánh giá để chấm đánh giá tháng <mm/yyyy>.
+Tiêu đề: Đánh giá định kì tháng <tháng trước: mm/yyyy>
+Nội dung: Từ ngày 01 đến hết ngày 05/<tháng gửi: mm/yyyy>, mọi người vào mục Đánh giá để chấm đánh giá tháng <tháng trước: mm/yyyy>.
 Người gửi: Hệ thống
 
-Mở đánh giá: https://erp.dosco.vn/evaluations
+Mở đánh giá: https://erp.dosco.vn/peer-review?month=<tháng trước: YYYY-MM>
 ```
 
-Link lấy origin callback đã được kiểm tra. Chỉ gửi vào `ZALO_GMF_GROUP_ID` của công ty/OA đã cấu hình, không gửi riêng hay phát tán điểm đánh giá. Dùng lại quyền GMF và cơ chế token/refresh hiện có, không cần quyền Zalo mới hoặc sửa frontend.
+Link lấy origin callback đã được kiểm tra. Chỉ gửi vào `ZALO_GMF_GROUP_ID` của công ty/OA đã cấu hình, không gửi riêng hay phát tán điểm đánh giá. Dùng lại quyền GMF và cơ chế token/refresh hiện có, không cần quyền Zalo mới. Deploy cả frontend để popup, link thông báo và tháng mặc định của phiếu cùng áp dụng lịch mới.
 
 Bảng mới `zalo_evaluation_reminders` chỉ lưu công ty, tháng, OA/nhóm và trạng thái `claimed|sent|failed`, cùng thời điểm UTC; không lưu token/secret/nội dung tin. Khóa chính `(company_id, period)` chống trùng giữa worker/restart và khi đổi group giữa tháng. Claim phải commit trước mọi HTTP Zalo. Sau claim không tự gửi lại, kể cả timeout, tiến trình dừng hoặc lỗi ghi kết quả; `claimed` có thể là lần gửi chưa xác định, `sent` chỉ là API đã tiếp nhận. Cơ chế ưu tiên không gửi trùng, không bảo đảm luôn giao được tin khi backend/DB/Zalo lỗi.
 
-Revision mới `e18c27a6d904` chỉ thêm bảng này. Startup không tự tạo bảng và không chạy migration. Trên VPS, giữ cờ nhắc `false`, backup rồi dùng bản code/image mới để chạy helper riêng dưới đây **chỉ khi bước deploy được duyệt** (chạy trong thư mục backend hoặc container backend có env/database đúng):
+Khóa `period` vẫn là **tháng gửi** (giờ Việt Nam), không đổi thành tháng được đánh giá; giữ nguyên mọi claim cũ để lịch ngày 27 trước đây không chặn thông báo ngày 1 của kỳ mới. Ví dụ ngày 01/11/2026 gửi nội dung tháng 10/2026, claim `2026-11`; ngày 01/01/2027 gửi nội dung tháng 12/2026, claim `2027-01`. Liên kết mở đúng phiếu tháng trước. Chỉ được gửi/sửa/rút phiếu của tháng trước từ 00:00 ngày 1 đến hết ngày 5 theo giờ Việt Nam; sang ngày 6 API và giao diện khóa các thao tác này cho mọi tài khoản, kể cả admin. Đầu kỳ mới chỉ mở tháng mới cần đánh giá, không mở lại tháng cũ. Xem phiếu đã chấm, lịch sử, tổng hợp và chi tiết điểm vẫn hoạt động.
+
+Revision `e18c27a6d904` chỉ thêm bảng này. Với bản kích hoạt mới, job nền tự chuẩn bị riêng bảng chống trùng nếu cả Zalo và nhắc đánh giá đã bật, công ty/nhóm đã được cấu hình. Bước này chạy sau khi scheduler khởi động, trước khi xét gửi; không tạo bảng OAuth hoặc sửa bảng nghiệp vụ, không chạy `alembic upgrade head` và không stamp `alembic_version`. Worker dùng cùng kiểm tra schema đầy đủ của revision, PostgreSQL advisory lock trong transaction và giữ nguyên mọi dấu claim cũ. Schema sẵn có không tương thích thì dừng gửi và ghi lỗi tổng quát, không tự sửa dữ liệu.
+
+Helper riêng dưới đây vẫn có thể dùng để kiểm tra hoặc chuẩn bị thủ công khi triển khai (chạy trong thư mục backend/container có đúng env/database):
 
 ```bash
 python scripts/zalo_prepare_reminders.py
@@ -244,9 +250,9 @@ python scripts/zalo_prepare_reminders.py --apply
 python scripts/zalo_prepare_reminders.py
 ```
 
-Helper mặc định chỉ đọc; `--apply` chỉ chạy revision nhắc tháng, không chạy `alembic upgrade head`, không sửa/stamp `alembic_version`, không đụng hai bảng OAuth hoặc bảng nghiệp vụ. PostgreSQL dùng advisory lock trong transaction; schema tương thích thì bỏ qua, schema sai thì từ chối. Chỉ bật `ZALO_EVAL_REMINDER_ENABLED=true` và recreate backend sau khi schema đã xác nhận ready. Compose/VPS thật có thể dùng `env_file=backend/.env`; không đổi Compose hoặc đưa `.env` vào image chỉ để thêm cờ này.
+Helper mặc định chỉ đọc; `--apply` chỉ chạy revision nhắc tháng, không sửa/stamp `alembic_version` hoặc đụng hai bảng OAuth/bảng nghiệp vụ. Với máy chủ đang gửi được tin xin nghỉ, chỉ cần dùng bản backend mới và bảo đảm `ZALO_EVAL_REMINDER_ENABLED` không còn bị đặt `false`. Compose/VPS thật có thể dùng `env_file=backend/.env`; không đưa `.env` vào image hoặc Git để thêm cờ này.
 
-Rollback tính năng: đặt cờ nhắc `false` và dùng lại backend image cũ theo runbook đã duyệt. Giữ bảng/dấu claim, không xóa hoặc reset để thử lại tháng đã gửi vì có thể gây trùng. Local test chỉ áp dụng schema trên DB tạm, HTTP Zalo giả lập; chưa áp dụng migration/nhắc trên production.
+Rollback tính năng: đặt cờ nhắc `false` rồi recreate backend. Giữ bảng/dấu claim, không xóa hoặc reset để thử lại tháng đã gửi vì có thể gây trùng. Kiểm thử bản kích hoạt chỉ áp dụng schema trên DB tạm và HTTP Zalo giả lập; chưa deploy hoặc gửi thử nhóm production.
 
 ### Gửi riêng: chưa triển khai
 

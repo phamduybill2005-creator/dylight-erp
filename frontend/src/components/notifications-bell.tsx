@@ -12,6 +12,7 @@ import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { api } from "@/lib/api";
 import { formatNotificationSendResult } from "@/lib/notification-send-result";
 import { formatVietnamTime } from "@/lib/vietnam-time";
+import { evaluationNotificationUrl } from "@/lib/evaluation-schedule";
 import { roleTier } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { useNicknames } from "@/lib/nicknames";
@@ -33,6 +34,8 @@ const TARGETS_MANAGER = [
 ];
 
 function getNotificationUrl(n: Notification): string | null {
+  const evaluationUrl = evaluationNotificationUrl(n);
+  if (evaluationUrl) return evaluationUrl;
   const text = `${n.title} ${n.body || ""}`.toLowerCase();
   if (
     text.includes("nghỉ phép") ||

@@ -58,7 +58,7 @@ class EvaluationZaloReminderTests(unittest.TestCase):
         self.db.add(self.credential)
         self.db.commit()
         self.service = self.module.EvaluationZaloService(self.oauth)
-        self.due = datetime(2026, 10, 27, 8)
+        self.due = datetime(2026, 11, 1, 8)
         self.addCleanup(self.engine.dispose)
         self.addCleanup(self.db.close)
         self.addCleanup(self.http.close)
@@ -75,39 +75,39 @@ class EvaluationZaloReminderTests(unittest.TestCase):
         self.assertEqual(request.url.path, "/v3.0/oa/group/message")
         return httpx.Response(200, json={"error": 0, "data": {"message_id": "synthetic-message"}})
 
-    def test_day_27_at_eight_sends_one_company_message_with_evaluation_link(self):
+    def test_day_1_at_eight_sends_one_company_message_with_evaluation_link(self):
         result = self.service.run_due(self.due)
         self.assertEqual(result, {"status": "sent"})
         self.assertEqual(len(self.requests), 1)
         expected = ("[THÔNG BÁO DOSCO]\n\nNgười nhận: Tất cả mọi người\n"
-            "Tiêu đề: Đến hạn đánh giá tháng 10/2026\n"
-            "Nội dung: Theo quy định, ngày 27 hằng tháng mọi người vào mục Đánh giá "
+            "Tiêu đề: Đánh giá định kì tháng 10/2026\n"
+            "Nội dung: Từ ngày 01 đến hết ngày 05/11/2026, mọi người vào mục Đánh giá "
             "để chấm đánh giá tháng 10/2026.\nNgười gửi: Hệ thống\n\n"
-            "Mở đánh giá: https://erp.dosco.vn/evaluations")
+            "Mở đánh giá: https://erp.dosco.vn/peer-review?month=2026-10")
         self.assertEqual(json.loads(self.requests[0].content),
             {"recipient": {"group_id": "synthetic-group"}, "message": {"text": expected}})
         row = self.db.query(self.model).one()
         self.assertEqual((row.period, row.oa_id, row.group_id, row.status),
-                         ("2026-10", "987654", "synthetic-group", "sent"))
+                         ("2026-11", "987654", "synthetic-group", "sent"))
         self.assertIsNotNone(row.finished_at)
         self.assertEqual(self.db.query(Notification).count(), 0)
 
     def test_before_eight_other_days_and_other_months_do_not_claim_or_send(self):
-        for now in [datetime(2026, 10, 26, 23), datetime(2026, 10, 27, 7, 59, 59),
-                    datetime(2026, 10, 28), datetime(2026, 11, 1, 8)]:
+        for now in [datetime(2026, 10, 31, 23), datetime(2026, 11, 1, 7, 59, 59),
+                    datetime(2026, 11, 6), datetime(2026, 11, 27, 8)]:
             with self.subTest(now=now):
                 self.assertEqual(self.service.run_due(now)["status"], "skipped")
         self.assertEqual(self.requests, [])
         self.assertEqual(self.db.query(self.model).count(), 0)
 
     def test_vietnam_time_is_used_for_aware_utc_datetime(self):
-        self.assertEqual(self.service.run_due(datetime(2026, 10, 27, 0, 59, tzinfo=timezone.utc))["status"], "skipped")
-        self.assertEqual(self.service.run_due(datetime(2026, 10, 27, 1, tzinfo=timezone.utc))["status"], "sent")
+        self.assertEqual(self.service.run_due(datetime(2026, 11, 1, 0, 59, tzinfo=timezone.utc))["status"], "skipped")
+        self.assertEqual(self.service.run_due(datetime(2026, 11, 1, 1, tzinfo=timezone.utc))["status"], "sent")
         self.assertEqual(len(self.requests), 1)
 
-    def test_late_start_on_day_27_catches_up_once(self):
-        self.assertEqual(self.service.run_due(datetime(2026, 10, 27, 23, 59))["status"], "sent")
-        self.assertEqual(self.service.run_due(datetime(2026, 10, 27, 23, 59))["status"], "skipped")
+    def test_late_start_on_day_1_catches_up_once(self):
+        self.assertEqual(self.service.run_due(datetime(2026, 11, 1, 23, 59))["status"], "sent")
+        self.assertEqual(self.service.run_due(datetime(2026, 11, 1, 23, 59))["status"], "skipped")
         self.assertEqual(len(self.requests), 1)
 
     def test_new_process_session_or_changed_group_cannot_send_month_again(self):
@@ -121,9 +121,23 @@ class EvaluationZaloReminderTests(unittest.TestCase):
 
     def test_next_month_gets_a_separate_claim(self):
         self.assertEqual(self.service.run_due(self.due)["status"], "sent")
-        self.assertEqual(self.service.run_due(datetime(2026, 11, 27, 8))["status"], "sent")
+        self.assertEqual(self.service.run_due(datetime(2026, 12, 1, 8))["status"], "sent")
         self.assertEqual(len(self.requests), 2)
-        self.assertIn("Đến hạn đánh giá tháng 11/2026", json.loads(self.requests[1].content)["message"]["text"])
+        self.assertIn("Đánh giá định kì tháng 11/2026", json.loads(self.requests[1].content)["message"]["text"])
+        self.assertEqual(self.db.query(self.model).count(), 2)
+
+    def test_january_reminds_december_of_previous_year(self):
+        self.assertEqual(self.service.run_due(datetime(2027, 1, 1, 8)), {"status": "sent"})
+        message = json.loads(self.requests[0].content)["message"]["text"]
+        self.assertIn("Đánh giá định kì tháng 12/2026", message)
+        self.assertIn("05/01/2027", message)
+        self.assertIn("/peer-review?month=2026-12", message)
+        self.assertEqual(self.db.query(self.model).one().period, "2027-01")
+
+    def test_old_day_27_claim_does_not_suppress_new_cycle(self):
+        self.service.repository.claim(self.config.ZALO_COMPANY_ID, "2026-10", "987654", "synthetic-group")
+        self.service.repository.finish(self.config.ZALO_COMPANY_ID, "2026-10", "sent")
+        self.assertEqual(self.service.run_due(self.due), {"status": "sent"})
         self.assertEqual(self.db.query(self.model).count(), 2)
 
     def test_disabled_missing_group_wrong_company_or_missing_credential_never_claim(self):
