@@ -9,4 +9,4 @@ def normalized_departments(value: str | None) -> set[str]:
 
 def can_review_quality(voter_department: str | None, target_department: str | None) -> bool:
     voter_departments = normalized_departments(voter_department)
-    return not voter_departments or bool(voter_departments & normalized_departments(target_department))
+    return bool(voter_departments & normalized_departments(target_department))

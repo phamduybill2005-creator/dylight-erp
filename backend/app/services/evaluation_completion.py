@@ -22,7 +22,7 @@ def pending_evaluators(db: Session, company_id: int, month: str) -> list[User]:
             if peer.id == voter.id:
                 continue
             required.add((peer.id, "TEAM"))
-            if not departments[voter.id] or departments[voter.id] & departments[peer.id]:
+            if departments[voter.id] & departments[peer.id]:
                 required.add((peer.id, "QUALITY"))
         if required - cast.get(voter.id, set()):
             pending.append(voter)

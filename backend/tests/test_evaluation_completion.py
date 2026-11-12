@@ -63,12 +63,10 @@ class EvaluationCompletionTests(unittest.TestCase):
         self.rate(self.admin, self.ai, "QUALITY")
         self.assertNotIn(self.admin.id, self.pending())
 
-    def test_missing_department_matches_unrestricted_quality_form(self):
+    def test_missing_department_has_only_team_obligations(self):
         self.admin.department = None; self.db.commit()
-        for person in (self.peer, self.ai): self.rate(self.admin, person, "TEAM")
-        self.rate(self.admin, self.peer, "QUALITY")
         self.assertIn(self.admin.id, self.pending())
-        self.rate(self.admin, self.ai, "QUALITY")
+        for person in (self.peer, self.ai): self.rate(self.admin, person, "TEAM")
         self.assertNotIn(self.admin.id, self.pending())
 
     def test_invalid_scores_wrong_month_company_self_or_director_do_not_complete(self):

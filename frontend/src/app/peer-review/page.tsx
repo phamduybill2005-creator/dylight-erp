@@ -114,7 +114,7 @@ function useEvaluationClock() {
 /** Một phiếu. `ownDepts` (phiếu Chất lượng công việc) = phòng của NGƯỜI CHẤM: phòng ban khóa theo
  *  phòng mình, chỉ chấm đồng nghiệp cùng phòng; không truyền (phiếu Hòa đồng) thì chọn mọi phòng. */
 function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: Colleague[]; ownDepts?: string[] }) {
-  const lockedDepts = ownDepts && ownDepts.length > 0 ? ownDepts : null;
+  const lockedDepts = def.kind === "QUALITY" ? ownDepts ?? [] : null;
   const [now, setNow] = useEvaluationClock();
   const cycle = evaluationCycle(now);
   const requestedMonth = useSearchParams().get("month");
@@ -145,7 +145,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
 
   // Không ai chấm Giám đốc (backend cũng chặn) -> bỏ khỏi danh sách.
   const candidates = useMemo(() => colleagues.filter((c) => c.role !== "DIRECTOR"
-    && (!ownDepts?.length || deptsOf(c).some((d) => ownDepts.includes(d)))), [colleagues, ownDepts]);
+    && (def.kind === "TEAM" || deptsOf(c).some((d) => ownDepts?.includes(d)))), [colleagues, ownDepts, def.kind]);
   // Phòng ban: 4 phòng chuẩn + phòng khác (nếu có) đang gán cho đồng nghiệp.
   const deptOptions = useMemo(() => {
     if (lockedDepts) return lockedDepts;
@@ -155,7 +155,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
   }, [candidates, lockedDepts]);
   // Phòng khóa: luôn là một trong các phòng của mình (kể cả khi sessionStorage còn giá trị cũ).
   useEffect(() => {
-    if (lockedDepts && !lockedDepts.includes(dept)) setDept(lockedDepts[0]);
+    if (lockedDepts && !lockedDepts.includes(dept) && dept !== (lockedDepts[0] ?? "")) setDept(lockedDepts[0] ?? "");
   }, [lockedDepts, dept, setDept]);
   const people = useMemo(
     () => candidates
@@ -200,7 +200,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
     setPersonId(id);
     if (!c) return;
     const ds = deptsOf(c);
-    if (ds.length && !ds.includes(dept)) setDept(ds.find((d) => !ownDepts?.length || ownDepts.includes(d)) ?? dept);
+    if (ds.length && !ds.includes(dept)) setDept(ds.find((d) => def.kind === "TEAM" || ownDepts?.includes(d)) ?? dept);
   }
 
   async function save() {
@@ -256,6 +256,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
   return (
     <section className="rounded-xl2 bg-white p-4 shadow-card lg:p-6">
       <h2 className="text-center text-sm font-bold uppercase tracking-wide text-ink lg:text-base">{def.title}</h2>
+      {lockedDepts?.length === 0 && <p role="status" className="mt-3 rounded-lg bg-paper p-3 text-xs text-muted">Bạn chưa được gán phòng ban nên chưa thể chấm Chất lượng công việc.</p>}
       {!canEdit && <p role="status" className="mt-3 rounded-lg bg-paper p-3 text-xs text-muted">{lockedMessage}</p>}
       {mine.month === month && mine.status === "error" ? (
         <div role="alert" className="mt-3 rounded-lg bg-paper p-3 text-xs text-bad">
@@ -280,11 +281,12 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
           <select
             value={dept}
             onChange={(e) => { if (busy.current || e.target.value === dept) return; invalidateSelection(); setDept(e.target.value); }}
-            disabled={saving || (!!lockedDepts && lockedDepts.length === 1)}
+            disabled={saving || (!!lockedDepts && lockedDepts.length <= 1)}
             title={lockedDepts ? "Phiếu này chấm đồng nghiệp cùng phòng với bạn" : undefined}
             className={`${sel} disabled:cursor-default disabled:bg-paper disabled:text-ink`}
           >
             {!lockedDepts && <option value="">Tất cả phòng ban</option>}
+            {lockedDepts?.length === 0 && <option value="">Chưa được gán phòng ban</option>}
             {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </label>

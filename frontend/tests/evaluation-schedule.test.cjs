@@ -162,8 +162,8 @@ function mountForm(search = "", options = {}) {
   if (!options.page) { page = false; slots.length = 0; effects.length = 0; }
   return { calls, writes, timers, navigate: search => { location.search = search; }, advance: iso => { instant = iso; },
     fireTimers() { const pending = [...timers.values()]; timers.clear(); pending.forEach(timer => timer.fn()); },
-    render() { cursor = 0; const tree = options.page ? module.exports.default() : form.type({ ...form.props, ownDepts: options.ownDepts,
-      colleagues: options.colleagues || [{ id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "" }] }); effects.splice(0).forEach(fn => fn()); return tree; } };
+    render() { cursor = 0; const tree = options.page ? module.exports.default() : form.type({ ...form.props, ownDepts: options.ownDepts ?? ["AI"],
+      colleagues: options.colleagues || [{ id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "AI" }] }); effects.splice(0).forEach(fn => fn()); return tree; } };
 }
 
 test("actual ballot defaults to previous month, honors reminder link and retains manual selection", () => {
@@ -284,8 +284,8 @@ test("one save blocks synchronous duplicate handlers and all selection controls"
 
 test("old selection handlers cannot mutate the newly selected ballot", async () => {
   const app = mountForm("", { ballots: [ballot("2026-10"), ballot("2026-10", 13, 9)], colleagues: [
-    { id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "" },
-    { id: 9, full_name: "Other", role: "FIELD_STAFF", department: "" },
+    { id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "AI" },
+    { id: 9, full_name: "Other", role: "FIELD_STAFF", department: "AI" },
   ] });
   renderForm(app); await settleForm(app); const tree = choosePeer(app);
   const staleSave = button(tree, "Lưu sửa").props.onClick;
@@ -353,13 +353,13 @@ test("returning to a month during its pending save reloads after the mutation se
   assert.deepEqual(pickers(await settleForm(app)).map(picker => picker.props.value), [1, 1, 1]);
 });
 
-test("quality without a department and team preserve unrestricted colleague eligibility", async () => {
+test("quality without a department has no eligible peers while team stays company wide", async () => {
   for (const kind of ["QUALITY", "TEAM"]) {
     const app = mountForm("", { kind, ownDepts: kind === "QUALITY" ? [] : undefined, colleagues: [
       { id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "AI" },
     ] });
     renderForm(app); const tree = await settleForm(app);
-    assert.equal(nodes(tree).some(node => node.type === "option" && node.props.value === 8), true);
+    assert.equal(nodes(tree).some(node => node.type === "option" && node.props.value === 8), kind === "TEAM");
   }
 });
 

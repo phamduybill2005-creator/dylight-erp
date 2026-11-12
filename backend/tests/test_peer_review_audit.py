@@ -44,15 +44,25 @@ class PeerReviewAuditTests(unittest.TestCase):
         with self.sessions() as db:
             self.assertEqual([row.kind for row in db.query(PeerReview).all()], ["TEAM"])
 
-    def test_quality_accepts_department_aliases_multiple_memberships_and_empty_department(self):
-        for voter_dept, peer_dept in (("AI開発", "Phòng AI"), ("Phòng AI, 測量解析", "Phòng Bản đồ"),
-                                     (None, "Phòng BIM")):
+    def test_quality_accepts_department_aliases_and_multiple_memberships(self):
+        for voter_dept, peer_dept in (("AI開発", "Phòng AI"), ("Phòng AI, 測量解析", "Phòng Bản đồ")):
             with self.subTest(voter_dept=voter_dept), self.sessions() as db:
                 db.get(User, self.staff.id).department = voter_dept
                 db.get(User, self.peer.id).department = peer_dept
                 db.commit()
             response = self.put()
             self.assertEqual(response.status_code, 200, response.text)
+
+    def test_quality_requires_a_shared_nonempty_department_for_both_people(self):
+        for voter_dept, peer_dept in ((None, "Phòng AI"), (" , ", "Phòng AI"),
+                                     ("Phòng AI", None), (None, None)):
+            with self.subTest(voter_dept=voter_dept, peer_dept=peer_dept):
+                with self.sessions() as db:
+                    db.get(User, self.staff.id).department = voter_dept
+                    db.get(User, self.peer.id).department = peer_dept
+                    db.commit()
+                self.assertEqual(self.put().status_code, 403)
+                self.assertEqual(self.put(kind="TEAM").status_code, 200)
 
     def test_unapproved_target_cannot_receive_new_or_updated_ballots(self):
         self.assertEqual(self.put(kind="TEAM").status_code, 200)

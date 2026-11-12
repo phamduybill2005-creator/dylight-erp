@@ -46,11 +46,11 @@ class PeerReviewTests(unittest.TestCase):
             self.director = User(company_id=company.id, email="gd@example.com", full_name="Giam doc",
                                  role=UserRole.DIRECTOR, hashed_password="unused")
             self.admin = User(company_id=company.id, email="admin@example.com", full_name="Admin",
-                              role=UserRole.ADMIN, hashed_password="unused")
+                              role=UserRole.ADMIN, department="Phòng AI", hashed_password="unused")
             self.staff = User(company_id=company.id, email="nv@example.com", full_name="Nhan vien",
-                              role=UserRole.FIELD_STAFF, hashed_password="unused")
+                              role=UserRole.FIELD_STAFF, department="Phòng AI", hashed_password="unused")
             self.peer = User(company_id=company.id, email="dn@example.com", full_name="Dong nghiep",
-                             role=UserRole.MANAGER_MID, hashed_password="unused")
+                             role=UserRole.MANAGER_MID, department="Phòng AI", hashed_password="unused")
             self.outsider = User(company_id=other.id, email="out@example.com", full_name="Ngoai cong ty",
                                  role=UserRole.FIELD_STAFF, hashed_password="unused")
             db.add_all([self.director, self.admin, self.staff, self.peer, self.outsider])
