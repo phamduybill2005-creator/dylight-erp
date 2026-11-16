@@ -81,3 +81,14 @@ export function tickInputClass(ticked: boolean): string {
 export function analysisNumber(v: string | null | undefined): string {
   return (v || "").replace(/,/g, ".").replace(/[^\d.]/g, "");
 }
+
+/** Số liệu dự án phía trên giờ thực tế ở Doanh thu, dùng chung cho máy tính và điện thoại. */
+export function revenueBandoValue(details: BanDoDetails, column: string): string | null {
+  if (column === "ortho" || column === "riegl" || column === "qlcl") return details[column].trim();
+  if (column === "data" || column === "ground" || column === "grid" || column === "trace") {
+    const area = analysisNumber(details.analysis);
+    return area ? `${area} ha` : "";
+  }
+  if (column === "tdtn") return details.section.trim();
+  return null;
+}

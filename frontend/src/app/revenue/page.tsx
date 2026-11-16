@@ -25,13 +25,13 @@ import { api } from "@/lib/api";
 import { isDirector, isSeniorManagerUp, canSeeRevenue } from "@/lib/roles";
 import { PRESET_DEPARTMENTS } from "@/lib/departments";
 import { getProjectDept, isBanDoView } from "@/lib/groups";
-import { parseBanDoDetails, analysisNumber, isBanDoTicked, tickInputClass } from "@/lib/bando-details";
+import { parseBanDoDetails, revenueBandoValue, isBanDoTicked, tickInputClass } from "@/lib/bando-details";
 import { BANDO_HOUR_COLUMNS, hoursByColumn, formatGroupHours, type ProjectGroupHours } from "@/lib/bando-hours";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { formatVND, todayLocal } from "@/lib/format";
 import { pickJpyRate, computeRevenueVnd, parseJpyInput } from "@/lib/revenue";
 import type { Project, User, Timesheet } from "@/lib/types";
-import { revenueMobileFacts } from "@/lib/mobile-view-models";
+import RevenueMobileCard from "@/components/revenue-mobile-card";
 
 /** Số giờ -> "X,X ngày" (8 giờ = 1 ngày). */
 function hoursToDays(h: number): string {
@@ -372,7 +372,7 @@ export default function RevenuePage() {
     } finally { clear(); }
   }
 
-  const clientMonthInput = (p: Project, month: string, opts: { align: string; title: string }) => {
+  const clientMonthInput = (p: Project, month: string, opts: { align: string; title: string; mobile?: boolean }) => {
     const k = monthKey(p, month);
     const shown = edits[k] ?? plainNumber(clientHoursOf(p, month) || null);
     return (
@@ -385,8 +385,8 @@ export default function RevenuePage() {
           if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
           if (e.key === "Escape") setEdits((st) => { const n = { ...st }; delete n[k]; return n; });
         }}
-        placeholder="—" title={opts.title}
-        className={`w-full rounded border border-transparent bg-transparent px-1 py-0.5 ${opts.align} text-[12px] font-semibold text-ink tnum outline-none transition-colors placeholder:text-line hover:border-line focus:border-steel focus:bg-white`}
+        placeholder="—" title={opts.title} aria-label={`${opts.title} · ${p.code}`}
+        className={`min-w-0 w-full rounded border bg-transparent ${opts.align} font-semibold text-ink tnum outline-none transition-colors placeholder:text-line focus:border-steel focus:bg-white ${opts.mobile ? "min-h-11 border-line bg-white px-2 py-2 text-base" : "border-transparent px-1 py-0.5 text-[12px] hover:border-line"}`}
       />
     );
   };
@@ -568,43 +568,28 @@ export default function RevenuePage() {
           <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Đang tải…</p>
         ) : rows.length === 0 ? (
           <p className="rounded-xl border border-line bg-white px-4 py-8 text-center text-sm text-muted">Không tìm thấy dự án nào khớp với bộ lọc.</p>
-        ) : rows.map((project, index) => {
-          const revenue = revenueOf(project);
-          const facts = revenueMobileFacts(project, revenue);
-          const pinned = pinnedIds.includes(project.id);
-          return (
-            <article key={project.id} className={`rounded-xl border bg-white p-3 shadow-card ${pinned ? "border-amber/60" : "border-line"}`}>
-              <div className="flex items-start gap-2">
-                <span className="pt-1 font-mono text-xs font-bold text-slate-400">{index + 1}</span>
-                <button type="button" onClick={(event) => { event.stopPropagation(); togglePin(project.id); }} className="flex h-11 w-9 shrink-0 items-start justify-center pt-1" aria-label={pinned ? "Bỏ ghim dự án" : "Ghim dự án"}>
-                  {pinned ? <StarIconSolid className="h-5 w-5 text-amber" /> : <StarIconOutline className="h-5 w-5 text-slate-300" />}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <p className="font-mono text-xs font-bold text-bad">{project.code}</p>
-                  <h2 className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug text-ink">
-                    <Link href={`/projects/${project.id}`} className="hover:text-steel hover:underline">{project.name}</Link>
-                  </h2>
-                </div>
-              </div>
-              <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Doanh thu</p>
-                <p className="mt-0.5 text-xl font-extrabold text-emerald-800 tnum">{facts.revenue > 0 ? formatVND(facts.revenue) : "—"}</p>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                <div className="col-span-2 rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Manual time</p><p className="mt-0.5 font-bold text-ink tnum">{manualCell(project)}</p></div>
-                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Time ({monthLabel})</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(monthHoursByProject[project.id] || 0)}h</p></div>
-                <div className="rounded-lg bg-paper px-2.5 py-2" onClick={(event) => event.stopPropagation()}>
-                  <p className="text-[10px] text-muted">TIME KHÁCH HÀNG ({monthLabel})</p>
-                  {isDirectorUser
-                    ? clientMonthInput(project, viewMonth, { align: "text-left", title: `Nhập số giờ khách hàng tháng ${monthLabel}` })
-                    : <p className="mt-0.5 font-bold text-ink tnum">{fmtH(clientHoursOf(project, viewMonth))}h</p>}
-                </div>
-                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">Time (All)</p><p className="mt-0.5 font-bold text-ink tnum">{facts.actualHours.toLocaleString("vi-VN")}h</p></div>
-                <div className="rounded-lg bg-paper px-2.5 py-2"><p className="text-[10px] text-muted">TIME KHÁCH HÀNG (All)</p><p className="mt-0.5 font-bold text-ink tnum">{fmtH(clientHoursOf(project))}h</p></div>
-              </div>
-            </article>
-          );
-        })}
+        ) : rows.map((project, index) => (
+          <RevenueMobileCard
+            key={project.id}
+            project={project}
+            index={index + 1}
+            pinned={pinnedIds.includes(project.id)}
+            onTogglePin={() => togglePin(project.id)}
+            revenue={revenueOf(project)}
+            jpyUnitPrice={parsedGlobalJpy > 0 ? parsedGlobalJpy : Number(project.unit_price || 0)}
+            exchangeRate={currentVcbRate}
+            revenuePeriodLabel={filterMonth ? monthLabel : "Toàn bộ"}
+            monthLabel={monthLabel}
+            monthActualHours={monthHoursByProject[project.id] || 0}
+            monthClientHours={clientHoursOf(project, viewMonth)}
+            totalClientHours={clientHoursOf(project)}
+            clientHoursByMonth={clientMonthHours[String(project.id)]}
+            clientMonthEditor={isDirectorUser ? clientMonthInput(project, viewMonth, { align: "text-right", title: `Nhập số giờ khách hàng tháng ${monthLabel}`, mobile: true }) : undefined}
+            isBanDoMode={isBanDoMode}
+            groupHours={groupHours[String(project.id)]}
+            groupHoursPeriodLabel={filterMonth ? monthLabel : "Toàn bộ"}
+          />
+        ))}
       </section>
 
       {/* BẢNG — không có cột Đơn giá, click hàng để nhập */}
@@ -738,14 +723,7 @@ export default function RevenuePage() {
                           // Ô CHIA ĐÔI — trên là số đã nhập ở tab Dự án (JSON `evaluation`), dưới là giờ
                           // realtime như các cột khác. Ortho / RIEGL / QLCL lấy đúng cột cùng tên;
                           // DATA / Ground / Grid_XML / トレース lấy Analysis (ha); TD-TN lấy Section.
-                          const analysisHa = analysisNumber(bando.analysis);
-                          const entered = c.key === "ortho" || c.key === "riegl" || c.key === "qlcl"
-                            ? (bando[c.key] || "").trim()
-                            : c.key === "data" || c.key === "ground" || c.key === "grid" || c.key === "trace"
-                              ? (analysisHa ? `${analysisHa} ha` : "")
-                              : c.key === "tdtn"
-                                ? bando.section.trim()
-                                : null;
+                          const entered = revenueBandoValue(bando, c.key);
                           const enteredTitle = c.key === "data" || c.key === "ground" || c.key === "grid" || c.key === "trace"
                             ? (entered ? `Analysis: ${entered} — nhập ở tab Dự án` : "Analysis: chưa nhập ở tab Dự án")
                             : c.key === "tdtn"
