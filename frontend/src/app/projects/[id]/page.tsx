@@ -69,9 +69,6 @@ export default function ProjectDetailPage() {
   const [progressLogs, setProgressLogs] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"items" | "progress" | "team">("items");
-  // Chỗ đặt 2 nút của tab Hạng mục (Sao chép từ dự án mẫu / Thêm hạng mục) ngay trong khung
-  // thông tin dự án — hạng mục dồn lên, không còn hàng tiêu đề + nút riêng phía dưới.
-  const [itemsToolbarHost, setItemsToolbarHost] = useState<HTMLDivElement | null>(null);
   /** Đổi tab + ghi vào URL (?tab=...) để F5 hay gửi link vẫn mở đúng tab (không tải lại trang). */
   const switchTab = (tab: "items" | "progress" | "team") => {
     setActiveTab(tab);
@@ -451,6 +448,15 @@ export default function ProjectDetailPage() {
     );
   }
 
+  const leadId = project.lead_id ?? resolveDoscoLead(project.members ?? [], project.dosco_manager)?.id ?? null;
+  const sortedMembers = [...(project.members ?? [])].sort((a, b) => {
+    const leadRankA = a.id === leadId ? 0 : 1;
+    const leadRankB = b.id === leadId ? 0 : 1;
+    return leadRankA - leadRankB
+      || getRoleRank(a.role, a.has_subordinates) - getRoleRank(b.role, b.has_subordinates)
+      || a.full_name.localeCompare(b.full_name, "vi");
+  });
+
   return (
     <AppShell maxWidthClass="max-w-md lg:max-w-none lg:px-4">
       {/* Nút quay lại */}
@@ -463,179 +469,126 @@ export default function ProjectDetailPage() {
       </button>
 
       {/* Thông tin chung dự án */}
-      <div className="rounded-xl2 bg-white p-3 lg:px-4 shadow-card border border-line/50">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <span className="font-mono text-sm font-bold text-bad">{project.code}</span>
-            <h1 className="break-words text-base font-bold leading-snug text-ink lg:text-lg">{project.name}</h1>
-          </div>
-          <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:shrink-0 lg:justify-end">
-            <button
-              onClick={openProjectChat}
-              className="inline-flex min-h-11 items-center gap-1 rounded-xl2 bg-steel px-3 py-2 text-xs font-semibold text-white shadow-card hover:bg-ink transition-colors"
+      <section aria-label="Thông tin dự án" className="rounded-xl2 border border-line/50 bg-white p-3 shadow-card lg:px-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="min-w-0 break-all font-mono text-xs font-bold text-bad">{project.code}</span>
+          {canForceStatus ? (
+            <select
+              value={project.status}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              aria-label="Trạng thái dự án"
+              title="Ép trạng thái dự án (giữ nguyên, không tự tính lại theo tiến độ)"
+              className={`min-h-11 max-w-[60%] shrink-0 cursor-pointer rounded-full border-0 px-2.5 py-2 text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber ${PROJECT_STATUS[project.status]?.cls}`}
             >
-              <ChatBubbleLeftRightIcon className="h-4 w-4" />
-              Chat dự án
-            </button>
-            <button
-              onClick={() => setArchiveModal(true)}
-              title="Thùng rác & Khôi phục"
-              className="inline-flex min-h-11 items-center gap-1 rounded-xl2 border border-amber-500/40 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-500 hover:text-white transition-colors cursor-pointer shadow-sm"
+              <option value="PLANNING">Chuẩn bị</option>
+              <option value="IN_PROGRESS">Đang làm</option>
+              <option value="COMPLETED">Hoàn thành</option>
+              <option value="ON_HOLD">Tạm dừng</option>
+              <option value="AUTO">↺ Tự động theo tiến độ</option>
+            </select>
+          ) : (
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}
+              title="Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới đổi được trạng thái"
             >
-              <ArchiveBoxIcon className="h-4 w-4 text-amber-600" />
-              Thùng rác
+              {PROJECT_STATUS[project.status]?.label}
+            </span>
+          )}
+        </div>
+        <h1 className="mt-1 break-words text-sm font-bold leading-snug text-ink lg:text-lg">{project.name}</h1>
+
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={openProjectChat}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-steel px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-ink"
+          >
+            <ChatBubbleLeftRightIcon className="h-4 w-4" />
+            Chat
+          </button>
+          {canManage && (
+            <button
+              onClick={() => setMembersModal(true)}
+              title="Sửa thông tin dự án"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-steel transition-colors hover:bg-slate-100"
+            >
+              <PencilSquareIcon className="h-4 w-4" />
+              Sửa
             </button>
-            {isDirector(currentUser?.role) && (
-              <button
-                onClick={handleDeleteProject}
-                title="Xoá dự án"
-                className="inline-flex min-h-11 items-center gap-1 rounded-xl2 border border-bad/40 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad hover:bg-bad hover:text-white transition-colors"
-              >
-                <TrashIcon className="h-4 w-4" />
-                Xoá dự án
-              </button>
-            )}
-            {canManage && (
-              <button
-                onClick={() => setMembersModal(true)}
-                title="Sửa thông tin dự án"
-                className="inline-flex min-h-11 items-center gap-1 rounded-xl2 border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 hover:text-ink transition-colors cursor-pointer shadow-sm"
-              >
-                <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
-                Sửa dự án
-              </button>
-            )}
-            {canForceStatus ? (
-              <select
-                value={project.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                title="Ép trạng thái dự án (giữ nguyên, không tự tính lại theo tiến độ)"
-                className={`min-h-11 cursor-pointer rounded-xl2 border-0 px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-amber ${PROJECT_STATUS[project.status]?.cls}`}
-              >
-                <option value="PLANNING">Chuẩn bị</option>
-                <option value="IN_PROGRESS">Đang làm</option>
-                <option value="COMPLETED">Hoàn thành</option>
-                <option value="ON_HOLD">Tạm dừng</option>
-                <option value="AUTO">↺ Tự động theo tiến độ</option>
-              </select>
-            ) : (
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${PROJECT_STATUS[project.status]?.cls}`}
-                title="Chỉ chủ trì dự án, Quản trị hệ thống hoặc Giám đốc mới đổi được trạng thái"
-              >
-                {PROJECT_STATUS[project.status]?.label}
-              </span>
-            )}
-          </div>
+          )}
+          <button
+            onClick={() => setArchiveModal(true)}
+            aria-label="Thùng rác và khôi phục"
+            title="Thùng rác & Khôi phục"
+            className="ml-auto inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 text-amber-700 transition-colors hover:bg-amber-100"
+          >
+            <ArchiveBoxIcon className="h-4 w-4" />
+            <span className="hidden text-xs font-semibold sm:inline">Thùng rác</span>
+          </button>
+          {isDirector(currentUser?.role) && (
+            <button
+              onClick={handleDeleteProject}
+              aria-label="Xoá dự án"
+              title="Xoá dự án"
+              className="inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-bad/20 bg-bad/5 px-2.5 text-bad transition-colors hover:bg-bad/10"
+            >
+              <TrashIcon className="h-4 w-4" />
+              <span className="hidden text-xs font-semibold sm:inline">Xoá dự án</span>
+            </button>
+          )}
         </div>
 
-        <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-2 lg:grid-cols-3">
-          {project.location && (
-            <p className="flex items-center gap-1.5">
-              <MapPinIcon className="h-4 w-4 text-muted/80" />
-              {project.location}
-            </p>
-          )}
-          {project.manager_name && (
-            <p className="flex items-center gap-1.5">
-              <UserIcon className="h-4 w-4 text-muted/80" />
-              {project.manager_name}
-            </p>
-          )}
-
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-muted lg:grid-cols-4 lg:text-xs">
           {project.group_name && (
-            <p className="flex items-center gap-1.5">
-              <UserGroupIcon className="h-4 w-4 text-muted/80" />
-              Nhóm: <span className="font-medium text-ink">{groupLabel(project.group_name)}</span>
+            <p className="flex min-w-0 items-start gap-1.5" title={groupLabel(project.group_name)}>
+              <UserGroupIcon className="h-4 w-4 shrink-0 text-muted/80" />
+              <span className="break-words font-medium text-ink">{normalizeDept(project.group_name)}</span>
             </p>
           )}
           {project.geo_manager && (
-            <p className="flex items-center gap-1.5">
-              <UserIcon className="h-4 w-4 text-muted/80" />
-              GEO担当: <span className="font-medium text-ink">{project.geo_manager}</span>
+            <p className="flex min-w-0 items-start gap-1.5">
+              <UserIcon className="h-4 w-4 shrink-0 text-muted/80" />
+              <span className="break-words">GEO: <span className="font-medium text-ink">{project.geo_manager}</span></span>
             </p>
           )}
-          {/* DOSCO担当 (phía Việt) = NGƯỜI CHỦ TRÌ dự án. */}
           {(project.dosco_manager || project.lead_name) && (
-            <p className="flex items-center gap-1.5">
-              <StarSolid className="h-4 w-4 text-amber" />
-              Chủ trì (DOSCO担当):{" "}
-              <span className="font-medium text-ink">
-                {project.dosco_manager || project.lead_name}
-              </span>
+            <p className="flex min-w-0 items-start gap-1.5">
+              <StarSolid className="h-4 w-4 shrink-0 text-amber" />
+              <span className="break-words">Chủ trì: <span className="font-medium text-ink">{project.dosco_manager || project.lead_name}</span></span>
             </p>
           )}
           {project.start_date && (
-            <p className="flex flex-wrap items-center gap-1.5 sm:col-span-2">
-              <CalendarDaysIcon className="h-4 w-4 text-muted/80" />
-              Ngày khởi công: <span className="font-medium text-ink">{formatDate(project.start_date)}</span>
-              {project.end_date && ` — Hoàn thành: ${formatDate(project.end_date)}`}
+            <p className="flex min-w-0 items-start gap-1.5">
+              <CalendarDaysIcon className="h-4 w-4 shrink-0 text-muted/80" />
+              <span>Bắt đầu: <span className="font-medium text-ink">{formatDate(project.start_date)}</span></span>
             </p>
           )}
         </div>
 
-        {/* Thành viên thực hiện dự án */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line/60 pt-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5 text-steel">
-              <UsersIcon className="h-4 w-4" />
-              Thành viên thực hiện ({project.members?.length ?? 0})
-            </h3>
-          </div>
-          
-          <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-            {(() => {
-              // Hiện CẢ chủ trì để số đếm "(N)" khớp với danh sách bên dưới —
-              // trước đây lọc bỏ chủ trì nên thấy "(1)" mà lại báo "Chưa phân công".
-              // Chủ trì = lead_id; dự án cũ chưa có lead_id thì dò theo tên DOSCO担当.
-              const leadId =
-                project.lead_id ??
-                resolveDoscoLead(project.members ?? [], project.dosco_manager)?.id ??
-                null;
-              const otherMembers = (project.members ?? [])
-                .slice()
-                .sort((a, b) => {
-                  // Chủ trì luôn đứng đầu danh sách.
-                  const leadRankA = a.id === leadId ? 0 : 1;
-                  const leadRankB = b.id === leadId ? 0 : 1;
-                  if (leadRankA !== leadRankB) return leadRankA - leadRankB;
-                  const rankA = getRoleRank(a.role, a.has_subordinates);
-                  const rankB = getRoleRank(b.role, b.has_subordinates);
-                  if (rankA !== rankB) return rankA - rankB;
-                  return a.full_name.localeCompare(b.full_name, "vi");
-                });
-              if (otherMembers.length === 0) {
-                return <p className="text-[11px] text-muted italic">Chưa phân công thành viên thực hiện.</p>;
-              }
-              return otherMembers.map((member) => {
-                const isLead = member.id === leadId;
-                return (
-                  <span
-                    key={member.id}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold text-ink ${
-                      isLead ? "border-amber bg-amber/15" : "bg-paper border-line/50"
-                    }`}
-                    title={`${isLead ? "Chủ trì (DOSCO担当) · " : ""}${roleTitle(member.role, member.has_subordinates)} - ${member.phone || "Không có SĐT"}`}
-                  >
-                    {isLead ? (
-                      <StarSolid className="h-3 w-3 text-amber" />
-                    ) : (
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-                    )}
-                    {member.full_name}
-                    {isLead && (
-                      <span className="rounded bg-amber px-1 text-[9px] font-bold text-white">Chủ trì</span>
-                    )}
-                    <span className="text-[9px] text-muted">({roleTitle(member.role, member.has_subordinates)})</span>
-                  </span>
-                );
-              });
-            })()}
-          </div>
-          {/* Nút của tab Hạng mục được gắn vào đây (portal) khi tab đó đang mở. */}
-          <div ref={setItemsToolbarHost} className="ml-auto flex shrink-0 flex-wrap items-center gap-1.5" />
-        </div>
-      </div>
+        {(project.location || project.manager_name || project.end_date) && (
+          <details className="mt-2 text-[11px] text-muted">
+            <summary className="w-fit cursor-pointer py-1 font-medium text-steel">Thông tin khác</summary>
+            <div className="mt-1 grid gap-1 sm:grid-cols-2">
+              {project.location && <p className="flex items-start gap-1.5"><MapPinIcon className="h-4 w-4 shrink-0" /><span className="break-words">{project.location}</span></p>}
+              {project.manager_name && <p className="flex items-start gap-1.5"><UserIcon className="h-4 w-4 shrink-0" /><span className="break-words">Quản lý: {project.manager_name}</span></p>}
+              {project.end_date && <p className="flex items-start gap-1.5"><CalendarDaysIcon className="h-4 w-4 shrink-0" /><span>Kết thúc: {formatDate(project.end_date)}</span></p>}
+            </div>
+          </details>
+        )}
+
+        <button
+          type="button"
+          onClick={() => switchTab("team")}
+          aria-label="Xem phân công thành viên"
+          className="mt-2 flex min-h-11 w-full items-center gap-2 border-t border-line/60 pt-2 text-left text-[11px] text-muted hover:text-steel"
+        >
+          <UsersIcon className="h-4 w-4 shrink-0 text-steel" />
+          <span className="shrink-0 font-semibold text-steel">Thành viên ({project.members?.length ?? 0})</span>
+          <span className="min-w-0 flex-1 truncate" title={sortedMembers.map(member => member.full_name).join(", ")}>
+            {sortedMembers.slice(0, 2).map(member => member.full_name).join(", ") || "Chưa phân công"}
+          </span>
+          {sortedMembers.length > 2 && <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 font-semibold text-steel">+{sortedMembers.length - 2}</span>}
+        </button>
+      </section>
 
       {/* Tabs điều hướng */}
       <div className="mt-3 flex border-b border-line">
@@ -662,7 +615,6 @@ export default function ProjectDetailPage() {
             // thường -> bật màn "Đang tải chi tiết dự án" thay cả trang -> tab hạng mục bị gỡ
             // rồi gắn lại, mất vị trí đang cuộn, trông như bị F5 mỗi lần chọn Người làm.
             onMemberAdded={() => loadData(true)}
-            toolbarHost={itemsToolbarHost}
           />
         )}
 

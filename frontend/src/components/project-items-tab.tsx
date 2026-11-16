@@ -6,7 +6,6 @@
 // tiểu tổng mỗi nhóm + tổng dự toán, và xuất ra Excel/CSV.
 
 import { useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { PlusIcon, TrashIcon, ArrowDownTrayIcon, TableCellsIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { api } from "@/lib/api";
@@ -248,7 +247,6 @@ export default function ProjectItemsTab({
   canManage = false,
   currentUserId = null,
   onMemberAdded,
-  toolbarHost = null,
 }: {
   projectId: number;
   /** Nhân viên (STAFF) = false: ẩn cột Khối lượng/Đơn giá/Thành tiền, tiểu tổng, tổng, xuất Excel. */
@@ -258,9 +256,6 @@ export default function ProjectItemsTab({
   canManage?: boolean;
   currentUserId?: number | null;
   onMemberAdded?: () => void;
-  /** Chỗ đặt 2 nút "Sao chép từ dự án mẫu" / "Thêm hạng mục" (khung thông tin dự án ở trang
-   *  chi tiết) để hạng mục dồn lên trên; không truyền thì nút nằm ngay trên bảng. */
-  toolbarHost?: HTMLElement | null;
 }) {
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -551,7 +546,7 @@ export default function ProjectItemsTab({
     return <p className="py-12 text-center text-xs text-muted">Đang tải bảng dự toán...</p>;
   }
 
-  // 2 nút thao tác chính — đặt lên khung thông tin dự án (portal) cho gọn, hoặc ngay trên bảng.
+  // Thao tác hạng mục nằm trong tab, tách khỏi thông tin chung dự án.
   const toolbar = canManage ? (
     <div className="flex flex-wrap items-center gap-1.5">
       <button
@@ -579,7 +574,7 @@ export default function ProjectItemsTab({
 
   return (
     <div className="space-y-3 lg:space-y-4">
-      {toolbar && (toolbarHost ? createPortal(toolbar, toolbarHost) : toolbar)}
+      {toolbar}
       {canSeeMoney && (
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-muted lg:text-xs">Tổng dự toán: <span className="font-bold text-ink tnum">{formatVND(grandTotal)}</span></p>
