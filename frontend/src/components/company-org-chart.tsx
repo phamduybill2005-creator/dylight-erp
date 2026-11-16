@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import OrgChartViewer, { OrgChartDialog } from "./org-chart-viewer";
 import { roleTitle, isSeniorManagerUp } from "@/lib/roles";
 import type { Colleague, OrgChartData, OrgChartNode, User } from "@/lib/types";
 import {
@@ -15,6 +16,9 @@ import {
   PlusIcon,
   TrashIcon,
   CheckIcon,
+  UserGroupIcon,
+  ArrowsPointingOutIcon,
+  ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 
 /** Các CỤM ô — trùng tên với backend (OrgChartData). */
@@ -88,6 +92,7 @@ export default function CompanyOrgChart() {
   const [colleagues, setColleagues] = useState<Colleague[]>([]);
   const [selectedUser, setSelectedUser] = useState<Colleague | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const [chart, setChart] = useState<OrgChartData>(DEFAULT_CHART);   // bản đang hiển thị
   const [draft, setDraft] = useState<OrgChartData | null>(null);     // bản đang sửa dở
@@ -143,6 +148,14 @@ export default function CompanyOrgChart() {
   // ------------------------------------------------------------ thao tác sửa
   const startEdit = () => setDraft(clone(chart));
   const cancelEdit = () => { setDraft(null); setEditing(null); setErr(null); };
+
+  const closeViewer = () => {
+    if (saving) return;
+    if (isEditMode && !window.confirm("Bạn có thay đổi chưa lưu. Bỏ thay đổi và đóng sơ đồ?")) return;
+    cancelEdit();
+    setSelectedUser(null);
+    setViewerOpen(false);
+  };
 
   const removeNode = (group: GroupKey, index: number) => {
     if (!draft) return;
@@ -280,22 +293,9 @@ export default function CompanyOrgChart() {
     );
   }
 
-  return (
-    <div className="relative overflow-hidden rounded-xl2 border border-line/45 bg-white p-5 shadow-card">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-steel">Sơ đồ tổ chức công ty</h2>
-          <p className="text-[10px] text-muted">
-            {isEditMode
-              ? "Đang sửa — bấm vào ô để đổi tên, bấm thùng rác để xoá, bấm Thêm để chèn nhân sự mới."
-              : "Bấm vào từng nhân sự để xem chi tiết thông tin quản lý & liên hệ"}
-          </p>
-          {!isEditMode && updatedBy && (
-            <p className="mt-0.5 text-[10px] text-muted italic">Cập nhật gần nhất bởi {updatedBy}</p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
+  const chartActions = (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
           {!isEditMode && (
             <div className="flex items-center gap-1.5 rounded bg-slate-50 px-2 py-1 text-[9px] text-muted">
               <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
@@ -308,7 +308,7 @@ export default function CompanyOrgChart() {
           {canEdit && !isEditMode && (
             <button
               onClick={startEdit}
-              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-200 hover:text-ink"
+              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-3 py-2.5 text-[11px] font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-200 hover:text-ink"
             >
               <PencilSquareIcon className="h-3.5 w-3.5 text-steel" />
               Sửa sơ đồ
@@ -320,14 +320,14 @@ export default function CompanyOrgChart() {
               <button
                 onClick={cancelEdit}
                 disabled={saving}
-                className="rounded-full border border-line px-3 py-1 text-[11px] font-semibold text-muted transition-colors hover:bg-paper hover:text-ink disabled:opacity-50"
+                className="rounded-full border border-line px-3 py-2.5 text-[11px] font-semibold text-muted transition-colors hover:bg-paper hover:text-ink disabled:opacity-50"
               >
                 Huỷ bỏ
               </button>
               <button
                 onClick={save}
                 disabled={saving}
-                className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1 text-[11px] font-bold text-white transition-colors hover:bg-steel disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-2.5 text-[11px] font-bold text-white transition-colors hover:bg-steel disabled:opacity-50"
               >
                 {saving ? (
                   <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-amber" />
@@ -339,18 +339,14 @@ export default function CompanyOrgChart() {
             </>
           )}
         </div>
-      </div>
-
+      {isEditMode && <p className="mt-2 text-xs text-muted">Bấm vào ô để sửa, hoặc bấm Thêm để chèn nhân sự.</p>}
       {err && !editing && (
         <p className="mb-3 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[11px] font-semibold text-bad">{err}</p>
       )}
+    </>
+  );
 
-      {/* Khung cuộn ngang của sơ đồ */}
-      {/* Không ép min-width nữa: trước đây min-w-[1200px] làm sơ đồ LUÔN rộng hơn
-          khung -> lúc nào cũng hiện thanh kéo ngang dù nội dung thật hẹp hơn nhiều.
-          Giờ sơ đồ tự co về CHÍNH GIỮA; overflow-x-auto chỉ để phòng màn hình quá
-          hẹp (điện thoại) thì mới xuất hiện thanh kéo. */}
-      <div className="overflow-x-auto pb-2">
+  const diagram = (
         <div className="flex w-full min-w-fit flex-col items-center space-y-6 py-2">
 
           {/* Hàng 1 */}
@@ -401,12 +397,56 @@ export default function CompanyOrgChart() {
 
           </div>
         </div>
+  );
+
+  const staffCount = Object.values(chart).reduce((total, group) => total + (group?.length ?? 0), 0);
+
+  return (
+    <>
+      <section className="overflow-hidden rounded-xl2 border border-line/45 bg-white shadow-card lg:hidden" aria-label="Cơ cấu tổ chức công ty">
+        <div className="p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-steel/10 text-steel">
+              <UserGroupIcon className="h-6 w-6" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-steel">Cơ cấu tổ chức</h2>
+              <p className="mt-0.5 text-xs text-muted"><span className="font-semibold text-ink">{staffCount}</span> nhân sự trên sơ đồ</p>
+            </div>
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-muted">Xem các cấp quản lý và thông tin liên hệ của đồng nghiệp.</p>
+          <button type="button" onClick={() => setViewerOpen(true)} className="mt-4 flex min-h-11 w-full items-center gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-steel">
+            <ArrowsPointingOutIcon className="h-4 w-4" />
+            <span className="flex-1 text-left">Xem sơ đồ</span>
+            <ArrowRightIcon className="h-4 w-4" />
+          </button>
+          {updatedBy && <p className="mt-2 truncate text-[10px] text-muted" title={`Cập nhật bởi ${updatedBy}`}>Cập nhật bởi {updatedBy}</p>}
+        </div>
+      </section>
+      <div className="relative hidden overflow-hidden rounded-xl2 border border-line/45 bg-white p-5 shadow-card lg:block">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-steel">Sơ đồ tổ chức công ty</h2>
+          <p className="text-[10px] text-muted">
+            {isEditMode
+              ? "Đang sửa — bấm vào ô để đổi tên, bấm thùng rác để xoá, bấm Thêm để chèn nhân sự mới."
+              : "Bấm vào từng nhân sự để xem chi tiết thông tin quản lý & liên hệ"}
+          </p>
+          {!isEditMode && updatedBy && (
+            <p className="mt-0.5 text-[10px] text-muted italic">Cập nhật gần nhất bởi {updatedBy}</p>
+          )}
+        </div>
+
+        {chartActions}
       </div>
 
+        <div className="overflow-x-auto pb-2">{diagram}</div>
+      </div>
+      {viewerOpen && <OrgChartViewer toolbar={chartActions} onClose={closeViewer}>{diagram}</OrgChartViewer>}
       {/* ---------------- Hộp thoại THÊM / SỬA một ô ---------------- */}
       {editing && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-line/60 bg-white p-5 shadow-2xl">
+        <OrgChartDialog label="Chỉnh sửa nhân sự" onClose={() => { setEditing(null); setErr(null); }}>
+          <div className="max-h-[90dvh] w-full overflow-y-auto rounded-t-3xl border border-line/60 bg-white px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-w-sm sm:rounded-2xl">
             <h3 className="text-sm font-bold text-ink">
               {editing.index < 0 ? "Thêm nhân sự vào sơ đồ" : "Sửa ô nhân sự"}
             </h3>
@@ -420,7 +460,7 @@ export default function CompanyOrgChart() {
                   onChange={(e) => setEditing({ ...editing, node: { ...editing.node, name: e.target.value } })}
                   onKeyDown={(e) => { if (e.key === "Enter") commitNode(); }}
                   placeholder="VD: HÙNG"
-                  className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                  className="min-h-11 w-full rounded-lg border border-line bg-paper px-3 py-2 text-base outline-none focus:border-steel sm:text-xs"
                 />
               </label>
 
@@ -430,7 +470,7 @@ export default function CompanyOrgChart() {
                   value={editing.node.key}
                   onChange={(e) => setEditing({ ...editing, node: { ...editing.node, key: e.target.value } })}
                   placeholder="Để trống sẽ lấy theo tên hiển thị"
-                  className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                  className="min-h-11 w-full rounded-lg border border-line bg-paper px-3 py-2 text-base outline-none focus:border-steel sm:text-xs"
                 />
                 <span className="mt-1 block text-[10px] text-muted">
                   Trùng <b className="text-ink">Họ tên</b> trong danh sách nhân viên thì ô sẽ hiện chấm xanh và bấm vào xem được hồ sơ.
@@ -444,7 +484,7 @@ export default function CompanyOrgChart() {
                     value={editing.node.deptLabel}
                     onChange={(e) => setEditing({ ...editing, node: { ...editing.node, deptLabel: e.target.value } })}
                     placeholder="VD: Cầu đường"
-                    className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    className="min-h-11 w-full rounded-lg border border-line bg-paper px-3 py-2 text-base outline-none focus:border-steel sm:text-xs"
                   />
                 </label>
                 <label className="block">
@@ -453,7 +493,7 @@ export default function CompanyOrgChart() {
                     value={editing.node.jpDeptLabel}
                     onChange={(e) => setEditing({ ...editing, node: { ...editing.node, jpDeptLabel: e.target.value } })}
                     placeholder="VD: 土木設計"
-                    className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-steel"
+                    className="min-h-11 w-full rounded-lg border border-line bg-paper px-3 py-2 text-base outline-none focus:border-steel sm:text-xs"
                   />
                 </label>
               </div>
@@ -489,13 +529,13 @@ export default function CompanyOrgChart() {
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => { setEditing(null); setErr(null); }}
-                className="flex-1 rounded-xl2 border border-line py-2 text-xs font-semibold text-muted transition-colors hover:bg-paper hover:text-ink"
+                className="min-h-11 flex-1 rounded-xl2 border border-line py-2 text-xs font-semibold text-muted transition-colors hover:bg-paper hover:text-ink"
               >
                 Huỷ
               </button>
               <button
                 onClick={commitNode}
-                className="flex-1 rounded-xl2 bg-ink py-2 text-xs font-semibold text-white transition-colors hover:bg-steel"
+                className="min-h-11 flex-1 rounded-xl2 bg-ink py-2 text-xs font-semibold text-white transition-colors hover:bg-steel"
               >
                 {editing.index < 0 ? "Thêm vào sơ đồ" : "Cập nhật"}
               </button>
@@ -504,16 +544,19 @@ export default function CompanyOrgChart() {
               Thay đổi chỉ được ghi lại khi bấm <b className="text-ink">Lưu sơ đồ</b>.
             </p>
           </div>
-        </div>
+        </OrgChartDialog>
       )}
+
 
       {/* ---------------- Hồ sơ nhân sự (chế độ xem) ---------------- */}
       {selectedUser && (
-        <div className="animate-fade-in absolute inset-0 z-30 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-          <div className="animate-scale-up relative w-full max-w-sm rounded-2xl border border-line/60 bg-white p-5 shadow-2xl">
+        <OrgChartDialog label="Hồ sơ nhân sự" onClose={() => setSelectedUser(null)}>
+          <div className="relative max-h-[90dvh] w-full overflow-y-auto rounded-t-3xl border border-line/60 bg-white px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-w-sm sm:rounded-2xl">
             <button
               onClick={() => setSelectedUser(null)}
-              className="absolute right-3 top-3 rounded-full p-1.5 text-muted transition-colors hover:bg-slate-100 hover:text-ink"
+              autoFocus
+              aria-label="Đóng hồ sơ nhân sự"
+              className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full p-1.5 text-muted transition-colors hover:bg-slate-100 hover:text-ink"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
@@ -545,7 +588,7 @@ export default function CompanyOrgChart() {
                     <EnvelopeIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
                     <div>
                       <span className="block text-[10px] font-semibold uppercase text-muted">Email</span>
-                      <span className="font-medium text-slate-800">{selectedUser.email || "—"}</span>
+                      <span className="break-all font-medium text-slate-800">{selectedUser.email || "—"}</span>
                     </div>
                   </div>
 
@@ -590,7 +633,7 @@ export default function CompanyOrgChart() {
             <div className="mt-5 flex gap-2">
               <button
                 onClick={() => setSelectedUser(null)}
-                className="w-full rounded-xl2 bg-slate-100 py-2 text-xs font-bold text-muted transition-colors hover:bg-slate-200 hover:text-ink"
+                className="min-h-11 w-full rounded-xl2 bg-slate-100 py-2 text-xs font-bold text-muted transition-colors hover:bg-slate-200 hover:text-ink"
               >
                 Đóng
               </button>
@@ -600,15 +643,16 @@ export default function CompanyOrgChart() {
                     setSelectedUser(null);
                     window.location.href = `/attendance?userId=${selectedUser.id}`;
                   }}
-                  className="w-full rounded-xl2 bg-steel py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-steel/90"
+                  className="min-h-11 w-full rounded-xl2 bg-steel py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-steel/90"
                 >
                   Xem chấm công
                 </button>
               )}
             </div>
           </div>
-        </div>
+        </OrgChartDialog>
       )}
-    </div>
+
+    </>
   );
 }
