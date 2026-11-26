@@ -1,5 +1,5 @@
 """
-Router Đánh giá ĐỒNG NGHIỆP (tab "Đánh giá" — mọi người trừ Giám đốc).
+Router Đánh giá ĐỒNG NGHIỆP (tab "Đánh giá" — mọi người trong công ty).
 
 Mỗi tháng, một người chấm đồng nghiệp bằng 2 phiếu, mỗi phiếu 3 tiêu chí điểm 1–5:
   - QUALITY "Chất lượng công việc": sản phẩm đúng, ít lỗi / nộp bài đúng hẹn / phối hợp với mọi người.
@@ -7,7 +7,7 @@ Mỗi tháng, một người chấm đồng nghiệp bằng 2 phiếu, mỗi phi
 1 phiếu = (người chấm, người được chấm, tháng, loại); gửi lại trong tháng là sửa phiếu đó.
 RIÊNG TƯ: mỗi người chỉ xem được phiếu MÌNH đã chấm (/mine). Giám đốc / Quản trị xem
 tổng hợp (/summary) và chi tiết người chấm, điểm từng tiêu chí (/details) theo yêu cầu quản lý.
-Không ai chấm Giám đốc; Giám đốc không chấm (tab này không hiện với Giám đốc).
+Không ai chấm Giám đốc; Giám đốc chấm cả hai loại phiếu cho mọi phòng ban.
 """
 import re
 
@@ -73,8 +73,6 @@ def save_peer_review(
     current: User = Depends(get_current_user),
 ):
     """Gửi / sửa 1 phiếu (người được chấm, tháng, loại). Ghi đè phiếu cũ cùng khóa nếu có."""
-    if current.role == UserRole.DIRECTOR:
-        raise HTTPException(403, "Giám đốc không tham gia chấm đánh giá đồng nghiệp.")
     month = _check_month(payload.month)
     if month > vn_now().strftime("%Y-%m"):
         raise HTTPException(400, "Chưa thể đánh giá cho tháng tương lai.")
@@ -87,7 +85,8 @@ def save_peer_review(
         raise HTTPException(400, "Không thể tự đánh giá chính mình.")
     if evaluatee.role == UserRole.DIRECTOR:
         raise HTTPException(403, "Không ai được đánh giá Giám đốc.")
-    if payload.kind == "QUALITY" and not can_review_quality(current.department, evaluatee.department):
+    if (payload.kind == "QUALITY" and current.role != UserRole.DIRECTOR
+            and not can_review_quality(current.department, evaluatee.department)):
         raise HTTPException(403, "Chỉ được chấm Chất lượng công việc cho đồng nghiệp cùng phòng.")
 
     ballot_query = (

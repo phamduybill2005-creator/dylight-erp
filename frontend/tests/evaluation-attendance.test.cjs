@@ -104,7 +104,8 @@ test("director sees automatic attitude and peer points including self without ma
   const tree = await ready(app);
   assert.equal(nodes(tree).filter(node => node.type === "input" && ["late_cp", "late_kp", "leave_cp", "leave_kp", "score_attitude", "score_quality", "score_team"].includes(node.props["aria-label"])).length, 0);
   const cards = nodes(tree).filter(node => node.type === "article");
-  assert.ok(textOf(cards.find(card => textOf(card).includes("Nguyễn An"))).includes("4 buổi chờ đối soát"));
+  assert.ok(cards.some(card => textOf(card).includes("Nguyễn An")));
+  assert.ok(!textOf(tree).includes("buổi chờ đối soát"));
   assert.ok(!textOf(tree).includes("99"));
   assert.ok(cards.every(card => textOf(card).includes("4/5") && textOf(card).includes("3/5") && textOf(card).includes("3,75")));
   app.unmount();
@@ -115,7 +116,7 @@ test("quarter totals and Excel preserve half days, lateness units, pending sessi
   const app = mount({ evaluationMonthReviews: async () => reviews });
   let tree = await ready(app); button(tree, "Quý 1").props.onClick(); app.render(); await flush(); tree = app.render();
   assert.equal(nodes(tree).filter(node => node.props?.["aria-label"] === "score_attitude").length, 0);
-  assert.ok(textOf(tree).includes("3 buổi chờ đối soát"));
+  assert.ok(!textOf(tree).includes("buổi chờ đối soát"));
   await button(tree, "Xuất Excel").props.onClick();
   assert.ok(app.exports[0][0].includes("Muộn CP (lần)"));
   assert.ok(app.exports[0][0].includes("Chờ đối soát (buổi)"));
@@ -135,7 +136,10 @@ test("attendance refresh reloads both sources and the latest period request wins
   find(tree, node => node.type === "input" && node.props.type === "month").props.onChange({ target: { value: nextMonth } });
   app.render(); await flush(); requests.at(-1).resolve([{ ...review, month: nextMonth, attendance_pending_sessions: 8 }]); await flush();
   stale.resolve([{ ...review, attendance_pending_sessions: 99 }]); await flush(); tree = app.render();
-  assert.ok(textOf(tree).includes("8 buổi chờ đối soát")); assert.ok(!textOf(tree).includes("99 buổi"));
+  assert.ok(!textOf(tree).includes("buổi chờ đối soát"));
+  await button(tree, "Xuất Excel").props.onClick();
+  const [headers, row] = app.exports[0];
+  assert.equal(row[headers.indexOf("Chờ đối soát (buổi)")], 8);
   assert.ok(app.listeners.has("attendance-reconciliation-changed"));
   app.listeners.get("attendance-reconciliation-changed")(); await flush(); assert.equal(calls, 4);
   app.unmount();
@@ -190,7 +194,7 @@ test("a failed refresh retains known attendance with an error, and retry restore
   assert.equal(button(tree, "Xuất Excel").props.disabled, true);
   app.api.evaluationMonthReviews = async () => [{ ...review, attendance_pending_sessions: 1 }];
   app.refresh(); await flush(); tree = app.render();
-  assert.ok(textOf(tree).includes("1 buổi chờ đối soát"));
+  assert.ok(!textOf(tree).includes("buổi chờ đối soát"));
   assert.equal(find(tree, node => node.props?.role === "alert"), undefined);
   assert.equal(button(tree, "Xuất Excel").props.disabled, false);
   app.unmount();
@@ -207,11 +211,12 @@ test("a request from a previous period visit cannot overwrite refreshed attendan
   monthInput().props.onChange({ target: { value: month } }); app.render(); await flush();
   requests.at(-1).resolve([{ ...review, late_cp: 6, attendance_pending_sessions: 8, peer_quality: 4.5, peer_quality_count: 5 }]); await flush();
   originalVisit.resolve([{ ...review, attendance_pending_sessions: 99 }]); await flush(); tree = app.render();
-  assert.ok(textOf(tree).includes("8 buổi chờ đối soát")); assert.ok(!textOf(tree).includes("99 buổi"));
+  assert.ok(!textOf(tree).includes("buổi chờ đối soát"));
   assert.ok(textOf(tree).includes("4,5/5"));
   await button(tree, "Xuất Excel").props.onClick();
   const [headers, row] = app.exports[0];
   assert.equal(row[headers.indexOf("Muộn CP (lần)")], 6);
+  assert.equal(row[headers.indexOf("Chờ đối soát (buổi)")], 8);
   assert.equal(row[headers.indexOf("Chất lượng CV (/5)")], 4.5);
   assert.equal(row[headers.indexOf("Số phiếu CL CV")], 5);
   app.unmount();

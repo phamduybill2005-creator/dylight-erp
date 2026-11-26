@@ -101,6 +101,11 @@ def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: U
                  zalo: LeaveZaloService = Depends(get_leave_zalo_service)):
     if payload.to_date < payload.from_date:
         raise HTTPException(400, "Ngày kết thúc phải sau ngày bắt đầu.")
+    now = vn_now()
+    if payload.from_date > now.date() + timedelta(days=3):
+        raise HTTPException(
+            400, "Chỉ được gửi đơn trước tối đa 3 ngày tính theo ngày bắt đầu nghỉ.",
+        )
     if payload.allowed_arrival_time:
         kind = (payload.leave_type or "FULL").upper()
         minute = int(payload.allowed_arrival_time[:2]) * 60 + int(payload.allowed_arrival_time[3:])
@@ -117,7 +122,7 @@ def create_leave(payload: LeaveCreate, db: Session = Depends(get_db), current: U
     # (Đăng ký lịch sinh viên đi endpoint riêng /leave/student-schedule, KHÔNG
     # dính luật này.)
     deadline = datetime.combine(payload.from_date - timedelta(days=1), time(19, 0))
-    if vn_now() >= deadline:
+    if now >= deadline:
         raise HTTPException(
             400,
             f"Đơn nghỉ ngày {payload.from_date.strftime('%d/%m/%Y')} phải gửi trước "

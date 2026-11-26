@@ -406,10 +406,6 @@ export default function EvaluationsPage() {
       ? <span className={`font-bold tnum ${kp ? "text-bad" : "text-ink"}`}>{fmtNum(v)}</span>
       : <span className="text-muted">0</span>;
   };
-  const pendingHint = (uid: number) => {
-    const pending = statsOf(uid).pendingSessions;
-    return pending > 0 ? <span className="ml-1 text-[10px] font-medium text-amber-deep" title="Buổi đang chờ dữ liệu, duyệt phép hoặc đối soát; chưa tính là vi phạm">{pending} buổi chờ đối soát</span> : null;
-  };
   /** Ô điểm /5 Tổng hợp (Ý thức / Chất lượng CV / Tập thể). Điểm đồng nghiệp kèm số phiếu. */
   const scoreCell = (f: ScoreField, st: PeriodStats, person?: EvaluationOverviewRow) => {
     const v = st[f];
@@ -749,21 +745,11 @@ export default function EvaluationsPage() {
         </header>
 
         {/* BẢNG ĐÁNH GIÁ THÁNG: Office time / Project time / Đi muộn + bấm sao để chấm */}
-        <section className="mt-4">
-          <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-ink">
-                Tổng hợp đánh giá {periodLabel}{selDept ? ` · ${selDept}` : ""} ({rows.length})
-              </h2>
-              <p className="mt-0.5 text-[11px] text-muted">
-                Cộng cả {isQuarter ? "quý" : "tháng"}: <b className="text-steel">Office time</b> = giờ có mặt theo chấm công (đã trừ nghỉ trưa) · <b className="text-steel">P time</b> = giờ khai ở bảng tiến độ dự án (bấm tên để xem theo từng dự án) · <b className="text-steel">Muộn CP/KP</b> = số lần, <b className="text-steel">Nghỉ CP/KP</b> = số ngày (0,5 ngày/buổi), tự tính từ đối soát chấm công; sửa phép tại ngày chấm công · <b className="text-steel">Ý thức</b> tự tính /5 · <b className="text-steel">Chất lượng CV</b> và <b className="text-steel">Tập thể</b> = trung bình /5 mọi phiếu đồng nghiệp chấm ở tab Đánh giá → <b className="text-steel">Kết quả</b> /5 = 25% × Ý thức + 50% × Chất lượng CV + 25% × Tập thể.
-                {isQuarter ? " Xem theo quý là cộng dồn 3 tháng (điểm lấy trung bình các tháng có dữ liệu)." : ""}
-              </p>
-              {rateMsg && <p className="mt-1 text-[11px] font-semibold text-bad">{rateMsg}</p>}
-              {overviewError && <p role="alert" className="mt-1 text-[11px] font-semibold text-bad">Không tải được dữ liệu đánh giá: {overviewError}{overviewKey === tableKey ? " · Đang hiển thị dữ liệu lần tải trước." : ""}</p>}
-            </div>
+        <section className="mt-4 lg:flex lg:max-h-[calc(100dvh-6rem)] lg:flex-col">
+          {rateMsg && <p className="shrink-0 text-[11px] font-semibold text-bad">{rateMsg}</p>}
+          {overviewError && <p role="alert" className="shrink-0 text-[11px] font-semibold text-bad">Không tải được dữ liệu đánh giá: {overviewError}{overviewKey === tableKey ? " · Đang hiển thị dữ liệu lần tải trước." : ""}</p>}
             {/* min-w-0 (không shrink-0): trên điện thoại hàng công cụ tự xuống dòng thay vì tràn ngang */}
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="sticky top-14 z-20 flex min-w-0 shrink-0 flex-wrap items-center gap-2 bg-paper py-2">
               <label className="flex items-center gap-1.5 rounded-lg border border-line bg-white px-2 py-1.5">
                 <FunnelIcon className="h-3.5 w-3.5 text-muted" />
                 <select
@@ -813,7 +799,6 @@ export default function EvaluationsPage() {
                 ))}
               </div>
             </div>
-          </div>
           {rows.length === 0 ? (
             <p className="rounded-xl2 bg-white p-4 text-center text-xs text-muted shadow-card">
               {overviewError ? "Chưa tải được dữ liệu; vui lòng thử lại." : overviewLoading || overviewKey !== tableKey ? "Đang tải…" : selDept ? `Không có ai thuộc ${selDept}.` : "Chưa có nhân sự nào."}
@@ -826,7 +811,7 @@ export default function EvaluationsPage() {
                   <button type="button" onClick={() => toggleProjects(r.user_id)} className="flex min-h-16 w-full items-center gap-2 px-3 py-2.5 text-left" aria-expanded={openUid === r.user_id}>
                     <span className="w-5 shrink-0 text-right font-mono text-xs font-bold text-slate-400">{i + 1}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold text-ink">{r.full_name}{pendingHint(r.user_id)}</span>
+                      <span className="block text-sm font-bold text-ink">{r.full_name}</span>
                       <span className="block truncate text-[10px] text-muted">{ROLE_LABEL[r.role] || "Nhân viên"}{r.department ? ` · ${r.department}` : ""}</span>
                     </span>
                     <ChevronRightIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${openUid === r.user_id ? "rotate-90" : ""}`} />
@@ -861,9 +846,9 @@ export default function EvaluationsPage() {
                 </article>
               ))}
             </div>
-            <div className="hidden overflow-x-auto rounded-xl2 bg-white shadow-card lg:block">
-              <table className="w-full min-w-[1040px] text-xs">
-                <thead>
+            <div className="hidden min-h-0 overflow-auto rounded-xl2 bg-white shadow-card lg:block">
+              <table className="w-full min-w-[1040px] border-separate border-spacing-0 text-xs" aria-label={`Tổng hợp đánh giá ${periodLabel}`}>
+                <thead className="sticky top-0 z-10 bg-white [&_th]:border-b [&_th]:border-b-line [&_th]:bg-white">
                   <tr className="text-left text-[10px] uppercase tracking-wide text-muted">
                     <th rowSpan={2} className="border-b border-line px-3 py-2 align-bottom font-semibold">Người</th>
                     <th rowSpan={2} className="border-b border-line px-2 py-2 text-center align-bottom font-semibold">Office time</th>
@@ -881,7 +866,7 @@ export default function EvaluationsPage() {
                     <th className="px-2 py-1.5 font-semibold" title="Trung bình /5 mọi phiếu “Hòa đồng, tập thể” đồng nghiệp chấm trong kỳ">Tập thể<span className="block text-[9px] font-normal normal-case">25%</span></th>
                   </tr>
                 </thead>
-                <tbody className={overviewLoading ? "opacity-60" : ""}>
+                <tbody className={`[&_td]:border-b [&_td]:border-b-line/50 [&_tr:last-child_td]:border-b-0 ${overviewLoading ? "opacity-60" : ""}`}>
                   {rows.map((r, i) => (
                     <Fragment key={r.user_id}>
                     <tr className="border-b border-line/50 last:border-0 hover:bg-paper/60">
@@ -897,7 +882,6 @@ export default function EvaluationsPage() {
                               className="group flex max-w-full items-center gap-1 text-left"
                             >
                               <span className="truncate font-semibold text-ink group-hover:text-steel group-hover:underline">{r.full_name}</span>
-                              {pendingHint(r.user_id)}
                               <ChevronRightIcon className={`h-3 w-3 shrink-0 text-muted transition-transform ${openUid === r.user_id ? "rotate-90" : ""}`} />
                             </button>
                             <p className="truncate text-[10px] text-muted">

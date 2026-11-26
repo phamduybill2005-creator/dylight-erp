@@ -1,4 +1,4 @@
-"""Đánh giá đồng nghiệp theo tháng (tab "Đánh giá" — mọi người trừ Giám đốc).
+"""Đánh giá đồng nghiệp theo tháng, bao gồm Giám đốc chấm mọi phòng ban.
 
 - PUT /peer-reviews: 1 phiếu (người được chấm, tháng, loại) với 3 điểm 1–5; gửi lại = ghi đè.
 - GET /peer-reviews/mine?month=: chỉ phiếu MÌNH chấm.
@@ -114,9 +114,42 @@ class PeerReviewTests(unittest.TestCase):
         self.assertEqual(self._put(self.director).status_code, 403)                     # không chấm Giám đốc
         self.assertEqual(self._put(self.outsider).status_code, 404)                     # khác công ty
         self.current = self.director
-        self.assertEqual(self._put(self.peer).status_code, 403)                         # Giám đốc không chấm
+        self.assertEqual(self._put(self.peer).status_code, 200)                         # Giám đốc chấm mọi phòng
         self.current = self.admin
         self.assertEqual(self._put(self.peer).status_code, 200)                         # Quản trị vẫn chấm
+
+    def test_director_reviews_all_roles_and_departments_with_normal_ballot_lifecycle(self):
+        self.current = self.director
+        with self.sessions() as db:
+            db.get(User, self.peer.id).department = "Phòng BIM"
+            db.get(User, self.peer.id).role = UserRole.MANAGER
+            db.get(User, self.staff.id).department = None
+            db.commit()
+        for target in (self.admin, self.peer, self.staff):
+            for kind in ("QUALITY", "TEAM"):
+                with self.subTest(target=target.id, kind=kind):
+                    response = self._put(target, kind=kind)
+                    self.assertEqual(response.status_code, 200, response.text)
+                    review_id = response.json()["id"]
+                    updated = self._put(target, kind=kind, scores=(2, 3, 4))
+                    self.assertEqual(updated.status_code, 200, updated.text)
+                    self.assertEqual(updated.json()["id"], review_id)
+                    self.assertEqual(updated.json()["scores"], [2, 3, 4])
+        self.assertEqual(len(self._mine()), 6)
+        summary = self.client.get("/peer-reviews/summary", params={"from_month": "2026-11", "to_month": "2026-11"})
+        self.assertEqual(summary.status_code, 200, summary.text)
+        self.assertTrue(all(row["avg"] == 3 and row["count"] == 1 for row in summary.json()))
+        self.assertEqual(self._put(self.director).status_code, 400)
+        self.assertEqual(self._put(self.outsider).status_code, 404)
+        with self.sessions() as db:
+            db.get(User, self.peer.id).is_active = False
+            db.get(User, self.staff.id).is_approved = False
+            db.commit()
+        for target in (self.peer, self.staff):
+            self.assertEqual(self._put(target).status_code, 404)
+        for review in self._mine():
+            self.assertEqual(self.client.delete(f"/peer-reviews/{review['id']}").status_code, 204)
+        self.assertEqual(self._mine(), [])
 
     def test_mine_is_private_and_delete_own_only(self):
         rid = self._put(self.peer).json()["id"]

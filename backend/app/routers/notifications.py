@@ -31,6 +31,8 @@ _eval_reminded: set[tuple[int, str]] = set()    # (user_id, "YYYY-MM") đã ch�
 
 
 def _ensure_eval_reminder(db: Session, user: User) -> None:
+    if user.role == UserRole.DIRECTOR:
+        return
     now = vn_now()
     if not evaluation_window_open(now):
         return

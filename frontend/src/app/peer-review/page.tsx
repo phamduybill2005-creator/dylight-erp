@@ -1,7 +1,7 @@
 "use client";
 
-// Tab "ĐÁNH GIÁ" — phiếu chấm ĐỒNG NGHIỆP theo tháng (mọi người TRỪ Giám đốc; Giám đốc được
-// chuyển sang /evaluations = Tổng hợp đánh giá). 2 phiếu theo mẫu của sếp, mỗi phiếu 3 tiêu chí 1–5:
+// Tab "ĐÁNH GIÁ" — phiếu chấm ĐỒNG NGHIỆP theo tháng; Giám đốc chấm mọi phòng ban.
+// 2 phiếu theo mẫu của sếp, mỗi phiếu 3 tiêu chí 1–5:
 //   - Chất lượng công việc: Sản phẩm đúng, ít lỗi / Nộp bài đúng hẹn / Phối hợp với mọi người.
 //   - Hòa đồng, tập thể   : Hòa đồng, thân thiện / Tham gia hoạt động tập thể / Tiếp thu góp ý.
 // Mỗi phiếu có Tháng · Phòng ban · Đồng nghiệp riêng; chọn người thì phòng ban tự theo người,
@@ -111,10 +111,9 @@ function useEvaluationClock() {
   return [now, setNow] as const;
 }
 
-/** Một phiếu. `ownDepts` (phiếu Chất lượng công việc) = phòng của NGƯỜI CHẤM: phòng ban khóa theo
- *  phòng mình, chỉ chấm đồng nghiệp cùng phòng; không truyền (phiếu Hòa đồng) thì chọn mọi phòng. */
-function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: Colleague[]; ownDepts?: string[] }) {
-  const lockedDepts = def.kind === "QUALITY" ? ownDepts ?? [] : null;
+/** Chất lượng công việc chấm cùng phòng; Giám đốc được chọn mọi phòng ở cả hai phiếu. */
+function ReviewForm({ def, colleagues, ownDepts, canReviewAll = false }: { def: FormDef; colleagues: Colleague[]; ownDepts?: string[]; canReviewAll?: boolean }) {
+  const lockedDepts = def.kind === "QUALITY" && !canReviewAll ? ownDepts ?? [] : null;
   const [now, setNow] = useEvaluationClock();
   const cycle = evaluationCycle(now);
   const requestedMonth = useSearchParams().get("month");
@@ -145,7 +144,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
 
   // Không ai chấm Giám đốc (backend cũng chặn) -> bỏ khỏi danh sách.
   const candidates = useMemo(() => colleagues.filter((c) => c.role !== "DIRECTOR"
-    && (def.kind === "TEAM" || deptsOf(c).some((d) => ownDepts?.includes(d)))), [colleagues, ownDepts, def.kind]);
+    && (def.kind === "TEAM" || canReviewAll || deptsOf(c).some((d) => ownDepts?.includes(d)))), [colleagues, ownDepts, def.kind, canReviewAll]);
   // Phòng ban: 4 phòng chuẩn + phòng khác (nếu có) đang gán cho đồng nghiệp.
   const deptOptions = useMemo(() => {
     if (lockedDepts) return lockedDepts;
@@ -200,7 +199,7 @@ function ReviewForm({ def, colleagues, ownDepts }: { def: FormDef; colleagues: C
     setPersonId(id);
     if (!c) return;
     const ds = deptsOf(c);
-    if (ds.length && !ds.includes(dept)) setDept(ds.find((d) => def.kind === "TEAM" || ownDepts?.includes(d)) ?? dept);
+    if (ds.length && !ds.includes(dept)) setDept(ds.find((d) => !lockedDepts || lockedDepts.includes(d)) ?? dept);
   }
 
   async function save() {
@@ -383,8 +382,6 @@ export default function PeerReviewPage() {
   useEffect(() => {
     api.me()
       .then((u) => {
-        // Giám đốc không chấm đồng nghiệp -> về Tổng hợp đánh giá.
-        if (u.role === "DIRECTOR") { router.replace("/evaluations"); return; }
         setUser(u);
         api.colleagues().then(setColleagues).catch(() => {});
       })
@@ -411,7 +408,7 @@ export default function PeerReviewPage() {
             <h1 className="text-base font-bold lg:text-xl">Đánh giá</h1>
             <p className="text-[11px] text-white/90">Đánh giá định kì tháng {cycle.monthLabel}</p>
             <p className="text-[11px] font-semibold text-white/90">Thời hạn: {cycle.startDate} – {cycle.deadline}</p>
-            <p className="text-[11px] text-white/70">Chấm đồng nghiệp theo tháng · thang 1–5 · phiếu không công khai với đồng nghiệp; Giám đốc / Quản trị có thể xem chi tiết · Chất lượng công việc chấm người cùng phòng, Hòa đồng chấm mọi phòng</p>
+            <p className="text-[11px] text-white/70">Chấm đồng nghiệp theo tháng · thang 1–5 · phiếu không công khai với đồng nghiệp; Giám đốc / Quản trị có thể xem chi tiết · {user.role === "DIRECTOR" ? "Giám đốc chấm tất cả phòng ban ở cả hai phiếu" : "Chất lượng công việc chấm người cùng phòng, Hòa đồng chấm mọi phòng"}</p>
           </div>
         </div>
       </header>
@@ -421,7 +418,7 @@ export default function PeerReviewPage() {
         {FORMS.map((f) => (
           <div key={f.kind} className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <Suspense fallback={<p className="p-4 text-xs text-muted">Đang tải phiếu đánh giá…</p>}>
-              <ReviewForm def={f} colleagues={colleagues} ownDepts={f.kind === "QUALITY" ? myDepts : undefined} />
+              <ReviewForm def={f} colleagues={colleagues} ownDepts={f.kind === "QUALITY" ? myDepts : undefined} canReviewAll={user.role === "DIRECTOR"} />
             </Suspense>
             <RubricCard def={f} />
           </div>

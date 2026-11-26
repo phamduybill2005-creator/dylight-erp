@@ -8,7 +8,8 @@ Chạy từ thư mục backend: python -m unittest tests.test_leave_notification
 """
 import os
 import unittest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from unittest.mock import Mock, patch
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["DEBUG"] = "true"
@@ -100,6 +101,48 @@ class LeaveNotificationTests(unittest.TestCase):
         return resp.json()["id"]
 
     # --------- Gửi đơn ---------
+
+    def test_start_more_than_three_days_ahead_is_rejected_without_side_effects(self):
+        from app.services.leave_zalo_service import get_leave_zalo_service
+
+        zalo = Mock()
+        zalo.send_request.return_value = {"status": "skipped"}
+        self.app.dependency_overrides[get_leave_zalo_service] = lambda: zalo
+        with patch("app.routers.leave.vn_now", return_value=datetime(2026, 11, 25, 10)):
+            for user in (self.staff, self.admin, self.director):
+                self.current = user
+                for kind in ("FULL", "MORNING", "AFTERNOON", "LATE_MORNING", "LATE_AFTERNOON"):
+                    with self.subTest(role=user.role, kind=kind):
+                        response = self.client.post("/leave", json={
+                            "from_date": "2026-11-29", "to_date": "2026-11-29",
+                            "leave_type": kind, "reason": "NGHỈ PHÉP",
+                        })
+                        self.assertEqual(response.status_code, 400, response.text)
+                        self.assertIn("3 ngày", response.json()["detail"])
+        with self.sessions() as db:
+            self.assertEqual(db.query(LeaveRequest).count(), 0)
+        self.assertEqual(self._notis(), [])
+        zalo.send_request.assert_not_called()
+
+    def test_exactly_three_days_ahead_accepts_new_reasons_and_longer_end_date(self):
+        self.ngay_nghi = date(2026, 11, 28)
+        with patch("app.routers.leave.vn_now", return_value=datetime(2026, 11, 25, 23, 59)):
+            for reason in ("NGHỈ PHÉP", "NGHỈ LỄ THEO QUY ĐỊNH"):
+                leave_id = self._gui_don(reason=reason, to_date=date(2026, 12, 2))
+                saved = self.client.get(f"/leave/{leave_id}").json()
+                self.assertEqual(saved["reason"], reason)
+                self.assertEqual(saved["to_date"], "2026-12-02")
+
+    def test_three_day_window_keeps_existing_19h_deadline(self):
+        self.ngay_nghi = date(2026, 11, 26)
+        with patch("app.routers.leave.vn_now", return_value=datetime(2026, 11, 25, 18, 59)):
+            self._gui_don(reason="NGHỈ PHÉP")
+        with patch("app.routers.leave.vn_now", return_value=datetime(2026, 11, 25, 19)):
+            response = self.client.post("/leave", json={
+                "from_date": "2026-11-26", "to_date": "2026-11-26", "reason": "NGHỈ PHÉP",
+            })
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("19h", response.json()["detail"])
 
     def test_new_leave_notifies_only_top_leadership(self):
         self.current = self.staff

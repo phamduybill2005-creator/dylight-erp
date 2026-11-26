@@ -44,6 +44,18 @@ class EvaluationWebReminderTests(unittest.TestCase):
         self.assertEqual(row.recipient_id, self.user.id)
         self.assertIsNone(row.sender_id)
 
+    def test_director_never_receives_personal_evaluation_reminders(self):
+        self.user.role = UserRole.DIRECTOR
+        self.db.commit()
+        for now in (datetime(2026, 11, 1, 8), datetime(2026, 11, 2, 8),
+                    datetime(2026, 11, 5, 23, 59), datetime(2026, 12, 1, 8)):
+            with self.subTest(now=now), patch.object(notifications, "vn_now", return_value=now), \
+                    patch.object(notifications, "publish") as publish:
+                self.assertEqual(notifications.my_notifications(db=self.db, current=self.user), [])
+                self.assertEqual(notifications.unread_count(db=self.db, current=self.user), {"count": 0})
+                publish.assert_not_called()
+        self.assertEqual(self.db.query(Notification).count(), 0)
+
     def test_window_includes_day_five_but_not_six_or_old_day_27(self):
         for now in (datetime(2026, 10, 31, 23), datetime(2026, 11, 1, 7, 59, 59),
                     datetime(2026, 11, 6), datetime(2026, 11, 27, 8)):

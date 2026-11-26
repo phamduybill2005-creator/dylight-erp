@@ -6,6 +6,7 @@ from app.services.peer_review_policy import normalized_departments
 
 
 def pending_evaluators(db: Session, company_id: int, month: str) -> list[User]:
+    # Directors may review everyone, but are exempt from incomplete-review reminders.
     people = db.query(User).filter(User.company_id == company_id, User.is_active.is_(True),
         User.is_approved.is_(True), User.role != UserRole.DIRECTOR).all()
     ballots = db.query(PeerReview).filter(PeerReview.company_id == company_id, PeerReview.month == month,

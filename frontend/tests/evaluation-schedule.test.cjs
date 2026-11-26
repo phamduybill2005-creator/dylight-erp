@@ -108,6 +108,8 @@ test("popup follows monthly calendar, opens correct ballot and dismissal lasts e
 function mountForm(search = "", options = {}) {
   const slots = [], effects = [], calls = [], writes = [], timers = new Map();
   const location = { search };
+  const currentUser = options.user || { id: 7, role: "FIELD_STAFF", department: "" };
+  const redirects = [];
   let instant = options.instant || "2026-11-01T01:00:00Z", nextTimer = 0;
   let cursor = 0, page = true;
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [instant])); } }
@@ -116,7 +118,7 @@ function mountForm(search = "", options = {}) {
   const react = { ...require("react"),
     useState(initial) {
       const i = cursor++;
-      if (page && i === 0) return [{ id: 7, role: "FIELD_STAFF", department: "" }, () => {}];
+      if (page && i === 0) return [currentUser, () => {}];
       if (!(i in slots)) slots[i] = { value: typeof initial === "function" ? initial() : initial, set: value => { slots[i].value = typeof value === "function" ? value(slots[i].value) : value; } };
       return [slots[i].value, slots[i].set];
     },
@@ -138,10 +140,10 @@ function mountForm(search = "", options = {}) {
     document: { addEventListener() {}, removeEventListener() {} },
     require: name => {
       if (name === "react") return react;
-      if (name === "next/navigation") return { useRouter: () => ({}), useSearchParams: () => new URLSearchParams(location.search) };
+      if (name === "next/navigation") return { useRouter: () => ({ replace: path => redirects.push(path), push: path => redirects.push(path) }), useSearchParams: () => new URLSearchParams(location.search) };
       if (name === "@/components/app-shell") return { __esModule: true, default: "main" };
       if (name === "@/lib/api") return { api: {
-        me: async () => ({ id: 7, role: "FIELD_STAFF", department: "" }),
+        me: async () => currentUser,
         colleagues: async () => options.colleagues || [],
         peerReviewsMine: async month => { calls.push(month); return options.load ? options.load(month) : options.ballots || []; },
         savePeerReview: async payload => { writes.push(["save", payload]); return options.save ? options.save(payload) : { ...payload, id: 12 }; },
@@ -160,11 +162,39 @@ function mountForm(search = "", options = {}) {
   const tree = module.exports.default();
   const form = nodes(tree).find(node => typeof node.type === "function" && node.type.name === "ReviewForm" && (!options.kind || node.props.def.kind === options.kind));
   if (!options.page) { page = false; slots.length = 0; effects.length = 0; }
-  return { calls, writes, timers, navigate: search => { location.search = search; }, advance: iso => { instant = iso; },
+  return { calls, writes, timers, redirects, navigate: search => { location.search = search; }, advance: iso => { instant = iso; },
     fireTimers() { const pending = [...timers.values()]; timers.clear(); pending.forEach(timer => timer.fn()); },
     render() { cursor = 0; const tree = options.page ? module.exports.default() : form.type({ ...form.props, ownDepts: options.ownDepts ?? ["AI"],
       colleagues: options.colleagues || [{ id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "AI" }] }); effects.splice(0).forEach(fn => fn()); return tree; } };
 }
+
+test("director can open the review page without being redirected", async () => {
+  const app = mountForm("", { page: true, user: { id: 7, role: "DIRECTOR", department: "" } });
+  app.render(); await new Promise(resolve => setImmediate(resolve));
+  const tree = app.render();
+  assert.deepEqual(app.redirects, []);
+  assert.ok(textOf(tree).includes("Giám đốc chấm tất cả phòng ban"));
+});
+
+test("director can select and submit both forms for staff across departments", async () => {
+  for (const kind of ["QUALITY", "TEAM"]) {
+    const app = mountForm("", { kind, user: { id: 7, role: "DIRECTOR", department: "" }, colleagues: [
+      { id: 8, full_name: "Peer", role: "FIELD_STAFF", department: "BIM" },
+      { id: 9, full_name: "Admin", role: "ADMIN", department: "AI" },
+      { id: 10, full_name: "Unassigned", role: "MANAGER", department: "" },
+      { id: 11, full_name: "Director", role: "DIRECTOR", department: "AI" },
+    ] });
+    renderForm(app); let tree = await settleForm(app);
+    const [departments, people] = nodes(tree).filter(node => node.type === "select");
+    assert.equal(departments.props.disabled, false);
+    assert.deepEqual(nodes(people).filter(node => node.type === "option").map(node => node.props.value), ["", 9, 8, 10]);
+    choosePeer(app);
+    await button(setScores(app, [5, 4, 3]), "Gửi đánh giá tháng 10/2026").props.onClick();
+    assert.equal(app.writes.length, 1);
+    assert.equal(app.writes[0][1].evaluatee_id, 8);
+    assert.equal(app.writes[0][1].kind, kind);
+  }
+});
 
 test("actual ballot defaults to previous month, honors reminder link and retains manual selection", () => {
   for (const [query, expected] of [["", "2026-10"], ["?month=2026-09", "2026-09"], ["?month=2027-01", "2026-10"]]) {

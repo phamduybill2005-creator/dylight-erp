@@ -18,6 +18,7 @@ import { LeaveWithdrawButton, canWithdrawLeave } from "@/components/leave-withdr
 import FilterBar, { NO_FILTERS, splitDepts, type Filters } from "@/components/filter-bar";
 import { api } from "@/lib/api";
 import { canDecideLinkedLeave, leaveLoginPath, linkedLeaveId } from "@/lib/leave-links";
+import { latestLeaveStartDate, validateLeaveStartDate } from "@/lib/leave-submission";
 import { isManagerUp, isDirector } from "@/lib/roles";
 import { formatDate, todayLocal } from "@/lib/format";
 import { lateArrivalLabel, validateArrivalTime } from "@/lib/attendance-reconciliation";
@@ -28,6 +29,7 @@ import type { LeaveRequest, LeaveStatus, User } from "@/lib/types";
 // lịch sinh viên có lý do bắt đầu bằng "Đi học" (viết thường). Đổi về "Đi học"
 // là đơn người dùng gửi sẽ biến mất khỏi danh sách.
 const LEAVE_REASONS = [
+  "NGHỈ PHÉP", "NGHỈ LỄ THEO QUY ĐỊNH",
   "GIỖ TẾT", "HIẾU SỰ", "HỶ SỰ", "ỐM ĐAU", "NGỦ QUÊN", "TẮC ĐƯỜNG",
   "HỎNG XE", "VỢ ĐẺ", "THIÊN TAI", "BIA RƯỢU", "ĐI HỌC", "YÊU ĐƯƠNG",
 ];
@@ -129,6 +131,8 @@ function LeaveContent() {
   const [deciding, setDeciding] = useState<number | null>(null);
   const [withdrawing, setWithdrawing] = useState<number | null>(null);
   const [requestFormOpen, setRequestFormOpen] = useState(false);
+  const latestStartDate = latestLeaveStartDate();
+  const startDateError = validateLeaveStartDate(fromDate);
 
   const loadLinkedLeave = useCallback(async () => {
     if (!requestId) return;
@@ -222,6 +226,11 @@ function LeaveContent() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!fromDate || !toDate || !reason) return;   // bắt buộc chọn 1 lý do
+    const dateError = validateLeaveStartDate(fromDate);
+    if (dateError) {
+      setSubmitError(dateError);
+      return;
+    }
     if (!validateArrivalTime(leaveCategory, allowedArrivalTime)) {
       setSubmitError("Vui lòng nhập giờ được phép đến muộn (HH:MM).");
       return;
@@ -425,7 +434,7 @@ function LeaveContent() {
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div>
             <label className="block text-[11px] font-semibold text-muted">Từ ngày *</label>
-            <input type="date" required value={fromDate} onChange={(e) => {
+            <input type="date" required max={latestStartDate} value={fromDate} onChange={(e) => {
               setFromDate(e.target.value);
               if (!toDate) setToDate(e.target.value);
             }}
@@ -480,17 +489,17 @@ function LeaveContent() {
           <input type="time" required value={allowedArrivalTime} onChange={e => setAllowedArrivalTime(e.target.value)} className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-steel sm:max-w-xs" />
           <span className="mt-1 block font-normal">Ghi giờ dự kiến đến để người duyệt xác nhận; đến quá giờ này vẫn được đối chiếu là muộn không phép.</span>
         </label>}
-        {submitError && (
-          <p className="mt-3 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[11px] font-semibold text-bad">
-            {submitError}
+        {(startDateError || submitError) && (
+          <p role="alert" className="mt-3 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[11px] font-semibold text-bad">
+            {startDateError || submitError}
           </p>
         )}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-[11px] text-muted">
             ⏰ Đơn phải gửi <b className="text-ink">trước 19h ngày hôm trước</b> ngày nghỉ — gửi sau
-            sẽ không được xét duyệt.
+            sẽ không được xét duyệt. Chỉ được gửi trước tối đa <b className="text-ink">3 ngày</b> tính theo ngày bắt đầu nghỉ.
           </p>
-          <button type="submit" disabled={saving || !fromDate || !toDate || !reason || !validateArrivalTime(leaveCategory, allowedArrivalTime)}
+          <button type="submit" disabled={saving || !fromDate || !toDate || !reason || !!startDateError || !validateArrivalTime(leaveCategory, allowedArrivalTime)}
             className="flex items-center gap-1.5 rounded-xl2 bg-ink px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
             <PaperAirplaneIcon className="h-4 w-4" /> {saving ? "Đang gửi…" : "Gửi đơn"}
           </button>

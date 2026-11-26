@@ -82,11 +82,9 @@ function deskNav(user: User | null): NavLink[] {
     { href: "/attendance-machine", label: "Máy chấm công", icon: FingerPrintIcon },
     { href: "/leave", label: "Nghỉ phép", icon: CalendarDaysIcon },
   );
-  // "Đánh giá" = phiếu chấm đồng nghiệp: mọi người TRỪ Giám đốc.
+  // "Đánh giá" = phiếu chấm đồng nghiệp; Giám đốc chấm mọi phòng ban.
   // "Tổng hợp đánh giá" = bảng tháng (Office/P time, muộn, nghỉ, %): CHỈ Giám đốc + Quản trị.
-  if (user?.role !== "DIRECTOR") {
-    items.push({ href: "/peer-review", label: "Đánh giá", icon: StarIcon });
-  }
+  items.push({ href: "/peer-review", label: "Đánh giá", icon: StarIcon });
   if (tier === "DIRECTOR") {
     items.push({ href: "/evaluations", label: "Tổng hợp đánh giá", icon: ClipboardDocumentCheckIcon });
   }

@@ -40,7 +40,7 @@ class PeerReviewDeadlineTests(unittest.TestCase):
             self.assertEqual(row.updated_at.isoformat(), ballot["updated_at"])
 
     def test_admin_and_managers_have_no_deadline_bypass(self):
-        for person in (self.staff, self.admin, self.peer):
+        for person in (self.staff, self.admin, self.peer, self.director):
             self.current = person
             for now in (datetime(2026, 11, 6), datetime(2026, 11, 27, 8), datetime(2026, 11, 30, 23, 59)):
                 with self.subTest(person=person.id, now=now), patch("app.routers.peer_reviews.vn_now", return_value=now):
